@@ -9,6 +9,16 @@ readme = "README.md"
 keywords = ["oobe", "ultramarine", "linux"]
 
 [dependencies]
+color-eyre = "0.6.3"
+gettext-rs = "0.7.2"
+libhelium = "0.9.0"
+paste = "1.0.15"
+relm4 = "0.9.1"
+tempfile = "3.13.0"
+tracing = "0.1.40"
+tracing-appender = "0.2.3"
+tracing-journald = "0.3.0"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [lints.clippy]
 # cargo = { level = "warn", priority = -1 }
