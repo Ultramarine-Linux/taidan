@@ -6,8 +6,6 @@ pub mod prelude;
 
 use crate::prelude::*;
 use gtk::glib::translate::FromGlibPtrNone;
-// use install::{InstallationState, InstallationType};
-// use pages::installation::InstallationPageMsg;
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, RelmApp, SharedState,
     SimpleComponent,
@@ -28,6 +26,24 @@ macro_rules! generate_pages {
         pub enum $Page {
             #[default]
             $([< $page:camel >]),+
+        }
+
+        impl TryFrom<usize> for $Page {
+            type Error = ();
+
+            fn try_from(value: usize) -> Result<Self, Self::Error> {
+                Ok(match value {
+                    $( $num => Self::[<$page:camel>], )+
+                    _ => return Err(()),
+                })
+            }
+        }
+        impl From<$Page> for usize {
+            fn from(val: $Page) -> Self {
+                match val {
+                    $( $Page::[<$page:camel>] => $num, )+
+                }
+            }
         }
 
         struct $AppModel {
@@ -58,6 +74,7 @@ macro_rules! generate_pages {
 
 generate_pages!(Page AppModel AppMsg:
     00: Welcome,
+    01: WhoAreYou,
 );
 
 #[derive(Debug)]
@@ -84,17 +101,22 @@ impl SimpleComponent for AppModel {
     view! {
         libhelium::ApplicationWindow {
             set_title: Some(&gettext("Welcome to %s").replace("%s", &CONFIG.read().distro)),
-            set_default_width: 550,
+            set_default_width: 700,
             set_default_height: 600,
             set_vexpand: true,
+            set_align: gtk::Align::Fill,
 
             #[wrap(Some)]
             set_child = &gtk::Box {
                 set_vexpand: true,
+                set_align: gtk::Align::Fill,
                 set_orientation: gtk::Orientation::Vertical,
+
                 #[transition = "SlideLeftRight"]
+                #[name = "stack"]
                 match model.page {
                     Page::Welcome => *model.welcome_page.widget(),
+                    Page::WhoAreYou => *model.who_are_you_page.widget(),
                 }
             }
         }
@@ -114,14 +136,27 @@ impl SimpleComponent for AppModel {
 
         let widgets = view_output!();
 
+        widgets.stack.set_vexpand(true);
+
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: Self::Input, _sender: ComponentSender<Self>) {
-        match msg {
+    fn update(&mut self, message: Self::Input, _sender: ComponentSender<Self>) {
+        match message {
             AppMsg::Nav(NavAction::GoTo(page)) => self.page = page,
             AppMsg::Nav(NavAction::Quit) => std::process::exit(0),
-            _ => todo!(),
+            AppMsg::Nav(NavAction::Next) => {
+                self.page = usize::from(self.page)
+                    .wrapping_add(1)
+                    .try_into()
+                    .expect("No next page!");
+            }
+            AppMsg::Nav(NavAction::Back) => {
+                self.page = usize::from(self.page)
+                    .wrapping_sub(1)
+                    .try_into()
+                    .expect("No prev page!");
+            }
         }
     }
 }
@@ -130,6 +165,7 @@ impl SimpleComponent for AppModel {
 #[allow(clippy::missing_panics_doc)]
 fn main() -> std::io::Result<()> {
     let _guard = setup_logs_and_install_panic_hook();
+    CONFIG.write().populate();
 
     gettextrs::textdomain(APPID)?;
     gettextrs::bind_textdomain_codeset(APPID, "UTF-8")?;

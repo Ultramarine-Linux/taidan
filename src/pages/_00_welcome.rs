@@ -1,14 +1,10 @@
 use crate::prelude::*;
 use relm4::{ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent};
 
-pub struct WelcomePage {
-    lbl0: gtk::Label,
-    lbl1: gtk::Label,
-}
+pub struct WelcomePage;
 
 #[derive(Debug)]
 pub enum WelcomePageMsg {
-    #[doc(hidden)]
     Nav(NavAction),
 }
 
@@ -29,6 +25,7 @@ impl SimpleComponent for WelcomePage {
                 set_orientation: gtk::Orientation::Vertical,
                 set_spacing: 4,
                 set_margin_all: 16,
+                set_vexpand: true,
 
                 gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
@@ -42,31 +39,33 @@ impl SimpleComponent for WelcomePage {
                         inline_css: "-gtk-icon-size: 128px",
                     },
 
-                    #[local_ref]
-                    lbl0 -> gtk::Label {
-                        #[watch]
+                    gtk::Label {
                         set_label: &gettext("Welcome to %s").replace("%s", &CONFIG.read().distro),
                         inline_css: "font-weight: bold; font-size: 1.75rem",
                     },
 
-                    #[local_ref]
-                    lbl1 -> gtk::Label {
-                        #[watch]
+                    gtk::Label {
                         set_label: &gettext("Let's get your system ready."),
-                        set_justify: gtk::Justification::Center,
-                        set_max_width_chars: 60,
-                        set_wrap: true,
+                        inline_css: "font-size: 1.25rem",
                     },
                 },
 
-                libhelium::Button {
-                    set_is_pill: true,
-                    #[watch]
-                    set_label: &gettext("Install"),
-                    inline_css: "padding-left: 48px; padding-right: 48px",
-                    add_css_class: "suggested-action",
-                    connect_clicked => WelcomePageMsg::Nav(NavAction::Next),
-                },
+                gtk::Box {
+                    set_valign: gtk::Align::End,
+                    set_halign: gtk::Align::Center,
+                    set_hexpand: true,
+                    set_orientation: gtk::Orientation::Horizontal,
+
+                    libhelium::Button {
+                        set_is_pill: true,
+                        set_valign: gtk::Align::End,
+                        set_halign: gtk::Align::Center,
+                        set_label: &gettext("Let's Go"),
+                        inline_css: "padding-left: 48px; padding-right: 48px",
+                        add_css_class: "suggested-action",
+                        connect_clicked => Self::Input::Nav(NavAction::Next),
+                    },
+                }
             },
         },
     }
@@ -76,11 +75,7 @@ impl SimpleComponent for WelcomePage {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let lbl0 = gtk::Label::new(None);
-        let lbl1 = gtk::Label::new(None);
-        let model = Self { lbl0, lbl1 };
-        let lbl0 = &model.lbl0;
-        let lbl1 = &model.lbl1;
+        let model = Self {};
         let widgets = view_output!();
 
         ComponentParts { model, widgets }
@@ -88,8 +83,8 @@ impl SimpleComponent for WelcomePage {
 
     fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>) {
         match message {
-            WelcomePageMsg::Nav(action) => {
-                sender.output(WelcomePageOutput::Nav(action)).unwrap();
+            Self::Input::Nav(action) => {
+                sender.output(Self::Output::Nav(action)).unwrap();
             }
         }
     }
