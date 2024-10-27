@@ -1,0 +1,10 @@
+[package]
+name = "taidan"
+version = "0.1.0"
+edition = "2021"
+description = "Out-Of-Box-Experience (OOBE) and Welcome App"
+license = "MIT"
+repository = "https://github.com/Ultramarine-Linux/taidan"
+readme = "README.md"
+
+[dependencies]
