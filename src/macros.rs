@@ -57,8 +57,11 @@ macro_rules! generate_pages {
 
 #[macro_export]
 macro_rules! generate_page {
-    ($page:ident $($model:block)?:
-        update(self, $message:ident, $sender:ident) {
+    ($page:ident $({$($model:tt)+})?:
+        $(
+        init($root:ident, $initsender:ident) $initblock:block
+        )?
+        update($self:ident, $message:ident, $sender:ident) {
             $( $msg:ident$(($($param:ident: $paramtype:ty),+$(,)?))? => $msghdl:expr ),*$(,)?
         }
         => {$( $out:pat ),*}
@@ -68,7 +71,7 @@ macro_rules! generate_page {
         use relm4::{ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent};
 
         ::paste::paste! {
-            $crate::generate_page!{ @model $page $($model)? }
+            $crate::generate_page!{ @model $page $($($model)+)? }
 
             #[derive(Debug)]
             pub enum [<$page PageMsg>] {
@@ -107,13 +110,13 @@ macro_rules! generate_page {
                     root: Self::Root,
                     $sender: ComponentSender<Self>,
                 ) -> ComponentParts<Self> {
-                    let model = Self {};
+                    let model = Self::default();
                     let widgets = view_output!();
 
                     ComponentParts { model, widgets }
                 }
 
-                fn update(&mut self, $message: Self::Input, $sender: ComponentSender<Self>) {
+                fn update(&mut $self, $message: Self::Input, $sender: ComponentSender<Self>) {
                     match $message {
                         Self::Input::Nav(action) => {
                             $sender.output(Self::Output::Nav(action)).unwrap();
@@ -124,8 +127,31 @@ macro_rules! generate_page {
             }
         }
     };
-    (@model $page:ident $model:block) => {paste::paste! {
-        pub struct [<$page Page>] $model
+    (@model $page:ident $($model:tt)+) => {paste::paste! {
+        #[derive(Debug, Default)]
+        pub struct [<$page Page>] {$($model)+}
     }};
-    (@model $page:ident) => {paste::paste! { pub struct [<$page Page>]; }};
+    (@model $page:ident) => {paste::paste! {
+        #[derive(Debug, Default)]
+        pub struct [<$page Page>];
+    }};
+    (@init $sender:ident) => {
+        fn init(
+            _init: Self::Init,
+            root: Self::Root,
+            $sender: ComponentSender<Self>,
+        ) -> ComponentParts<Self> {
+            let model = Self::default();
+            let widgets = view_output!();
+
+            ComponentParts { model, widgets }
+        }
+    };
+    (@init $sender:ident $root:ident $initsender:ident $initblock:block) => {
+        fn init(
+            _init: Self::Init,
+            $root: Self::Root,
+            $initsender: ComponentSender<Self>,
+        ) -> ComponentParts<Self> $initblock
+    };
 }
