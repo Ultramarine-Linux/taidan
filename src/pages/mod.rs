@@ -6,3 +6,4 @@
 #![allow(clippy::semicolon_outside_block)] // bug from relm4 component macro
 pub mod _00_welcome;
 pub mod _01_whoareyou;
+pub mod _02_password;

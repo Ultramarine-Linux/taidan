@@ -21,6 +21,7 @@ pub static CONFIG: SharedState<cfg::Config> = SharedState::new();
 generate_pages!(Page AppModel AppMsg:
     00: Welcome,
     01: WhoAreYou,
+    02: Password,
 );
 
 #[derive(Debug)]
@@ -63,6 +64,7 @@ impl SimpleComponent for AppModel {
                 match model.page {
                     Page::Welcome => *model.welcome_page.widget(),
                     Page::WhoAreYou => *model.who_are_you_page.widget(),
+                    Page::Password => *model.password_page.widget(),
                 }
             }
         }
