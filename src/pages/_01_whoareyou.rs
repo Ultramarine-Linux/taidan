@@ -19,7 +19,6 @@ crate::generate_page!(WhoAreYou:
         },
 
         gtk::Label {
-            #[watch]
             set_label: &gettext("Who are You?"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -47,26 +46,12 @@ crate::generate_page!(WhoAreYou:
         },
     },
 
-    gtk::Box {
-        set_valign: gtk::Align::End,
-
-        libhelium::Button {
-            set_is_pill: true,
-            #[watch]
-            set_label: &gettext("Previous"),
-            inline_css: "padding-left: 48px; padding-right: 48px",
+    #[template] crate::ui::PrevNextBtns {
+        #[template_child] prev {
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
-
-        gtk::Box { set_hexpand: true },
-
-        libhelium::Button {
-            set_is_pill: true,
-            #[watch]
-            set_label: &gettext("Next"),
-            inline_css: "padding-left: 48px; padding-right: 48px",
-            add_css_class: "suggested-action",
+        #[template_child] next {
             connect_clicked => Self::Input::Nav(NavAction::Next),
         },
-    },
+    }
 );

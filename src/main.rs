@@ -4,6 +4,7 @@ pub mod cfg;
 pub mod macros;
 pub mod pages;
 pub mod prelude;
+pub mod ui;
 
 use crate::prelude::*;
 use gtk::glib::translate::FromGlibPtrNone;
