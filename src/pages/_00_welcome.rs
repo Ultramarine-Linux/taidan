@@ -41,7 +41,8 @@ impl SimpleComponent for WelcomePage {
 
                     gtk::Label {
                         set_label: &gettext("Welcome to %s").replace("%s", &CONFIG.read().distro),
-                        inline_css: "font-weight: bold; font-size: 1.75rem",
+                        add_css_class: "view-title",
+                        inline_css: "font-weight: bold",
                     },
 
                     gtk::Label {

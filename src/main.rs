@@ -101,8 +101,8 @@ impl SimpleComponent for AppModel {
     view! {
         libhelium::ApplicationWindow {
             set_title: Some(&gettext("Welcome to %s").replace("%s", &CONFIG.read().distro)),
-            set_default_width: 700,
-            set_default_height: 600,
+            set_default_width: 600,
+            set_default_height: 500,
             set_vexpand: true,
             set_align: gtk::Align::Fill,
 

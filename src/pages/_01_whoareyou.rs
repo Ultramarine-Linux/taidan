@@ -39,13 +39,14 @@ impl SimpleComponent for WhoAreYouPage {
 
                     gtk::Image {
                         set_icon_name: Some("meeting-attending"),
-                        inline_css: "-gtk-icon-size: 128px",
+                        inline_css: "-gtk-icon-size: 64px",
                     },
 
                     gtk::Label {
                         #[watch]
                         set_label: &gettext("Who are You?"),
-                        inline_css: "font-weight: bold; font-size: 1.5rem",
+                        add_css_class: "view-subtitle",
+                        inline_css: "font-weight: bold",
                     },
 
                     libhelium::TextField {
