@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 pub mod cfg;
+pub mod macros;
 pub mod pages;
 pub mod prelude;
 
@@ -15,62 +16,6 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 const APPID: &str = "com.fyralabs.Readymade";
 
 pub static CONFIG: SharedState<cfg::Config> = SharedState::new();
-
-macro_rules! generate_pages {
-    ($Page:ident $AppModel:ident $AppMsg:ident: $($num:tt: $page:ident $($forward:expr)?),+$(,)?) => {paste::paste! {
-        use pages::{$([<_$num _$page:lower>]::[<$page:camel Page>]),+};
-        use pages::{$([<_$num _$page:lower>]::[<$page:camel PageOutput>]),+};
-
-
-        #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
-        pub enum $Page {
-            #[default]
-            $([< $page:camel >]),+
-        }
-
-        impl TryFrom<usize> for $Page {
-            type Error = ();
-
-            fn try_from(value: usize) -> Result<Self, Self::Error> {
-                Ok(match value {
-                    $( $num => Self::[<$page:camel>], )+
-                    _ => return Err(()),
-                })
-            }
-        }
-        impl From<$Page> for usize {
-            fn from(val: $Page) -> Self {
-                match val {
-                    $( $Page::[<$page:camel>] => $num, )+
-                }
-            }
-        }
-
-        struct $AppModel {
-            page: $Page,
-            $(
-                [<$page:snake _page>]: relm4::Controller<[<$page:camel Page>]>,
-            )+
-        }
-
-        impl $AppModel {
-            fn _default(sender: ComponentSender<Self>) -> Self {Self {
-                page: $Page::default(),
-                $(
-                    [<$page:snake _page>]: [<$page:camel Page>]::builder()
-                        .launch(())
-                        .forward(sender.input_sender(), generate_pages!(@$page $AppMsg $($forward)?)),
-                )+
-            }}
-        }
-    }};
-    (@$page:ident $AppMsg:ident) => {paste::paste! {
-        |msg| match msg {
-            [<$page:camel PageOutput>]::Nav(action) => $AppMsg::Nav(action),
-        }
-    }};
-    (@$page:ident $AppMsg:ident $forward:expr) => { $forward };
-}
 
 generate_pages!(Page AppModel AppMsg:
     00: Welcome,
