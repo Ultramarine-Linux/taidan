@@ -11,3 +11,4 @@ pub mod _03_internet;
 pub mod _04_analytics;
 pub mod _05_crashreport;
 pub mod _06_location;
+pub mod _07_nightlight;

@@ -26,6 +26,7 @@ generate_pages!(Page AppModel AppMsg:
     04: Analytics,
     05: CrashReport,
     06: Location,
+    07: NightLight,
 );
 
 #[derive(Debug)]
@@ -73,6 +74,7 @@ impl SimpleComponent for AppModel {
                     Page::Analytics => *model.analytics_page.widget(),
                     Page::CrashReport => *model.crash_report_page.widget(),
                     Page::Location => *model.location_page.widget(),
+                    Page::NightLight => *model.night_light_page.widget(),
                 }
             }
         }
