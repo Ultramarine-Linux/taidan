@@ -111,9 +111,12 @@ macro_rules! generate_page {
                     $sender: ComponentSender<Self>,
                 ) -> ComponentParts<Self> {
                     let model = Self::default();
-                    let widgets = view_output!();
+                    // HACK: invoking view_output!() directly gives `()` when $init* is given.
+                    // I don't know why this fixes the issue. — mado
+                    let widgets = [<view _output>]!();
 
                     $(
+                        // HACK: this solves variable name obfuscation in macro_rules! {}
                         let $initmodel = model;
                         let $initwidgets = widgets;
 
