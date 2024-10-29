@@ -60,7 +60,7 @@ macro_rules! generate_pages {
 macro_rules! generate_page {
     ($page:ident $({$($model:tt)+})?:
         $(
-        init($root:ident, $initsender:ident, $initmodel:ident, $initwidgets:ident) $initblock:block
+        init$([$($local_ref:ident)+])?($root:ident, $initsender:ident, $initmodel:ident, $initwidgets:ident) $initblock:block
         )?
         update($self:ident, $message:ident, $sender:ident) {
             $( $msg:ident$(($($param:ident: $paramtype:ty),+$(,)?))? => $msghdl:expr ),*$(,)?
@@ -111,6 +111,9 @@ macro_rules! generate_page {
                     $sender: ComponentSender<Self>,
                 ) -> ComponentParts<Self> {
                     let model = Self::default();
+
+                    $($($(let $local_ref = &model.$local_ref;)+)?)?
+
                     // HACK: invoking view_output!() directly gives `()` when $init* is given.
                     // I don't know why this fixes the issue. — mado
                     let widgets = [<view _output>]!();
