@@ -22,7 +22,10 @@ generate_pages!(Page AppModel AppMsg:
     00: Welcome,
     01: WhoAreYou,
     02: Password,
-    03: Analytics,
+    03: Internet,
+    04: Analytics,
+    05: CrashReport,
+    06: Location,
 );
 
 #[derive(Debug)]
@@ -66,7 +69,10 @@ impl SimpleComponent for AppModel {
                     Page::Welcome => *model.welcome_page.widget(),
                     Page::WhoAreYou => *model.who_are_you_page.widget(),
                     Page::Password => *model.password_page.widget(),
+                    Page::Internet => *model.internet_page.widget(),
                     Page::Analytics => *model.analytics_page.widget(),
+                    Page::CrashReport => *model.crash_report_page.widget(),
+                    Page::Location => *model.location_page.widget(),
                 }
             }
         }
@@ -93,8 +99,8 @@ impl SimpleComponent for AppModel {
 
     fn update(&mut self, message: Self::Input, _sender: ComponentSender<Self>) {
         match message {
-            AppMsg::Nav(NavAction::GoTo(Page::Analytics)) => {
-                self.page = 4.try_into().expect("No page 4!");
+            AppMsg::Nav(NavAction::Next) if self.page == Page::Internet => {
+                self.page = 6.try_into().expect("No page 6!");
             }
             AppMsg::Nav(NavAction::GoTo(page)) => self.page = page,
             AppMsg::Nav(NavAction::Quit) => std::process::exit(0),

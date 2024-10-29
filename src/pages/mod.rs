@@ -7,4 +7,7 @@
 pub mod _00_welcome;
 pub mod _01_whoareyou;
 pub mod _02_password;
-pub mod _03_analytics;
+pub mod _03_internet;
+pub mod _04_analytics;
+pub mod _05_crashreport;
+pub mod _06_location;
