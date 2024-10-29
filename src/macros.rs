@@ -110,7 +110,8 @@ macro_rules! generate_page {
                     root: Self::Root,
                     $sender: ComponentSender<Self>,
                 ) -> ComponentParts<Self> {
-                    let model = Self::default();
+                    #[allow(unused_mut)]
+                    let mut model = Self::default();
 
                     $($($(let $local_ref = &model.$local_ref;)+)?)?
 
@@ -119,8 +120,9 @@ macro_rules! generate_page {
                     let widgets = [<view _output>]!();
 
                     $(
+                        #[allow(unused_mut)]
                         // HACK: this solves variable name obfuscation in macro_rules! {}
-                        let $initmodel = model;
+                        let mut $initmodel = model;
                         let $initwidgets = widgets;
 
                         $initblock

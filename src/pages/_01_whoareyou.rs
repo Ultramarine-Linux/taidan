@@ -2,6 +2,7 @@ crate::generate_page!(WhoAreYou {
     pub name: String,
     pub user: String,
     lbl_error: gtk::Label,
+    btn_next: libhelium::Button,
 }:
     init[lbl_error](root, sender, model, widgets) {
         let s1 = sender.clone();
@@ -17,7 +18,7 @@ crate::generate_page!(WhoAreYou {
             }
         });
 
-        tracing::trace!(?model, ?widgets);
+        model.btn_next = widgets.prev_next_btns.next.clone();
     }
     update(self, message, sender) {
         NotifyFullName(name: String) => {
@@ -28,9 +29,11 @@ crate::generate_page!(WhoAreYou {
             tracing::trace!(?user, "Username Input");
             self.user = user;
             self.lbl_error.set_visible(false);
+            self.btn_next.set_sensitive(!self.name.is_empty());
         },
         InvalidUsername => {
             self.lbl_error.set_visible(true);
+            self.btn_next.set_sensitive(false);
         }
     } => {}
 
@@ -82,11 +85,13 @@ crate::generate_page!(WhoAreYou {
         }
     },
 
+    #[name(prev_next_btns)]
     #[template] crate::ui::PrevNextBtns {
         #[template_child] prev {
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
+            set_sensitive: false,
             connect_clicked => Self::Input::Nav(NavAction::Next),
         },
     }
