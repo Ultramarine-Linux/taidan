@@ -7,3 +7,5 @@ on:
 jobs:
   rust:
     uses: FyraLabs/actions/.github/workflows/rust.yml@main
+    with:
+      test-container: '{"image": "ghcr.io/tau-os/builder:main"}'
