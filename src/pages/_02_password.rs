@@ -1,16 +1,9 @@
 crate::generate_page!(Password {
     pub passwd: String,
+    btn_next: libhelium::Button,
 }:
     init(root, sender, model, widgets) {
-        let s1 = sender.clone();
-        widgets.tf_passwd.internal_entry().connect_changed(move |en| {
-            s1.input(Self::Input::NotifyPasswd(en.text().to_string()));
-        });
-
-        let s2 = sender.clone();
-        widgets.tf_repeat.internal_entry().connect_changed(move |en| {
-            s2.input(Self::Input::NotifyRepeat(en.text().to_string()));
-        });
+        model.btn_next = widgets.prev_next_btns.next.clone();
     }
     update(self, message, sender) {
         NotifyPasswd(pass: String) => {
@@ -18,7 +11,7 @@ crate::generate_page!(Password {
             self.passwd = pass;
         },
         NotifyRepeat(pass: String) => {
-            todo!()
+            self.btn_next.set_sensitive(self.passwd == pass && !pass.is_empty());
         },
     } => {}
 
@@ -43,22 +36,25 @@ crate::generate_page!(Password {
         },
 
         #[name = "tf_passwd"]
-        libhelium::TextField {
+        gtk::PasswordEntry {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
-            set_support_text: Some(&gettext("Password")),
-            set_is_outline: true,
+            set_show_peek_icon: true,
+            set_placeholder_text: Some(&gettext("Password")),
+            connect_changed[sender] => move |en| sender.input(Self::Input::NotifyPasswd(en.text().to_string())),
         },
 
         #[name = "tf_repeat"]
-        libhelium::TextField {
+        gtk::PasswordEntry {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
-            set_support_text: Some(&gettext("Repeat Password")),
-            set_is_outline: true,
+            set_show_peek_icon: true,
+            set_placeholder_text: Some(&gettext("Repeat Password")),
+            connect_changed[sender] => move |en| sender.input(Self::Input::NotifyRepeat(en.text().to_string())),
         },
     },
 
+    #[name(prev_next_btns)]
     #[template] crate::ui::PrevNextBtns {
         #[template_child] prev {
             connect_clicked => Self::Input::Nav(NavAction::Back),
