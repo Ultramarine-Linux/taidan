@@ -58,7 +58,7 @@ crate::generate_page!(WhoAreYou {
         libhelium::TextField {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
-            set_support_text: Some(&gettext("Full Name")),
+            set_placeholder_text: Some(&gettext("Full Name")),
             set_is_outline: true,
         },
 
@@ -66,7 +66,7 @@ crate::generate_page!(WhoAreYou {
         libhelium::TextField {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
-            set_support_text: Some(&gettext("Username")),
+            set_placeholder_text: Some(&gettext("Username")),
             set_is_outline: true,
             set_needs_validation: true,
             set_regex: &libhelium::glib::Regex::new(r"^[a-z][-a-z0-9_]*\$?$", gtk::glib::RegexCompileFlags::DEFAULT, gtk::glib::RegexMatchFlags::DEFAULT).unwrap().unwrap(),
