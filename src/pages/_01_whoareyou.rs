@@ -38,7 +38,7 @@ crate::generate_page!(WhoAreYou {
         set_halign: gtk::Align::Fill,
 
         gtk::Image {
-            set_icon_name: Some("meeting-attending"),
+            set_icon_name: Some("people-symbolic"),
             inline_css: "-gtk-icon-size: 64px",
         },
 
