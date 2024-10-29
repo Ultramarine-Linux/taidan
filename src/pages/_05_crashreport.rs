@@ -34,16 +34,16 @@ crate::generate_page!(CrashReport {
             set_label: &gettext("All data collected is anonymous and end-to-end encrypted.\nYou will be given a crash ID to help support find what went wrong."),
         },
 
-        // FIXME:
-        // libhelium::MiniContentBlock {
-        //     set_title: &gettext("Send Crash Data"),
-        //     set_subtitle: &gettext("Press next to keep off"),
-        //
-        //     set_primary_button = &libhelium::Switch {
-        //         connect_left_icon_notify => Self::Input::On,
-        //         connect_right_icon_notify => Self::Input::Off,
-        //     }
-        // }
+        libhelium::MiniContentBlock {
+            set_title: &gettext("Send Crash Data"),
+            set_subtitle: &gettext("Press next to keep off"),
+
+            #[wrap(Some)]
+            set_widget = &libhelium::Switch {
+                connect_left_icon_notify => Self::Input::On,
+                connect_right_icon_notify => Self::Input::Off,
+            }
+        }
     },
 
     #[template] crate::ui::PrevNextBtns {

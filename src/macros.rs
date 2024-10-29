@@ -29,6 +29,7 @@ macro_rules! generate_pages {
             }
         }
 
+        #[derive(Debug)]
         struct $AppModel {
             page: $Page,
             $(
@@ -59,7 +60,7 @@ macro_rules! generate_pages {
 macro_rules! generate_page {
     ($page:ident $({$($model:tt)+})?:
         $(
-        init($root:ident, $initsender:ident) $initblock:block
+        init($root:ident, $initsender:ident, $initmodel:ident, $initwidgets:ident) $initblock:block
         )?
         update($self:ident, $message:ident, $sender:ident) {
             $( $msg:ident$(($($param:ident: $paramtype:ty),+$(,)?))? => $msghdl:expr ),*$(,)?
@@ -104,7 +105,6 @@ macro_rules! generate_page {
                     }
                 }
 
-
                 fn init(
                     _init: Self::Init,
                     root: Self::Root,
@@ -113,10 +113,21 @@ macro_rules! generate_page {
                     let model = Self::default();
                     let widgets = view_output!();
 
+                    $(
+                        let $initmodel = model;
+                        let $initwidgets = widgets;
+
+                        $initblock
+
+                        let model = $initmodel;
+                        let widgets = $initwidgets;
+                    )?
+
                     ComponentParts { model, widgets }
                 }
 
                 fn update(&mut $self, $message: Self::Input, $sender: ComponentSender<Self>) {
+                    tracing::trace!(?$message, "{}", const_format::concatcp!(stringify!($page), "Page: received message"));
                     match $message {
                         Self::Input::Nav(action) => {
                             $sender.output(Self::Output::Nav(action)).unwrap();
@@ -135,23 +146,4 @@ macro_rules! generate_page {
         #[derive(Debug, Default)]
         pub struct [<$page Page>];
     }};
-    (@init $sender:ident) => {
-        fn init(
-            _init: Self::Init,
-            root: Self::Root,
-            $sender: ComponentSender<Self>,
-        ) -> ComponentParts<Self> {
-            let model = Self::default();
-            let widgets = view_output!();
-
-            ComponentParts { model, widgets }
-        }
-    };
-    (@init $sender:ident $root:ident $initsender:ident $initblock:block) => {
-        fn init(
-            _init: Self::Init,
-            $root: Self::Root,
-            $initsender: ComponentSender<Self>,
-        ) -> ComponentParts<Self> $initblock
-    };
 }

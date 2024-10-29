@@ -2,9 +2,7 @@ crate::generate_page!(WhoAreYou {
     pub name: String,
     pub user: String,
 }:
-    init(root, sender) {
-        let model = Self::default();
-        let widgets = view_output!();
+    init(root, sender, model, widgets) {
         let s1 = sender.clone();
         widgets.tf_fullname.internal_entry().connect_changed(move |en| {
             s1.input(Self::Input::NotifyFullName(en.text().to_string()));
@@ -15,7 +13,7 @@ crate::generate_page!(WhoAreYou {
             s2.input(Self::Input::NotifyUsername(en.text().to_string()));
         });
 
-        ComponentParts { model, widgets }
+        tracing::trace!(?model, ?widgets);
     }
     update(self, message, sender) {
         NotifyFullName(name: String) => {

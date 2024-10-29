@@ -1,20 +1,16 @@
 crate::generate_page!(Password {
     pub passwd: String,
 }:
-    init(root, sender) {
-        let model = Self::default();
-        let widgets = view_output!();
+    init(root, sender, model, widgets) {
         let s1 = sender.clone();
         widgets.tf_passwd.internal_entry().connect_changed(move |en| {
-            s1.input(Self::Input::NotifyFullName(en.text().to_string()));
+            s1.input(Self::Input::NotifyPasswd(en.text().to_string()));
         });
 
         let s2 = sender.clone();
         widgets.tf_repeat.internal_entry().connect_changed(move |en| {
-            s2.input(Self::Input::NotifyUsername(en.text().to_string()));
+            s2.input(Self::Input::NotifyRepeat(en.text().to_string()));
         });
-
-        ComponentParts { model, widgets }
     }
     update(self, message, sender) {
         NotifyPasswd(pass: String) => {

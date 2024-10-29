@@ -1,5 +1,16 @@
-crate::generate_page!(Location:
-    update(self, message, sender) {} => {}
+crate::generate_page!(Location {
+    pub service: bool,
+}:
+    update(self, message, sender) {
+        On => {
+            tracing::trace!("location service on");
+            self.service = true;
+        },
+        Off => {
+            tracing::trace!("location service off");
+            self.service = false;
+        },
+    } => {}
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
@@ -26,7 +37,16 @@ crate::generate_page!(Location:
             set_label: &gettext("Allow apps to request your approximate location with [Mozilla Location Services]"),
         },
 
-        // TODO: "Location Services" switch
+        libhelium::MiniContentBlock {
+            set_title: &gettext("Location Services"),
+
+            #[wrap(Some)]
+            #[name = "switch"]
+            set_widget = &libhelium::Switch {
+                connect_left_icon_notify => Self::Input::On,
+                connect_right_icon_notify => Self::Input::Off,
+            }
+        }
     },
 
     #[template] crate::ui::PrevNextBtns {
