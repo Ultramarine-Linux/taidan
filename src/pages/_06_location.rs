@@ -2,13 +2,9 @@ crate::generate_page!(Location {
     pub service: bool,
 }:
     update(self, message, sender) {
-        On => {
-            tracing::trace!("location service on");
-            self.service = true;
-        },
-        Off => {
-            tracing::trace!("location service off");
-            self.service = false;
+        Switch(active: bool) => {
+            tracing::trace!("location service active: {active}");
+            self.service = active;
         },
     } => {}
 
@@ -42,9 +38,11 @@ crate::generate_page!(Location {
 
             #[wrap(Some)]
             #[name = "switch"]
-            set_widget = &libhelium::Switch {
-                connect_left_icon_notify => Self::Input::On,
-                connect_right_icon_notify => Self::Input::Off,
+            set_widget = &gtk::Switch {
+                connect_state_set[sender] => move |_, state| {
+                    sender.input(Self::Input::Switch(state));
+                    glib::Propagation::Proceed
+                },
             }
         }
     },
