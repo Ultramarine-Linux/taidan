@@ -80,8 +80,7 @@ crate::generate_page!(WhoAreYou {
             set_label: &gettext("Username \n- must start with lowercase letters\n- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)\n- may optionally end with a dollar sign (<tt>$</tt>)"),
             set_use_markup: true,
             set_visible: false,
-            add_css_class: "destructive-action",
-            inline_css: "color: orange",
+            add_css_class: "error",
         }
     },
 
