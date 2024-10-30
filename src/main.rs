@@ -87,10 +87,10 @@ impl SimpleComponent for AppModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         // TODO: make libhelium force this
-        //
         let display = gtk::gdk::Display::default().unwrap();
         let settings = gtk::Settings::for_display(&display);
         settings.set_gtk_icon_theme_name(Some("Hydrogen"));
+        gtk::gio::resources_register_include!("icons.gresource").unwrap();
         let theme = gtk::IconTheme::for_display(&display);
         theme.add_resource_path("/com/FyraLabs/Taidan/icons");
 

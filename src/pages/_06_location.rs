@@ -18,7 +18,7 @@ crate::generate_page!(Location {
         set_halign: gtk::Align::Fill,
 
         gtk::Image {
-            set_icon_name: Some("dialog-question-symbolic"),
+            set_icon_name: Some("location-active-symbolic"),
             inline_css: "-gtk-icon-size: 64px",
         },
 

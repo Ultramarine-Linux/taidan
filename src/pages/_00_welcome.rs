@@ -9,7 +9,8 @@ crate::generate_page!(Welcome:
         set_halign: gtk::Align::Center,
 
         gtk::Image {
-            set_icon_name: Some("distro-icon-name-symbolic"),
+            // FIXME: for some reason distro-icon-symbolic doesn't work
+            set_icon_name: Some("fedora-logo-icon"),
             inline_css: "-gtk-icon-size: 128px",
         },
 
