@@ -1,5 +1,12 @@
-crate::generate_page!(Welcome:
-    update(self, message, sender) {} => {}
+crate::generate_page!(Welcome {
+    pub skipconfig: bool,
+}:
+    update(self, message, sender) {
+        SkipConfig => {
+            self.skipconfig = true;
+            sender.output(Self::Output::Nav(NavAction::Next)).unwrap();
+        }
+    } => {}
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
@@ -31,6 +38,13 @@ crate::generate_page!(Welcome:
         set_halign: gtk::Align::Center,
         set_hexpand: true,
         set_orientation: gtk::Orientation::Horizontal,
+
+        libhelium::Button {
+            set_valign: gtk::Align::End,
+            set_halign: gtk::Align::Start,
+            set_label: &gettext("Skip Configuration"),
+            connect_clicked => Self::Input::SkipConfig,
+        },
 
         libhelium::Button {
             set_is_pill: true,

@@ -106,6 +106,12 @@ impl SimpleComponent for AppModel {
     fn update(&mut self, message: Self::Input, _sender: ComponentSender<Self>) {
         tracing::trace!(?message, "AppModel: Received message");
         match message {
+            AppMsg::Nav(NavAction::Next)
+                if self.page == Page::Password && self.welcome_page.model().skipconfig =>
+            {
+                // TODO: skip to end?
+                todo!();
+            }
             AppMsg::Nav(NavAction::Next) if self.page == Page::Internet => {
                 tracing::trace!("Skipping to page 6 after Page::Internet");
                 self.page = 6.try_into().expect("No page 6!");
