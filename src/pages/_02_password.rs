@@ -25,7 +25,7 @@ crate::generate_page!(Password {
         set_halign: gtk::Align::Fill,
 
         gtk::Image {
-            set_icon_name: Some("people-symbolic"),
+            set_icon_name: Some("system-users-symbolic"),
             inline_css: "-gtk-icon-size: 64px",
         },
 

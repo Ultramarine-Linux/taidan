@@ -14,7 +14,7 @@ use relm4::{
 };
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-const APPID: &str = "com.fyralabs.Readymade";
+const APPID: &str = "com.FyraLabs.Taidan";
 
 pub static CONFIG: SharedState<cfg::Config> = SharedState::new();
 
@@ -87,8 +87,12 @@ impl SimpleComponent for AppModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         // TODO: make libhelium force this
-        let settings = gtk::Settings::for_display(&gtk::gdk::Display::default().unwrap());
+        //
+        let display = gtk::gdk::Display::default().unwrap();
+        let settings = gtk::Settings::for_display(&display);
         settings.set_gtk_icon_theme_name(Some("Hydrogen"));
+        let theme = gtk::IconTheme::for_display(&display);
+        theme.add_resource_path("/com/FyraLabs/Taidan/icons");
 
         let model = Self::_default(sender);
 

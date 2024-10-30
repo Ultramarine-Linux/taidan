@@ -21,6 +21,9 @@ tracing-appender = "0.2.3"
 tracing-journald = "0.3.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
+[build-dependencies]
+glib-build-tools = "0.20.0"
+
 [lints.clippy]
 # cargo = { level = "warn", priority = -1 }
 complexity = { level = "warn", priority = -1 }

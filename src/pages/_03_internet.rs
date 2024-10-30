@@ -11,7 +11,7 @@ crate::generate_page!(Internet:
         set_halign: gtk::Align::Fill,
 
         gtk::Image {
-            set_icon_name: Some("question-round-outline-symbolic"),
+            set_icon_name: Some("dialog-question-symbolic"),
             inline_css: "-gtk-icon-size: 64px",
         },
 

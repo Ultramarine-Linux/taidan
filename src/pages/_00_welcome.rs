@@ -9,7 +9,7 @@ crate::generate_page!(Welcome:
         set_halign: gtk::Align::Center,
 
         gtk::Image {
-            set_icon_name: Some(&CONFIG.read().icon_name),
+            set_icon_name: Some("distro-icon-name-symbolic"),
             inline_css: "-gtk-icon-size: 128px",
         },
 

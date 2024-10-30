@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+    <gresource prefix="com/FyraLabs/Taidan/icons/24x24/actions/">
+        <file preprocess="xml-stripblanks" alias="distro-icon-name-symbolic.svg">icons/distro-icon-name-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="system-users-symbolic.svg">icons/system-users-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="dialog-question-symbolic.svg">icons/dialog-question-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="eye-open-negative-filled-symbolic.svg">icons/eye-open-negative-filled-symbolic.svg</file>
+    </gresource>
+</gresources>

@@ -1,7 +1,6 @@
 #[derive(Default, Clone, Debug)]
 pub struct Config {
     pub distro: String,
-    pub icon_name: String,
 }
 
 impl Config {
@@ -20,11 +19,6 @@ impl Config {
             .and_then(|name| name.strip_suffix('"'))
             .unwrap_or(name)
             .clone_into(&mut self.distro);
-
-        // icon_name
-        option_env!("TAIDAN_ICON_NAME")
-            .unwrap_or("fedora-logo-icon")
-            .clone_into(&mut self.icon_name);
 
         tracing::debug!("Populated config: {self:#?}");
     }
