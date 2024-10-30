@@ -27,3 +27,14 @@ impl WidgetTemplate for PrevNextBtns {
         },
     }
 }
+
+#[relm4::widget_template(pub)]
+impl WidgetTemplate for SwitchBox {
+    view! {
+        libhelium::MiniContentBlock {
+            #[wrap(Some)]
+            #[name(switch)]
+            set_widget = &gtk::Switch {}
+        }
+    }
+}

@@ -1,5 +1,9 @@
-crate::generate_page!(NightLight:
-    update(self, message, sender) {} => {}
+crate::generate_page!(NightLight {
+    pub setting: bool
+}:
+    update(self, message, sender) {
+        Switch(state: bool) => self.setting = state,
+    } => {}
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
@@ -31,12 +35,20 @@ crate::generate_page!(NightLight:
             set_label: &gettext("Night Light is not proven to help with difficulty falling sleep."),
         },
 
-        gtk::Label {
-            set_use_markup: true,
-            set_label: &gettext("(Night Light is also known as Night Color on KDE Plasma.)"),
-        },
+        // gtk::Label {
+        //     set_use_markup: true,
+        //     set_label: &gettext("(Night Light is also known as Night Color on KDE Plasma.)"),
+        // },
 
-        // TODO: "Night Light" switch
+        #[template] crate::ui::SwitchBox {
+            set_title: &gettext("Night Light"),
+            #[template_child] switch {
+                connect_state_set[sender] => move |_, state| {
+                    sender.input(Self::Input::Switch(state));
+                    glib::Propagation::Proceed
+                },
+            }
+        },
     },
 
     #[template] crate::ui::PrevNextBtns {

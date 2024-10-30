@@ -33,18 +33,15 @@ crate::generate_page!(Location {
             set_label: &gettext("Allow apps to request your approximate location with [Mozilla Location Services]"),
         },
 
-        libhelium::MiniContentBlock {
+        #[template] crate::ui::SwitchBox {
             set_title: &gettext("Location Services"),
-
-            #[wrap(Some)]
-            #[name = "switch"]
-            set_widget = &gtk::Switch {
+            #[template_child] switch {
                 connect_state_set[sender] => move |_, state| {
                     sender.input(Self::Input::Switch(state));
                     glib::Propagation::Proceed
                 },
             }
-        }
+        },
     },
 
     #[template] crate::ui::PrevNextBtns {
