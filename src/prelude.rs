@@ -1,5 +1,5 @@
 pub use gettextrs::gettext;
-// pub use itertools::Itertools;
+pub use itertools::Itertools;
 pub use libhelium::{
     glib::{self, prelude::*},
     prelude::*,

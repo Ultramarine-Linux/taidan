@@ -13,3 +13,4 @@ pub mod _05_crashreport;
 pub mod _06_location;
 pub mod _07_nightlight;
 pub mod _08_theme;
+pub mod _09_browser;

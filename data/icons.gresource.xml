@@ -6,5 +6,6 @@
         <file preprocess="xml-stripblanks" alias="dialog-question-symbolic.svg">icons/dialog-question-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="eye-open-negative-filled-symbolic.svg">icons/eye-open-negative-filled-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="location-active-symbolic.svg">icons/location-active-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="web-browser-symbolic.svg">icons/web-browser-symbolic.svg</file>
     </gresource>
 </gresources>

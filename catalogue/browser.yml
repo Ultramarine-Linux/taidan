@@ -1,0 +1,42 @@
+category: Browser
+choices:
+  - name: Firefox
+    provider: Mozilla
+    description: |
+      Firefox is an open source web browser using the Gecko engine. Firefox has
+      historically been the default in Ultramarine.
+    note: Some features like WebUSB may be unavailable.
+    options:
+      - checkbox: [flatpak]
+    actions:
+      - rpm:firefox
+      - flatpak:org.mozilla.firefox
+
+  - name: Edge
+    provider: Microsoft
+    description: |
+      Edge is a Chromium-based browser centered around the Microsoft ecosystem,
+      including many convenient and AI features.
+    actions: todo
+
+  - name: Chrome
+    provider: Google
+    description: |
+      Chrome is the world's most popular web browser and the base for many
+      others.
+    note: |
+      Chrome may say it is managed by an organization, this is because of
+      Fedora's bookmarks package.
+    options:
+      - radio: [Chrome Stable, Chrome Dev Channel, Chrome Beta]
+    actions:
+      - enable_yum_repo:google-chrome;rpm:google-chrome-stable
+      - enable_yum_repo:google-chrome;rpm:google-chrome-unstable
+      - enable_yum_repo:google-chrome;rpm:google-chrome-beta
+
+  - name: Chromium
+    provider: Google
+    description: |
+      Chromium is Chrome without the Google, everything should be similar, but
+      no tracking and no accounts.
+    actions: rpm:chromium
