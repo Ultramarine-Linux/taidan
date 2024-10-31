@@ -27,6 +27,7 @@ generate_pages!(Page AppModel AppMsg:
     05: CrashReport,
     06: Location,
     07: NightLight,
+    08: Theme,
 );
 
 #[derive(Debug)]
@@ -75,6 +76,7 @@ impl SimpleComponent for AppModel {
                     Page::CrashReport => *model.crash_report_page.widget(),
                     Page::Location => *model.location_page.widget(),
                     Page::NightLight => *model.night_light_page.widget(),
+                    Page::Theme => *model.theme_page.widget(),
                 }
             }
         }
@@ -112,9 +114,13 @@ impl SimpleComponent for AppModel {
                 // TODO: skip to end?
                 todo!();
             }
-            AppMsg::Nav(NavAction::Next) if self.page == Page::Internet => {
+            AppMsg::Nav(NavAction::Next) if usize::from(self.page) == 3 => {
                 tracing::trace!("Skipping to page 6 after Page::Internet");
                 self.page = 6.try_into().expect("No page 6!");
+            }
+            AppMsg::Nav(NavAction::Back) if usize::from(self.page) == 6 => {
+                tracing::trace!("Skipping to page 3");
+                self.page = 3.try_into().expect("No page 3!");
             }
             AppMsg::Nav(NavAction::GoTo(page)) => self.page = page,
             AppMsg::Nav(NavAction::Quit) => std::process::exit(0),
