@@ -28,6 +28,7 @@ generate_pages!(Page AppModel AppMsg:
     06: Location,
     07: NightLight,
     08: Theme,
+    09: Browser,
 );
 
 #[derive(Debug)]
@@ -77,6 +78,7 @@ impl SimpleComponent for AppModel {
                     Page::Location => *model.location_page.widget(),
                     Page::NightLight => *model.night_light_page.widget(),
                     Page::Theme => *model.theme_page.widget(),
+                    Page::Browser => *model.browser_page.widget(),
                 }
             }
         }
@@ -94,7 +96,7 @@ impl SimpleComponent for AppModel {
         settings.set_gtk_icon_theme_name(Some("Hydrogen"));
         gtk::gio::resources_register_include!("icons.gresource").unwrap();
         let theme = gtk::IconTheme::for_display(&display);
-        theme.add_resource_path("/com/FyraLabs/Taidan/icons");
+        theme.add_resource_path("/com/FyraLabs/Taidan/icons/symbolic/actions");
 
         let model = Self::_default(sender);
 
