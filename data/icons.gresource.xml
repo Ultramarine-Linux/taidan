@@ -7,5 +7,9 @@
         <file preprocess="xml-stripblanks" alias="eye-open-negative-filled-symbolic.svg">icons/eye-open-negative-filled-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="location-active-symbolic.svg">icons/location-active-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="web-browser-symbolic.svg">icons/web-browser-symbolic.svg</file>
+        <file alias="background-light.png">icons/background-light.png</file>
+        <file alias="background-dark.png">icons/background-dark.png</file>
+
+        <file preprocess="xml-stripblanks" alias="ctlg-browser-firefox.svg">catalogue/browser/firefox.svg</file>
     </gresource>
 </gresources>
