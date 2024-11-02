@@ -26,7 +26,7 @@ crate::generate_page!(Theme {
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
         set_spacing: 16,
-        set_margin_horizontal: 128,
+        set_margin_horizontal: 80,
         set_vexpand: true,
         set_hexpand: true,
         set_valign: gtk::Align::Center,
@@ -63,13 +63,10 @@ crate::generate_page!(Theme {
             #[name(lightbox)]
             gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
-                gtk::Frame {
-                    set_expand: false,
-                    gtk::Image {
-                        set_from_file: Some("/usr/share/backgrounds/default.png"),
-                        set_pixel_size: 200,
-                        // inline_css: "border-radius: 25pt;",
-                    },
+                libhelium::ContentBlockImage {
+                    set_file: "background-light",
+                    set_requested_height: 150,
+                    set_requested_width: 150*1920/1080,
                 },
                 gtk::Label {
                     set_label: &*gettext("Light"),
@@ -78,13 +75,10 @@ crate::generate_page!(Theme {
             #[name(darkbox)]
             gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
-                gtk::Frame {
-                    set_expand: false,
-                    gtk::Image {
-                        set_from_file: Some("/usr/share/backgrounds/default-dark.png"),
-                        set_pixel_size: 200,
-                        // inline_css: "border-radius: 25pt;",
-                    },
+                libhelium::ContentBlockImage {
+                    set_file: "background-dark",
+                    set_requested_height: 150,
+                    set_requested_width: 150*1920/1080,
                 },
                 gtk::Label {
                     set_label: &*gettext("Dark"),

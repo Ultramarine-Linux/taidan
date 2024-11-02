@@ -40,7 +40,7 @@ crate::generate_page!(WhoAreYou {
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
         set_spacing: 16,
-        set_margin_horizontal: 128,
+        set_margin_horizontal: 80,
         set_vexpand: true,
         set_hexpand: true,
         set_valign: gtk::Align::Center,
