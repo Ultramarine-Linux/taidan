@@ -11,5 +11,8 @@
         <file alias="background-dark.png">icons/background-dark.png</file>
 
         <file preprocess="xml-stripblanks" alias="ctlg-browser-firefox.svg">catalogue/browser/firefox.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-browser-edge.svg">catalogue/browser/edge.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-browser-chrome.svg">catalogue/browser/chrome.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-browser-chromium.svg">catalogue/browser/chromium.svg</file>
     </gresource>
 </gresources>

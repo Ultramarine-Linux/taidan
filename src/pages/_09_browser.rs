@@ -1,12 +1,11 @@
-use relm4::factory::FactoryVecDeque;
-use std::rc::Rc;
-
 crate::generate_page!(Browser {
     browser_rows: Vec<relm4::Controller<BrowserRow>>,
 }:
     init(root, sender, model, widgets) {
         let cfg = crate::CONFIG.read();
-        let browser_category = cfg.catalogue.iter().find(|category| category.name == "Browser").expect("No browser category");
+        let browser_category = cfg.catalogue.iter()
+            .find(|category| category.name == "Browser")
+            .expect("No browser category");
         model.browser_rows = browser_category.choices.iter().cloned().enumerate()
             .map(|(index, choice)| {
                 BrowserRow::builder()
@@ -88,7 +87,6 @@ impl SimpleComponent for BrowserRow {
             set_title: &model.choice.name,
             set_subtitle: &model.choice.description,
             set_icon: &format!("ctlg-browser-{}", model.choice.name.to_ascii_lowercase()),
-            // TODO: each browser
         },
     }
 

@@ -131,6 +131,10 @@ impl TryFrom<&str> for ChoiceActions {
 
     #[tracing::instrument]
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if value == "todo" {
+            tracing::warn!("Found todo. This should not be propagated to production!");
+            return Ok(Self::Todo);
+        }
         if value.contains(';') {
             return Ok(Self::List(
                 value.split(';').map(TryInto::try_into).try_collect()?,
