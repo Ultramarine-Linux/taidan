@@ -1,7 +1,10 @@
+use relm4::RelmRemoveAllExt;
+
 crate::generate_page!(Browser {
     browser_rows: Vec<relm4::Controller<BrowserRow>>,
+    optlist: gtk::Box,
 }:
-    init(root, sender, model, widgets) {
+    init[optlist](root, sender, model, widgets) {
         let cfg = crate::CONFIG.read();
         let browser_category = cfg.catalogue.iter()
             .find(|category| category.name == "Browser")
@@ -18,7 +21,10 @@ crate::generate_page!(Browser {
     }
     update(self, message, sender) {
         BrowserRowSel(index: usize) => {
-            todo!()
+            self.optlist.remove_all();
+            let row = (self.browser_rows.get(index))
+                .expect("browser row not exist called browser page");
+            row.model().populate_optlist(&self.optlist);
         },
     } => {}
 
@@ -43,11 +49,13 @@ crate::generate_page!(Browser {
         },
     },
 
+    #[name(viewdual)]
     libhelium::ViewDual {
         set_valign: gtk::Align::Fill,
         set_halign: gtk::Align::Fill,
         set_vexpand: true,
         set_hexpand: true,
+        set_show_handle: false,
 
         #[name(browsers)]
         #[wrap(Some)]
@@ -57,6 +65,12 @@ crate::generate_page!(Browser {
         #[wrap(Some)]
         set_child_end = &libhelium::ContentBlock {
             set_hexpand: true,
+
+            #[local_ref]
+            set_child = optlist -> gtk::Box {
+                set_orientation: gtk::Orientation::Horizontal,
+                set_halign: gtk::Align::Center,
+            }
         },
     },
 
@@ -87,9 +101,12 @@ impl SimpleComponent for BrowserRow {
             set_title: &model.choice.name,
             set_subtitle: &model.choice.description,
             set_icon: &format!("ctlg-browser-{}", model.choice.name.to_ascii_lowercase()),
+
+            add_controller: ctl,
         },
     }
 
+    #[allow(clippy::renamed_function_params)]
     fn init(
         model: Self::Init,
         root: Self::Root,
@@ -98,17 +115,42 @@ impl SimpleComponent for BrowserRow {
         let index = model.index;
         let ctl = gtk::GestureClick::new();
         ctl.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
-        let s0 = sender.clone();
         ctl.connect_pressed(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
-            s0.output(index).unwrap();
+            sender.output(index).unwrap();
         });
-        root.add_controller(ctl);
         let widgets = view_output!();
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, message: Self::Input, sender: relm4::prelude::ComponentSender<Self>) {
-        todo!();
+    // fn update(&mut self, message: Self::Input, sender: relm4::prelude::ComponentSender<Self>) {}
+}
+
+impl BrowserRow {
+    /// # Panics
+    /// this assumes there are at least 1 element in each checkbox list
+    fn populate_optlist(&self, list: &gtk::Box) {
+        self.choice.options.iter().for_each(|opt| {
+            let inneroptlist = gtk::Box::new(gtk::Orientation::Vertical, 8);
+            match opt {
+                crate::cfg::ChoiceOption::Checkbox(list) => list
+                    .iter()
+                    .map(|s| gtk::CheckButton::builder().label(s).build())
+                    .for_each(|btn| inneroptlist.append(&btn)),
+                crate::cfg::ChoiceOption::Radio(list) => {
+                    let btnlist = list
+                        .iter()
+                        .map(|s| gtk::CheckButton::builder().label(s).build())
+                        .collect_vec();
+                    let firstbtn = btnlist.first().expect("No first checkbox?");
+                    btnlist
+                        .iter()
+                        .skip(1)
+                        .for_each(|btn| btn.set_group(Some(firstbtn)));
+                    btnlist.iter().for_each(|btn| inneroptlist.append(btn));
+                }
+            }
+            list.append(&inneroptlist);
+        });
     }
 }
