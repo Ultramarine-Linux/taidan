@@ -1,0 +1,6 @@
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        subject.isInGroup("taidan")) {
+        return polkit.Result.YES;
+    }
+});
