@@ -14,3 +14,4 @@ pub mod _06_location;
 pub mod _07_nightlight;
 pub mod _08_theme;
 pub mod _09_browser;
+pub mod _10_categories;
