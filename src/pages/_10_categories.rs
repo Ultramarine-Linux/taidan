@@ -1,8 +1,24 @@
-crate::generate_page!(Categories:
+use relm4::RelmRemoveAllExt;
+
+crate::generate_page!(Categories {
+    categories: Option<FactoryVecDeque<CategoryBtn>>,
+}:
+    init(root, sender, model, widgets) {
+        let mut catfactory: FactoryVecDeque<CategoryBtn>
+            = FactoryVecDeque::builder().launch(widgets.flowbox.clone()).forward(sender.input_sender(), CategoriesPageMsg::BtnClick);
+        let mut catf = catfactory.guard();
+        CONFIG.read().catalogue.iter().filter(|cat| cat.name != "Browser")
+            .for_each(|cat| _ = catf.push_back(CategoryBtn {
+                category: cat.name.clone(),
+            }));
+        drop(catf);
+        model.categories = Some(catfactory);
+    }
     update(self, message, sender) {
-
+        BtnClick(index: usize) => {
+            todo!();
+        },
     } => {}
-
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
@@ -44,3 +60,165 @@ crate::generate_page!(Categories:
         },
     }
 );
+
+#[derive(Debug, Default)]
+struct CategoryBtn {
+    category: String,
+}
+#[relm4::factory]
+impl FactoryComponent for CategoryBtn {
+    type Init = Self;
+    type Input = ();
+    type Output = usize;
+    type CommandOutput = ();
+    type ParentWidget = gtk::FlowBox;
+
+    view! {
+        gtk::Box {
+            set_orientation: gtk::Orientation::Vertical,
+            add_controller: ctl,
+
+            libhelium::ContentBlockImage {
+                set_file: &format!("ctlg-{}", self.category),
+                set_requested_height: 100,
+                set_requested_width: 100*1920/1080,
+            },
+            gtk::Label {
+                set_label: &*gettext(&self.category),
+            },
+        },
+    }
+
+    fn init_model(
+        init: Self::Init,
+        _index: &relm4::factory::DynamicIndex,
+        _sender: relm4::FactorySender<Self>,
+    ) -> Self {
+        init
+    }
+
+    fn init_widgets(
+        &mut self,
+        index: &Self::Index,
+        root: Self::Root,
+        _returned_widget: &<Self::ParentWidget as relm4::factory::FactoryView>::ReturnedWidget,
+        sender: FactorySender<Self>,
+    ) -> Self::Widgets {
+        let i = index.current_index();
+        let ctl = gtk::GestureClick::new();
+        ctl.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
+        ctl.connect_pressed(move |gesture, _, _, _| {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            sender.output(i).unwrap();
+        });
+        let widgets = view_output!();
+        widgets
+    }
+}
+
+crate::generate_component!(CategoryWindow {
+    rows: Vec<relm4::Controller<CatRow>>,
+    optlist: gtk::Box,
+}:
+    init[optlist](root, sender, model, widgets) for init: String {
+        let cfg = crate::CONFIG.read();
+        let category = (cfg.catalogue.iter())
+            .find(|category| category.name == init)
+            .expect("No browser category");
+        model.rows = (category.choices.iter().cloned().enumerate())
+            .map(|(index, choice)| {
+                CatRow::builder()
+                    .launch(CatRow {
+                        index,
+                        choice,
+                        category: init.clone(),
+                    })
+                    .forward(sender.input_sender(), Self::Input::BrowserRowSel)
+            })
+            .collect();
+        drop(cfg);
+        model
+            .rows
+            .iter()
+            .for_each(|x| widgets.viewdual.browsers.add(x.widget()));
+    }
+
+    update(self, message, sender) {
+        BrowserRowSel(index: usize) => {
+            self.optlist.remove_all();
+            let row = (self.rows.get(index)).expect("browser row not exist called browser page");
+            row.model().populate_optlist(&self.optlist);
+        }
+    } => {}
+
+    libhelium::Window {
+        #[wrap(Some)]
+        set_child = &gtk::Box {
+            libhelium::AppBar {},
+            #[name(viewdual)] #[template] crate::ui::Category {
+                #[template_child] optlist {
+                    #[local_ref]
+                    set_child = optlist -> gtk::Box {
+                        set_orientation: gtk::Orientation::Horizontal,
+                        set_halign: gtk::Align::Center,
+                    }
+                }
+            },
+        }
+    }
+);
+
+crate::generate_component!(CatRow {
+    index: usize,
+    choice: crate::cfg::Choice,
+    category: String,
+}:
+    init(root, sender, model, widgets) for init: Self {
+        let index = model.index;
+        let ctl = gtk::GestureClick::new();
+        ctl.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
+        ctl.connect_pressed(move |gesture, _, _, _| {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            sender.output(index).unwrap();
+        });
+        root.add_controller(ctl);
+    }
+    update(self, message, sender) { } => usize
+
+    libhelium::MiniContentBlock {
+        set_hexpand: true,
+        set_title: &model.choice.name,
+        set_subtitle: &model.choice.description,
+        set_icon: &format!("ctlg-{}-{}", model.category, model.choice.name.to_ascii_lowercase()),
+
+    },
+);
+
+impl CatRow {
+    /// # Panics
+    /// this assumes there are at least 1 element in each checkbox list
+    fn populate_optlist(&self, list: &gtk::Box) {
+        self.choice.options.iter().for_each(|opt| {
+            let inneroptlist = gtk::Box::new(gtk::Orientation::Vertical, 8);
+            match opt {
+                crate::cfg::ChoiceOption::Checkbox(list) => list
+                    .iter()
+                    .map(|s| gtk::CheckButton::builder().label(s).build())
+                    .for_each(|btn| inneroptlist.append(&btn)),
+                crate::cfg::ChoiceOption::Radio(list) => {
+                    let btnlist = list
+                        .iter()
+                        .map(|s| gtk::CheckButton::builder().label(s).build())
+                        .collect_vec();
+                    let firstbtn = btnlist.first().expect("No first checkbox?");
+                    btnlist
+                        .iter()
+                        .skip(1)
+                        .for_each(|btn| btn.set_group(Some(firstbtn)));
+                    btnlist.iter().for_each(|btn| inneroptlist.append(btn));
+                }
+            }
+            list.append(&inneroptlist);
+        });
+    }
+}

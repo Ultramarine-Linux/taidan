@@ -76,7 +76,7 @@ impl Config {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, Default)]
 pub struct Choice {
     pub name: String,
     pub provider: String,

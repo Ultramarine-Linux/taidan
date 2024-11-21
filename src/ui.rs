@@ -38,3 +38,28 @@ impl WidgetTemplate for SwitchBox {
         }
     }
 }
+
+#[relm4::widget_template(pub)]
+impl WidgetTemplate for Category {
+    view! {
+        #[name(viewdual)]
+        libhelium::ViewDual {
+            set_valign: gtk::Align::Fill,
+            set_halign: gtk::Align::Fill,
+            set_vexpand: true,
+            set_hexpand: true,
+            set_show_handle: false,
+
+            #[name(browsers)]
+            #[wrap(Some)]
+            set_child_start = &libhelium::ContentList {
+                set_hexpand: true,
+            },
+            #[name(optlist)]
+            #[wrap(Some)]
+            set_child_end = &libhelium::ContentBlock {
+                set_hexpand: true,
+            },
+        },
+    }
+}

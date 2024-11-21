@@ -16,7 +16,7 @@ crate::generate_page!(Browser {
                     .forward(sender.input_sender(), Self::Input::BrowserRowSel)
             })
             .collect();
-        model.browser_rows.iter().for_each(|x| widgets.browsers.add(x.widget()));
+        model.browser_rows.iter().for_each(|x| widgets.viewdual.browsers.add(x.widget()));
         drop(cfg);
     }
     update(self, message, sender) {
@@ -49,29 +49,14 @@ crate::generate_page!(Browser {
         },
     },
 
-    #[name(viewdual)]
-    libhelium::ViewDual {
-        set_valign: gtk::Align::Fill,
-        set_halign: gtk::Align::Fill,
-        set_vexpand: true,
-        set_hexpand: true,
-        set_show_handle: false,
-
-        #[name(browsers)]
-        #[wrap(Some)]
-        set_child_start = &libhelium::ContentList {
-            set_hexpand: true,
-        },
-        #[wrap(Some)]
-        set_child_end = &libhelium::ContentBlock {
-            set_hexpand: true,
-
+    #[name(viewdual)] #[template] crate::ui::Category {
+        #[template_child] optlist {
             #[local_ref]
             set_child = optlist -> gtk::Box {
                 set_orientation: gtk::Orientation::Horizontal,
                 set_halign: gtk::Align::Center,
             }
-        },
+        }
     },
 
     #[template] crate::ui::PrevNextBtns {
