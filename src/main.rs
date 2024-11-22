@@ -10,14 +10,20 @@ pub mod ui;
 use crate::prelude::*;
 use gtk::glib::translate::FromGlibPtrNone;
 use relm4::{
-    Component, ComponentController, ComponentParts, ComponentSender, RelmApp, SharedState,
-    SimpleComponent,
+    Component, ComponentController, ComponentParts, ComponentSender, RelmApp, SimpleComponent,
 };
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 const APPID: &str = "com.FyraLabs.Taidan";
 
-pub static CONFIG: SharedState<cfg::Config> = SharedState::new();
+// configuration of the distro OOBE.
+pub static CFG: std::sync::LazyLock<cfg::Config> = std::sync::LazyLock::new(|| {
+    tracing::debug!("Initializing cfg::Config");
+    let mut cfg = cfg::Config::default();
+    cfg.populate();
+    tracing::debug!("Populated cfg::Config (turn on `trace` to see body)");
+    cfg
+});
 
 generate_pages!(Page AppModel AppMsg:
     00: Welcome,
@@ -57,7 +63,7 @@ impl SimpleComponent for AppModel {
 
     view! {
         libhelium::ApplicationWindow {
-            set_title: Some(&gettext("Welcome to %s").replace("%s", &CONFIG.read().distro)),
+            set_title: Some(&gettext("Welcome to %s").replace("%s", &CFG.distro)),
             set_default_width: 600,
             set_default_height: 500,
             set_vexpand: true,
@@ -137,8 +143,9 @@ impl SimpleComponent for AppModel {
                     .try_into()
                     .expect("No next page!");
                 if self.page == Page::Installing {
-                    // TODO: call start_install() or something with the sender to the page!
-                    todo!();
+                    relm4::spawn(backend::start_install(
+                        self.installing_page.sender().clone(),
+                    ));
                 }
             }
             AppMsg::Nav(NavAction::Back) => {
@@ -155,7 +162,6 @@ impl SimpleComponent for AppModel {
 #[allow(clippy::missing_panics_doc)]
 fn main() -> std::io::Result<()> {
     let _guard = setup_logs_and_install_panic_hook();
-    CONFIG.write().populate();
 
     gettextrs::textdomain(APPID)?;
     gettextrs::bind_textdomain_codeset(APPID, "UTF-8")?;

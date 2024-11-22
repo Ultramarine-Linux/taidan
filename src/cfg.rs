@@ -29,7 +29,7 @@ impl Config {
         self.populate_catalogue()
             .expect("cannot populate catalogue");
 
-        tracing::debug!("Populated config: {self:#?}");
+        tracing::trace!("Populated config: {self:#?}");
     }
 
     /// # Errors

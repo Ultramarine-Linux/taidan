@@ -124,6 +124,8 @@ macro_rules! generate_page {
                         // HACK: this solves variable name obfuscation in macro_rules! {}
                         let mut $initmodel = model;
                         let $initwidgets = widgets;
+                        #[allow(unused_variables)]
+                        let $initsender = $sender;
 
                         $initblock
 
@@ -186,6 +188,7 @@ macro_rules! generate_component {
             view! { $($viewtt)+ }
 
 
+            #[allow(clippy::used_underscore_binding)]
             fn init(
                 init: Self::Init,
                 root: Self::Root,
@@ -213,6 +216,8 @@ macro_rules! generate_component {
                 #[allow(unused_mut)]
                 // HACK: this solves variable name obfuscation in macro_rules! {}
                 let $initwidgets = widgets;
+                #[allow(unused_variables)]
+                let $initsender = $sender;
 
                 $initblock
 

@@ -9,4 +9,4 @@ pub use relm4::{
     prelude::*,
 };
 
-pub use crate::{NavAction, CONFIG};
+pub use crate::{NavAction, CFG};

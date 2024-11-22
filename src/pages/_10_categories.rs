@@ -9,7 +9,7 @@ crate::generate_page!(Categories {
         let mut catfactory: FactoryVecDeque<CategoryBtn>
             = FactoryVecDeque::builder().launch(widgets.flowbox.clone()).forward(sender.input_sender(), CategoriesPageMsg::BtnClick);
         let mut catf = catfactory.guard();
-        CONFIG.read().catalogue.iter().filter(|cat| cat.name != "Browser")
+        CFG.catalogue.iter().filter(|cat| cat.name != "Browser")
             .for_each(|cat| _ = catf.push_back(CategoryBtn {
                 category: cat.name.clone(),
             }));
@@ -139,9 +139,8 @@ crate::generate_component!(CategoryWindow {
     rows: Vec<relm4::Controller<CatRow>>,
     optlist: gtk::Box,
 }:
-    init[optlist](root, sender, model, widgets) for init: String {
-        let cfg = crate::CONFIG.read();
-        let category = (cfg.catalogue.iter())
+    init[optlist](_root, sender, model, widgets) for init: String {
+        let category = (CFG.catalogue.iter())
             .find(|category| category.name == init)
             .expect("No browser category");
         model.rows = (category.choices.iter().cloned().enumerate())
@@ -155,14 +154,13 @@ crate::generate_component!(CategoryWindow {
                     .forward(sender.input_sender(), Self::Input::BrowserRowSel)
             })
             .collect();
-        drop(cfg);
         model
             .rows
             .iter()
             .for_each(|x| widgets.viewdual.browsers.add(x.widget()));
     }
 
-    update(self, message, sender) {
+    update(self, message, _sender) {
         BrowserRowSel(index: usize) => {
             self.optlist.remove_all();
             let row = (self.rows.get(index)).expect("browser row not exist called browser page");
@@ -193,6 +191,7 @@ crate::generate_component!(CatRow {
     category: String,
 }:
     init(root, sender, model, widgets) for init: Self {
+        model = init;
         let index = model.index;
         let ctl = gtk::GestureClick::new();
         ctl.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
@@ -203,7 +202,7 @@ crate::generate_component!(CatRow {
         root.add_controller(ctl);
     }
     // NOTE: output `usize` index from `ctl` in `init()`
-    update(self, message, sender) { } => usize
+    update(self, message, _sender) { } => usize
 
     libhelium::MiniContentBlock {
         set_hexpand: true,

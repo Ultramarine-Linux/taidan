@@ -21,7 +21,7 @@ crate::generate_page!(Welcome {
         },
 
         gtk::Label {
-            set_label: &gettext("Welcome to %s").replace("%s", &CONFIG.read().distro),
+            set_label: &gettext("Welcome to %s").replace("%s", &CFG.distro),
             add_css_class: "view-title",
             inline_css: "font-weight: bold",
         },

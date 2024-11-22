@@ -1,7 +1,15 @@
-crate::generate_page!(Installing:
+crate::generate_page!(Installing {
+    main_progress_bar: gtk::ProgressBar,
+}:
+    init[main_progress_bar](root, sender, model, widgets) {
+    }
     update(self, message, sender) {
         // handle UI updates here.
         // NOTE: main.rs should call the start_install() fns.
+        UpdLbl(stage: crate::backend::Stage) => {
+            self.main_progress_bar.set_text(Some(&*String::from(stage)));
+        },
+        Finish => sender.output(Self::Output::Nav(NavAction::Next)).unwrap(),
     } => {}
 
     gtk::Box {
@@ -31,6 +39,12 @@ crate::generate_page!(Installing:
     },
 
     // FIXME: libhelium::ProgressBar
+    #[local_ref] main_progress_bar ->
     gtk::ProgressBar {
-    }
+        set_text: Some(&*gettext("Loading…")),
+    },
+
+    gtk::ProgressBar {
+
+    },
 );

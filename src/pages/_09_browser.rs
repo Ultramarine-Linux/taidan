@@ -5,8 +5,7 @@ crate::generate_page!(Browser {
     optlist: gtk::Box,
 }:
     init[optlist](root, sender, model, widgets) {
-        let cfg = crate::CONFIG.read();
-        let browser_category = cfg.catalogue.iter()
+        let browser_category = CFG.catalogue.iter()
             .find(|category| category.name == "Browser")
             .expect("No browser category");
         model.browser_rows = browser_category.choices.iter().cloned().enumerate()
@@ -17,7 +16,6 @@ crate::generate_page!(Browser {
             })
             .collect();
         model.browser_rows.iter().for_each(|x| widgets.viewdual.browsers.add(x.widget()));
-        drop(cfg);
     }
     update(self, message, sender) {
         BrowserRowSel(index: usize) => {
