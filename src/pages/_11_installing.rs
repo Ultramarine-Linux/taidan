@@ -1,15 +1,35 @@
 crate::generate_page!(Installing {
     main_progress_bar: gtk::ProgressBar,
+    sub_progress_bar: gtk::ProgressBar,
+    stage: crate::backend::Stage,
+    throb_timeout: Option<glib::SourceId>,
 }:
-    init[main_progress_bar](root, sender, model, widgets) {
+    init[main_progress_bar sub_progress_bar](root, sender, model, widgets) {
+        model.throb_timeout = Some(gtk::glib::timeout_add(std::time::Duration::from_secs(1), move || {
+            sender.input(Self::Input::Throb);
+            gtk::glib::ControlFlow::Continue
+        })); // TODO: cleanup
     }
     update(self, message, sender) {
         // handle UI updates here.
         // NOTE: main.rs should call the start_install() fns.
-        UpdLbl(stage: crate::backend::Stage) => {
-            self.main_progress_bar.set_text(Some(&*String::from(stage)));
+        UpdStage(stage: crate::backend::Stage) => {
+            let stage_num = usize::from(&stage);
+            #[allow(clippy::cast_precision_loss)]
+            self.main_progress_bar.set_fraction(stage_num as f64 / crate::backend::NUM_STAGES as f64);
+            let text = format!("[{stage_num}/{}] {}", crate::backend::NUM_STAGES, String::from(&stage));
+            self.stage = stage;
+            self.main_progress_bar.set_text(Some(&text));
         },
         Finish => sender.output(Self::Output::Nav(NavAction::Next)).unwrap(),
+        Throb => {
+            if self.stage.is_dnf() && self.sub_progress_bar.fraction() != 0.0 {
+                self.throb_timeout.take().expect("throbbed by nonexistent glib::SourceId").remove();
+            } else {
+                self.sub_progress_bar.pulse();
+            }
+        },
+        UpdSubProg(frac: f64) => self.sub_progress_bar.set_fraction(frac),
     } => {}
 
     gtk::Box {
@@ -44,7 +64,6 @@ crate::generate_page!(Installing {
         set_text: Some(&*gettext("Loading…")),
     },
 
-    gtk::ProgressBar {
-
-    },
+    #[local_ref] sub_progress_bar ->
+    gtk::ProgressBar { },
 );
