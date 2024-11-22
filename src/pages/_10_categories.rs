@@ -1,7 +1,9 @@
 use relm4::RelmRemoveAllExt;
+use std::rc::Rc;
 
 crate::generate_page!(Categories {
     categories: Option<FactoryVecDeque<CategoryBtn>>,
+    windows: Vec<Option<Rc<Controller<CategoryWindow>>>>,
 }:
     init(root, sender, model, widgets) {
         let mut catfactory: FactoryVecDeque<CategoryBtn>
@@ -11,12 +13,28 @@ crate::generate_page!(Categories {
             .for_each(|cat| _ = catf.push_back(CategoryBtn {
                 category: cat.name.clone(),
             }));
+        model.windows = vec![None; catf.len()];
         drop(catf);
         model.categories = Some(catfactory);
     }
     update(self, message, sender) {
         BtnClick(index: usize) => {
-            todo!();
+            // on btn click, open new CategoryWindow
+            let ctl = if let Some(ctl) = &self.windows[index] {
+                Rc::clone(ctl)
+            } else {
+                // init new window
+                let dialog = CategoryWindow::builder()
+                    .launch(
+                        self.categories.as_ref().unwrap().get(index).unwrap().category.clone()
+                    )
+                    .detach();
+                let rc = Rc::new(dialog);
+                self.windows[index] = Some(Rc::clone(&rc));
+                rc
+            };
+            ctl.widget().present();
+            ctl.widget().set_visible(true);
         },
     } => {}
 
@@ -55,6 +73,7 @@ crate::generate_page!(Categories {
         },
         #[template_child] next {
             set_label: &gettext("Confirm and Setup System"),
+            remove_css_class: "suggested-action",
             add_css_class: "destructive-action",
             connect_clicked => Self::Input::Nav(NavAction::Next),
         },
@@ -183,6 +202,7 @@ crate::generate_component!(CatRow {
         });
         root.add_controller(ctl);
     }
+    // NOTE: output `usize` index from `ctl` in `init()`
     update(self, message, sender) { } => usize
 
     libhelium::MiniContentBlock {

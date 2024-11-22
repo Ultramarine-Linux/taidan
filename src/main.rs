@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 
+pub mod backend;
 pub mod cfg;
 pub mod macros;
 pub mod pages;
@@ -29,6 +30,8 @@ generate_pages!(Page AppModel AppMsg:
     07: NightLight,
     08: Theme,
     09: Browser,
+    10: Categories,
+    11: Installing,
 );
 
 #[derive(Debug)]
@@ -79,6 +82,8 @@ impl SimpleComponent for AppModel {
                     Page::NightLight => *model.night_light_page.widget(),
                     Page::Theme => *model.theme_page.widget(),
                     Page::Browser => *model.browser_page.widget(),
+                    Page::Categories => *model.categories_page.widget(),
+                    Page::Installing => *model.installing_page.widget(),
                 }
             }
         }
@@ -131,6 +136,10 @@ impl SimpleComponent for AppModel {
                     .wrapping_add(1)
                     .try_into()
                     .expect("No next page!");
+                if self.page == Page::Installing {
+                    // TODO: call start_install() or something with the sender to the page!
+                    todo!();
+                }
             }
             AppMsg::Nav(NavAction::Back) => {
                 self.page = usize::from(self.page)

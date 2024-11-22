@@ -15,3 +15,4 @@ pub mod _07_nightlight;
 pub mod _08_theme;
 pub mod _09_browser;
 pub mod _10_categories;
+pub mod _11_installing;
