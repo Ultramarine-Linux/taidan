@@ -68,14 +68,14 @@ choices:
   - name: Vivaldi
     provider: Vivaldi Technologies
     description: |
-      Vivaldi comes with everything AND the kitchen sink, from a built-in mail client, to automations and deep personalization. Vivaldi will cover more than just your browsing needs.
+      Vivaldi is a Chromium-based browser that comes with everything AND the kitchen sink. From a built-in mail client, to automations and deep personalization. Vivaldi will cover more than just your browsing needs.
     options:
     actions: todo
 
   - name: Floorp
     provider: Ablaze
     description: |
-      Floorp is a Japanese Firefox fork with improved customization and privacy features.
+      Floorp is a Firefox-based browser from Japan with improved customization and privacy features.
     options:
     actions: todo
 
