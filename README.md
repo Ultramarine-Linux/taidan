@@ -3,6 +3,12 @@
 Taidan is a GUI Out-Of-Box-Experience (OOBE) and Welcome App for Ultramarine
 Linux, written in Rust and the [Helium] toolkit.
 
+## Testing
+
+```sh
+TAIDAN_CATALOGUE_DIR=./catalogue TAIDAN_LOG=trace cargo r
+```
+
 ## 📃 License
 
     Copyright © 2024  Fyra Labs & Ultramarine Linux Contributors

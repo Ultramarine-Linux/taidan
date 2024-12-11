@@ -137,7 +137,10 @@ macro_rules! generate_page {
                 }
 
                 fn update(&mut $self, $message: Self::Input, $sender: ComponentSender<Self>) {
-                    tracing::trace!(?$message, "{}", const_format::concatcp!(stringify!($page), "Page: received message"));
+                    // HACK: hard code InstallingPageMsg::Throb to not log
+                    if &*format!("{:?}", $message) != "Throb" {
+                        tracing::trace!(?$message, "{}", const_format::concatcp!(stringify!($page), "Page: received message"));
+                    }
                     match $message {
                         Self::Input::Nav(action) => {
                             $sender.output(Self::Output::Nav(action)).unwrap();

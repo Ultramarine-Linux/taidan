@@ -1,3 +1,18 @@
+/// Check if the entry (assume inside [`libhelium::TextField`]) is valid.
+///
+/// # Panics
+/// Panic if it is not an `internal_entry` inside [`libhelium::TextField`].
+fn valid_entry(en: &gtk::Text) -> bool {
+    en.parent()
+        .and_then(|x| x.parent())
+        .and_then(|x| x.parent())
+        .and_then(|x| x.parent())
+        .unwrap()
+        .dynamic_cast::<libhelium::TextField>()
+        .unwrap()
+        .is_valid()
+}
+
 crate::generate_page!(WhoAreYou {
     pub name: String,
     pub user: String,
@@ -5,31 +20,46 @@ crate::generate_page!(WhoAreYou {
     btn_next: libhelium::Button,
 }:
     init[lbl_error](root, sender, model, widgets) {
+        let s0 = sender.clone();
         let s1 = sender.clone();
         widgets.tf_fullname.internal_entry().connect_changed(move |en| {
             s1.input(Self::Input::NotifyFullName(en.text().to_string()));
         });
-
-        widgets.tf_username.internal_entry().connect_changed(move |en| {
-            if en.parent().and_then(|x| x.parent()).and_then(|x| x.parent()).and_then(|x| x.parent()).unwrap().dynamic_cast::<libhelium::TextField>().unwrap().is_valid() {
-                sender.input(Self::Input::NotifyUsername(en.text().to_string()));
+        widgets.tf_username.internal_entry().connect_changed(move |en| sender.input(
+            if valid_entry(en) {
+                Self::Input::NotifyUsername(en.text().to_string())
             } else {
-                sender.input(Self::Input::InvalidUsername);
+                Self::Input::InvalidUsername
+            }
+        ));
+        let tfu0 = widgets.tf_username.clone();
+        let tfu1 = widgets.tf_username.clone();
+        widgets.tf_fullname.internal_entry().connect_activate(move |_| _ = tfu0.internal_entry().grab_focus());
+        widgets.tf_fullname.internal_entry().connect_move_focus(move |_, direction| {
+            // FIXME: doesn't work ;;
+            // FIXME: btw this is a libhelium bug
+            if direction == gtk::DirectionType::TabForward {
+                tfu1.internal_entry().grab_focus();
             }
         });
-
+        widgets.tf_username.internal_entry().connect_activate(move |en| if valid_entry(en) { s0.output(Self::Output::Nav(NavAction::Next)).unwrap(); });
         model.btn_next = widgets.prev_next_btns.next.clone();
     }
     update(self, message, sender) {
         NotifyFullName(name: String) => {
-            tracing::trace!(?name, "FullName Input");
-            self.name = name;
+            if name.is_empty() {
+                self.name.clone_from(&self.user);
+            } else {
+                self.name = name;
+            }
         },
         NotifyUsername(user: String) => {
-            tracing::trace!(?user, "Username Input");
+            if self.name.is_empty() {
+                self.name.clone_from(&user);
+            }
             self.user = user;
             self.lbl_error.set_visible(false);
-            self.btn_next.set_sensitive(!self.name.is_empty());
+            self.btn_next.set_sensitive(true);
         },
         InvalidUsername => {
             self.lbl_error.set_visible(true);
@@ -73,6 +103,8 @@ crate::generate_page!(WhoAreYou {
             set_is_outline: true,
             set_needs_validation: true,
             set_regex: &libhelium::glib::Regex::new(r"^[a-z][-a-z0-9_]*\$?$", gtk::glib::RegexCompileFlags::DEFAULT, gtk::glib::RegexMatchFlags::DEFAULT).unwrap().unwrap(),
+
+            connect_activate[sender] => move |en| if en.is_valid() { sender.output(Self::Output::Nav(NavAction::Next)).unwrap(); },
         },
 
         #[local_ref]

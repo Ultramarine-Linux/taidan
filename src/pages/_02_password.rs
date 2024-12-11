@@ -4,15 +4,13 @@ crate::generate_page!(Password {
 }:
     init(root, sender, model, widgets) {
         model.btn_next = widgets.prev_next_btns.next.clone();
+        let tf_repeat = widgets.tf_repeat.clone();
+        widgets.tf_passwd.connect_activate(move |_| _ = tf_repeat.grab_focus());
     }
     update(self, message, sender) {
-        NotifyPasswd(pass: String) => {
-            tracing::trace!(?pass, "Password Input");
-            self.passwd = pass;
-        },
-        NotifyRepeat(pass: String) => {
-            self.btn_next.set_sensitive(self.passwd == pass && !pass.is_empty());
-        },
+        NotifyPasswd(pass: String) => self.passwd = pass,
+        NotifyRepeat(pass: String) => self.btn_next.set_sensitive(self.passwd == pass && !pass.is_empty()),
+        NotifyActivate => if self.btn_next.is_sensitive() { sender.input(Self::Input::Nav(NavAction::Next)) },
     } => {}
 
     gtk::Box {
@@ -51,6 +49,7 @@ crate::generate_page!(Password {
             set_show_peek_icon: true,
             set_placeholder_text: Some(&gettext("Repeat Password")),
             connect_changed[sender] => move |en| sender.input(Self::Input::NotifyRepeat(en.text().to_string())),
+            connect_activate => Self::Input::NotifyActivate,
         },
     },
 
@@ -61,6 +60,7 @@ crate::generate_page!(Password {
         },
         #[template_child] next {
             connect_clicked => Self::Input::Nav(NavAction::Next),
+            set_sensitive: false,
         },
     }
 );

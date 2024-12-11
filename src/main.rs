@@ -128,10 +128,10 @@ impl SimpleComponent for AppModel {
                 todo!();
             }
             AppMsg::Nav(NavAction::Next) if usize::from(self.page) == 3 => {
-                tracing::trace!("Skipping to page 6 after Page::Internet");
-                self.page = 6.try_into().expect("No page 6!");
+                tracing::trace!("Skipping to page 7 after Page::Internet");
+                self.page = 7.try_into().expect("No page 7!");
             }
-            AppMsg::Nav(NavAction::Back) if usize::from(self.page) == 6 => {
+            AppMsg::Nav(NavAction::Back) if usize::from(self.page) == 7 => {
                 tracing::trace!("Skipping to page 3");
                 self.page = 3.try_into().expect("No page 3!");
             }
