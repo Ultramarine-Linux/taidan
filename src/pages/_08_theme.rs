@@ -1,34 +1,27 @@
-crate::generate_page!(Theme {
-    pub is_dark: bool,
-    pub accent: usize,
-}:
+crate::generate_page!(Theme:
     init(root, sender, model, widgets) {
         let (light0, dark0) = (widgets.lightbox.clone(), widgets.darkbox.clone());
         let (light1, dark1) = (widgets.lightbox.clone(), widgets.darkbox.clone());
         let (ctl_light, ctl_dark) = (gtk::GestureClick::new(), gtk::GestureClick::new());
         ctl_light.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
         ctl_dark.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
-        let (s0, s1) = (sender.clone(), sender);
         // FIXME: WHY IS THERE NO BORDER
         ctl_light.connect_pressed(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
-            s0.input(Self::Input::ClickLight);
+            SETTINGS.write().theme_is_dark = false;
             light0.inline_css("border-radius: 16px");
             dark1.inline_css("border-radius: 0px");
         });
         ctl_dark.connect_pressed(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
-            s1.input(Self::Input::ClickDark);
+            SETTINGS.write().theme_is_dark = true;
             dark0.inline_css("border-radius: 16px");
             light1.inline_css("border-radius: 0px");
         });
         widgets.lightbox.add_controller(ctl_light);
         widgets.darkbox.add_controller(ctl_dark);
     }
-    update(self, message, sender) {
-        ClickLight => self.is_dark = false,
-        ClickDark => self.is_dark = true,
-    } => {}
+    update(self, message, sender) {} => {}
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,

@@ -1,9 +1,7 @@
-crate::generate_page!(Welcome {
-    pub skipconfig: bool,
-}:
+crate::generate_page!(Welcome:
     update(self, message, sender) {
         SkipConfig => {
-            self.skipconfig = true;
+            SETTINGS.write().skipconfig = true;
             sender.output(Self::Output::Nav(NavAction::Next)).unwrap();
         }
     } => {}

@@ -4,6 +4,7 @@ use relm4::Sender;
 use crate::pages::_11_installing::InstallingPageMsg;
 
 pub mod dnf;
+pub mod settings;
 
 pub const NUM_STAGES: usize = 5;
 
@@ -49,6 +50,6 @@ impl From<&Stage> for String {
 }
 
 #[tracing::instrument]
-pub async fn start_install(sender: Sender<InstallingPageMsg>) {
+pub async fn start_install(settings: settings::Settings, sender: Sender<InstallingPageMsg>) {
     tracing::info!("Starting installation");
 }

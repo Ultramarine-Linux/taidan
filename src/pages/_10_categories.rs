@@ -40,12 +40,14 @@ crate::generate_page!(Categories {
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
-        set_spacing: 16,
-        set_margin_horizontal: 80,
-        set_vexpand: true,
+        // set_spacing: 16,
+        // set_margin_horizontal: 80,
+        // set_vexpand: true,
+        set_margin_bottom: 16,
         set_hexpand: true,
-        set_valign: gtk::Align::Center,
+        set_valign: gtk::Align::Fill,
         set_halign: gtk::Align::Fill,
+
 
         gtk::Image {
             set_icon_name: Some("dialog-question-symbolic"),
@@ -98,6 +100,7 @@ impl FactoryComponent for CategoryBtn {
             add_controller: ctl,
 
             libhelium::ContentBlockImage {
+                // FIXME: image doesn't display, probably libhelium bug
                 set_file: &format!("ctlg-{}", self.category),
                 set_requested_height: 100,
                 set_requested_width: 100*1920/1080,
@@ -137,7 +140,7 @@ impl FactoryComponent for CategoryBtn {
 
 crate::generate_component!(CategoryWindow {
     rows: Vec<relm4::Controller<CatRow>>,
-    optlist: gtk::Box,
+    optlist: gtk::ListBox,
 }:
     init[optlist](_root, sender, model, widgets) for init: String {
         let category = (CFG.catalogue.iter())
@@ -157,7 +160,7 @@ crate::generate_component!(CategoryWindow {
         model
             .rows
             .iter()
-            .for_each(|x| widgets.viewdual.browsers.add(x.widget()));
+            .for_each(|x| widgets.viewdual.browsers.append(x.widget()));
     }
 
     update(self, message, _sender) {
@@ -171,15 +174,20 @@ crate::generate_component!(CategoryWindow {
     libhelium::Window {
         #[wrap(Some)]
         set_child = &gtk::Box {
+            set_orientation: gtk::Orientation::Vertical,
             libhelium::AppBar {},
             #[name(viewdual)] #[template] crate::ui::Category {
                 #[template_child] optlist {
-                    #[local_ref]
-                    set_child = optlist -> gtk::Box {
-                        set_orientation: gtk::Orientation::Horizontal,
+                    #[local_ref] optlist ->
+                    gtk::ListBox {
+                        add_css_class: "content-list",
+                        set_selection_mode: gtk::SelectionMode::Single,
+                        set_vexpand: true,
+                        set_hexpand: true,
+                        set_valign: gtk::Align::Center,
                         set_halign: gtk::Align::Center,
-                    }
-                }
+                    },
+                },
             },
         }
     }
@@ -216,7 +224,7 @@ crate::generate_component!(CatRow {
 impl CatRow {
     /// # Panics
     /// this assumes there are at least 1 element in each checkbox list
-    fn populate_optlist(&self, list: &gtk::Box) {
+    fn populate_optlist(&self, list: &gtk::ListBox) {
         self.choice.options.iter().for_each(|opt| {
             let inneroptlist = gtk::Box::new(gtk::Orientation::Vertical, 8);
             match opt {

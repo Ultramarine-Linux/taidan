@@ -30,10 +30,10 @@ macro_rules! generate_pages {
         }
 
         #[derive(Debug)]
-        struct $AppModel {
+        pub struct $AppModel {
             page: $Page,
             $(
-                [<$page:snake _page>]: relm4::Controller<[<$page:camel Page>]>,
+                pub [<$page:snake _page>]: relm4::Controller<[<$page:camel Page>]>,
             )+
         }
 
@@ -113,19 +113,22 @@ macro_rules! generate_page {
                     #[allow(unused_mut)]
                     let mut model = Self::default();
 
-                    $($($(let $local_ref = &model.$local_ref;)+)?)?
+                    $(
+                        #[allow(unused_mut)]
+                        // HACK: this solves variable name obfuscation in macro_rules! {}
+                        let mut $initmodel = model;
+                        #[allow(unused_variables)]
+                        let $initsender = $sender;
+                    )?
+
+                    $($($(let $local_ref = &$initmodel.$local_ref;)+)?)?
 
                     // HACK: invoking view_output!() directly gives `()` when $init* is given.
                     // I don't know why this fixes the issue. — mado
                     let widgets = [<view _output>]!();
 
                     $(
-                        #[allow(unused_mut)]
-                        // HACK: this solves variable name obfuscation in macro_rules! {}
-                        let mut $initmodel = model;
                         let $initwidgets = widgets;
-                        #[allow(unused_variables)]
-                        let $initsender = $sender;
 
                         $initblock
 
@@ -159,6 +162,8 @@ macro_rules! generate_page {
         #[derive(Debug, Default)]
         pub struct [<$page Page>];
     }};
+    (@?model) => { model };
+    (@?model $model:ident) => { $model };
 }
 
 #[macro_export]

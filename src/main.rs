@@ -25,6 +25,8 @@ pub static CFG: std::sync::LazyLock<cfg::Config> = std::sync::LazyLock::new(|| {
     cfg
 });
 
+pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::SharedState::new();
+
 generate_pages!(Page AppModel AppMsg:
     00: Welcome,
     01: WhoAreYou,
@@ -49,12 +51,12 @@ pub enum NavAction {
 }
 
 #[derive(Debug)]
-enum AppMsg {
+pub enum AppMsg {
     Nav(NavAction),
 }
 
 #[allow(clippy::str_to_string)]
-#[relm4::component]
+#[relm4::component(pub)]
 impl SimpleComponent for AppModel {
     type Init = ();
 
@@ -122,10 +124,13 @@ impl SimpleComponent for AppModel {
         tracing::trace!(?message, "AppModel: Received message");
         match message {
             AppMsg::Nav(NavAction::Next)
-                if self.page == Page::Password && self.welcome_page.model().skipconfig =>
+                if self.page == Page::Password && SETTINGS.read().skipconfig =>
             {
-                // TODO: skip to end?
-                todo!();
+                self.page = Page::Installing;
+                relm4::spawn(backend::start_install(
+                    SETTINGS.read().clone(),
+                    self.installing_page.sender().clone(),
+                ));
             }
             AppMsg::Nav(NavAction::Next) if usize::from(self.page) == 3 => {
                 tracing::trace!("Skipping to page 7 after Page::Internet");
@@ -144,6 +149,7 @@ impl SimpleComponent for AppModel {
                     .expect("No next page!");
                 if self.page == Page::Installing {
                     relm4::spawn(backend::start_install(
+                        SETTINGS.read().clone(),
                         self.installing_page.sender().clone(),
                     ));
                 }

@@ -1,9 +1,5 @@
-crate::generate_page!(NightLight {
-    pub setting: bool
-}:
-    update(self, message, sender) {
-        Switch(state: bool) => self.setting = state,
-    } => {}
+crate::generate_page!(NightLight:
+    update(self, message, sender) {} => {}
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
@@ -43,8 +39,8 @@ crate::generate_page!(NightLight {
         #[template] crate::ui::SwitchBox {
             set_title: &gettext("Night Light"),
             #[template_child] switch {
-                connect_state_set[sender] => move |_, state| {
-                    sender.input(Self::Input::Switch(state));
+                connect_state_set => move |_, state| {
+                    SETTINGS.write().nightlight = state;
                     glib::Propagation::Proceed
                 },
             }

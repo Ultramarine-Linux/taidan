@@ -2,7 +2,7 @@ use relm4::RelmRemoveAllExt;
 
 crate::generate_page!(Browser {
     browser_rows: Vec<relm4::Controller<BrowserRow>>,
-    optlist: gtk::Box,
+    optlist: gtk::ListBox,
 }:
     init[optlist](root, sender, model, widgets) {
         let browser_category = CFG.catalogue.iter()
@@ -15,7 +15,7 @@ crate::generate_page!(Browser {
                     .forward(sender.input_sender(), Self::Input::BrowserRowSel)
             })
             .collect();
-        model.browser_rows.iter().for_each(|x| widgets.viewdual.browsers.add(x.widget()));
+        model.browser_rows.iter().for_each(|x| widgets.viewdual.browsers.append(x.widget()));
     }
     update(self, message, sender) {
         BrowserRowSel(index: usize) => {
@@ -28,11 +28,12 @@ crate::generate_page!(Browser {
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
-        set_spacing: 16,
-        set_margin_horizontal: 80,
-        set_vexpand: true,
+        // set_spacing: 16,
+        // set_margin_horizontal: 80,
+        // set_vexpand: true,
+        set_margin_bottom: 16,
         set_hexpand: true,
-        set_valign: gtk::Align::Center,
+        set_valign: gtk::Align::Fill,
         set_halign: gtk::Align::Fill,
 
         gtk::Image {
@@ -49,9 +50,13 @@ crate::generate_page!(Browser {
 
     #[name(viewdual)] #[template] crate::ui::Category {
         #[template_child] optlist {
-            #[local_ref]
-            set_child = optlist -> gtk::Box {
-                set_orientation: gtk::Orientation::Horizontal,
+            #[local_ref] optlist ->
+            gtk::ListBox {
+                add_css_class: "content-list",
+                set_selection_mode: gtk::SelectionMode::Single,
+                set_vexpand: true,
+                set_hexpand: true,
+                set_valign: gtk::Align::Center,
                 set_halign: gtk::Align::Center,
             }
         }
@@ -112,7 +117,7 @@ impl SimpleComponent for BrowserRow {
 impl BrowserRow {
     /// # Panics
     /// this assumes there are at least 1 element in each checkbox list
-    fn populate_optlist(&self, list: &gtk::Box) {
+    fn populate_optlist(&self, list: &gtk::ListBox) {
         self.choice.options.iter().for_each(|opt| {
             let inneroptlist = gtk::Box::new(gtk::Orientation::Vertical, 8);
             match opt {

@@ -14,8 +14,6 @@ fn valid_entry(en: &gtk::Text) -> bool {
 }
 
 crate::generate_page!(WhoAreYou {
-    pub name: String,
-    pub user: String,
     lbl_error: gtk::Label,
     btn_next: libhelium::Button,
 }:
@@ -48,16 +46,16 @@ crate::generate_page!(WhoAreYou {
     update(self, message, sender) {
         NotifyFullName(name: String) => {
             if name.is_empty() {
-                self.name.clone_from(&self.user);
+                SETTINGS.write().fullname.clone_from(&SETTINGS.read().username);
             } else {
-                self.name = name;
+                SETTINGS.write().fullname = name;
             }
         },
         NotifyUsername(user: String) => {
-            if self.name.is_empty() {
-                self.name.clone_from(&user);
+            if SETTINGS.read().fullname.is_empty() {
+                SETTINGS.write().fullname.clone_from(&user);
             }
-            self.user = user;
+            SETTINGS.write().username = user;
             self.lbl_error.set_visible(false);
             self.btn_next.set_sensitive(true);
         },

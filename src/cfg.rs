@@ -107,16 +107,21 @@ impl ChoiceOption {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum Action {
+    EnableYumRepo(String),
+    Rpm(String),
+    Flatpak(String),
+    Shell(String),
+}
+
 #[derive(Debug, Clone, Default)]
 pub enum ChoiceActions {
     Traverse(Box<[Self]>),
     List(Box<[Self]>),
     #[default]
     Todo,
-    EnableYumRepo(String),
-    Rpm(String),
-    Flatpak(String),
-    Shell(String),
+    Action(Action),
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -142,13 +147,13 @@ impl TryFrom<&str> for ChoiceActions {
         }
         let Some((id, val)) = value.split_once(':') else {
             tracing::warn!("Found action `{value}` (no type), treating as shell script");
-            return Ok(Self::Shell(value.to_owned()));
+            return Ok(Self::Action(Action::Shell(value.to_owned())));
         };
         Ok(match id {
-            "enable_yum_repo" => Self::EnableYumRepo(val.to_owned()),
-            "rpm" => Self::Rpm(val.to_owned()),
-            "flatpak" => Self::Flatpak(val.to_owned()),
-            "shell" => Self::Shell(val.to_owned()),
+            "enable_yum_repo" => Self::Action(Action::EnableYumRepo(val.to_owned())),
+            "rpm" => Self::Action(Action::Rpm(val.to_owned())),
+            "flatpak" => Self::Action(Action::Flatpak(val.to_owned())),
+            "shell" => Self::Action(Action::Shell(val.to_owned())),
             x => return Err(format!("Unknown action type `{x}` (value `{val}`)")),
         })
     }
@@ -228,6 +233,25 @@ impl Choice {
         }
         // get inner seq
         let Some(seq) = val.as_sequence_mut() else {
+            if matches!(&val, serde_yaml::Value::String(s) if s == "todo") {
+                // assume inner arrays with all todos
+                return (0..dimension[depth])
+                    .map(|i| {
+                        Self::recurse_yml_seq(
+                            val.clone(),
+                            {
+                                let mut counter = counter.clone();
+                                counter[depth] = i;
+                                counter
+                            },
+                            dimension,
+                            depth + 1,
+                        )
+                    })
+                    .try_collect()
+                    .map(|v: Vec<ChoiceActions>| v.into_boxed_slice())
+                    .map(ChoiceActions::Traverse);
+            }
             return Err(eyre!(
                 "Expected yaml sequence at `actions:` with dimension {dimension:?} (currently depth {depth}), found {val:?}"
             ));

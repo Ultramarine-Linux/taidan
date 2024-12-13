@@ -42,24 +42,43 @@ impl WidgetTemplate for SwitchBox {
 #[relm4::widget_template(pub)]
 impl WidgetTemplate for Category {
     view! {
+        // libhelium::ViewDual
         #[name(viewdual)]
-        libhelium::ViewDual {
+        gtk::Box {
+            set_orientation: gtk::Orientation::Horizontal,
             set_valign: gtk::Align::Fill,
             set_halign: gtk::Align::Fill,
             set_vexpand: true,
             set_hexpand: true,
-            set_show_handle: false,
+            // set_show_handle: false,
 
-            #[name(browsers)]
-            #[wrap(Some)]
-            set_child_start = &libhelium::ContentList {
-                set_hexpand: true,
+            // #[wrap(Some)]
+            // set_child_start = &gtk::ScrolledWindow {
+            gtk::ScrolledWindow {
+                #[name(browsers)]
+                gtk::ListBox {
+                    add_css_class: "content-list",
+                    set_selection_mode: gtk::SelectionMode::Multiple,
+                    set_vexpand: true,
+                    set_hexpand: true,
+                    set_valign: gtk::Align::Fill,
+                    set_halign: gtk::Align::Fill,
+                }
             },
             #[name(optlist)]
-            #[wrap(Some)]
-            set_child_end = &libhelium::ContentBlock {
-                set_hexpand: true,
-            },
-        },
+            // #[wrap(Some)]
+            // set_child_end = &gtk::ScrolledWindow {
+            gtk::ScrolledWindow {
+                // #[name(optlist)]
+                // gtk::ListBox {
+                //     add_css_class: "content-list",
+                //     set_selection_mode: gtk::SelectionMode::Single,
+                //     set_vexpand: true,
+                //     set_hexpand: true,
+                //     set_valign: gtk::Align::Center,
+                //     set_halign: gtk::Align::Center,
+                // },
+            }
+        }
     }
 }
