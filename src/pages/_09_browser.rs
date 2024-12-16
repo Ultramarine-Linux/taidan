@@ -22,7 +22,23 @@ crate::generate_page!(Browser {
             self.optlist.remove_all();
             let row = (self.browser_rows.get(index))
                 .expect("browser row not exist called browser page");
-            row.model().populate_optlist(&self.optlist);
+            let mut sett = SETTINGS.write();
+            let ctlg = &mut sett.catalogue;
+            if let Some(browsers) = ctlg.get_mut("browser") {
+                // NOTE: since we only allow 1 browser choice, remove the old one
+                browsers.clear();
+                if let Some(opts) = browsers.get(&index) {
+                    row.model().populate_optlist(&self.optlist, index, &opts.iter().copied());
+                } else {
+                    browsers.insert(index, vec![]);
+                    row.model().populate_optlist(&self.optlist, index, &std::iter::empty());
+                }
+            } else {
+                let mut map = std::collections::HashMap::new();
+                map.insert(index, vec![]);
+                ctlg.insert("browser".into(), map);
+                row.model().populate_optlist(&self.optlist, index, &std::iter::empty());
+            }
         },
     } => {}
 
@@ -49,11 +65,13 @@ crate::generate_page!(Browser {
     },
 
     #[name(viewdual)] #[template] crate::ui::Category {
+        #[template_child] browsers {
+            set_selection_mode: gtk::SelectionMode::Single,
+        },
         #[template_child] optlist {
             #[local_ref] optlist ->
             gtk::ListBox {
                 add_css_class: "content-list",
-                set_selection_mode: gtk::SelectionMode::Single,
                 set_vexpand: true,
                 set_hexpand: true,
                 set_valign: gtk::Align::Center,
@@ -117,28 +135,70 @@ impl SimpleComponent for BrowserRow {
 impl BrowserRow {
     /// # Panics
     /// this assumes there are at least 1 element in each checkbox list
-    fn populate_optlist(&self, list: &gtk::ListBox) {
-        self.choice.options.iter().for_each(|opt| {
+    fn populate_optlist<I: Iterator<Item = (usize, usize)> + Clone>(
+        &self,
+        list: &gtk::ListBox,
+        browser_index: usize,
+        optlist: &I,
+    ) {
+        self.choice.options.iter().enumerate().for_each(|(i, opt)| {
             let inneroptlist = gtk::Box::new(gtk::Orientation::Vertical, 8);
+            let iter = optlist.clone().filter(|(j, _)| i == *j).map(|(_, j)| j);
             match opt {
-                crate::cfg::ChoiceOption::Checkbox(list) => list
-                    .iter()
-                    .map(|s| gtk::CheckButton::builder().label(s).build())
+                crate::cfg::ChoiceOption::Checkbox(list) => (list.iter().enumerate())
+                    .map(|(k, s)| {
+                        let btn = gtk::CheckButton::builder()
+                            .label(s)
+                            .active(iter.clone().contains(&k))
+                            .build();
+                        btn.connect_toggled(on_choice_toggled(browser_index, i, k));
+                        btn
+                    })
                     .for_each(|btn| inneroptlist.append(&btn)),
                 crate::cfg::ChoiceOption::Radio(list) => {
-                    let btnlist = list
-                        .iter()
-                        .map(|s| gtk::CheckButton::builder().label(s).build())
+                    let btnlist = (list.iter().enumerate())
+                        .map(|(k, s)| {
+                            let btn = gtk::CheckButton::builder()
+                                .label(s)
+                                .active(iter.clone().contains(&k))
+                                .build();
+                            btn.connect_toggled(on_choice_toggled(browser_index, i, k));
+                            btn
+                        })
                         .collect_vec();
                     let firstbtn = btnlist.first().expect("No first checkbox?");
-                    btnlist
-                        .iter()
-                        .skip(1)
-                        .for_each(|btn| btn.set_group(Some(firstbtn)));
+                    (btnlist.iter().skip(1)).for_each(|btn| btn.set_group(Some(firstbtn)));
                     btnlist.iter().for_each(|btn| inneroptlist.append(btn));
                 }
             }
             list.append(&inneroptlist);
         });
+    }
+}
+
+fn on_choice_toggled(browser_index: usize, i: usize, k: usize) -> impl Fn(&gtk::CheckButton) {
+    move |b: &gtk::CheckButton| {
+        if b.is_active() {
+            SETTINGS
+                .write()
+                .catalogue
+                .get_mut("browser")
+                .unwrap()
+                .get_mut(&browser_index)
+                .unwrap()
+                .push((i, k));
+        } else {
+            let mut sett = SETTINGS.write();
+            let vec = sett
+                .catalogue
+                .get_mut("browser")
+                .unwrap()
+                .get_mut(&browser_index)
+                .unwrap();
+            let pos = vec
+                .binary_search(&(i, k))
+                .expect("deactivated choice not in list");
+            vec.remove(pos);
+        }
     }
 }

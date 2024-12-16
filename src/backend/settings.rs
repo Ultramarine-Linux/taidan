@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[derive(Clone, Debug, Default)]
 pub struct Settings {
     pub skipconfig: bool,
@@ -13,5 +15,5 @@ pub struct Settings {
     // TODO: impl accent colors
     pub accent: usize,
 
-    pub catalogue: Vec<crate::cfg::Action>,
+    pub catalogue: HashMap<String, HashMap<usize, Vec<(usize, usize)>>>,
 }
