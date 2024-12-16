@@ -1,10 +1,5 @@
 crate::generate_page!(Welcome:
-    update(self, message, sender) {
-        SkipConfig => {
-            SETTINGS.write().skipconfig = true;
-            sender.output(Self::Output::Nav(NavAction::Next)).unwrap();
-        }
-    } => {}
+    update(self, message, sender) {} => {}
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
@@ -40,7 +35,10 @@ crate::generate_page!(Welcome:
             set_is_textual: true,
             set_halign: gtk::Align::Start,
             set_label: &gettext("Skip Configuration"),
-            connect_clicked => Self::Input::SkipConfig,
+            connect_clicked[sender] => move |_| {
+                SETTINGS.write().skipconfig = true;
+                sender.input(Self::Input::Nav(NavAction::Next));
+            },
         },
 
         gtk::Box { set_halign: gtk::Align::Fill, set_hexpand: true },
@@ -51,7 +49,10 @@ crate::generate_page!(Welcome:
             set_label: &gettext("Let's Go"),
             inline_css: "padding-left: 48px; padding-right: 48px",
             add_css_class: "suggested-action",
-            connect_clicked => Self::Input::Nav(NavAction::Next),
+            connect_clicked[sender] => move |_| {
+                SETTINGS.write().skipconfig = false;
+                sender.input(Self::Input::Nav(NavAction::Next));
+            },
         },
 
     }
