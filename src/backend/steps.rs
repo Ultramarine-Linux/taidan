@@ -1,19 +1,26 @@
 mod _00_useradd;
 mod _01_settime;
 mod _02_settheme;
-mod _03_dnfupdate;
-mod _04_dnfinstall;
+mod _03_dnfdownloadupdate;
+mod _04_dnfinstallupdate;
+mod _05_dnfdownloadapps;
+mod _06_dnfinstallapps;
 
 use gettextrs::gettext;
 
 use crate::backend::steps::{
-    _00_useradd::UserAdd, _01_settime::SetTime, _02_settheme::SetTheme, _03_dnfupdate::DnfUpdate,
-    _04_dnfinstall::DnfInstall,
+    _00_useradd::UserAdd, _01_settime::SetTime, _02_settheme::SetTheme,
+    _03_dnfdownloadupdate::DnfDownloadUpdate, _04_dnfinstallupdate::DnfInstallUpdate,
+    _05_dnfdownloadapps::DnfDownloadApps, _06_dnfinstallapps::DnfInstallApps,
 };
 
 #[enum_dispatch::enum_dispatch(Stage)]
 pub trait Step {
-    fn run(&self, settings: &crate::backend::settings::Settings) -> color_eyre::Result<()>;
+    async fn run(
+        &self,
+        settings: &crate::backend::settings::Settings,
+        sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+    ) -> color_eyre::Result<()>;
 }
 
 pub const NUM_STAGES: usize = 5;
@@ -24,14 +31,34 @@ pub enum Stage {
     UserAdd,
     SetTime,
     SetTheme,
-    DnfUpdate,
-    DnfInstall,
+    DnfDownloadUpdate,
+    DnfInstallUpdate,
+    DnfDownloadApps,
+    DnfInstallApps,
 }
 
 impl Stage {
     #[must_use]
     pub const fn is_dnf(&self) -> bool {
-        matches!(self, Self::DnfUpdate(_) | Self::DnfInstall(_))
+        matches!(
+            self,
+            Self::DnfDownloadUpdate(_)
+                | Self::DnfInstallUpdate(_)
+                | Self::DnfDownloadApps(_)
+                | Self::DnfInstallApps(_)
+        )
+    }
+    #[must_use]
+    pub const fn all() -> &'static [Self] {
+        &[
+            Self::UserAdd(UserAdd),
+            Self::SetTime(SetTime),
+            Self::SetTheme(SetTheme),
+            Self::DnfDownloadUpdate(DnfDownloadUpdate),
+            Self::DnfInstallUpdate(DnfInstallUpdate),
+            Self::DnfDownloadApps(DnfDownloadApps),
+            Self::DnfInstallApps(DnfInstallApps),
+        ]
     }
 }
 
@@ -47,8 +74,10 @@ impl From<Stage> for u8 {
             Stage::UserAdd(_) => 0,
             Stage::SetTime(_) => 1,
             Stage::SetTheme(_) => 2,
-            Stage::DnfUpdate(_) => 3,
-            Stage::DnfInstall(_) => 4,
+            Stage::DnfDownloadUpdate(_) => 3,
+            Stage::DnfInstallUpdate(_) => 4,
+            Stage::DnfDownloadApps(_) => 5,
+            Stage::DnfInstallApps(_) => 6,
         }
     }
 }
@@ -59,8 +88,10 @@ impl From<Stage> for String {
             Stage::UserAdd(_) => gettext("Creating User…"),
             Stage::SetTime(_) => gettext("Setting Timezone…"),
             Stage::SetTheme(_) => gettext("Configuring Themes…"),
-            Stage::DnfUpdate(_) => gettext("Performing System Update…"),
-            Stage::DnfInstall(_) => gettext("Adding User Programs…"),
+            Stage::DnfDownloadUpdate(_) => gettext("Downloading System Update…"),
+            Stage::DnfInstallUpdate(_) => gettext("Installing System Update…"),
+            Stage::DnfDownloadApps(_) => gettext("Downloading User Programs…"),
+            Stage::DnfInstallApps(_) => gettext("Installing User Programs…"),
         }
     }
 }

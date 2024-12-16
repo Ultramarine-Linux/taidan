@@ -1,3 +1,7 @@
+pub use color_eyre::{
+    eyre::{eyre, Context},
+    Section,
+};
 pub use gettextrs::gettext;
 pub use itertools::Itertools;
 pub use libhelium::{

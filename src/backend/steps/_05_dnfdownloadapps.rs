@@ -1,6 +1,6 @@
 #[derive(Clone, Copy, Debug, Default)]
-pub struct SetTheme;
-impl super::Step for SetTheme {
+pub struct DnfDownloadApps;
+impl super::Step for DnfDownloadApps {
     async fn run(
         &self,
         settings: &crate::backend::settings::Settings,

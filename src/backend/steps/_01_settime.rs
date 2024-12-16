@@ -1,12 +1,13 @@
-use color_eyre::{
-    eyre::{eyre, Context},
-    Section,
-};
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SetTime;
 impl super::Step for SetTime {
-    fn run(&self, _: &crate::backend::settings::Settings) -> color_eyre::Result<()> {
+    async fn run(
+        &self,
+        _: &crate::backend::settings::Settings,
+        sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+    ) -> color_eyre::Result<()> {
         let enable_timesyncd = std::process::Command::new("systemctl")
             .args(["enable", "systemd-timesyncd.service", "--now"])
             .status()

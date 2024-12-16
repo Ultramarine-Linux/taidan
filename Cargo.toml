@@ -20,6 +20,7 @@ relm4 = "0.9.1"
 serde = { version = "1.0.214", features = ["derive"] }
 serde_yaml = "0.9.34"
 tempfile = "3.13.0"
+tokio = { version = "1.42.0", features = ["io-util", "process"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-journald = "0.3.0"

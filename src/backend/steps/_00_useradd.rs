@@ -1,12 +1,13 @@
-use color_eyre::{
-    eyre::{eyre, Context},
-    Section,
-};
+use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct UserAdd;
 impl super::Step for UserAdd {
-    fn run(&self, settings: &crate::backend::settings::Settings) -> color_eyre::Result<()> {
+    async fn run(
+        &self,
+        settings: &crate::backend::settings::Settings,
+        sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+    ) -> color_eyre::Result<()> {
         let crypt_setting = xcrypt::crypt_gensalt(None, 0, None)
             .wrap_err("fail to encrypt password")
             .map_err(|e| e.note("fail: crypt_gensalt()"))?;
