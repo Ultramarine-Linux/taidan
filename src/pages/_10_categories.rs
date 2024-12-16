@@ -139,13 +139,14 @@ impl FactoryComponent for CategoryBtn {
 }
 
 crate::generate_component!(CategoryWindow {
+    category: String,
     rows: Vec<relm4::Controller<CatRow>>,
     optlist: gtk::ListBox,
 }:
     init[optlist](_root, sender, model, widgets) for init: String {
         let category = (CFG.catalogue.iter())
             .find(|category| category.name == init)
-            .expect("No browser category");
+            .expect("no such category");
         model.rows = (category.choices.iter().cloned().enumerate())
             .map(|(index, choice)| {
                 CatRow::builder()
@@ -154,20 +155,35 @@ crate::generate_component!(CategoryWindow {
                         choice,
                         category: init.clone(),
                     })
-                    .forward(sender.input_sender(), Self::Input::BrowserRowSel)
+                    .forward(sender.input_sender(), Self::Input::RowSel)
             })
             .collect();
         model
             .rows
             .iter()
             .for_each(|x| widgets.viewdual.browsers.append(x.widget()));
+        model.category = init;
     }
 
     update(self, message, _sender) {
-        BrowserRowSel(index: usize) => {
+        RowSel(index: usize) => {
             self.optlist.remove_all();
-            let row = (self.rows.get(index)).expect("browser row not exist called browser page");
-            row.model().populate_optlist(&self.optlist);
+            let row = (self.rows.get(index)).expect("row not exist called window");
+            let mut sett = SETTINGS.write();
+            let ctlg = &mut sett.catalogue;
+            if let Some(apps) = ctlg.get_mut(&self.category) {
+                if let Some(opts) = apps.get(&index) {
+                    row.model().populate_optlist(&self.optlist, &self.category, index, &opts.iter().copied());
+                } else {
+                    apps.insert(index, vec![]);
+                    row.model().populate_optlist(&self.optlist, &self.category,index, &std::iter::empty());
+                }
+            } else {
+                let mut map = std::collections::HashMap::new();
+                map.insert(index, vec![]);
+                ctlg.insert(self.category.clone(), map);
+                row.model().populate_optlist(&self.optlist, &self.category, index, &std::iter::empty());
+            }
         }
     } => {}
 
@@ -199,8 +215,7 @@ crate::generate_component!(CatRow {
     category: String,
 }:
     init(root, sender, model, widgets) for init: Self {
-        model = init;
-        let index = model.index;
+        let index = init.index;
         let ctl = gtk::GestureClick::new();
         ctl.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
         ctl.connect_pressed(move |gesture, _, _, _| {
@@ -208,15 +223,16 @@ crate::generate_component!(CatRow {
             sender.output(index).unwrap();
         });
         root.add_controller(ctl);
+        model = init;
     }
     // NOTE: output `usize` index from `ctl` in `init()`
     update(self, message, _sender) { } => usize
 
     libhelium::MiniContentBlock {
         set_hexpand: true,
-        set_title: &model.choice.name,
-        set_subtitle: &model.choice.description,
-        set_icon: &format!("ctlg-{}-{}", model.category, model.choice.name.to_ascii_lowercase()),
+        set_title: &init.choice.name,
+        set_subtitle: &init.choice.description,
+        set_icon: &format!("ctlg-{}-{}", init.category, init.choice.name.to_ascii_lowercase()),
 
     },
 );
@@ -224,28 +240,77 @@ crate::generate_component!(CatRow {
 impl CatRow {
     /// # Panics
     /// this assumes there are at least 1 element in each checkbox list
-    fn populate_optlist(&self, list: &gtk::ListBox) {
-        self.choice.options.iter().for_each(|opt| {
+    fn populate_optlist<I: Iterator<Item = (usize, usize)> + Clone>(
+        &self,
+        list: &gtk::ListBox,
+        cat: &str,
+        cat_index: usize,
+        optlist: &I,
+    ) {
+        self.choice.options.iter().enumerate().for_each(|(i, opt)| {
             let inneroptlist = gtk::Box::new(gtk::Orientation::Vertical, 8);
+            let iter = optlist.clone().filter(|(j, _)| i == *j).map(|(_, j)| j);
             match opt {
-                crate::cfg::ChoiceOption::Checkbox(list) => list
-                    .iter()
-                    .map(|s| gtk::CheckButton::builder().label(s).build())
+                crate::cfg::ChoiceOption::Checkbox(list) => (list.iter().enumerate())
+                    .map(|(k, s)| {
+                        let btn = gtk::CheckButton::builder()
+                            .label(s)
+                            .active(iter.clone().contains(&k))
+                            .build();
+                        btn.connect_toggled(on_choice_toggled(cat, cat_index, i, k));
+                        btn
+                    })
                     .for_each(|btn| inneroptlist.append(&btn)),
                 crate::cfg::ChoiceOption::Radio(list) => {
-                    let btnlist = list
-                        .iter()
-                        .map(|s| gtk::CheckButton::builder().label(s).build())
+                    let btnlist = (list.iter().enumerate())
+                        .map(|(k, s)| {
+                            let btn = gtk::CheckButton::builder()
+                                .label(s)
+                                .active(iter.clone().contains(&k))
+                                .build();
+                            btn.connect_toggled(on_choice_toggled(cat, cat_index, i, k));
+                            btn
+                        })
                         .collect_vec();
                     let firstbtn = btnlist.first().expect("No first checkbox?");
-                    btnlist
-                        .iter()
-                        .skip(1)
-                        .for_each(|btn| btn.set_group(Some(firstbtn)));
+                    (btnlist.iter().skip(1)).for_each(|btn| btn.set_group(Some(firstbtn)));
                     btnlist.iter().for_each(|btn| inneroptlist.append(btn));
                 }
             }
             list.append(&inneroptlist);
         });
+    }
+}
+
+fn on_choice_toggled(
+    cat: &str,
+    cat_index: usize,
+    i: usize,
+    k: usize,
+) -> impl Fn(&gtk::CheckButton) {
+    let cat = cat.to_owned();
+    move |b: &gtk::CheckButton| {
+        if b.is_active() {
+            SETTINGS
+                .write()
+                .catalogue
+                .get_mut(&cat)
+                .unwrap()
+                .get_mut(&cat_index)
+                .unwrap()
+                .push((i, k));
+        } else {
+            let mut sett = SETTINGS.write();
+            let vec = sett
+                .catalogue
+                .get_mut(&cat)
+                .unwrap()
+                .get_mut(&cat_index)
+                .unwrap();
+            let pos = vec
+                .binary_search(&(i, k))
+                .expect("deactivated choice not in list");
+            vec.remove(pos);
+        }
     }
 }
