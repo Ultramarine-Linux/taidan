@@ -1,7 +1,9 @@
+use crate::backend::steps::Stage;
+
 crate::generate_page!(Installing {
     main_progress_bar: gtk::ProgressBar,
     sub_progress_bar: gtk::ProgressBar,
-    stage: crate::backend::Stage,
+    stage: Stage,
     throb_timeout: Option<glib::SourceId>,
 }:
     init[main_progress_bar sub_progress_bar](root, sender, model, widgets) {
@@ -13,11 +15,11 @@ crate::generate_page!(Installing {
     update(self, message, sender) {
         // handle UI updates here.
         // NOTE: main.rs should call the start_install() fns.
-        UpdStage(stage: crate::backend::Stage) => {
-            let stage_num = usize::from(&stage);
+        UpdStage(stage: Stage) => {
+            let stage_num = u8::from(stage);
             #[allow(clippy::cast_precision_loss)]
-            self.main_progress_bar.set_fraction(stage_num as f64 / crate::backend::NUM_STAGES as f64);
-            let text = format!("[{stage_num}/{}] {}", crate::backend::NUM_STAGES, String::from(&stage));
+            self.main_progress_bar.set_fraction(f64::from(stage_num) / crate::backend::steps::NUM_STAGES as f64);
+            let text = format!("[{stage_num}/{}] {}", crate::backend::steps::NUM_STAGES, String::from(stage));
             self.stage = stage;
             self.main_progress_bar.set_text(Some(&text));
         },
