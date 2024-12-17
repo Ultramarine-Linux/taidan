@@ -2,11 +2,12 @@ use crate::backend::steps::Stage;
 
 crate::generate_page!(Installing {
     main_progress_bar: gtk::ProgressBar,
-    sub_progress_bar: gtk::ProgressBar,
+    dnf_progress_bar: gtk::ProgressBar,
+    flatpak_progress_bar: gtk::ProgressBar,
     stage: Stage,
     throb_timeout: Option<glib::SourceId>,
 }:
-    init[main_progress_bar sub_progress_bar](root, sender, model, widgets) {
+    init[main_progress_bar dnf_progress_bar flatpak_progress_bar](root, sender, model, widgets) {
         model.throb_timeout = Some(gtk::glib::timeout_add(std::time::Duration::from_secs(1), move || {
             sender.input(Self::Input::Throb);
             gtk::glib::ControlFlow::Continue
@@ -25,13 +26,14 @@ crate::generate_page!(Installing {
         },
         Finish => sender.output(Self::Output::Nav(NavAction::Next)).unwrap(),
         Throb => {
-            if self.stage.is_dnf() && self.sub_progress_bar.fraction() != 0.0 {
+            if self.stage.is_dnf() && self.dnf_progress_bar.fraction() != 0.0 {
                 self.throb_timeout.take().expect("throbbed by nonexistent glib::SourceId").remove();
             } else {
-                self.sub_progress_bar.pulse();
+                self.dnf_progress_bar.pulse();
             }
         },
-        UpdSubProg(frac: f64) => self.sub_progress_bar.set_fraction(frac),
+        UpdDnfProg(frac: f64) => self.dnf_progress_bar.set_fraction(frac),
+        UpdFlatpakProg(frac: f64) => self.flatpak_progress_bar.set_fraction(frac),
     } => {}
 
     gtk::Box {
@@ -66,6 +68,9 @@ crate::generate_page!(Installing {
         set_text: Some(&*gettext("Loading…")),
     },
 
-    #[local_ref] sub_progress_bar ->
+    #[local_ref] dnf_progress_bar ->
+    gtk::ProgressBar { },
+
+    #[local_ref] flatpak_progress_bar ->
     gtk::ProgressBar { },
 );

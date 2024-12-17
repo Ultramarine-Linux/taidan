@@ -3,7 +3,7 @@ pub use color_eyre::{
     Section,
 };
 pub use gettextrs::gettext;
-pub use itertools::Itertools;
+pub use itertools::{Either, Itertools};
 pub use libhelium::{
     glib::{self, prelude::*},
     prelude::*,

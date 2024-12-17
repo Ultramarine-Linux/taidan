@@ -21,6 +21,14 @@ pub trait Step {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
     ) -> color_eyre::Result<()>;
+
+    async fn pre(
+        &self,
+        _: &mut crate::backend::settings::Settings,
+        _: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+    ) -> color_eyre::Result<()> {
+        Ok(())
+    }
 }
 
 pub const NUM_STAGES: usize = 5;

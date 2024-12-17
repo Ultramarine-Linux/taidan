@@ -7,7 +7,7 @@ choices:
       historically been the default in Ultramarine.
     note: Some features like WebUSB may be unavailable.
     options:
-      - checkbox: [flatpak]
+      - checkbox: flatpak
     actions:
       - rpm:firefox
       - flatpak:org.mozilla.firefox

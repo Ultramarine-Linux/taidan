@@ -3,6 +3,7 @@ use crate::prelude::*;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SetTime;
 impl super::Step for SetTime {
+    #[tracing::instrument]
     async fn run(
         &self,
         _: &crate::backend::settings::Settings,

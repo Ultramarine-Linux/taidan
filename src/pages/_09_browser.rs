@@ -135,7 +135,7 @@ impl SimpleComponent for BrowserRow {
 impl BrowserRow {
     /// # Panics
     /// this assumes there are at least 1 element in each checkbox list
-    fn populate_optlist<I: Iterator<Item = (usize, usize)> + Clone>(
+    fn populate_optlist<I: Iterator<Item = usize> + Clone>(
         &self,
         list: &gtk::ListBox,
         browser_index: usize,
@@ -143,18 +143,16 @@ impl BrowserRow {
     ) {
         self.choice.options.iter().enumerate().for_each(|(i, opt)| {
             let inneroptlist = gtk::Box::new(gtk::Orientation::Vertical, 8);
-            let iter = optlist.clone().filter(|(j, _)| i == *j).map(|(_, j)| j);
+            let iter = optlist.clone().skip(i);
             match opt {
-                crate::cfg::ChoiceOption::Checkbox(list) => (list.iter().enumerate())
-                    .map(|(k, s)| {
-                        let btn = gtk::CheckButton::builder()
-                            .label(s)
-                            .active(iter.clone().contains(&k))
-                            .build();
-                        btn.connect_toggled(on_choice_toggled(browser_index, i, k));
-                        btn
-                    })
-                    .for_each(|btn| inneroptlist.append(&btn)),
+                crate::cfg::ChoiceOption::Checkbox(lbl) => inneroptlist.append(&{
+                    let btn = gtk::CheckButton::builder()
+                        .label(lbl)
+                        .active(iter.clone().next().is_some())
+                        .build();
+                    btn.connect_toggled(on_choice_toggled(browser_index, i, 1));
+                    btn
+                }),
                 crate::cfg::ChoiceOption::Radio(list) => {
                     let btnlist = (list.iter().enumerate())
                         .map(|(k, s)| {
@@ -185,20 +183,15 @@ fn on_choice_toggled(browser_index: usize, i: usize, k: usize) -> impl Fn(&gtk::
                 .get_mut("browser")
                 .unwrap()
                 .get_mut(&browser_index)
-                .unwrap()
-                .push((i, k));
-        } else {
-            let mut sett = SETTINGS.write();
-            let vec = sett
+                .unwrap()[i] = k;
+        } else if b.css_name().as_str() != "radio" {
+            SETTINGS
+                .write()
                 .catalogue
                 .get_mut("browser")
                 .unwrap()
                 .get_mut(&browser_index)
-                .unwrap();
-            let pos = vec
-                .binary_search(&(i, k))
-                .expect("deactivated choice not in list");
-            vec.remove(pos);
+                .unwrap()[i] = 0;
         }
     }
 }

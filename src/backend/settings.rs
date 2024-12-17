@@ -15,5 +15,7 @@ pub struct Settings {
     // TODO: impl accent colors
     pub accent: usize,
 
-    pub catalogue: HashMap<String, HashMap<usize, Vec<(usize, usize)>>>,
+    pub catalogue: HashMap<String, HashMap<usize, Vec<usize>>>,
+
+    pub actions: [Vec<String>; crate::cfg::ACTION_TYPES],
 }

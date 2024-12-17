@@ -4,17 +4,26 @@ use steps::Step;
 use crate::pages::_11_installing::InstallingPageMsg;
 
 pub mod dnf;
+pub mod flatpak;
 pub mod settings;
 pub mod steps;
 
+static REQWEST_CLIENT: std::sync::LazyLock<reqwest::Client> =
+    std::sync::LazyLock::new(reqwest::Client::new);
+
 #[tracing::instrument]
 pub async fn start_install(
-    settings: settings::Settings,
+    mut settings: settings::Settings,
     sender: Sender<InstallingPageMsg>,
 ) -> color_eyre::Result<()> {
     tracing::info!("Starting installation");
     for stage in steps::Stage::all() {
-        sender.send(InstallingPageMsg::UpdStage(*stage));
+        tracing::debug!(?stage, "Running pre()");
+        stage.pre(&mut settings, sender.clone()).await?;
+        tracing::info!(?stage, "Running stage");
+        sender
+            .send(InstallingPageMsg::UpdStage(*stage))
+            .expect("sender dropped?");
         stage.run(&settings, sender.clone()).await?;
     }
     Ok(())

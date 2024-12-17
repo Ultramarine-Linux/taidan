@@ -175,12 +175,12 @@ crate::generate_component!(CategoryWindow {
                 if let Some(opts) = apps.get(&index) {
                     row.model().populate_optlist(&self.optlist, &self.category, index, &opts.iter().copied());
                 } else {
-                    apps.insert(index, vec![]);
+                    apps.insert(index, vec![0;CFG.catalogue.iter().find(|c| c.name == self.category).expect("can't find category").choices[index].options.len()]);
                     row.model().populate_optlist(&self.optlist, &self.category,index, &std::iter::empty());
                 }
             } else {
                 let mut map = std::collections::HashMap::new();
-                map.insert(index, vec![]);
+                map.insert(index, vec![0;CFG.catalogue.iter().find(|c| c.name == self.category).expect("can't find category").choices[index].options.len()]);
                 ctlg.insert(self.category.clone(), map);
                 row.model().populate_optlist(&self.optlist, &self.category, index, &std::iter::empty());
             }
@@ -240,7 +240,7 @@ crate::generate_component!(CatRow {
 impl CatRow {
     /// # Panics
     /// this assumes there are at least 1 element in each checkbox list
-    fn populate_optlist<I: Iterator<Item = (usize, usize)> + Clone>(
+    fn populate_optlist<I: Iterator<Item = usize> + Clone>(
         &self,
         list: &gtk::ListBox,
         cat: &str,
@@ -249,24 +249,23 @@ impl CatRow {
     ) {
         self.choice.options.iter().enumerate().for_each(|(i, opt)| {
             let inneroptlist = gtk::Box::new(gtk::Orientation::Vertical, 8);
-            let iter = optlist.clone().filter(|(j, _)| i == *j).map(|(_, j)| j);
+            let mut iter = optlist.clone().skip(i);
             match opt {
-                crate::cfg::ChoiceOption::Checkbox(list) => (list.iter().enumerate())
-                    .map(|(k, s)| {
-                        let btn = gtk::CheckButton::builder()
-                            .label(s)
-                            .active(iter.clone().contains(&k))
-                            .build();
-                        btn.connect_toggled(on_choice_toggled(cat, cat_index, i, k));
-                        btn
-                    })
-                    .for_each(|btn| inneroptlist.append(&btn)),
+                crate::cfg::ChoiceOption::Checkbox(lbl) => inneroptlist.append(&{
+                    let btn = gtk::CheckButton::builder()
+                        .label(lbl)
+                        .active(iter.next().is_some())
+                        .build();
+                    btn.connect_toggled(on_choice_toggled(cat, cat_index, i, 1));
+                    btn
+                }),
                 crate::cfg::ChoiceOption::Radio(list) => {
+                    let active_index = iter.next().expect("no such option");
                     let btnlist = (list.iter().enumerate())
                         .map(|(k, s)| {
                             let btn = gtk::CheckButton::builder()
                                 .label(s)
-                                .active(iter.clone().contains(&k))
+                                .active(k == active_index)
                                 .build();
                             btn.connect_toggled(on_choice_toggled(cat, cat_index, i, k));
                             btn
@@ -297,20 +296,15 @@ fn on_choice_toggled(
                 .get_mut(&cat)
                 .unwrap()
                 .get_mut(&cat_index)
-                .unwrap()
-                .push((i, k));
-        } else {
-            let mut sett = SETTINGS.write();
-            let vec = sett
+                .unwrap()[i] = k;
+        } else if b.css_name().as_str() != "radio" {
+            SETTINGS
+                .write()
                 .catalogue
                 .get_mut(&cat)
                 .unwrap()
                 .get_mut(&cat_index)
-                .unwrap();
-            let pos = vec
-                .binary_search(&(i, k))
-                .expect("deactivated choice not in list");
-            vec.remove(pos);
+                .unwrap()[i] = 0;
         }
     }
 }

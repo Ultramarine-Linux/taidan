@@ -95,13 +95,13 @@ pub struct Choice {
 
 #[derive(Debug, Clone)]
 pub enum ChoiceOption {
-    Checkbox(Box<[String]>),
+    Checkbox(String),
     Radio(Box<[String]>),
 }
 impl ChoiceOption {
     const fn as_dimension(&self) -> usize {
         match self {
-            Self::Checkbox(v) => v.len().wrapping_add(1),
+            Self::Checkbox(_) => 2,
             Self::Radio(v) => v.len(),
         }
     }
@@ -115,13 +115,58 @@ pub enum Action {
     Shell(String),
 }
 
+pub const ACTION_TYPES: usize = 4;
+
+impl Action {
+    #[must_use]
+    pub const fn as_int(&self) -> usize {
+        match self {
+            Self::EnableYumRepo(_) => 0,
+            Self::Rpm(_) => 1,
+            Self::Flatpak(_) => 2,
+            Self::Shell(_) => 3,
+        }
+    }
+    #[must_use]
+    pub fn as_inner_str(&self) -> &str {
+        match self {
+            Self::EnableYumRepo(s) | Self::Rpm(s) | Self::Flatpak(s) | Self::Shell(s) => s,
+        }
+    }
+    #[must_use]
+    pub fn consume_inner_str(self) -> String {
+        match self {
+            Self::EnableYumRepo(s) | Self::Rpm(s) | Self::Flatpak(s) | Self::Shell(s) => s,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub enum ChoiceActions {
     Traverse(Box<[Self]>),
-    List(Box<[Self]>),
+    List(Box<[Action]>),
     #[default]
     Todo,
     Action(Action),
+}
+
+impl ChoiceActions {
+    #[must_use]
+    pub fn get_action<'a>(
+        &'a self,
+        opts: &[usize],
+    ) -> Option<Box<dyn Iterator<Item = &'a Action> + 'a>> {
+        match opts.iter().try_fold(self, |this, &idx| {
+            let Self::Traverse(inner) = this else {
+                return None;
+            };
+            inner.get(idx)
+        })? {
+            Self::Todo | Self::Traverse(_) => None,
+            Self::List(actions) => Some(Box::new(actions.iter())),
+            Self::Action(action) => Some(Box::new(std::iter::once(action))),
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -142,19 +187,31 @@ impl TryFrom<&str> for ChoiceActions {
         }
         if value.contains(';') {
             return Ok(Self::List(
-                value.split(';').map(TryInto::try_into).try_collect()?,
+                value
+                    .split(';')
+                    .filter_map(|s| s.split_once(':'))
+                    .map(TryInto::try_into)
+                    .try_collect()?,
             ));
         }
         let Some((id, val)) = value.split_once(':') else {
             tracing::warn!("Found action `{value}` (no type), treating as shell script");
             return Ok(Self::Action(Action::Shell(value.to_owned())));
         };
-        Ok(match id {
-            "enable_yum_repo" => Self::Action(Action::EnableYumRepo(val.to_owned())),
-            "rpm" => Self::Action(Action::Rpm(val.to_owned())),
-            "flatpak" => Self::Action(Action::Flatpak(val.to_owned())),
-            "shell" => Self::Action(Action::Shell(val.to_owned())),
-            x => return Err(format!("Unknown action type `{x}` (value `{val}`)")),
+        (id, val).try_into().map(ChoiceActions::Action)
+    }
+}
+
+impl TryFrom<(&str, &str)> for Action {
+    type Error = String;
+
+    fn try_from((k, v): (&str, &str)) -> Result<Self, Self::Error> {
+        Ok(match k {
+            "enable_yum_repo" => Self::EnableYumRepo(v.to_owned()),
+            "rpm" => Self::Rpm(v.to_owned()),
+            "flatpak" => Self::Flatpak(v.to_owned()),
+            "shell" => Self::Shell(v.to_owned()),
+            x => return Err(format!("Unknown action type `{x}` (value `{v}`)")),
         })
     }
 }
@@ -184,25 +241,40 @@ impl Choice {
                         .suggestion(ONLY_ALLOW_OPT_KEY)
                         .note("This should be unreachable, please report this bug."));
                 };
-                let (Value::String(key), Value::Sequence(choices)) = first else {
+                let (Value::String(key), choices) = first else {
                     let (k, v) = first;
                     return Err(eyre!("Unexpected key `{k:?}`, value `{v:?}` in `options:`")
                         .suggestion(ONLY_ALLOW_OPT_KEY)
                         .suggestion("Only sequences are accepted as values."));
                 };
-                let choices = choices
-                    .iter_mut()
-                    .filter_map(|v| {
-                        if let Value::String(s) = v {
-                            Some(std::mem::take(s))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
                 Ok(match &**key {
-                    "checkbox" => ChoiceOption::Checkbox(choices),
-                    "radio" => ChoiceOption::Radio(choices),
+                    "checkbox" => ChoiceOption::Checkbox({
+                        let Value::String(s) = choices else {
+                            return Err(eyre!(
+                                "Expected string, found `{choices:?}` in `checkbox:`"
+                            ));
+                        };
+                        std::mem::take(s)
+                    }),
+                    "radio" => ChoiceOption::Radio({
+                        let Value::Sequence(choices) = choices else {
+                            return Err(eyre!(
+                                "Expected sequence, found `{choices:?}` in `radio:`"
+                            ));
+                        };
+                        choices
+                            .iter_mut()
+                            .map(|s| {
+                                if let Value::String(s) = s {
+                                    Ok(std::mem::take(s))
+                                } else {
+                                    Err(eyre!(
+                                        "Expected string, found `{s:?}` in `radio:` sequence"
+                                    ))
+                                }
+                            })
+                            .try_collect()?
+                    }),
                     x => {
                         return Err(eyre!("Unexpected key `{x}:` in `options:`")
                             .suggestion(ONLY_ALLOW_OPT_KEY))

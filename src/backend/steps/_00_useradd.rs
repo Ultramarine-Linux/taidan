@@ -3,6 +3,7 @@ use crate::prelude::*;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct UserAdd;
 impl super::Step for UserAdd {
+    #[tracing::instrument]
     async fn run(
         &self,
         settings: &crate::backend::settings::Settings,
