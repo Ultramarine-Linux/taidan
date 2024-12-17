@@ -192,6 +192,13 @@ crate::generate_component!(CategoryWindow {
         set_child = &gtk::Box {
             set_orientation: gtk::Orientation::Vertical,
             libhelium::AppBar {},
+
+            gtk::Label {
+                set_label: &gettext(&model.category),
+                add_css_class: "view-subtitle",
+                inline_css: "font-weight: bold",
+            },
+
             #[name(viewdual)] #[template] crate::ui::Category {
                 #[template_child] optlist {
                     #[local_ref] optlist ->

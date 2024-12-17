@@ -16,3 +16,5 @@ pub mod _08_theme;
 pub mod _09_browser;
 pub mod _10_categories;
 pub mod _11_installing;
+pub mod _12_finish;
+pub mod _13_error;

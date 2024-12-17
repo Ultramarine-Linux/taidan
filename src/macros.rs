@@ -14,7 +14,7 @@ macro_rules! generate_pages {
         impl TryFrom<usize> for $Page {
             type Error = ();
 
-            fn try_from(value: usize) -> Result<Self, Self::Error> {
+            fn try_from(value: usize) -> Result<Self, ()> {
                 Ok(match value {
                     $( $num => Self::[<$page:camel>], )+
                     _ => return Err(()),

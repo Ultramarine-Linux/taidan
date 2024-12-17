@@ -26,5 +26,8 @@ pub async fn start_install(
             .expect("sender dropped?");
         stage.run(&settings, sender.clone()).await?;
     }
+    sender
+        .send(InstallingPageMsg::Finish)
+        .expect("sender dropped?");
     Ok(())
 }

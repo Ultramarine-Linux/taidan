@@ -40,6 +40,8 @@ generate_pages!(Page AppModel AppMsg:
     09: Browser,
     10: Categories,
     11: Installing,
+    12: Finish,
+    13: Error,
 );
 
 #[derive(Debug)]
@@ -53,6 +55,7 @@ pub enum NavAction {
 #[derive(Debug)]
 pub enum AppMsg {
     Nav(NavAction),
+    InstallError(String),
 }
 
 #[allow(clippy::str_to_string)]
@@ -92,6 +95,8 @@ impl SimpleComponent for AppModel {
                     Page::Browser => *model.browser_page.widget(),
                     Page::Categories => *model.categories_page.widget(),
                     Page::Installing => *model.installing_page.widget(),
+                    Page::Finish => *model.finish_page.widget(),
+                    Page::Error => *model.error_page.widget(),
                 }
             }
         }
@@ -120,7 +125,7 @@ impl SimpleComponent for AppModel {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, message: Self::Input, _sender: ComponentSender<Self>) {
+    fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>) {
         tracing::trace!(?message, "AppModel: Received message");
         match message {
             AppMsg::Nav(NavAction::Next)
@@ -148,10 +153,14 @@ impl SimpleComponent for AppModel {
                     .try_into()
                     .expect("No next page!");
                 if self.page == Page::Installing {
-                    relm4::spawn(backend::start_install(
-                        SETTINGS.read().clone(),
-                        self.installing_page.sender().clone(),
-                    ));
+                    let inst_sender = self.installing_page.sender().clone();
+                    let ss = sender.clone();
+                    let sett = SETTINGS.read().clone();
+                    sender.oneshot_command(async move {
+                        if let Err(e) = backend::start_install(sett, inst_sender).await {
+                            ss.input(Self::Input::InstallError(format!("{e:#?}")));
+                        }
+                    });
                 }
             }
             AppMsg::Nav(NavAction::Back) => {
@@ -159,6 +168,13 @@ impl SimpleComponent for AppModel {
                     .wrapping_sub(1)
                     .try_into()
                     .expect("No prev page!");
+            }
+            AppMsg::InstallError(msg) => {
+                self.page = Page::Error;
+                self.error_page
+                    .sender()
+                    .send(pages::_13_error::ErrorPageMsg::Receive(msg))
+                    .expect("sender dropped?");
             }
         }
     }
