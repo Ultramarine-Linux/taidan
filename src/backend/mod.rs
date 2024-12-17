@@ -31,3 +31,23 @@ pub async fn start_install(
         .expect("sender dropped?");
     Ok(())
 }
+
+#[tracing::instrument]
+pub async fn start_simple_install(
+    settings: settings::Settings,
+    sender: Sender<InstallingPageMsg>,
+) -> color_eyre::Result<()> {
+    tracing::info!("Starting installation");
+    tracing::info!("Running UserAdd");
+    steps::Stage::UserAdd(Default::default())
+        .run(&settings, sender.clone())
+        .await?;
+    tracing::info!("Running SetTime");
+    steps::Stage::SetTime(Default::default())
+        .run(&settings, sender.clone())
+        .await?;
+    sender
+        .send(InstallingPageMsg::Finish)
+        .expect("sender dropped?");
+    Ok(())
+}

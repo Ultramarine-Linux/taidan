@@ -132,10 +132,14 @@ impl SimpleComponent for AppModel {
                 if self.page == Page::Password && SETTINGS.read().skipconfig =>
             {
                 self.page = Page::Installing;
-                relm4::spawn(backend::start_install(
-                    SETTINGS.read().clone(),
-                    self.installing_page.sender().clone(),
-                ));
+                let inst_sender = self.installing_page.sender().clone();
+                let ss = sender.clone();
+                let sett = SETTINGS.read().clone();
+                sender.oneshot_command(async move {
+                    if let Err(e) = backend::start_simple_install(sett, inst_sender).await {
+                        ss.input(Self::Input::InstallError(format!("{e:#?}")));
+                    }
+                });
             }
             AppMsg::Nav(NavAction::Next) if usize::from(self.page) == 3 => {
                 tracing::trace!("Skipping to page 7 after Page::Internet");
