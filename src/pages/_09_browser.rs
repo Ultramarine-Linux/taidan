@@ -143,12 +143,12 @@ impl BrowserRow {
     ) {
         self.choice.options.iter().enumerate().for_each(|(i, opt)| {
             let inneroptlist = gtk::Box::new(gtk::Orientation::Vertical, 8);
-            let iter = optlist.clone().skip(i);
+            let mut iter = optlist.clone().skip(i);
             match opt {
                 crate::cfg::ChoiceOption::Checkbox(lbl) => inneroptlist.append(&{
                     let btn = gtk::CheckButton::builder()
                         .label(lbl)
-                        .active(iter.clone().next().is_some())
+                        .active(iter.next().is_some())
                         .build();
                     btn.connect_toggled(on_choice_toggled(browser_index, i, 1));
                     btn

@@ -14,6 +14,7 @@ use crate::backend::steps::{
     _05_dnfdownloadapps::DnfDownloadApps, _06_dnfinstallapps::DnfInstallApps,
 };
 
+#[allow(async_fn_in_trait, clippy::unused_async)]
 #[enum_dispatch::enum_dispatch(Stage)]
 pub trait Step {
     async fn run(

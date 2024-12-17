@@ -8,6 +8,7 @@ use crate::prelude::*;
 /// # Panics
 /// No shut up clippy this function is mathematically impossible to panic
 #[allow(clippy::arithmetic_side_effects)]
+#[allow(clippy::indexing_slicing)]
 pub(super) async fn handle_flatpak(
     sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
     f: impl Fn(&mut tokio::process::Command) -> &mut tokio::process::Command + Send,

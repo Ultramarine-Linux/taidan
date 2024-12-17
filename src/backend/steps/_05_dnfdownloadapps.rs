@@ -1,10 +1,9 @@
-use futures::{StreamExt, TryStreamExt};
-
 use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DnfDownloadApps;
 impl super::Step for DnfDownloadApps {
+    #[allow(clippy::indexing_slicing)]
     #[tracing::instrument]
     async fn pre(
         &self,
