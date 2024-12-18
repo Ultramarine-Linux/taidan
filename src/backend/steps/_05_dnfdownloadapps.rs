@@ -50,6 +50,17 @@ impl super::Step for DnfDownloadApps {
             enable_repo.enable_repo(repo).await?;
         }
         enable_repo.save().await?;
+        for copr in &settings.actions[4] {
+            let dnf = tokio::process::Command::new("dnf")
+                .args(["copr", "enable", copr])
+                .status()
+                .await
+                .wrap_err("fail to run `dnf`")?;
+            if !dnf.success() {
+                return Err(eyre!("`dnf copr enable {copr}` failed")
+                    .note(format!("Exit code: {:?}", dnf.code())));
+            }
+        }
 
         // run flatpak and dnf in parallel
         // this should be safe, supposedly they don't affect each other

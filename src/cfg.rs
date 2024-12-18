@@ -113,9 +113,10 @@ pub enum Action {
     Rpm(String),
     Flatpak(String),
     Shell(String),
+    Copr(String),
 }
 
-pub const ACTION_TYPES: usize = 4;
+pub const ACTION_TYPES: usize = 5;
 
 impl Action {
     #[must_use]
@@ -125,18 +126,27 @@ impl Action {
             Self::Rpm(_) => 1,
             Self::Flatpak(_) => 2,
             Self::Shell(_) => 3,
+            Self::Copr(_) => 4,
         }
     }
     #[must_use]
     pub fn as_inner_str(&self) -> &str {
         match self {
-            Self::EnableYumRepo(s) | Self::Rpm(s) | Self::Flatpak(s) | Self::Shell(s) => s,
+            Self::EnableYumRepo(s)
+            | Self::Rpm(s)
+            | Self::Flatpak(s)
+            | Self::Shell(s)
+            | Self::Copr(s) => s,
         }
     }
     #[must_use]
     pub fn consume_inner_str(self) -> String {
         match self {
-            Self::EnableYumRepo(s) | Self::Rpm(s) | Self::Flatpak(s) | Self::Shell(s) => s,
+            Self::EnableYumRepo(s)
+            | Self::Rpm(s)
+            | Self::Flatpak(s)
+            | Self::Shell(s)
+            | Self::Copr(s) => s,
         }
     }
 }
@@ -211,6 +221,7 @@ impl TryFrom<(&str, &str)> for Action {
             "rpm" => Self::Rpm(v.to_owned()),
             "flatpak" => Self::Flatpak(v.to_owned()),
             "shell" => Self::Shell(v.to_owned()),
+            "copr" => Self::Copr(v.to_owned()),
             x => return Err(format!("Unknown action type `{x}` (value `{v}`)")),
         })
     }
