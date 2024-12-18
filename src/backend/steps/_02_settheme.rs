@@ -7,6 +7,11 @@ impl super::Step for SetTheme {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
-        todo!()
+        super::super::theme::set_theme(
+            Some(&settings.username),
+            settings.theme_is_dark,
+            settings.accent,
+        )
+        .await
     }
 }

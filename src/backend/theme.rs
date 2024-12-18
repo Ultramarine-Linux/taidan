@@ -77,13 +77,12 @@ impl AccentColor {
     }
     pub async fn plasma(self, user: &str, is_dark: bool) -> color_eyre::Result<()> {
         let theme = if is_dark { "BreezeDark" } else { "BreezeLight" };
+        let accent = self.w3_color_keywords();
         let p = tokio::process::Command::new("su")
             .args([
+                user,
                 "-c",
-                &format!(
-                    "plasma-apply-colorscheme {theme} -a {}",
-                    self.w3_color_keywords()
-                ),
+                &format!("plasma-apply-colorscheme {theme} -a {accent}"),
             ])
             .status()
             .await
@@ -97,10 +96,11 @@ impl AccentColor {
     }
 }
 
-pub async fn plasma_set_theme_only(is_dark: bool) -> color_eyre::Result<()> {
+pub async fn plasma_set_theme_only(user: &str, is_dark: bool) -> color_eyre::Result<()> {
     let theme = if is_dark { "BreezeDark" } else { "BreezeLight" };
-    let p = tokio::process::Command::new("plasma-apply-colorscheme")
-        .arg(theme)
+
+    let p = tokio::process::Command::new("su")
+        .args([user, "-c", &format!("plasma-apply-colorscheme {theme}")])
         .status()
         .await
         .wrap_err("fail to run `plasma-apply-colorscheme`")?;
@@ -131,7 +131,7 @@ pub async fn set_theme(
                 .await
                 .wrap_err("cannot set accent and theme for plama")?;
         } else {
-            plasma_set_theme_only(is_dark)
+            plasma_set_theme_only(user, is_dark)
                 .await
                 .wrap_err("cannot set theme for plasma")?;
         }

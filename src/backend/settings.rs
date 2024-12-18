@@ -13,8 +13,7 @@ pub struct Settings {
     pub nightlight: bool,
 
     pub theme_is_dark: bool,
-    // TODO: impl accent colors
-    pub accent: usize,
+    pub accent: Option<super::theme::AccentColor>,
 
     pub catalogue: HashMap<String, HashMap<usize, Vec<usize>>>,
 
