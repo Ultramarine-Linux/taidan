@@ -64,18 +64,25 @@ crate::generate_page!(Internet {
 );
 
 async fn check_online(sender: ComponentSender<InternetPage>) {
+    let mut is_online = false;
     loop {
         tokio::select! {
             Ok(200) = async { REQWEST_CLIENT.get("https://fyralabs.com/.well-known/security.txt").send().await.map(|r| r.status().as_u16()) } => {
-                sender.input(InternetPageMsg::IsOnline(true));
+                is_online = true;
             }
             Ok(200) = async { REQWEST_CLIENT.get("https://security.access.redhat.com/data/meta/v1/security.txt").send().await.map(|r| r.status().as_u16()) } => {
-                sender.input(InternetPageMsg::IsOnline(true));
+                is_online = true;
             }
             else => {
-                sender.input(InternetPageMsg::IsOnline(false));
+                is_online = false;
             }
         }
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        sender.input(InternetPageMsg::IsOnline(is_online));
+        tokio::time::sleep(std::time::Duration::from_secs(if is_online {
+            30
+        } else {
+            5
+        }))
+        .await;
     }
 }
