@@ -12,6 +12,8 @@ impl super::Step for SetTheme {
             settings.theme_is_dark,
             settings.accent,
         )
-        .await
+        .await?;
+        super::super::theme::set_night_light(Some(&settings.username), settings.nightlight).await?;
+        Ok(())
     }
 }

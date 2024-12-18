@@ -146,3 +146,23 @@ pub async fn set_theme(
     }
     Ok(())
 }
+
+pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::Result<()> {
+    let mut tmp = Default::default();
+    let user = user.unwrap_or_else(|| {
+        tmp = users::get_current_username().expect("can't get current username");
+        tmp.to_str().unwrap()
+    });
+    if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
+        let p = tokio::process::Command::new("su").args([user, "-c", &format!("kwriteconfig6 --file ~/.config/kwinrc --group NightColor --key Active --type bool {enabled}")]).status().await.wrap_err("fail to run `kwriteconfig6`")?;
+        if !p.success() {
+            return Err(eyre!("`kwriteconfig6` failed").note(format!("Exit code: {:?}", p.code())));
+        }
+    } else {
+        let p = tokio::process::Command::new("su").args([user, "-c", &format!("gsettings set org.gnome.settings-daemon.plugins.color night-light-enabled {enabled}")]).status().await.wrap_err("fail to run `gsettings`")?;
+        if !p.success() {
+            return Err(eyre!("`gsettings` failed").note(format!("Exit code: {:?}", p.code())));
+        }
+    }
+    Ok(())
+}

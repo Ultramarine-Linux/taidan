@@ -39,8 +39,9 @@ crate::generate_page!(NightLight:
         #[template] crate::ui::SwitchBox {
             set_title: &gettext("Night Light"),
             #[template_child] switch {
-                connect_state_set => move |_, state| {
+                connect_state_set[sender] => move |_, state| {
                     SETTINGS.write().nightlight = state;
+                    sender.oneshot_command(async move { crate::backend::theme::set_night_light(None, state).await.unwrap()});
                     glib::Propagation::Proceed
                 },
             }
