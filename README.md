@@ -3,6 +3,25 @@
 Taidan is a GUI Out-Of-Box-Experience (OOBE) and Welcome App for Ultramarine
 Linux, written in Rust and the [Helium] toolkit.
 
+## 📦 Dependencies
+
+```
+libhelium
+gsettings or (plasma-apply-colorscheme with kwriteconfig6)
+shadow-utils
+systemd-udev [esp. with systemd-timesyncd.service]
+sh
+dnf5 with dnf5-command(copr)
+flatpak
+```
+
+### 🛠️ Build Dependencies
+
+```
+pkgconfig(openssl)
+pkgconfig(libhelium-1)
+```
+
 ## Testing
 
 ```sh
