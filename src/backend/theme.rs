@@ -121,7 +121,7 @@ pub async fn set_theme(
 ) -> color_eyre::Result<()> {
     let mut tmp = Default::default();
     let user = user.unwrap_or_else(|| {
-        tmp = users::get_current_username().expect("can't get current username");
+        tmp = uzers::get_current_username().expect("can't get current username");
         tmp.to_str().unwrap()
     });
     if let Ok(true) = tokio::fs::try_exists("/usr/bin/plasma-apply-colorscheme").await {
@@ -150,7 +150,7 @@ pub async fn set_theme(
 pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::Result<()> {
     let mut tmp = Default::default();
     let user = user.unwrap_or_else(|| {
-        tmp = users::get_current_username().expect("can't get current username");
+        tmp = uzers::get_current_username().expect("can't get current username");
         tmp.to_str().unwrap()
     });
     if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {

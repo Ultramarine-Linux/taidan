@@ -10,7 +10,7 @@ keywords = ["oobe", "ultramarine", "linux"]
 
 [dependencies]
 color-eyre = "0.6.3"
-const_format = "0.2.33"
+const_format = "0.2.34"
 #dbus = { version = "0.9.7", features = ["vendored"] }
 enum_dispatch = "0.3.13"
 #fusebox = { git = "https://github.com/tau-OS/rust", version = "0.5.0", branch = "stable" }
@@ -25,9 +25,9 @@ reqwest = { version = "0.12.9", features = [
     "http2",
     "native-tls-vendored",
 ], default-features = false }
-serde = { version = "1.0.214", features = ["derive"] }
+serde = { version = "1.0.216", features = ["derive"] }
 serde_yaml = "0.9.34"
-tempfile = "3.13.0"
+tempfile = "3.14.0"
 tokio = { version = "1.42.0", features = [
     "fs",
     "io-util",
@@ -35,11 +35,11 @@ tokio = { version = "1.42.0", features = [
     "process",
 ] }
 toml_edit = "0.22.22"
-tracing = "0.1.40"
+tracing = "0.1.41"
 tracing-appender = "0.2.3"
-tracing-journald = "0.3.0"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-users = "0.11.0"
+tracing-journald = "0.3.1"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+uzers = "0.12.1"
 xcrypt = "0.3.0"
 #zbus = "5.2.0"
 
