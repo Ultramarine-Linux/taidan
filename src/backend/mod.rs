@@ -7,6 +7,7 @@ pub mod dnf;
 pub mod flatpak;
 pub mod settings;
 pub mod steps;
+pub mod theme;
 
 use crate::prelude::REQWEST_CLIENT;
 

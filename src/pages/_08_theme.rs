@@ -3,18 +3,23 @@ crate::generate_page!(Theme:
         let (light0, dark0) = (widgets.lightbox.clone(), widgets.darkbox.clone());
         let (light1, dark1) = (widgets.lightbox.clone(), widgets.darkbox.clone());
         let (ctl_light, ctl_dark) = (gtk::GestureClick::new(), gtk::GestureClick::new());
+        let (s0, s1) = (sender.clone(), sender);
         ctl_light.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
         ctl_dark.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
         // FIXME: WHY IS THERE NO BORDER
         ctl_light.connect_pressed(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
             SETTINGS.write().theme_is_dark = false;
+            // TODO: accent?
+            s0.oneshot_command(async { crate::backend::theme::set_theme(None, false, None).await.unwrap()});
             light0.inline_css("border-radius: 16px");
             dark1.inline_css("border-radius: 0px");
         });
         ctl_dark.connect_pressed(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
             SETTINGS.write().theme_is_dark = true;
+            // TODO: accent?
+            s1.oneshot_command(async { crate::backend::theme::set_theme(None, true, None).await.unwrap()});
             dark0.inline_css("border-radius: 16px");
             light1.inline_css("border-radius: 0px");
         });
