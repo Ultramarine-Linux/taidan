@@ -9,6 +9,9 @@ impl super::Step for DnfInstallApps {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
+        if settings.nointernet {
+            return Ok(());
+        }
         // run flatpak and dnf in parallel
         // this should be safe, supposedly they don't affect each other
         futures::future::try_join(

@@ -14,3 +14,6 @@ pub use relm4::{
 };
 
 pub use crate::{NavAction, CFG, SETTINGS};
+
+pub(crate) static REQWEST_CLIENT: std::sync::LazyLock<reqwest::Client> =
+    std::sync::LazyLock::new(reqwest::Client::new);

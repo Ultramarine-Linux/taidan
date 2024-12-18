@@ -11,11 +11,14 @@ keywords = ["oobe", "ultramarine", "linux"]
 [dependencies]
 color-eyre = "0.6.3"
 const_format = "0.2.33"
+dbus = { version = "0.9.7", features = ["vendored"] }
 enum_dispatch = "0.3.13"
+#fusebox = { git = "https://github.com/tau-OS/rust", version = "0.5.0", branch = "stable" }
 futures = "0.3.31"
 gettext-rs = "0.7.2"
 itertools = "0.13.0"
 libhelium = "0.10.0"
+nm = { package = "networkmanager", version = "0.4.1" }
 paste = "1.0.15"
 relm4 = "0.9.1"
 reqwest = { version = "0.12.9", features = [
@@ -25,7 +28,7 @@ reqwest = { version = "0.12.9", features = [
 serde = { version = "1.0.214", features = ["derive"] }
 serde_yaml = "0.9.34"
 tempfile = "3.13.0"
-tokio = { version = "1.42.0", features = ["fs", "io-util", "process"] }
+tokio = { version = "1.42.0", features = ["fs", "io-util", "macros", "process"] }
 toml_edit = "0.22.22"
 tracing = "0.1.40"
 tracing-appender = "0.2.3"

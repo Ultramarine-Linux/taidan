@@ -141,6 +141,19 @@ impl SimpleComponent for AppModel {
                     }
                 });
             }
+            AppMsg::Nav(NavAction::Next)
+                if self.page == Page::Theme && SETTINGS.read().nointernet =>
+            {
+                self.page = Page::Installing;
+                let inst_sender = self.installing_page.sender().clone();
+                let ss = sender.clone();
+                let sett = SETTINGS.read().clone();
+                sender.oneshot_command(async move {
+                    if let Err(e) = backend::start_install(sett, inst_sender).await {
+                        ss.input(Self::Input::InstallError(format!("{e:#?}")));
+                    }
+                });
+            }
             AppMsg::Nav(NavAction::Next) if usize::from(self.page) == 3 => {
                 tracing::trace!("Skipping to page 7 after Page::Internet");
                 self.page = 7.try_into().expect("No page 7!");

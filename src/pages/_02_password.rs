@@ -9,6 +9,11 @@ crate::generate_page!(Password {
     }
     update(self, message, sender) {
         SetBtnSensitive(b: bool) => self.btn_next.set_sensitive(b),
+        Enter => {
+            if self.btn_next.is_sensitive() {
+                sender.input(Self::Input::Nav(NavAction::Next));
+            }
+        }
     } => {}
 
     gtk::Box {
@@ -53,7 +58,7 @@ crate::generate_page!(Password {
                 let pass = en.text().to_string();
                 sender.input(Self::Input::SetBtnSensitive(SETTINGS.read().passwd == pass && !pass.is_empty()));
             },
-            connect_activate[sender] => move |_| if model.btn_next.is_sensitive() { sender.input(Self::Input::Nav(NavAction::Next)) }
+            connect_activate => Self::Input::Enter,
         },
     },
 

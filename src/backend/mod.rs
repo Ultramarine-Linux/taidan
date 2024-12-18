@@ -8,8 +8,7 @@ pub mod flatpak;
 pub mod settings;
 pub mod steps;
 
-static REQWEST_CLIENT: std::sync::LazyLock<reqwest::Client> =
-    std::sync::LazyLock::new(reqwest::Client::new);
+use crate::prelude::REQWEST_CLIENT;
 
 #[tracing::instrument]
 pub async fn start_install(

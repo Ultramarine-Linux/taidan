@@ -10,6 +10,9 @@ impl super::Step for DnfDownloadApps {
         settings: &mut crate::backend::settings::Settings,
         _: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
+        if settings.nointernet {
+            return Ok(());
+        }
         (settings.catalogue.iter())
             .flat_map(|(category_name, category)| {
                 let app_list = CFG.catalogue.iter().find(|cat| &cat.name == category_name);

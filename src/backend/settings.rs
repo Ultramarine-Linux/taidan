@@ -3,6 +3,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, Default)]
 pub struct Settings {
     pub skipconfig: bool,
+    pub nointernet: bool,
 
     pub fullname: String,
     pub username: String,
