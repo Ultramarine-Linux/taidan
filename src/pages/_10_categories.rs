@@ -142,6 +142,7 @@ crate::generate_component!(CategoryWindow {
     category: String,
     rows: Vec<relm4::Controller<CatRow>>,
     optlist: gtk::ListBox,
+    last_select_row: Option<usize>,
 }:
     init[optlist](_root, sender, model, widgets) for init: String {
         let category = (CFG.catalogue.iter())
@@ -167,6 +168,12 @@ crate::generate_component!(CategoryWindow {
 
     update(self, message, _sender) {
         RowSel(index: usize) => {
+            if self.last_select_row.is_some_and(|i| i == index) {
+                // deselect this
+                self.last_select_row = None;
+                SETTINGS.write().catalogue.get_mut(&self.category).unwrap().remove(&index);
+                return;
+            }
             self.optlist.remove_all();
             let row = (self.rows.get(index)).expect("row not exist called window");
             let mut sett = SETTINGS.write();
