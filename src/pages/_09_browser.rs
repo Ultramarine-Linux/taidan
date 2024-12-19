@@ -30,12 +30,12 @@ crate::generate_page!(Browser {
                 if let Some(opts) = browsers.get(&index) {
                     row.model().populate_optlist(&self.optlist, index, &opts.iter().copied());
                 } else {
-                    browsers.insert(index, vec![]);
+                    browsers.insert(index, vec![0;CFG.catalogue.iter().find(|c| c.name == "Browser").expect("can't find category").choices[index].options.len()]);
                     row.model().populate_optlist(&self.optlist, index, &std::iter::empty());
                 }
             } else {
                 let mut map = std::collections::HashMap::new();
-                map.insert(index, vec![]);
+                map.insert(index, vec![0;CFG.catalogue.iter().find(|c| c.name == "Browser").expect("can't find category").choices[index].options.len()]);
                 ctlg.insert("browser".into(), map);
                 row.model().populate_optlist(&self.optlist, index, &std::iter::empty());
             }
