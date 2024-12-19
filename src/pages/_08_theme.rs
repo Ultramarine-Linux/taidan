@@ -1,3 +1,14 @@
+use crate::backend::theme;
+
+const ENABLED_ACCENT_BTN_CSS: &str = "
+background: @color;
+color: transparent;";
+
+const DISABLED_ACCENT_BTN_CSS: &str = "
+background: alpha(@color, 0.18);
+color: transparent;
+box-shadow: inset 0 0 0 3px alpha(@color, 0.32);";
+
 crate::generate_page!(Theme:
     init(root, sender, model, widgets) {
         let (light0, dark0) = (widgets.lightbox.clone(), widgets.darkbox.clone());
@@ -11,7 +22,7 @@ crate::generate_page!(Theme:
             gesture.set_state(gtk::EventSequenceState::Claimed);
             SETTINGS.write().theme_is_dark = false;
             // TODO: accent?
-            s0.oneshot_command(async { crate::backend::theme::set_theme(None, false, None).await.unwrap()});
+            s0.oneshot_command(async { theme::set_theme(None, false, None).await.unwrap()});
             light0.inline_css("border-radius: 16px");
             dark1.inline_css("border-radius: 0px");
         });
@@ -19,12 +30,25 @@ crate::generate_page!(Theme:
             gesture.set_state(gtk::EventSequenceState::Claimed);
             SETTINGS.write().theme_is_dark = true;
             // TODO: accent?
-            s1.oneshot_command(async { crate::backend::theme::set_theme(None, true, None).await.unwrap()});
+            s1.oneshot_command(async { theme::set_theme(None, true, None).await.unwrap()});
             dark0.inline_css("border-radius: 16px");
             light1.inline_css("border-radius: 0px");
         });
         widgets.lightbox.add_controller(ctl_light);
         widgets.darkbox.add_controller(ctl_dark);
+        let first = gtk::CheckButton::new();
+        first.add_css_class("accent-mode");
+        first.inline_css(&DISABLED_ACCENT_BTN_CSS.replace("@color", theme::AccentColor::all()[0].w3_color_keywords()));
+        first.connect_toggled(on_accent_toggled(theme::AccentColor::all()[0]));
+        widgets.accentbox.append(&first);
+        theme::AccentColor::all().iter().skip(1).for_each(|&color| {
+            let btn = gtk::CheckButton::new();
+            btn.set_group(Some(&first));
+            btn.add_css_class("accent-mode");
+            btn.inline_css(&DISABLED_ACCENT_BTN_CSS.replace("@color", color.w3_color_keywords()));
+            btn.connect_toggled(on_accent_toggled(color));
+            widgets.accentbox.append(&btn);
+        });
     }
     update(self, message, sender) {} => {}
 
@@ -97,7 +121,32 @@ crate::generate_page!(Theme:
             },
         },
 
-        // TODO: list of colour buttons
+        #[name(accentbox)]
+        gtk::Box {
+            set_orientation: gtk::Orientation::Horizontal,
+            set_halign: gtk::Align::Center,
+            // ? https://github.com/tau-OS/fusebox/blob/286522b7d8f1017e8cd1379396407f29e0c83789/data/style.css#L29
+            inline_css: "
+                .accent-mode {
+                    min-height: 48px;
+                    min-width: 48px;
+                    border-radius: 12px;
+                    background: @surface_container_bg_color;
+                }
+
+                .accent-mode radio {
+                    min-height: 42px;
+                    min-width: 42px;
+                    margin: 6px;
+                }
+                .accent-mode:checked radio,
+                .accent-mode:active radio,
+                .accent-mode:hover:checked radio,
+                .accent-mode:active:checked radio {
+                    box-shadow: 0 0 0 5px @accent_color, 0 0 0 2px @view_bg_color;
+                }
+            "
+        }
     },
 
     #[template] crate::ui::PrevNextBtns {
@@ -109,3 +158,14 @@ crate::generate_page!(Theme:
         },
     }
 );
+
+fn on_accent_toggled(accent: theme::AccentColor) -> impl Fn(&gtk::CheckButton) {
+    move |b: &gtk::CheckButton| {
+        if b.is_active() {
+            SETTINGS.write().accent = Some(accent);
+            b.inline_css(&ENABLED_ACCENT_BTN_CSS.replace("@color", accent.w3_color_keywords()));
+        } else {
+            b.inline_css(&DISABLED_ACCENT_BTN_CSS.replace("@color", accent.w3_color_keywords()));
+        }
+    }
+}

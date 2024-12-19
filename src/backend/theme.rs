@@ -32,6 +32,20 @@ impl From<AccentColor> for &str {
 }
 
 impl AccentColor {
+    #[must_use]
+    pub const fn all() -> &'static [Self] {
+        &[
+            Self::Blue,
+            Self::Teal,
+            Self::Green,
+            Self::Yellow,
+            Self::Orange,
+            Self::Red,
+            Self::Pink,
+            Self::Purple,
+            Self::Slate,
+        ]
+    }
     pub async fn gsettings(self, user: &str, is_dark: bool) -> color_eyre::Result<()> {
         let p = tokio::process::Command::new("su")
             .args([
@@ -140,6 +154,7 @@ pub async fn set_theme(
         tmp = uzers::get_current_username().expect("can't get current username");
         tmp.to_str().unwrap()
     });
+    tracing::debug!(?user);
     if let Ok(true) = tokio::fs::try_exists("/usr/bin/plasma-apply-colorscheme").await {
         if let Some(accent) = accent {
             accent
@@ -169,6 +184,7 @@ pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::R
         tmp = uzers::get_current_username().expect("can't get current username");
         tmp.to_str().unwrap()
     });
+    tracing::debug!(?user);
     if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
         let p = tokio::process::Command::new("su").args([user, "-c", &format!("kwriteconfig6 --file ~/.config/kwinrc --group NightColor --key Active --type bool {enabled}")]).status().await.wrap_err("fail to run `kwriteconfig6`")?;
         if !p.success() {
