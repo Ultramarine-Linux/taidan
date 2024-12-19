@@ -46,7 +46,7 @@ impl AccentColor {
             .await
             .wrap_err("fail to run `gsettings`")?;
         if !p.success() {
-            return Err(eyre!("`gsettings` failed").note(format!("Exit code: {:?}", p.code())));
+            return Err(eyre!("cannot set accent-color").note(format!("Exit code: {:?}", p.code())));
         }
 
         let p = tokio::process::Command::new("su")
@@ -62,7 +62,23 @@ impl AccentColor {
             .await
             .wrap_err("fail to run `gsettings`")?;
         if !p.success() {
-            return Err(eyre!("`gsettings` failed").note(format!("Exit code: {:?}", p.code())));
+            return Err(eyre!("cannot set color-scheme").note(format!("Exit code: {:?}", p.code())));
+        }
+
+        let p = tokio::process::Command::new("su")
+            .args([
+                user,
+                "-c",
+                &format!(
+                    "gsettings set org.gnome.desktop.interface gtk-theme {}",
+                    if is_dark { "Adwaita-dark" } else { "Adwaita" }
+                ),
+            ])
+            .status()
+            .await
+            .wrap_err("fail to run `gsettings`")?;
+        if !p.success() {
+            return Err(eyre!("cannot set gtk-theme").note(format!("Exit code: {:?}", p.code())));
         }
 
         Ok(())
