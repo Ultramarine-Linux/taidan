@@ -47,15 +47,10 @@ impl AccentColor {
         ]
     }
     pub async fn gsettings(self, user: &str, is_dark: bool) -> color_eyre::Result<()> {
-        let p = tokio::process::Command::new("su")
-            .args([
-                user,
-                "-c",
-                &format!(
-                    "gsettings set org.gnome.desktop.interface accent-color {}",
-                    <&str>::from(self)
-                ),
-            ])
+        let p = tokio::process::Command::new("pkexec")
+            .args(["--user", user, "gsettings"])
+            .args(["set", "org.gnome.desktop.interface"])
+            .args(["accent-color", self.into()])
             .status()
             .await
             .wrap_err("fail to run `gsettings`")?;
@@ -63,14 +58,12 @@ impl AccentColor {
             return Err(eyre!("cannot set accent-color").note(format!("Exit code: {:?}", p.code())));
         }
 
-        let p = tokio::process::Command::new("su")
+        let p = tokio::process::Command::new("pkexec")
+            .args(["--user", user, "gsettings"])
+            .args(["set", "org.gnome.desktop.interface"])
             .args([
-                user,
-                "-c",
-                &format!(
-                    "gsettings set org.gnome.desktop.interface color-scheme {}",
-                    if is_dark { "prefer-dark" } else { "default" }
-                ),
+                "color-scheme",
+                if is_dark { "prefer-dark" } else { "default" },
             ])
             .status()
             .await
@@ -79,14 +72,12 @@ impl AccentColor {
             return Err(eyre!("cannot set color-scheme").note(format!("Exit code: {:?}", p.code())));
         }
 
-        let p = tokio::process::Command::new("su")
+        let p = tokio::process::Command::new("pkexec")
+            .args(["--user", user, "gsettings"])
+            .args(["set", "org.gnome.desktop.interface"])
             .args([
-                user,
-                "-c",
-                &format!(
-                    "gsettings set org.gnome.desktop.interface gtk-theme {}",
-                    if is_dark { "Adwaita-dark" } else { "Adwaita" }
-                ),
+                "gtk-theme",
+                if is_dark { "Adwaita-dark" } else { "Adwaita" },
             ])
             .status()
             .await
@@ -107,13 +98,10 @@ impl AccentColor {
     }
     pub async fn plasma(self, user: &str, is_dark: bool) -> color_eyre::Result<()> {
         let theme = if is_dark { "BreezeDark" } else { "BreezeLight" };
-        let accent = self.w3_color_keywords();
-        let p = tokio::process::Command::new("su")
-            .args([
-                user,
-                "-c",
-                &format!("plasma-apply-colorscheme {theme} -a {accent}"),
-            ])
+
+        let p = tokio::process::Command::new("pkexec")
+            .args(["--user", user, "plasma-apply-colorscheme", theme])
+            .args(["-a", self.w3_color_keywords()])
             .status()
             .await
             .wrap_err("fail to run `plasma-apply-colorscheme`")?;
@@ -129,8 +117,8 @@ impl AccentColor {
 pub async fn plasma_set_theme_only(user: &str, is_dark: bool) -> color_eyre::Result<()> {
     let theme = if is_dark { "BreezeDark" } else { "BreezeLight" };
 
-    let p = tokio::process::Command::new("su")
-        .args([user, "-c", &format!("plasma-apply-colorscheme {theme}")])
+    let p = tokio::process::Command::new("pkexec")
+        .args(["--user", user, "plasma-apply-colorscheme", theme])
         .status()
         .await
         .wrap_err("fail to run `plasma-apply-colorscheme`")?;
@@ -186,12 +174,25 @@ pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::R
     });
     tracing::debug!(?user);
     if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
-        let p = tokio::process::Command::new("su").args([user, "-c", &format!("kwriteconfig6 --file ~/.config/kwinrc --group NightColor --key Active --type bool {enabled}")]).status().await.wrap_err("fail to run `kwriteconfig6`")?;
+        let p = tokio::process::Command::new("pkexec")
+            .args(["--user", user, "kwriteconfig6"])
+            .args(["--file", "~/.config/kwinrc", "--group", "NightColor"])
+            .args(["--key", "Active"])
+            .args(["--type", "bool", &*enabled.to_string()])
+            .status()
+            .await
+            .wrap_err("fail to run `kwriteconfig6`")?;
         if !p.success() {
             return Err(eyre!("`kwriteconfig6` failed").note(format!("Exit code: {:?}", p.code())));
         }
     } else {
-        let p = tokio::process::Command::new("su").args([user, "-c", &format!("gsettings set org.gnome.settings-daemon.plugins.color night-light-enabled {enabled}")]).status().await.wrap_err("fail to run `gsettings`")?;
+        let p = tokio::process::Command::new("pkexec")
+            .args(["--user", user, "gsettings"])
+            .args(["set", "org.gnome.settings-daemon.plugins.color"])
+            .args(["night-light-enabled", &*enabled.to_string()])
+            .status()
+            .await
+            .wrap_err("fail to run `gsettings`")?;
         if !p.success() {
             return Err(eyre!("`gsettings` failed").note(format!("Exit code: {:?}", p.code())));
         }
