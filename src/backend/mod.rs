@@ -17,15 +17,15 @@ pub async fn start_install(
     sender: Sender<InstallingPageMsg>,
 ) -> color_eyre::Result<()> {
     tracing::info!("Starting installation");
-    // for stage in steps::Stage::all() {
-    //     tracing::debug!(?stage, "Running pre()");
-    //     stage.pre(&mut settings, sender.clone()).await?;
-    //     tracing::info!(?stage, "Running stage");
-    //     sender
-    //         .send(InstallingPageMsg::UpdStage(*stage))
-    //         .expect("sender dropped?");
-    //     stage.run(&settings, sender.clone()).await?;
-    // }
+    for stage in steps::Stage::all() {
+        tracing::debug!(?stage, "Running pre()");
+        stage.pre(&mut settings, sender.clone()).await?;
+        tracing::info!(?stage, "Running stage");
+        sender
+            .send(InstallingPageMsg::UpdStage(*stage))
+            .expect("sender dropped?");
+        stage.run(&settings, sender.clone()).await?;
+    }
     sender
         .send(InstallingPageMsg::Finish)
         .expect("sender dropped?");
