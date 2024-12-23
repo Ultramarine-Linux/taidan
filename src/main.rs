@@ -132,29 +132,15 @@ impl SimpleComponent for AppModel {
                 if self.page == Page::Password && SETTINGS.read().skipconfig =>
             {
                 self.page = Page::Installing;
-                let inst_sender = self.installing_page.sender().clone();
-                let ss = sender.clone();
-                let sett = SETTINGS.read().clone();
-                sender.oneshot_command(async move {
-                    if let Err(e) = backend::start_simple_install(sett, inst_sender).await {
-                        ss.input(Self::Input::InstallError(format!("{e:#?}")));
-                    }
-                });
+                self.run_install(sender, backend::start_simple_install);
             }
             AppMsg::Nav(NavAction::Next)
                 if self.page == Page::Theme && SETTINGS.read().nointernet =>
             {
                 self.page = Page::Installing;
-                let inst_sender = self.installing_page.sender().clone();
-                let ss = sender.clone();
-                let sett = SETTINGS.read().clone();
-                sender.oneshot_command(async move {
-                    if let Err(e) = backend::start_install(sett, inst_sender).await {
-                        ss.input(Self::Input::InstallError(format!("{e:#?}")));
-                    }
-                });
+                self.run_install(sender, backend::start_install);
             }
-            AppMsg::Nav(NavAction::Next) if usize::from(self.page) == 3 => {
+            AppMsg::Nav(NavAction::Next) if self.page == Page::Internet => {
                 tracing::trace!("Skipping to page 7 after Page::Internet");
                 self.page = 7.try_into().expect("No page 7!");
             }
@@ -170,14 +156,7 @@ impl SimpleComponent for AppModel {
                     .try_into()
                     .expect("No next page!");
                 if self.page == Page::Installing {
-                    let inst_sender = self.installing_page.sender().clone();
-                    let ss = sender.clone();
-                    let sett = SETTINGS.read().clone();
-                    sender.oneshot_command(async move {
-                        if let Err(e) = backend::start_install(sett, inst_sender).await {
-                            ss.input(Self::Input::InstallError(format!("{e:#?}")));
-                        }
-                    });
+                    self.run_install(sender, backend::start_install);
                 }
             }
             AppMsg::Nav(NavAction::Back) => {
@@ -197,6 +176,24 @@ impl SimpleComponent for AppModel {
     }
 }
 
+type Sd = relm4::Sender<pages::_11_installing::InstallingPageMsg>;
+impl AppModel {
+    #[allow(clippy::needless_pass_by_value)]
+    fn run_install<Fut, F>(&self, sender: ComponentSender<Self>, f: F)
+    where
+        Fut: std::future::Future<Output = color_eyre::Result<()>> + Send,
+        F: Fn(backend::settings::Settings, Sd) -> Fut + Send + 'static,
+    {
+        let inst_sender = self.installing_page.sender().clone();
+        let (ss, sett) = (sender.clone(), SETTINGS.read().clone());
+        sender.oneshot_command(async move {
+            if let Err(e) = f(sett, inst_sender).await {
+                ss.input(AppMsg::InstallError(format!("{e:#?}")));
+            }
+        });
+    }
+}
+
 #[allow(clippy::missing_errors_doc)]
 #[allow(clippy::missing_panics_doc)]
 fn main() -> std::io::Result<()> {
@@ -207,7 +204,7 @@ fn main() -> std::io::Result<()> {
 
     let app = libhelium::Application::builder()
         .application_id(APPID)
-        .flags(libhelium::gtk::gio::ApplicationFlags::default())
+        .flags(gtk::gio::ApplicationFlags::default())
         // SAFETY: placeholder
         .default_accent_color(unsafe {
             &libhelium::RGBColor::from_glib_none(std::ptr::from_mut(

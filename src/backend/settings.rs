@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub skipconfig: bool,
     pub nointernet: bool,

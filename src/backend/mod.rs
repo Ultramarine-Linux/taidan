@@ -32,6 +32,7 @@ pub async fn start_install(
     Ok(())
 }
 
+#[allow(clippy::default_trait_access)]
 #[tracing::instrument]
 pub async fn start_simple_install(
     settings: settings::Settings,
