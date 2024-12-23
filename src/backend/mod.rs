@@ -52,3 +52,59 @@ pub async fn start_simple_install(
         .expect("sender dropped?");
     Ok(())
 }
+
+#[allow(clippy::arithmetic_side_effects)]
+mod parseutil {
+    use crate::prelude::*;
+
+    pub fn search<F: FnMut(u8) -> Option<bool>, I: Iterator<Item = u8>>(
+        it: &mut I,
+        mut f: F,
+    ) -> Option<usize> {
+        let mut idx = 0;
+        while !f(it.next()?)? {
+            idx += 1;
+        }
+        Some(idx)
+    }
+
+    /// # Errors
+    /// - wait for `output` failed…?
+    /// - process exited with non-zero error code
+    pub async fn wait_for(
+        s: &'static str,
+        mut output: tokio::process::Child,
+    ) -> color_eyre::Result<()> {
+        let status = output
+            .wait()
+            .await
+            .wrap_err(format!("waiting for `{s}` failed"))?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(eyre!("`{s}` failed with status: {status}"))
+        }
+    }
+
+    /// # Panics
+    /// - cannot convert bytes to `&str`
+    /// - cannot parse to `u32`
+    pub fn send_frac(
+        sender: &relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        num: &[u8],
+        den: &[u8],
+    ) {
+        let denominator: u32 = core::str::from_utf8(den).unwrap().parse().unwrap();
+        if denominator == 0 {
+            return;
+        }
+        let numerator: u32 = core::str::from_utf8(num).unwrap().parse().unwrap();
+        sender
+            .send(
+                crate::pages::_11_installing::InstallingPageMsg::UpdFlatpakProg(
+                    f64::from(numerator) / f64::from(denominator),
+                ),
+            )
+            .expect("ui sender fails");
+    }
+}

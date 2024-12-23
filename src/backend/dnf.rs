@@ -1,3 +1,4 @@
+use super::parseutil as pu;
 use tokio::io::AsyncBufReadExt;
 
 use crate::prelude::*;
@@ -20,9 +21,9 @@ pub(super) async fn handle_dnf(
         .spawn()
         .wrap_err("fail to run `dnf5`")?;
     let mut stdout_lines = tokio::io::BufReader::new(output.stdout.take().unwrap()).split(b'\n');
-    for task in [
-        tokio::spawn(async move {
-            'line: while let Some(line) =
+    futures::try_join!(
+        async move {
+            while let Some(line) =
                 (stdout_lines.next_segment().await).wrap_err("cannot read stdout")?
             {
                 let mut it = line.iter().copied();
@@ -30,67 +31,31 @@ pub(super) async fn handle_dnf(
                     continue;
                 }
 
-                let mut slash = 1;
-                let mut c;
-                while {
-                    let Some(n) = it.next() else {
-                        continue 'line;
-                    };
-                    c = n;
-                    if c != b' ' && !c.is_ascii_digit() {
-                        continue 'line;
-                    }
-                    n != b'/'
-                } {
-                    slash += 1;
-                }
+                let slash = if let Some(slash) = pu::search(&mut it, |c| {
+                    (c == b' ' || c.is_ascii_digit()).then_some(c == b'/')
+                }) {
+                    slash + 1
+                } else {
+                    continue;
+                };
 
-                let mut end = slash + 1;
-
-                while {
-                    let Some(n) = it.next() else {
-                        continue 'line;
-                    };
-                    c = n;
-                    if !c.is_ascii_digit() {
-                        continue 'line;
-                    }
-                    n != b']'
-                } {
-                    end += 1;
-                }
+                let end = if let Some(end) =
+                    pu::search(&mut it, |c| c.is_ascii_digit().then_some(c == b']'))
+                {
+                    end + slash + 1
+                } else {
+                    continue;
+                };
 
                 if end == slash + 1 || slash == 1 {
                     continue;
                 }
-                let numerator: u32 =
-                    (core::str::from_utf8(&line[1..slash]).unwrap().parse()).unwrap();
-                let denominator: u32 =
-                    (core::str::from_utf8(&line[slash + 1..end]).unwrap().parse()).unwrap();
-
-                if denominator == 0 {
-                    continue;
-                }
-
-                sender
-                    .send(crate::pages::_11_installing::InstallingPageMsg::UpdDnfProg(
-                        f64::from(numerator) / f64::from(denominator),
-                    ))
-                    .expect("ui sender fails");
+                pu::send_frac(&sender, &line[1..slash], &line[slash + 1..end]);
             }
             Ok(())
-        }),
-        tokio::spawn(async move {
-            let status = output.wait().await.wrap_err("waiting for `dnf5` failed")?;
-            if status.success() {
-                Ok(())
-            } else {
-                Err(eyre!("`dnf5` failed with status: {status}"))
-            }
-        }),
-    ] {
-        task.await??;
-    }
+        },
+        pu::wait_for("dnf5", output)
+    )?;
     Ok(())
 }
 
