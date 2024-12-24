@@ -1,3 +1,4 @@
+#![allow(clippy::indexing_slicing)]
 use crate::backend::theme;
 
 const ENABLED_ACCENT_BTN_CSS: &str = "

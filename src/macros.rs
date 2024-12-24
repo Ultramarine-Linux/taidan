@@ -110,7 +110,7 @@ macro_rules! generate_page {
                     root: Self::Root,
                     $sender: ComponentSender<Self>,
                 ) -> ComponentParts<Self> {
-                    #[allow(unused_mut)]
+                    #[allow(unused_mut, unused_assignments)]
                     let mut model = Self::default();
 
                     $(
@@ -205,7 +205,7 @@ macro_rules! generate_component {
                 $crate::generate_component!(@default {
                     let model = Self::default();
                 } $({
-                    #[allow(unused_mut)]
+                    #[allow(unused_mut, unused_assignments)]
                     let mut $initmodel = Self::default();
                 })?);
 

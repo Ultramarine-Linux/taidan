@@ -1,3 +1,4 @@
+#![allow(clippy::significant_drop_tightening, clippy::indexing_slicing)]
 use relm4::RelmRemoveAllExt;
 
 crate::generate_page!(Browser {
@@ -20,8 +21,7 @@ crate::generate_page!(Browser {
     update(self, message, sender) {
         BrowserRowSel(index: usize) => {
             self.optlist.remove_all();
-            let row = (self.browser_rows.get(index))
-                .expect("browser row not exist called browser page");
+            let row = self.browser_rows.get(index).expect("browser row not exist called browser page");
             let mut sett = SETTINGS.write();
             let ctlg = &mut sett.catalogue;
             if let Some(browsers) = ctlg.get_mut("browser") {
@@ -174,7 +174,12 @@ impl BrowserRow {
     }
 }
 
+/// # Panics
+/// - if for some reason the category doesn't exist
+/// - if for some reason the browser doesn't exist
+#[allow(clippy::indexing_slicing)]
 fn on_choice_toggled(browser_index: usize, i: usize, k: usize) -> impl Fn(&gtk::CheckButton) {
+    // and I want to kill you so bad rust why do you torture me with the inability to use `hashmap[key]`
     move |b: &gtk::CheckButton| {
         if b.is_active() {
             SETTINGS

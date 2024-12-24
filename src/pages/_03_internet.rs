@@ -64,7 +64,7 @@ crate::generate_page!(Internet {
 );
 
 async fn check_online(sender: ComponentSender<InternetPage>) {
-    let mut is_online = false;
+    let mut is_online;
     loop {
         tokio::select! {
             Ok(200) = async { REQWEST_CLIENT.get("https://fyralabs.com/.well-known/security.txt").send().await.map(|r| r.status().as_u16()) } => {

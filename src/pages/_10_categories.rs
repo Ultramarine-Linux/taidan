@@ -1,3 +1,4 @@
+#![allow(clippy::significant_drop_tightening, clippy::indexing_slicing)]
 use relm4::RelmRemoveAllExt;
 use std::rc::Rc;
 
@@ -295,6 +296,7 @@ impl CatRow {
     }
 }
 
+#[allow(clippy::missing_panics_doc)]
 fn on_choice_toggled(
     cat: &str,
     cat_index: usize,

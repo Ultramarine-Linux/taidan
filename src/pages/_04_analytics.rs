@@ -1,3 +1,4 @@
+#![allow(unused_variables)]
 crate::generate_page!(Analytics:
     update(self, message, sender) {} => {}
 
