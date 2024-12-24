@@ -15,26 +15,8 @@ impl super::Step for UserAdd {
         let pass =
             xcrypt::crypt(&settings.passwd, &crypt_setting).wrap_err("fail to encrypt password")?;
 
-        let useradd = std::process::Command::new("useradd")
-            .arg("-p")
-            .arg(pass)
-            .arg("-m") // --create-home
-            .arg(&settings.username)
-            .status()
-            .wrap_err("fail to run `useradd`")?;
-        if !useradd.success() {
-            return Err(eyre!("`useradd` failed").note(format!("Exit code: {:?}", useradd.code())));
-        }
-
-        let usermod = std::process::Command::new("usermod")
-            .arg("-aG")
-            .arg("wheel")
-            .arg(&settings.username)
-            .status()
-            .wrap_err("fail to run `usermod`")?;
-        if !usermod.success() {
-            return Err(eyre!("`usermod` failed").note(format!("Exit code: {:?}", usermod.code())));
-        }
+        super::cmd("useradd", &["-p", &pass, "-m", &settings.username])?;
+        super::cmd("usermod", &["-aG", "wheel", &settings.username])?;
 
         Ok(())
     }

@@ -13,29 +13,25 @@ impl super::Step for DnfDownloadApps {
         if settings.nointernet {
             return Ok(());
         }
-        (settings.catalogue.iter())
-            .flat_map(|(category_name, category)| {
-                let app_list = CFG.catalogue.iter().find(|cat| &cat.name == category_name);
-                let app_list = &*app_list.expect("cannot find category").choices;
-                category
-                    .iter()
-                    .map(move |(&appidx, opts)| {
-                        (app_list[appidx].actions.get_action(opts))
-                            .map(Iterator::cloned)
-                            .ok_or_else(|| {
-                                eyre!("cannot get action").note(format!(
-                                    "appidx={appidx}, category={category_name}, opts={opts:?}"
-                                ))
-                            })
+        let mut it = settings.catalogue.iter().flat_map(|(cat_name, category)| {
+            let app_list = CFG.catalogue.iter().find(|cat| &cat.name == cat_name);
+            let app_list = &*app_list.expect("cannot find category").choices;
+            let it = category.iter().map(move |(&appidx, opts)| {
+                (app_list[appidx].actions.get_action(opts))
+                    .map(Iterator::cloned)
+                    .ok_or_else(|| {
+                        eyre!("cannot get action").note(format!(
+                            "appidx={appidx}, category={cat_name}, opts={opts:?}"
+                        ))
                     })
-                    .flatten_ok()
+            });
+            it.flatten_ok()
+        });
+        it.try_for_each(|action| {
+            action.map(|action| {
+                settings.actions[action.as_int()].push(action.consume_inner_str());
             })
-            .try_for_each(|action| {
-                action.map(|action| {
-                    settings.actions[action.as_int()].push(action.consume_inner_str());
-                })
-            })?;
-        Ok(())
+        })
     }
     #[tracing::instrument]
     async fn run(

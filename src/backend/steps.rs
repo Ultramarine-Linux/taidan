@@ -6,6 +6,7 @@ mod _04_dnfinstallupdate;
 mod _05_dnfdownloadapps;
 mod _06_dnfinstallapps;
 
+use crate::prelude::*;
 use gettextrs::gettext;
 
 use crate::backend::steps::{
@@ -103,4 +104,18 @@ impl From<Stage> for String {
             Stage::DnfInstallApps(_) => gettext("Installing User Programs…"),
         }
     }
+}
+
+/// # Errors
+/// - command failed to run
+/// - command exited with non-zero status code
+pub fn cmd(name: &str, args: &[&str]) -> color_eyre::Result<()> {
+    let p = std::process::Command::new(name)
+        .args(args)
+        .status()
+        .wrap_err(format!("fail to run `{name}`"))?;
+    if !p.success() {
+        return Err(eyre!("`{name}` failed").note(format!("Exit code: {:?}", p.code())));
+    }
+    Ok(())
 }
