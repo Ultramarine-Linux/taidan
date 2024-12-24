@@ -1978,6 +1978,7 @@ dependencies = [
  "toml_edit",
  "tracing",
  "tracing-appender",
+ "tracing-error",
  "tracing-journald",
  "tracing-subscriber",
  "uzers",

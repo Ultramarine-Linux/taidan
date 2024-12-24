@@ -254,6 +254,7 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
                 .with_ansi(false)
                 .compact(),
         )
+        .with(tracing_error::ErrorLayer::default())
         .init();
 
     if cfg!(debug_assertions) {
