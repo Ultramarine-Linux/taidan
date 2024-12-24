@@ -36,8 +36,7 @@ choices:
     provider: Lains
     description: |
       Notejot is a modern notes app with notebooks and simple formatting.
-    actions:
-      - flatpak:io.github.lainsce.Notejot
+    actions: flatpak:io.github.lainsce.Notejot
 
   - name: Rnote
     provider: Flxzt
@@ -53,5 +52,4 @@ choices:
     provider: Obsidian
     description: |
       Obsidian is a powerful knowledge base that works on top of a local folder of plain text Markdown files.
-    actions:
-      - flatpak:md.obsidian.Obsidian
+    actions: flatpak:md.obsidian.Obsidian
