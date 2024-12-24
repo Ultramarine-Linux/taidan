@@ -1,0 +1,57 @@
+category: Productivity
+choices:
+  - name: LibreOffice
+    provider: The Document Foundation
+    description: |
+      LibreOffice is an open source office suite. It features applications like a word processor, presentation builder, spreadsheet tool, and more. It's compatible with all Microsoft Office files.
+    actions: rpm:libreoffice
+
+  - name: OnlyOffice
+    provider: ONLYOFFICE
+    description: |
+      OnlyOffice is an office suite designed to behave like Microsoft Office, with familiar design and collaboration features.
+    actions: flatpak:org.onlyoffice.desktopeditors
+
+  - name: Evolution
+    provider: The GNOME Project
+    description: |
+      Evolution is a powerful personal information manager and email client with support for IMAP, POP3, and Exchange.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:evolution
+      - flatpak:org.gnome.Evolution
+
+  - name: Thunderbird
+    provider: Mozilla
+    description: |
+      Thunderbird is a FOSS email, newsfeed, chat, and calendar client built on the same technology as Firefox.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:thunderbird
+      - flatpak:org.mozilla.Thunderbird
+
+  - name: Notejot
+    provider: Lains
+    description: |
+      Notejot is a modern notes app with notebooks and simple formatting.
+    actions:
+      - flatpak:io.github.lainsce.Notejot
+
+  - name: Rnote
+    provider: Flxzt
+    description: |
+      Rnote is a versatile note-taking app with infinite pages and PDF imports.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:rnote
+      - flatpak:com.github.flxzt.rnote
+
+  - name: Obsidian
+    provider: Obsidian
+    description: |
+      Obsidian is a powerful knowledge base that works on top of a local folder of plain text Markdown files.
+    actions:
+      - flatpak:md.obsidian.Obsidian
