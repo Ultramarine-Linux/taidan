@@ -27,7 +27,7 @@ crate::generate_page!(Categories {
                 // init new window
                 let dialog = CategoryWindow::builder()
                     .launch(
-                        self.categories.as_ref().unwrap().get(index).unwrap().category.clone()
+                        self.categories.as_ref().unwrap()[index].category.clone()
                     )
                     .detach();
                 let rc = Rc::new(dialog);
@@ -160,9 +160,7 @@ crate::generate_component!(CategoryWindow {
                     .forward(sender.input_sender(), Self::Input::RowSel)
             })
             .collect();
-        model
-            .rows
-            .iter()
+        model.rows.iter()
             .for_each(|x| widgets.viewdual.browsers.append(x.widget()));
         model.category = init;
     }
@@ -173,10 +171,12 @@ crate::generate_component!(CategoryWindow {
                 // deselect this
                 self.last_select_row = None;
                 SETTINGS.write().catalogue.get_mut(&self.category).unwrap().remove(&index);
+                self.optlist.remove_all();
                 return;
             }
+            self.last_select_row = Some(index);
             self.optlist.remove_all();
-            let row = (self.rows.get(index)).expect("row not exist called window");
+            let row = self.rows.get(index).expect("row not exist called window");
             let mut sett = SETTINGS.write();
             let ctlg = &mut sett.catalogue;
             if let Some(apps) = ctlg.get_mut(&self.category) {
@@ -196,13 +196,21 @@ crate::generate_component!(CategoryWindow {
     } => {}
 
     libhelium::Window {
+        set_default_width: 500,
+        set_default_height: 450,
+        set_vexpand: true,
+        set_hexpand: true,
+        set_align: gtk::Align::Fill,
+
         #[wrap(Some)]
         set_child = &gtk::Box {
             set_orientation: gtk::Orientation::Vertical,
+            // BUG: the close button destroys the window.
+            // If the window is destroyed, the window cannot be shown properly next time.
             libhelium::AppBar {},
 
             gtk::Label {
-                set_label: &gettext(&model.category),
+                set_label: &gettext(&init),
                 add_css_class: "view-subtitle",
                 inline_css: "font-weight: bold",
             },
@@ -269,7 +277,7 @@ impl CatRow {
                 crate::cfg::ChoiceOption::Checkbox(lbl) => inneroptlist.append(&{
                     let btn = gtk::CheckButton::builder()
                         .label(lbl)
-                        .active(iter.next().is_some())
+                        .active(iter.next().is_some_and(|i| i == 1))
                         .build();
                     btn.connect_toggled(on_choice_toggled(cat, cat_index, i, 1));
                     btn

@@ -4,6 +4,7 @@ use relm4::RelmRemoveAllExt;
 crate::generate_page!(Browser {
     browser_rows: Vec<relm4::Controller<BrowserRow>>,
     optlist: gtk::ListBox,
+    btn_next: libhelium::Button,
 }:
     init[optlist](root, sender, model, widgets) {
         let browser_category = CFG.catalogue.iter()
@@ -17,9 +18,11 @@ crate::generate_page!(Browser {
             })
             .collect();
         model.browser_rows.iter().for_each(|x| widgets.viewdual.browsers.append(x.widget()));
+        model.btn_next = widgets.prev_next_btns.next.clone();
     }
     update(self, message, sender) {
         BrowserRowSel(index: usize) => {
+            self.btn_next.set_sensitive(true);
             self.optlist.remove_all();
             let row = self.browser_rows.get(index).expect("browser row not exist called browser page");
             let mut sett = SETTINGS.write();
@@ -80,11 +83,13 @@ crate::generate_page!(Browser {
         }
     },
 
+    #[name(prev_next_btns)]
     #[template] crate::ui::PrevNextBtns {
         #[template_child] prev {
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
+            set_sensitive: false,
             connect_clicked => Self::Input::Nav(NavAction::Next),
         },
     }
@@ -148,7 +153,7 @@ impl BrowserRow {
                 crate::cfg::ChoiceOption::Checkbox(lbl) => inneroptlist.append(&{
                     let btn = gtk::CheckButton::builder()
                         .label(lbl)
-                        .active(iter.next().is_some())
+                        .active(iter.next().is_some_and(|i| i == 1))
                         .build();
                     btn.connect_toggled(on_choice_toggled(browser_index, i, 1));
                     btn
