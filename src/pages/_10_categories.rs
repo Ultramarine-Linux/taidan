@@ -213,6 +213,7 @@ crate::generate_component!(CategoryWindow {
                 set_label: &gettext(&init),
                 add_css_class: "view-subtitle",
                 inline_css: "font-weight: bold",
+                set_margin_bottom: 20,
             },
 
             #[name(viewdual)] #[template] crate::ui::Category {
@@ -228,7 +229,7 @@ crate::generate_component!(CategoryWindow {
                     },
                 },
             },
-        }
+        },
     }
 );
 
