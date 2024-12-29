@@ -538,9 +538,9 @@ dependencies = [
 
 [[package]]
 name = "gettext-rs"
-version = "0.7.2"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a44e92f7dc08430aca7ed55de161253a22276dfd69c5526e5c5e95d1f7cf338a"
+checksum = "e49ea8a8fad198aaa1f9655a2524b64b70eb06b2f3ff37da407566c93054f364"
 dependencies = [
  "gettext-sys",
  "locale_config",
@@ -548,9 +548,9 @@ dependencies = [
 
 [[package]]
 name = "gettext-sys"
-version = "0.22.5"
+version = "0.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb45773f5b8945f12aecd04558f545964f943dacda1b1155b3d738f5469ef661"
+checksum = "f7b8797f28f2dabfbe2caadb6db4f7fd739e251b5ede0a2ba49e506071edcf67"
 dependencies = [
  "cc",
  "temp-dir",
