@@ -15,7 +15,7 @@ const_format = "0.2.34"
 enum_dispatch = "0.3.13"
 #fusebox = { git = "https://github.com/tau-OS/rust", version = "0.5.0", branch = "stable" }
 futures = "0.3.31"
-gettext-rs = "0.7.2"
+gettext-rs = { version = "0.7.2", features = ["gettext-system"] }
 itertools = "0.13.0"
 libhelium = "0.10.0"
 #nm = { package = "networkmanager", version = "0.4.1" }
