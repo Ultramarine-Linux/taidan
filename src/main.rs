@@ -14,7 +14,7 @@ use relm4::{
 };
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-const APPID: &str = "com.FyraLabs.Taidan";
+const APPID: &str = "com.fyralabs.Taidan";
 
 // configuration of the distro OOBE.
 pub static CFG: std::sync::LazyLock<cfg::Config> = std::sync::LazyLock::new(|| {
@@ -112,9 +112,8 @@ impl SimpleComponent for AppModel {
         let display = gtk::gdk::Display::default().unwrap();
         let settings = gtk::Settings::for_display(&display);
         settings.set_gtk_icon_theme_name(Some("Hydrogen"));
-        gtk::gio::resources_register_include!("icons.gresource").unwrap();
         let theme = gtk::IconTheme::for_display(&display);
-        theme.add_resource_path("/com/FyraLabs/Taidan/icons/symbolic/actions");
+        theme.add_resource_path("/com/fyralabs/Taidan/icons/symbolic/actions");
 
         let model = Self::_default(sender);
 
@@ -201,6 +200,8 @@ fn main() -> std::io::Result<()> {
 
     gettextrs::textdomain(APPID)?;
     gettextrs::bind_textdomain_codeset(APPID, "UTF-8")?;
+
+    gtk::gio::resources_register_include!("icons.gresource").unwrap();
 
     let app = libhelium::Application::builder()
         .application_id(APPID)

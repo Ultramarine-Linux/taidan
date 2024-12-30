@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-    <gresource prefix="com/FyraLabs/Taidan/icons/symbolic/actions/">
+    <gresource prefix="com/fyralabs/Taidan/icons/symbolic/actions/">
         <file preprocess="xml-stripblanks" alias="distro-icon-symbolic.svg">icons/distro-icon-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="system-users-symbolic.svg">icons/system-users-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="dialog-question-symbolic.svg">icons/dialog-question-symbolic.svg</file>
@@ -8,12 +8,14 @@
         <file preprocess="xml-stripblanks" alias="location-active-symbolic.svg">icons/location-active-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="web-browser-symbolic.svg">icons/web-browser-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="dialog-error-symbolic.svg">icons/dialog-error-symbolic.svg</file>
-        <file alias="background-light.png">icons/background-light.png</file>
-        <file alias="background-dark.png">icons/background-dark.png</file>
 
         <file preprocess="xml-stripblanks" alias="ctlg-browser-firefox.svg">catalogue/browser/firefox.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-browser-edge.svg">catalogue/browser/edge.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-browser-chrome.svg">catalogue/browser/chrome.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-browser-chromium.svg">catalogue/browser/chromium.svg</file>
+    </gresource>
+    <gresource prefix="/com/fyralabs/Taidan/">
+        <file alias="background-light.webp">icons/background-light.webp</file>
+        <file alias="background-dark.webp">icons/background-dark.webp</file>
     </gresource>
 </gresources>

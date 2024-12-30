@@ -94,7 +94,7 @@ crate::generate_page!(Theme:
             gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
                 libhelium::ContentBlockImage {
-                    set_file: "file:///usr/share/backgrounds/default.png",
+                    set_file: "resource:///com/fyralabs/Taidan/background-light.webp",
                     inline_css: "border-color: aqua",
                     // inline_css: "padding: unset; border-radius: 16px; background-repeat: no-repeat; background-position: center; background-size: cover",
                     // inline_css: "background-image: url(file:///usr/share/backgrounds/default.png)",
@@ -109,7 +109,7 @@ crate::generate_page!(Theme:
             gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
                 libhelium::ContentBlockImage {
-                    set_file: "file:///usr/share/backgrounds/default-dark.png",
+                    set_file: "resource:///com/fyralabs/Taidan/background-dark.webp",
                     inline_css: "border-color: aqua",
                     // inline_css: "padding: unset; border-radius: 16px; background-repeat: no-repeat; background-position: center; background-size: cover",
                     // inline_css: "background-image: url(file:///usr/share/backgrounds/default-dark.png)",
