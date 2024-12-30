@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-12-30 10:46+0000\n"
-"PO-Revision-Date: 2024-12-30 13:11+0000\n"
+"PO-Revision-Date: 2024-12-31 12:26+0000\n"
 "Last-Translator: madomado <madonuko@outlook.com>\n"
 "Language-Team: Japanese <https://weblate.fyralabs.com/projects/"
 "ultramarine-linux/taidan/ja/>\n"
@@ -81,30 +81,34 @@ msgid "Username\n"
 "- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)\n"
 "- may optionally end with a dollar sign (<tt>$</tt>)"
 msgstr ""
+"ユーザー名のフォーマットについて\n"
+"- 英小文字で始まる\n"
+"- 英文字・数字・<tt>_</tt>・<tt>-</tt>だけで組む\n"
+"- <tt>$</tt>で終わるのが可能"
 
 #: src/pages/_02_password.rs:34
 msgid "Create a Password"
-msgstr ""
+msgstr "パスワード作成"
 
 #: src/pages/_02_password.rs:44
 msgid "Password"
-msgstr ""
+msgstr "パスワード"
 
 #: src/pages/_02_password.rs:56
 msgid "Repeat Password"
-msgstr ""
+msgstr "確認"
 
 #: src/pages/_03_internet.rs:28
 msgid "Let's Get You Online"
-msgstr ""
+msgstr "インターネット接続"
 
 #: src/pages/_03_internet.rs:34
 msgid "Connect to the Internet to get the latest and greatest."
-msgstr ""
+msgstr "インターネットに接続すると、最新ソフトをダウンロードできることになります。"
 
 #: src/pages/_03_internet.rs:42
 msgid "I don't have Internet"
-msgstr ""
+msgstr "スキップ"
 
 #: src/pages/_04_analytics.rs:20
 msgid "Analytics and Crash Reporting"
@@ -141,11 +145,11 @@ msgstr ""
 
 #: src/pages/_07_nightlight.rs:19 src/pages/_07_nightlight.rs:40
 msgid "Night Light"
-msgstr ""
+msgstr "夜間モード"
 
 #: src/pages/_07_nightlight.rs:26
 msgid "Tint the display with a warm tone at night to reduce eyestrain."
-msgstr ""
+msgstr "画面の色合いを暖かくすることによって、目への負担を軽減することができます。"
 
 #: src/pages/_07_nightlight.rs:31
 msgid "Night Light is not proven to help with difficulty falling sleep."
