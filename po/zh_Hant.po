@@ -1,0 +1,235 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE Taidan'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the Taidan package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Taidan 0.1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-12-30 10:46+0000\n"
+"PO-Revision-Date: 2024-12-30 11:42+0000\n"
+"Last-Translator: madomado <madonuko@outlook.com>\n"
+"Language-Team: Chinese (Traditional Han script) <https://"
+"weblate.fyralabs.com/projects/ultramarine-linux/taidan/zh_Hant/>\n"
+"Language: zh_Hant\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Weblate 5.9.2\n"
+
+#: src/backend/steps.rs:98
+msgid "Creating User…"
+msgstr "製作用戶中…"
+
+#: src/backend/steps.rs:99
+msgid "Setting Timezone…"
+msgstr "設定時區中…"
+
+#: src/backend/steps.rs:100
+msgid "Configuring Themes…"
+msgstr "設定主題中…"
+
+#: src/backend/steps.rs:101
+msgid "Downloading System Update…"
+msgstr "下載系統更新中…"
+
+#: src/backend/steps.rs:102
+msgid "Installing System Update…"
+msgstr "安裝系統更新中…"
+
+#: src/backend/steps.rs:103
+msgid "Downloading User Programs…"
+msgstr "下載使用者程式中…"
+
+#: src/backend/steps.rs:104
+msgid "Installing User Programs…"
+msgstr "安裝使用者程式中…"
+
+#: src/pages/_00_welcome.rs:17 src/main.rs:71
+msgid "Welcome to %s"
+msgstr "歡迎來到 %s"
+
+#: src/pages/_00_welcome.rs:23
+msgid "Let's get your system ready."
+msgstr "一起準備好新的系統吧。"
+
+#: src/pages/_00_welcome.rs:37
+msgid "Skip Configuration"
+msgstr "跳過設定"
+
+#: src/pages/_00_welcome.rs:49
+msgid "Let's Go"
+msgstr "好哇"
+
+#: src/pages/_01_whoareyou.rs:83
+msgid "Who are You?"
+msgstr "您是誰？"
+
+#: src/pages/_01_whoareyou.rs:92
+msgid "Full Name"
+msgstr "名字"
+
+#: src/pages/_01_whoareyou.rs:100
+msgid "Username"
+msgstr "用戶名稱"
+
+#: src/pages/_01_whoareyou.rs:110
+msgid ""
+"Username\n"
+"- must start with lowercase letters\n"
+"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</"
+"tt>)\n"
+"- may optionally end with a dollar sign (<tt>$</tt>)"
+msgstr ""
+"用戶名稱\n"
+"- 首個字母須為小楷\n"
+"- 必須只以英文字母、底線(<tt>_</tt>)或連接號(<tt>-</tt>)組成\n"
+"- 最尾可以為<tt>$</tt>"
+
+#: src/pages/_02_password.rs:34
+msgid "Create a Password"
+msgstr "創建密碼"
+
+#: src/pages/_02_password.rs:44
+msgid "Password"
+msgstr "密碼"
+
+#: src/pages/_02_password.rs:56
+msgid "Repeat Password"
+msgstr "重覆密碼"
+
+#: src/pages/_03_internet.rs:28
+msgid "Let's Get You Online"
+msgstr ""
+
+#: src/pages/_03_internet.rs:34
+msgid "Connect to the Internet to get the latest and greatest."
+msgstr "連接至互聯網，取得最新、最好的。"
+
+#: src/pages/_03_internet.rs:42
+msgid "I don't have Internet"
+msgstr "我不能連上網"
+
+#: src/pages/_04_analytics.rs:20
+msgid "Analytics and Crash Reporting"
+msgstr ""
+
+#: src/pages/_05_crashreport.rs:24
+msgid "Crash Reporting"
+msgstr ""
+
+#: src/pages/_05_crashreport.rs:30
+msgid "Allow Fyra Labs to collect crash data to find bugs and assist you."
+msgstr ""
+
+#: src/pages/_05_crashreport.rs:34
+msgid ""
+"All data collected is anonymous and end-to-end encrypted.\n"
+"You will be given a crash ID to help support find what went wrong."
+msgstr ""
+
+#: src/pages/_05_crashreport.rs:38
+msgid "Send Crash Data"
+msgstr ""
+
+#: src/pages/_05_crashreport.rs:39
+msgid "Press next to keep off"
+msgstr ""
+
+#: src/pages/_06_location.rs:26 src/pages/_06_location.rs:37
+msgid "Location Services"
+msgstr ""
+
+#: src/pages/_06_location.rs:33
+msgid ""
+"Allow apps to request your approximate location with [Mozilla Location "
+"Services]"
+msgstr ""
+
+#: src/pages/_07_nightlight.rs:19 src/pages/_07_nightlight.rs:40
+msgid "Night Light"
+msgstr "夜間模式"
+
+#: src/pages/_07_nightlight.rs:26
+msgid "Tint the display with a warm tone at night to reduce eyestrain."
+msgstr "夜間時調教至較暖和的色溫有助減少對雙眼的傷害。"
+
+#: src/pages/_07_nightlight.rs:31
+msgid "Night Light is not proven to help with difficulty falling sleep."
+msgstr "夜間模式並未證實能改善睡眠。"
+
+#: src/pages/_08_theme.rs:71
+msgid "Choose your theme"
+msgstr "選擇主題"
+
+#: src/pages/_08_theme.rs:78
+msgid ""
+"Make this system your own with a splash of colour.\n"
+"You can change this option later in settings."
+msgstr ""
+
+#: src/pages/_08_theme.rs:84
+msgid "Some apps may not respect this preference."
+msgstr "部分程式並不會對此設定有所反應。"
+
+#: src/pages/_08_theme.rs:105
+msgid "Light"
+msgstr "淺色"
+
+#: src/pages/_08_theme.rs:120
+msgid "Dark"
+msgstr "深色"
+
+#: src/pages/_09_browser.rs:64
+msgid "Browser Selection"
+msgstr "選擇瀏覽器"
+
+#: src/pages/_10_categories.rs:59
+msgid "What Do You Use This Device For?"
+msgstr ""
+
+#: src/pages/_10_categories.rs:78
+msgid "Confirm and Setup System"
+msgstr "確定並裝配系統"
+
+#: src/pages/_11_installing.rs:54
+msgid "Installing your Apps"
+msgstr ""
+
+#: src/pages/_11_installing.rs:60
+msgid "This won't take long!"
+msgstr ""
+
+#: src/pages/_11_installing.rs:68
+msgid "Loading…"
+msgstr ""
+
+#: src/pages/_12_finish.rs:17
+msgid "Your System is Ready"
+msgstr ""
+
+#: src/pages/_12_finish.rs:23
+msgid "We hope you enjoy your fresh system!"
+msgstr ""
+
+#: src/pages/_12_finish.rs:31 src/pages/_13_error.rs:43
+msgid "Done"
+msgstr ""
+
+#: src/pages/_13_error.rs:22
+msgid "Error"
+msgstr ""
+
+#: src/pages/_13_error.rs:28
+msgid "We are sorry, but there is an unexpected problem."
+msgstr ""
+
+#: src/ui.rs:13
+msgid "Previous"
+msgstr "上一頁"
+
+#: src/ui.rs:23
+msgid "Next"
+msgstr "下一頁"
