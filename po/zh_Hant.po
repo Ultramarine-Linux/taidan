@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-12-30 10:35+0000\n"
+"POT-Creation-Date: 2024-12-30 10:46+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -73,9 +73,11 @@ msgid "Username"
 msgstr ""
 
 #: src/pages/_01_whoareyou.rs:110
-msgid "Username \n"
+msgid ""
+"Username\n"
 "- must start with lowercase letters\n"
-"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)\n"
+"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</"
+"tt>)\n"
 "- may optionally end with a dollar sign (<tt>$</tt>)"
 msgstr ""
 
@@ -116,7 +118,8 @@ msgid "Allow Fyra Labs to collect crash data to find bugs and assist you."
 msgstr ""
 
 #: src/pages/_05_crashreport.rs:34
-msgid "All data collected is anonymous and end-to-end encrypted.\n"
+msgid ""
+"All data collected is anonymous and end-to-end encrypted.\n"
 "You will be given a crash ID to help support find what went wrong."
 msgstr ""
 
@@ -133,7 +136,9 @@ msgid "Location Services"
 msgstr ""
 
 #: src/pages/_06_location.rs:33
-msgid "Allow apps to request your approximate location with [Mozilla Location Services]"
+msgid ""
+"Allow apps to request your approximate location with [Mozilla Location "
+"Services]"
 msgstr ""
 
 #: src/pages/_07_nightlight.rs:19 src/pages/_07_nightlight.rs:40
@@ -153,7 +158,8 @@ msgid "Choose your theme"
 msgstr ""
 
 #: src/pages/_08_theme.rs:78
-msgid "Make this system your own with a splash of colour.\n"
+msgid ""
+"Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
 msgstr ""
 
