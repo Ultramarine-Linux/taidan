@@ -8,57 +8,60 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-12-30 10:46+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: Automatically generated\n"
-"Language-Team: none\n"
+"PO-Revision-Date: 2024-12-30 13:11+0000\n"
+"Last-Translator: madomado <madonuko@outlook.com>\n"
+"Language-Team: Japanese <https://weblate.fyralabs.com/projects/"
+"ultramarine-linux/taidan/ja/>\n"
 "Language: ja\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Weblate 5.9.2\n"
 
 #: src/backend/steps.rs:98
 msgid "Creating User…"
-msgstr ""
+msgstr "ユーザー登録中…"
 
 #: src/backend/steps.rs:99
 msgid "Setting Timezone…"
-msgstr ""
+msgstr "タイムゾーン設定中…"
 
 #: src/backend/steps.rs:100
 msgid "Configuring Themes…"
-msgstr ""
+msgstr "テーマ設定中…"
 
 #: src/backend/steps.rs:101
 msgid "Downloading System Update…"
-msgstr ""
+msgstr "システムアップデートダウンロード中…"
 
 #: src/backend/steps.rs:102
 msgid "Installing System Update…"
-msgstr ""
+msgstr "システムアップデートインストール中…"
 
 #: src/backend/steps.rs:103
 msgid "Downloading User Programs…"
-msgstr ""
+msgstr "ユーザーアプリダウンロード中…"
 
 #: src/backend/steps.rs:104
 msgid "Installing User Programs…"
-msgstr ""
+msgstr "ユーザーアプリインストール中…"
 
 #: src/pages/_00_welcome.rs:17 src/main.rs:71
 msgid "Welcome to %s"
-msgstr ""
+msgstr "%s へようこそ"
 
 #: src/pages/_00_welcome.rs:23
 msgid "Let's get your system ready."
-msgstr ""
+msgstr "システムをちゃんとセットアップしましょう。"
 
 #: src/pages/_00_welcome.rs:37
 msgid "Skip Configuration"
-msgstr ""
+msgstr "スキップ"
 
 #: src/pages/_00_welcome.rs:49
 msgid "Let's Go"
-msgstr ""
+msgstr "次"
 
 #: src/pages/_01_whoareyou.rs:83
 msgid "Who are You?"
@@ -66,11 +69,11 @@ msgstr ""
 
 #: src/pages/_01_whoareyou.rs:92
 msgid "Full Name"
-msgstr ""
+msgstr "名前"
 
 #: src/pages/_01_whoareyou.rs:100
 msgid "Username"
-msgstr ""
+msgstr "ユーザー名"
 
 #: src/pages/_01_whoareyou.rs:110
 msgid "Username\n"
