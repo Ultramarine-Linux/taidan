@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-12-30 10:46+0000\n"
-"PO-Revision-Date: 2024-12-30 12:00+0000\n"
+"PO-Revision-Date: 2024-12-30 13:11+0000\n"
 "Last-Translator: sadlerm4 <sad_lerm@hotmail.com>\n"
 "Language-Team: Chinese (Simplified Han script) <https://weblate.fyralabs.com/"
 "projects/ultramarine-linux/taidan/zh_Hans/>\n"
@@ -25,31 +25,31 @@ msgstr "创建用户中…"
 
 #: src/backend/steps.rs:99
 msgid "Setting Timezone…"
-msgstr ""
+msgstr "设定时区中…"
 
 #: src/backend/steps.rs:100
 msgid "Configuring Themes…"
-msgstr ""
+msgstr "设定主题中…"
 
 #: src/backend/steps.rs:101
 msgid "Downloading System Update…"
-msgstr ""
+msgstr "下载系统更新中…"
 
 #: src/backend/steps.rs:102
 msgid "Installing System Update…"
-msgstr ""
+msgstr "安装系统更新中…"
 
 #: src/backend/steps.rs:103
 msgid "Downloading User Programs…"
-msgstr ""
+msgstr "下载使用者应用中…"
 
 #: src/backend/steps.rs:104
 msgid "Installing User Programs…"
-msgstr ""
+msgstr "安装使用者应用中…"
 
 #: src/pages/_00_welcome.rs:17 src/main.rs:71
 msgid "Welcome to %s"
-msgstr ""
+msgstr "欢迎使用 %s"
 
 #: src/pages/_00_welcome.rs:23
 msgid "Let's get your system ready."
@@ -57,23 +57,23 @@ msgstr ""
 
 #: src/pages/_00_welcome.rs:37
 msgid "Skip Configuration"
-msgstr ""
+msgstr "跳过设定"
 
 #: src/pages/_00_welcome.rs:49
 msgid "Let's Go"
-msgstr ""
+msgstr "开始"
 
 #: src/pages/_01_whoareyou.rs:83
 msgid "Who are You?"
-msgstr ""
+msgstr "创建新用户"
 
 #: src/pages/_01_whoareyou.rs:92
 msgid "Full Name"
-msgstr ""
+msgstr "名字"
 
 #: src/pages/_01_whoareyou.rs:100
 msgid "Username"
-msgstr ""
+msgstr "用户名称"
 
 #: src/pages/_01_whoareyou.rs:110
 msgid "Username\n"
@@ -81,10 +81,14 @@ msgid "Username\n"
 "- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)\n"
 "- may optionally end with a dollar sign (<tt>$</tt>)"
 msgstr ""
+"用戶名称\n"
+"- 首个英文字母须为小楷\n"
+"- 必须只包含数字、英文字母、底线(<tt>_</tt>)或连接号(<tt>-</tt>)\n"
+"- 最尾可以为<tt>$</tt>"
 
 #: src/pages/_02_password.rs:34
 msgid "Create a Password"
-msgstr ""
+msgstr "创建密码"
 
 #: src/pages/_02_password.rs:44
 msgid "Password"
