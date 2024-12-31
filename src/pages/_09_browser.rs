@@ -127,7 +127,7 @@ impl SimpleComponent for BrowserRow {
         let ctl = gtk::GestureClick::new();
         ctl.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
         ctl.connect_pressed(move |gesture, _, _, _| {
-            gesture.set_state(gtk::EventSequenceState::Claimed);
+            gesture.set_state(gtk::EventSequenceState::None);
             sender.output(index).unwrap();
         });
         let widgets = view_output!();
