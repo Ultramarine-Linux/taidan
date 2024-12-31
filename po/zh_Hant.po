@@ -8,8 +8,8 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-12-30 10:46+0000\n"
-"PO-Revision-Date: 2024-12-30 11:42+0000\n"
-"Last-Translator: madomado <madonuko@outlook.com>\n"
+"PO-Revision-Date: 2024-12-31 12:26+0000\n"
+"Last-Translator: sadlerm4 <sad_lerm@hotmail.com>\n"
 "Language-Team: Chinese (Traditional Han script) <https://"
 "weblate.fyralabs.com/projects/ultramarine-linux/taidan/zh_Hant/>\n"
 "Language: zh_Hant\n"
@@ -41,15 +41,15 @@ msgstr "安裝系統更新中…"
 
 #: src/backend/steps.rs:103
 msgid "Downloading User Programs…"
-msgstr "下載使用者程式中…"
+msgstr "下載用户應用程式中…"
 
 #: src/backend/steps.rs:104
 msgid "Installing User Programs…"
-msgstr "安裝使用者程式中…"
+msgstr "安裝用户應用程式中…"
 
 #: src/pages/_00_welcome.rs:17 src/main.rs:71
 msgid "Welcome to %s"
-msgstr "歡迎來到 %s"
+msgstr "歡迎使用 %s"
 
 #: src/pages/_00_welcome.rs:23
 msgid "Let's get your system ready."
@@ -57,15 +57,15 @@ msgstr "一起準備好新的系統吧。"
 
 #: src/pages/_00_welcome.rs:37
 msgid "Skip Configuration"
-msgstr "跳過設定"
+msgstr "略過系統配置"
 
 #: src/pages/_00_welcome.rs:49
 msgid "Let's Go"
-msgstr "好哇"
+msgstr "開始"
 
 #: src/pages/_01_whoareyou.rs:83
 msgid "Who are You?"
-msgstr "您是誰？"
+msgstr "創建新用戶帳號"
 
 #: src/pages/_01_whoareyou.rs:92
 msgid "Full Name"
@@ -85,7 +85,7 @@ msgid ""
 msgstr ""
 "用戶名稱\n"
 "- 首個字母須為小楷\n"
-"- 必須只以英文字母、底線(<tt>_</tt>)或連接號(<tt>-</tt>)組成\n"
+"- 必須只以數字、英文字母、底線(<tt>_</tt>)或連接號(<tt>-</tt>)組成\n"
 "- 最尾可以為<tt>$</tt>"
 
 #: src/pages/_02_password.rs:34
@@ -106,7 +106,7 @@ msgstr ""
 
 #: src/pages/_03_internet.rs:34
 msgid "Connect to the Internet to get the latest and greatest."
-msgstr "連接至互聯網，取得最新、最好的。"
+msgstr "連接互聯網，取得最新、最好的。"
 
 #: src/pages/_03_internet.rs:42
 msgid "I don't have Internet"
@@ -150,7 +150,7 @@ msgstr ""
 
 #: src/pages/_07_nightlight.rs:19 src/pages/_07_nightlight.rs:40
 msgid "Night Light"
-msgstr "夜間模式"
+msgstr "護眼模式"
 
 #: src/pages/_07_nightlight.rs:26
 msgid "Tint the display with a warm tone at night to reduce eyestrain."
@@ -158,7 +158,7 @@ msgstr "夜間時調教至較暖和的色溫有助減少對雙眼的傷害。"
 
 #: src/pages/_07_nightlight.rs:31
 msgid "Night Light is not proven to help with difficulty falling sleep."
-msgstr "夜間模式並未證實能改善睡眠。"
+msgstr "護眼模式並未證實能改善睡眠。"
 
 #: src/pages/_08_theme.rs:71
 msgid "Choose your theme"
@@ -169,6 +169,8 @@ msgid ""
 "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
 msgstr ""
+"選擇主題色彩。\n"
+"您可以隨時在設定更改此選項。"
 
 #: src/pages/_08_theme.rs:84
 msgid "Some apps may not respect this preference."
@@ -188,7 +190,7 @@ msgstr "選擇瀏覽器"
 
 #: src/pages/_10_categories.rs:59
 msgid "What Do You Use This Device For?"
-msgstr ""
+msgstr "您會如何使用此設備？"
 
 #: src/pages/_10_categories.rs:78
 msgid "Confirm and Setup System"
@@ -196,7 +198,7 @@ msgstr "確定並裝配系統"
 
 #: src/pages/_11_installing.rs:54
 msgid "Installing your Apps"
-msgstr ""
+msgstr "正在安裝您的應用程式"
 
 #: src/pages/_11_installing.rs:60
 msgid "This won't take long!"

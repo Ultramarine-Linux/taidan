@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-12-30 10:46+0000\n"
-"PO-Revision-Date: 2024-12-30 13:11+0000\n"
+"PO-Revision-Date: 2024-12-31 12:26+0000\n"
 "Last-Translator: sadlerm4 <sad_lerm@hotmail.com>\n"
 "Language-Team: Chinese (Simplified Han script) <https://weblate.fyralabs.com/"
 "projects/ultramarine-linux/taidan/zh_Hans/>\n"
@@ -41,11 +41,11 @@ msgstr "安装系统更新中…"
 
 #: src/backend/steps.rs:103
 msgid "Downloading User Programs…"
-msgstr "下载使用者应用中…"
+msgstr "下载用户应用中…"
 
 #: src/backend/steps.rs:104
 msgid "Installing User Programs…"
-msgstr "安装使用者应用中…"
+msgstr "安装用户应用中…"
 
 #: src/pages/_00_welcome.rs:17 src/main.rs:71
 msgid "Welcome to %s"
@@ -57,7 +57,7 @@ msgstr ""
 
 #: src/pages/_00_welcome.rs:37
 msgid "Skip Configuration"
-msgstr "跳过设定"
+msgstr "跳过系统配置"
 
 #: src/pages/_00_welcome.rs:49
 msgid "Let's Go"
@@ -65,7 +65,7 @@ msgstr "开始"
 
 #: src/pages/_01_whoareyou.rs:83
 msgid "Who are You?"
-msgstr "创建新用户"
+msgstr "创建新用户帐号"
 
 #: src/pages/_01_whoareyou.rs:92
 msgid "Full Name"
@@ -92,11 +92,11 @@ msgstr "创建密码"
 
 #: src/pages/_02_password.rs:44
 msgid "Password"
-msgstr ""
+msgstr "密码"
 
 #: src/pages/_02_password.rs:56
 msgid "Repeat Password"
-msgstr ""
+msgstr "重复密码"
 
 #: src/pages/_03_internet.rs:28
 msgid "Let's Get You Online"
@@ -145,7 +145,7 @@ msgstr ""
 
 #: src/pages/_07_nightlight.rs:19 src/pages/_07_nightlight.rs:40
 msgid "Night Light"
-msgstr ""
+msgstr "护眼模式"
 
 #: src/pages/_07_nightlight.rs:26
 msgid "Tint the display with a warm tone at night to reduce eyestrain."
@@ -153,52 +153,54 @@ msgstr ""
 
 #: src/pages/_07_nightlight.rs:31
 msgid "Night Light is not proven to help with difficulty falling sleep."
-msgstr ""
+msgstr "护眼模式並未证实能改善睡眠。"
 
 #: src/pages/_08_theme.rs:71
 msgid "Choose your theme"
-msgstr ""
+msgstr "选择主题"
 
 #: src/pages/_08_theme.rs:78
 msgid "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
 msgstr ""
+"选择主题色彩。\n"
+"您可以随时在设定更改此选项。"
 
 #: src/pages/_08_theme.rs:84
 msgid "Some apps may not respect this preference."
-msgstr ""
+msgstr "部分应用并不会对此设定有所反应。"
 
 #: src/pages/_08_theme.rs:105
 msgid "Light"
-msgstr ""
+msgstr "浅色"
 
 #: src/pages/_08_theme.rs:120
 msgid "Dark"
-msgstr ""
+msgstr "深色"
 
 #: src/pages/_09_browser.rs:64
 msgid "Browser Selection"
-msgstr ""
+msgstr "选择浏览器"
 
 #: src/pages/_10_categories.rs:59
 msgid "What Do You Use This Device For?"
-msgstr ""
+msgstr "您会如何使用此设备？"
 
 #: src/pages/_10_categories.rs:78
 msgid "Confirm and Setup System"
-msgstr ""
+msgstr "确定并装配系统"
 
 #: src/pages/_11_installing.rs:54
 msgid "Installing your Apps"
-msgstr ""
+msgstr "正在安装您的应用"
 
 #: src/pages/_11_installing.rs:60
 msgid "This won't take long!"
-msgstr ""
+msgstr "请稍等一下"
 
 #: src/pages/_11_installing.rs:68
 msgid "Loading…"
-msgstr ""
+msgstr "加载中…"
 
 #: src/pages/_12_finish.rs:17
 msgid "Your System is Ready"

@@ -8,11 +8,11 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-12-30 10:46+0000\n"
-"PO-Revision-Date: 2024-12-31 12:26+0000\n"
-"Last-Translator: madomado <madonuko@outlook.com>\n"
-"Language-Team: Japanese <https://weblate.fyralabs.com/projects/"
-"ultramarine-linux/taidan/ja/>\n"
-"Language: ja\n"
+"PO-Revision-Date: 2024-12-31 13:21+0000\n"
+"Last-Translator: Cappy <cappy@cappuchino.xyz>\n"
+"Language-Team: Thai <https://weblate.fyralabs.com/projects/ultramarine-linux/"
+"taidan/th/>\n"
+"Language: th\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -21,59 +21,59 @@ msgstr ""
 
 #: src/backend/steps.rs:98
 msgid "Creating User…"
-msgstr "ユーザー登録中…"
+msgstr "กำลังสร้างบัญชี…"
 
 #: src/backend/steps.rs:99
 msgid "Setting Timezone…"
-msgstr "タイムゾーン設定中…"
+msgstr "กำลังตั้งเขตเวลา…"
 
 #: src/backend/steps.rs:100
 msgid "Configuring Themes…"
-msgstr "テーマ設定中…"
+msgstr "กำลังตั้งค่าธีม…"
 
 #: src/backend/steps.rs:101
 msgid "Downloading System Update…"
-msgstr "システムアップデートダウンロード中…"
+msgstr "กำลังดาวน์โหลดอัปเดตระบบ…"
 
 #: src/backend/steps.rs:102
 msgid "Installing System Update…"
-msgstr "システムアップデートインストール中…"
+msgstr "กำลังติดตั้งอัปเดตระบบ…"
 
 #: src/backend/steps.rs:103
 msgid "Downloading User Programs…"
-msgstr "ユーザーアプリダウンロード中…"
+msgstr "กำลังดาวน์โหลดโปรแกรม…"
 
 #: src/backend/steps.rs:104
 msgid "Installing User Programs…"
-msgstr "ユーザーアプリインストール中…"
+msgstr "กำลังติดตั้งโปรแกรม…"
 
 #: src/pages/_00_welcome.rs:17 src/main.rs:71
 msgid "Welcome to %s"
-msgstr "%s へようこそ"
+msgstr "ยินดีต้อนรับสู่ %s"
 
 #: src/pages/_00_welcome.rs:23
 msgid "Let's get your system ready."
-msgstr "システムをちゃんとセットアップしましょう。"
+msgstr "เรามาเตรียมพร้อมระบบกันดีกว่า"
 
 #: src/pages/_00_welcome.rs:37
 msgid "Skip Configuration"
-msgstr "スキップ"
+msgstr "ข้ามการตั้งค่า"
 
 #: src/pages/_00_welcome.rs:49
 msgid "Let's Go"
-msgstr "次"
+msgstr "ไปกันเถอะ"
 
 #: src/pages/_01_whoareyou.rs:83
 msgid "Who are You?"
-msgstr ""
+msgstr "คุณเป็นใคร?"
 
 #: src/pages/_01_whoareyou.rs:92
 msgid "Full Name"
-msgstr "名前"
+msgstr "ชื่อจริง"
 
 #: src/pages/_01_whoareyou.rs:100
 msgid "Username"
-msgstr "ユーザー名"
+msgstr "ชื่อผู้ใช้"
 
 #: src/pages/_01_whoareyou.rs:110
 msgid "Username\n"
@@ -81,34 +81,34 @@ msgid "Username\n"
 "- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)\n"
 "- may optionally end with a dollar sign (<tt>$</tt>)"
 msgstr ""
-"ユーザー名のフォーマットについて\n"
-"- 英小文字で始まる\n"
-"- 英文字・数字・<tt>_</tt>・<tt>-</tt>だけで組む\n"
-"- <tt>$</tt>で終わるのが可能"
+"ชื่อผู้ใช้\n"
+"- ต้องเริ่มด้วยตัวพิมพ์เล็ก\n"
+"- ต้องมีแค่เลขหรืออักษรอังกฤษ, อันเดอร์สกอร์ (<tt>_</tt>) หรือยัติภาค(<tt>-</tt>)\n"
+"- อาจจบด้วยเครื่องหมายดอลลาร์ (<tt>$</tt>)"
 
 #: src/pages/_02_password.rs:34
 msgid "Create a Password"
-msgstr "パスワード作成"
+msgstr "สร้างรหัสผ่าน"
 
 #: src/pages/_02_password.rs:44
 msgid "Password"
-msgstr "パスワード"
+msgstr "รหัสผ่าน"
 
 #: src/pages/_02_password.rs:56
 msgid "Repeat Password"
-msgstr "確認"
+msgstr "ใส่รหัสผ่านอีกครั้ง"
 
 #: src/pages/_03_internet.rs:28
 msgid "Let's Get You Online"
-msgstr "インターネット接続"
+msgstr "มาต่ออินเตอร์เน็ตกันเถอะ"
 
 #: src/pages/_03_internet.rs:34
 msgid "Connect to the Internet to get the latest and greatest."
-msgstr "インターネットに接続すると、最新ソフトをダウンロードできることになります。"
+msgstr ""
 
 #: src/pages/_03_internet.rs:42
 msgid "I don't have Internet"
-msgstr "スキップ"
+msgstr "ฉันไม่มีอินเตอร์เน็ต"
 
 #: src/pages/_04_analytics.rs:20
 msgid "Analytics and Crash Reporting"
@@ -145,11 +145,11 @@ msgstr ""
 
 #: src/pages/_07_nightlight.rs:19 src/pages/_07_nightlight.rs:40
 msgid "Night Light"
-msgstr "夜間モード"
+msgstr ""
 
 #: src/pages/_07_nightlight.rs:26
 msgid "Tint the display with a warm tone at night to reduce eyestrain."
-msgstr "画面の色合いを暖かくすることによって、目への負担を軽減することができます。"
+msgstr "ปรับสีจอภาพด้วยโทนสีอุ่นในเวลากลางคืนเพื่อลดอาการปวดตา"
 
 #: src/pages/_07_nightlight.rs:31
 msgid "Night Light is not proven to help with difficulty falling sleep."
@@ -170,11 +170,11 @@ msgstr ""
 
 #: src/pages/_08_theme.rs:105
 msgid "Light"
-msgstr ""
+msgstr "สว่าง"
 
 #: src/pages/_08_theme.rs:120
 msgid "Dark"
-msgstr ""
+msgstr "มืด"
 
 #: src/pages/_09_browser.rs:64
 msgid "Browser Selection"
@@ -182,7 +182,7 @@ msgstr ""
 
 #: src/pages/_10_categories.rs:59
 msgid "What Do You Use This Device For?"
-msgstr ""
+msgstr "คุณใช้เครื่องนี้ทำอะไร?"
 
 #: src/pages/_10_categories.rs:78
 msgid "Confirm and Setup System"
@@ -226,4 +226,4 @@ msgstr ""
 
 #: src/ui.rs:23
 msgid "Next"
-msgstr ""
+msgstr "ถัดไป"
