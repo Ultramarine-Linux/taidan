@@ -5,6 +5,7 @@ use itertools::Itertools;
 pub struct Config {
     pub distro: String,
     pub catalogue: Vec<Category>,
+    pub edition: String,
 }
 
 impl Config {
@@ -25,9 +26,29 @@ impl Config {
             .unwrap_or(name)
             .clone_into(&mut self.distro);
 
+        let edition = file
+            .split('\n')
+            .find_map(|line| line.strip_prefix("VARIANT_ID="))
+            .expect("Cannot find VARIANT_ID=… in /etc/os-release");
+        edition
+            .strip_prefix('"')
+            .and_then(|name| name.strip_suffix('"'))
+            .unwrap_or(edition)
+            .clone_into(&mut self.edition);
+
         // catalogue
         self.populate_catalogue()
             .expect("cannot populate catalogue");
+
+        // remove choices by filter editions
+        self.catalogue.iter_mut().for_each(|cat| {
+            cat.choices.retain(|choice| {
+                choice
+                    .editions
+                    .as_ref()
+                    .is_none_or(|editions| editions.contains(&self.edition))
+            });
+        });
 
         tracing::trace!("Populated config: {self:#?}");
     }
@@ -91,6 +112,7 @@ pub struct Choice {
     _actions: serde_yaml::Value,
     #[serde(skip)]
     pub actions: ChoiceActions,
+    pub editions: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -183,7 +205,7 @@ impl ChoiceActions {
 pub struct Category {
     #[serde(rename = "category")]
     pub name: String,
-    pub choices: Box<[Choice]>,
+    pub choices: Vec<Choice>,
 }
 
 impl TryFrom<&str> for ChoiceActions {
