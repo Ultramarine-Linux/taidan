@@ -8,8 +8,8 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-12-30 10:46+0000\n"
-"PO-Revision-Date: 2024-12-31 13:21+0000\n"
-"Last-Translator: Cappy <cappy@cappuchino.xyz>\n"
+"PO-Revision-Date: 2025-01-01 13:45+0000\n"
+"Last-Translator: Co9ski <co9ski@gmail.com>\n"
 "Language-Team: Thai <https://weblate.fyralabs.com/projects/ultramarine-linux/"
 "taidan/th/>\n"
 "Language: th\n"
@@ -82,9 +82,10 @@ msgid "Username\n"
 "- may optionally end with a dollar sign (<tt>$</tt>)"
 msgstr ""
 "ชื่อผู้ใช้\n"
-"- ต้องเริ่มด้วยตัวพิมพ์เล็ก\n"
-"- ต้องมีแค่เลขหรืออักษรอังกฤษ, อันเดอร์สกอร์ (<tt>_</tt>) หรือยัติภาค(<tt>-</tt>)\n"
-"- อาจจบด้วยเครื่องหมายดอลลาร์ (<tt>$</tt>)"
+"- ต้องเริ่มด้วยอักษรละตินตัวพิมพ์เล็ก\n"
+"- ใส่ได้แค่อักษรละติน, เลขฮินดูอารบิก, อันเดอร์สกอร์ (<tt>_</tt>) หรือยัติภาค(<tt>-</tt>) "
+"เท่านั้น\n"
+"- อาจลงท้ายด้วยเครื่องหมายดอลลาร์ (<tt>$</tt>)"
 
 #: src/pages/_02_password.rs:34
 msgid "Create a Password"
@@ -163,10 +164,12 @@ msgstr ""
 msgid "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
 msgstr ""
+"ตั้งธีมให้ตรงใจคุณ\n"
+"คุณยังกลับมาที่การตั้งค่าเพื่อเปลี่ยนตรงนี้ทีหลังได้"
 
 #: src/pages/_08_theme.rs:84
 msgid "Some apps may not respect this preference."
-msgstr ""
+msgstr "บางแอพพลิเคชันอาจไม่ปรับสีให้ตามธีม"
 
 #: src/pages/_08_theme.rs:105
 msgid "Light"
@@ -222,7 +225,7 @@ msgstr ""
 
 #: src/ui.rs:13
 msgid "Previous"
-msgstr ""
+msgstr "ก่อนหน้า"
 
 #: src/ui.rs:23
 msgid "Next"
