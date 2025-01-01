@@ -5,6 +5,7 @@ mod _03_dnfdownloadupdate;
 mod _04_dnfinstallupdate;
 mod _05_dnfdownloadapps;
 mod _06_dnfinstallapps;
+mod _07_drivers_codecs;
 
 use crate::prelude::*;
 use gettextrs::gettext;
@@ -13,6 +14,7 @@ use crate::backend::steps::{
     _00_useradd::UserAdd, _01_settime::SetTime, _02_settheme::SetTheme,
     _03_dnfdownloadupdate::DnfDownloadUpdate, _04_dnfinstallupdate::DnfInstallUpdate,
     _05_dnfdownloadapps::DnfDownloadApps, _06_dnfinstallapps::DnfInstallApps,
+    _07_drivers_codecs::DriversCodecs,
 };
 
 #[allow(async_fn_in_trait, clippy::unused_async)]
@@ -33,7 +35,7 @@ pub trait Step {
     }
 }
 
-pub const NUM_STAGES: usize = 5;
+pub const NUM_STAGES: usize = 8;
 
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone, Copy, Debug)]
@@ -45,6 +47,7 @@ pub enum Stage {
     DnfInstallUpdate,
     DnfDownloadApps,
     DnfInstallApps,
+    DriversCodecs,
 }
 
 impl Stage {
@@ -68,6 +71,7 @@ impl Stage {
             Self::DnfInstallUpdate(DnfInstallUpdate),
             Self::DnfDownloadApps(DnfDownloadApps),
             Self::DnfInstallApps(DnfInstallApps),
+            Self::DriversCodecs(DriversCodecs),
         ]
     }
 }
@@ -88,6 +92,7 @@ impl From<Stage> for u8 {
             Stage::DnfInstallUpdate(_) => 4,
             Stage::DnfDownloadApps(_) => 5,
             Stage::DnfInstallApps(_) => 6,
+            Stage::DriversCodecs(_) => 7,
         }
     }
 }
@@ -102,6 +107,7 @@ impl From<Stage> for String {
             Stage::DnfInstallUpdate(_) => gettext("Installing System Update…"),
             Stage::DnfDownloadApps(_) => gettext("Downloading User Programs…"),
             Stage::DnfInstallApps(_) => gettext("Installing User Programs…"),
+            Stage::DriversCodecs(_) => gettext("Installing additional drivers…"),
         }
     }
 }
@@ -113,6 +119,21 @@ pub fn cmd(name: &str, args: &[&str]) -> color_eyre::Result<()> {
     let p = std::process::Command::new(name)
         .args(args)
         .status()
+        .wrap_err(format!("fail to run `{name}`"))?;
+    if !p.success() {
+        return Err(eyre!("`{name}` failed").note(format!("Exit code: {:?}", p.code())));
+    }
+    Ok(())
+}
+
+/// # Errors
+/// - command failed to run
+/// - command exited with non-zero status code
+pub async fn acmd(name: &str, args: &[&str]) -> color_eyre::Result<()> {
+    let p = tokio::process::Command::new(name)
+        .args(args)
+        .status()
+        .await
         .wrap_err(format!("fail to run `{name}`"))?;
     if !p.success() {
         return Err(eyre!("`{name}` failed").note(format!("Exit code: {:?}", p.code())));
