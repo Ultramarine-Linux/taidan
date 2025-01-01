@@ -9,7 +9,7 @@ pub mod settings;
 pub mod steps;
 pub mod theme;
 
-use crate::prelude::REQWEST_CLIENT;
+use crate::prelude::*;
 
 #[tracing::instrument]
 pub async fn start_install(
@@ -24,7 +24,9 @@ pub async fn start_install(
         sender
             .send(InstallingPageMsg::UpdStage(*stage))
             .expect("sender dropped?");
-        stage.run(&settings, sender.clone()).await?;
+        (stage.run(&settings, sender.clone()).await)
+            .wrap_err("stage failed")
+            .with_note(|| format!("Stage: {stage:?}"))?;
     }
     sender
         .send(InstallingPageMsg::Finish)

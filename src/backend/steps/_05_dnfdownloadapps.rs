@@ -57,6 +57,8 @@ impl super::Step for DnfDownloadApps {
                     .note(format!("Exit code: {:?}", dnf.code())));
             }
         }
+        // as per jade's request, we need to remove firefox first for the browser category
+        super::cmd("dnf5", &["rm", "-y", "--noninteractive", "firefox"])?;
 
         // run flatpak and dnf in parallel
         // this should be safe, supposedly they don't affect each other
