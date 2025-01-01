@@ -31,7 +31,13 @@ impl super::Step for DnfDownloadApps {
             action.map(|action| {
                 settings.actions[action.as_int()].push(action.consume_inner_str());
             })
-        })
+        })?;
+        settings.actions[1].extend(
+            super::_07_drivers_codecs::Codecs::codecs()
+                .iter()
+                .map(ToString::to_string),
+        );
+        Ok(())
     }
     #[tracing::instrument]
     async fn run(

@@ -43,18 +43,18 @@ impl super::Step for DriversCodecs {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
-        futures::future::try_join3(
-            Drivers::setup_nvidia(),
-            Drivers::setup_broadcom(),
-            Codecs::install_codecs(),
-        )
-        .await?;
+        Drivers::setup_nvidia().await?;
+        Drivers::setup_broadcom().await?;
+        // FIXME: refactor this to somewhere else not in this file
+        // also this is done inside `_05_dnfdownloadapps.rs`
+        // Codecs::install_codecs().await?;
         Ok(())
     }
 }
 
+// NOTE: added during `_05_dnfdownloadapps.rs`
 impl Codecs {
-    const fn codecs() -> &'static [&'static str] {
+    pub const fn codecs() -> &'static [&'static str] {
         &[
             "ffmpeg",
             "gstreamer1",
