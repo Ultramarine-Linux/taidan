@@ -81,13 +81,9 @@ async fn set_gsettings_im(user: &str, im: &str) -> color_eyre::Result<()> {
 }
 
 pub async fn set_keymap(user: &str, layout: &str, variant: &str) -> color_eyre::Result<()> {
-    if tokio::fs::try_exists("/usr/share/kwriteconfig6")
-        .await
-        .is_ok()
-    {
-        set_kde_keymap(user, layout, variant).await?;
+    if (tokio::fs::try_exists("/usr/share/kwriteconfig6").await).is_ok() {
+        set_kde_keymap(user, layout, variant).await
     } else {
-        set_gsettings_keymap(user, layout, variant).await?;
+        set_gsettings_keymap(user, layout, variant).await
     }
-    Ok(())
 }

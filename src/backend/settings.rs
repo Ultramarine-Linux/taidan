@@ -6,6 +6,9 @@ pub struct Settings {
     pub skipconfig: bool,
     pub nointernet: bool,
 
+    pub kb_layout: String,
+    pub kb_variant: String,
+
     pub fullname: String,
     pub username: String,
 
