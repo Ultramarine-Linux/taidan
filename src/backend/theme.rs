@@ -140,7 +140,7 @@ pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::R
 /// # Errors
 /// - command failed to run
 /// - command exited with non-zero status code
-async fn pkexec(user: &str, name: &str, args: &[&str]) -> color_eyre::Result<()> {
+pub async fn pkexec(user: &str, name: &str, args: &[&str]) -> color_eyre::Result<()> {
     let p = tokio::process::Command::new("pkexec")
         .args(["--user", user, name])
         .args(args)

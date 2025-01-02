@@ -5,6 +5,7 @@ use crate::pages::InstallingPageMsg;
 
 pub mod dnf;
 pub mod flatpak;
+pub mod i18n;
 pub mod settings;
 pub mod steps;
 pub mod theme;
