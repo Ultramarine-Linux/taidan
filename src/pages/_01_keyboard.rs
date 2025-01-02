@@ -1,48 +1,61 @@
-use relm4::RelmRemoveAllExt;
+use relm4::{RelmIterChildrenExt, RelmRemoveAllExt, SharedState};
 
 use crate::backend::i18n;
 
+fn miniblk(row: &gtk::ListBoxRow) -> libhelium::MiniContentBlock {
+    row.child().unwrap().dynamic_cast().unwrap()
+}
+
+static SEARCH_LAYOUT: SharedState<libhelium::glib::GString> = SharedState::new();
+static SEARCH_VARIANT: SharedState<libhelium::glib::GString> = SharedState::new();
+
 crate::generate_page!(Keyboard {
-    layouts: Vec<String>,
     layoutbox: gtk::ListBox,
     variantbox: gtk::ListBox,
 }:
     init[layoutbox variantbox](root, sender, model, widgets) {
-        model.layouts = i18n::list_layouts().unwrap();
+        i18n::LAYOUTS.iter()
+            .map(|(layout, i18n::Layout { name, .. })| libhelium::MiniContentBlock::builder().subtitle(name).title(layout).build())
+            .map(|mini_content_block| gtk::ListBoxRow::builder().child(&mini_content_block).build())
+            .for_each(|row| model.layoutbox.append(&row));
+        model.layoutbox.select_row(model.layoutbox.iter_children().find(|child| miniblk(child).title() == "us").as_ref());
         let layoutbox2 = layoutbox.clone();
         let variantbox2 = variantbox.clone();
         widgets.searchlayout.internal_entry().connect_changed(move |en| {
-            SETTINGS.write().kb_layout = en.text().to_string();
+            *SEARCH_LAYOUT.write() = en.text();
             layoutbox2.invalidate_filter();
         });
-        let layouts1 = model.layouts.clone();
         layoutbox.set_filter_func(move |row| {
-            layouts1[row.index() as usize].contains(&SETTINGS.write().kb_layout)
+            let search = SEARCH_LAYOUT.read().to_ascii_lowercase();
+            miniblk(row).title().contains(&search) || miniblk(row).subtitle().contains(&search)
         });
         widgets.searchvariant.internal_entry().connect_changed(move |en| {
-            SETTINGS.write().kb_variant = en.text().to_string();
+            *SEARCH_VARIANT.write() = en.text();
             variantbox2.invalidate_filter();
         });
         variantbox.set_filter_func(move |row| {
-            let sett = SETTINGS.read();
-            let variants = i18n::list_variants(&sett.kb_layout).unwrap();
-            variants[row.index() as usize].contains(&sett.kb_variant)
+            let search = SEARCH_VARIANT.read().to_ascii_lowercase();
+            miniblk(row).title().contains(&search) || miniblk(row).subtitle().contains(&search)
         });
     }
     update(self, message, sender) {
         LayoutSelected => {
             self.variantbox.remove_all();
-            let index = self.layoutbox.selected_row().unwrap().index() as usize;
-            SETTINGS.write().kb_layout = self.layouts[index].clone();
-            i18n::list_variants(&self.layouts[index]).expect("can't list variants").iter()
-                .map(|variant| gtk::ListBoxRow::builder().child(&gtk::Label::new(Some(variant))).build())
+            self.variantbox.append(&gtk::ListBoxRow::builder().child(&libhelium::MiniContentBlock::builder().subtitle(gettext("Default")).build()).build());
+            let row = self.layoutbox.selected_row().unwrap();
+            let layout = miniblk(&row).title().to_string();
+            i18n::LAYOUTS[&layout].variants.iter()
+                .map(|(variant, desc)| gtk::ListBoxRow::builder().child(&libhelium::MiniContentBlock::builder().subtitle(desc).title(variant).build()).build())
                 .for_each(|row| self.variantbox.append(&row));
+            SETTINGS.write().kb_layout.clone_from(&layout);
+            sender.oneshot_command(async move { i18n::set_keymap(None, &layout, None).await.expect("cannot set keymap") });
         },
         VariantSelected => {
-            let mut sett = SETTINGS.write();
-            let variants = i18n::list_variants(&sett.kb_layout).unwrap();
-            let index = self.variantbox.selected_row().unwrap().index() as usize;
-            sett.kb_variant = variants[index].clone();
+            let row = self.variantbox.selected_row().unwrap();
+            let variant = (miniblk(&row).subtitle() != "Default").then(|| miniblk(&row).title().to_string());
+            SETTINGS.write().kb_variant.clone_from(&variant);
+            let layout = SETTINGS.read().kb_layout.clone();
+            sender.oneshot_command(async move { i18n::set_keymap(None, &layout, variant.as_deref()).await.expect("cannot set keymap") });
         },
     } => {}
 
@@ -50,8 +63,8 @@ crate::generate_page!(Keyboard {
         set_orientation: gtk::Orientation::Vertical,
         set_spacing: 16,
         set_vexpand: true,
-        set_valign: gtk::Align::Center,
-        set_halign: gtk::Align::Center,
+        set_valign: gtk::Align::Fill,
+        set_halign: gtk::Align::Fill,
 
         gtk::Image {
             set_icon_name: Some("input-keyboard-symbolic"),
@@ -69,13 +82,14 @@ crate::generate_page!(Keyboard {
         set_orientation: gtk::Orientation::Horizontal,
         set_spacing: 4,
         set_vexpand: true,
+        set_hexpand: true,
 
         gtk::Box {
             set_orientation: gtk::Orientation::Vertical,
             set_spacing: 10,
             set_vexpand: true,
             set_hexpand: true,
-            set_halign: gtk::Align::Center,
+            set_halign: gtk::Align::Fill,
 
             #[name(searchlayout)]
             libhelium::TextField {
@@ -88,14 +102,12 @@ crate::generate_page!(Keyboard {
                 set_placeholder_text: Some(&gettext("Search keyboard layout…")),
             },
             gtk::ScrolledWindow {
+                set_hscrollbar_policy: gtk::PolicyType::Never,
                 #[local_ref]
                 layoutbox -> gtk::ListBox {
                     add_css_class: "content-list",
                     set_selection_mode: gtk::SelectionMode::Single,
                     set_vexpand: true,
-                    set_hexpand: true,
-                    set_valign: gtk::Align::Center,
-                    set_halign: gtk::Align::Center,
                     connect_selected_rows_changed => Self::Input::LayoutSelected,
                 }
             },
@@ -106,7 +118,7 @@ crate::generate_page!(Keyboard {
             set_spacing: 10,
             set_vexpand: true,
             set_hexpand: true,
-            set_halign: gtk::Align::Center,
+            set_halign: gtk::Align::Fill,
 
             #[name(searchvariant)]
             libhelium::TextField {
@@ -119,14 +131,12 @@ crate::generate_page!(Keyboard {
                 set_placeholder_text: Some(&gettext("Search keyboard variant…")),
             },
             gtk::ScrolledWindow {
+                set_hscrollbar_policy: gtk::PolicyType::Never,
                 #[local_ref]
                 variantbox -> gtk::ListBox {
                     add_css_class: "content-list",
                     set_selection_mode: gtk::SelectionMode::Single,
                     set_vexpand: true,
-                    set_hexpand: true,
-                    set_valign: gtk::Align::Center,
-                    set_halign: gtk::Align::Center,
                     connect_selected_rows_changed => Self::Input::VariantSelected,
                 }
             },
@@ -139,7 +149,6 @@ crate::generate_page!(Keyboard {
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
-            set_sensitive: false,
             connect_clicked => Self::Input::Nav(NavAction::Next),
         },
     }

@@ -7,7 +7,7 @@ pub struct Settings {
     pub nointernet: bool,
 
     pub kb_layout: String,
-    pub kb_variant: String,
+    pub kb_variant: Option<String>,
 
     pub fullname: String,
     pub username: String,

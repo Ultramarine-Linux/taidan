@@ -7,12 +7,13 @@ Linux, written in Rust and the [Helium] toolkit.
 
 ```
 libhelium
-gsettings or (plasma-apply-colorscheme with kwriteconfig6)
+gsettings or (plasma-apply-colorscheme and kwriteconfig6)
 shadow-utils
-systemd-udev [esp. with systemd-timesyncd.service]
+systemd-udev [for systemd-timesyncd.service]
 sh
-dnf5 with dnf5-command(copr)
+dnf5 and dnf5-command(copr)
 flatpak
+xkeyboard-config [for /usr/share/X11/xkb/rules/evdev.lst]
 ```
 
 ### 🛠️ Build Dependencies
