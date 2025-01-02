@@ -29,19 +29,20 @@ pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::Sh
 
 generate_pages!(Page AppModel AppMsg:
     00: Welcome,
-    01: WhoAreYou,
-    02: Password,
-    03: Internet,
-    04: Analytics,
-    05: CrashReport,
-    06: Location,
-    07: NightLight,
-    08: Theme,
-    09: Browser,
-    10: Categories,
-    11: Installing,
-    12: Finish,
-    13: Error,
+    01: Keyboard,
+    02: WhoAreYou,
+    03: Password,
+    04: Internet,
+    05: Analytics,
+    06: CrashReport,
+    07: Location,
+    08: NightLight,
+    09: Theme,
+    10: Browser,
+    11: Categories,
+    12: Installing,
+    13: Finish,
+    14: Error,
 );
 
 #[derive(Debug)]
@@ -84,6 +85,7 @@ impl SimpleComponent for AppModel {
                 #[name = "stack"]
                 match model.page {
                     Page::Welcome => *model.welcome_page.widget(),
+                    Page::Keyboard => *model.keyboard_page.widget(),
                     Page::WhoAreYou => *model.who_are_you_page.widget(),
                     Page::Password => *model.password_page.widget(),
                     Page::Internet => *model.internet_page.widget(),
@@ -168,14 +170,14 @@ impl SimpleComponent for AppModel {
                 self.page = Page::Error;
                 self.error_page
                     .sender()
-                    .send(pages::_13_error::ErrorPageMsg::Receive(msg))
+                    .send(pages::_14_error::ErrorPageMsg::Receive(msg))
                     .expect("sender dropped?");
             }
         }
     }
 }
 
-type Sd = relm4::Sender<pages::_11_installing::InstallingPageMsg>;
+type Sd = relm4::Sender<pages::InstallingPageMsg>;
 impl AppModel {
     #[allow(clippy::needless_pass_by_value)]
     fn run_install<Fut, F>(&self, sender: ComponentSender<Self>, f: F)

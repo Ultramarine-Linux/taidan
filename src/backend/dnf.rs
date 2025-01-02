@@ -11,7 +11,7 @@ use crate::prelude::*;
 #[allow(clippy::arithmetic_side_effects)]
 #[allow(clippy::indexing_slicing)]
 pub(super) async fn handle_dnf(
-    sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+    sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     f: impl Fn(&mut tokio::process::Command) -> &mut tokio::process::Command + Send,
 ) -> color_eyre::Result<()> {
     let mut cmd = tokio::process::Command::new("dnf5");

@@ -5,7 +5,7 @@ impl super::Step for SetTime {
     async fn run(
         &self,
         _: &crate::backend::settings::Settings,
-        sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
         super::cmd(
             "systemctl",

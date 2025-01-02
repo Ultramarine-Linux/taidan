@@ -23,13 +23,13 @@ pub trait Step {
     async fn run(
         &self,
         settings: &crate::backend::settings::Settings,
-        sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()>;
 
     async fn pre(
         &self,
         _: &mut crate::backend::settings::Settings,
-        _: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        _: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
         Ok(())
     }

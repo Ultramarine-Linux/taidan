@@ -5,16 +5,18 @@
 
 #![allow(clippy::semicolon_outside_block)] // bug from relm4 component macro
 pub mod _00_welcome;
-pub mod _01_whoareyou;
-pub mod _02_password;
-pub mod _03_internet;
-pub mod _04_analytics;
-pub mod _05_crashreport;
-pub mod _06_location;
-pub mod _07_nightlight;
-pub mod _08_theme;
-pub mod _09_browser;
-pub mod _10_categories;
-pub mod _11_installing;
-pub mod _12_finish;
-pub mod _13_error;
+pub mod _01_keyboard;
+pub mod _02_whoareyou;
+pub mod _03_password;
+pub mod _04_internet;
+pub mod _05_analytics;
+pub mod _06_crashreport;
+pub mod _07_location;
+pub mod _08_nightlight;
+pub mod _09_theme;
+pub mod _10_browser;
+pub mod _11_categories;
+pub mod _12_installing;
+pub mod _13_finish;
+pub mod _14_error;
+pub use _12_installing::InstallingPageMsg;

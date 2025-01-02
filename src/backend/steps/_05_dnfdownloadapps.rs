@@ -8,7 +8,7 @@ impl super::Step for DnfDownloadApps {
     async fn pre(
         &self,
         settings: &mut crate::backend::settings::Settings,
-        _: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        _: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
         if settings.nointernet {
             return Ok(());
@@ -43,7 +43,7 @@ impl super::Step for DnfDownloadApps {
     async fn run(
         &self,
         settings: &crate::backend::settings::Settings,
-        sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
         let mut enable_repo = super::super::dnf::EnableRepo::new().await?;
         // NOTE: we unfortunately cannot execute this in parallel because `enable_repo()` borrows

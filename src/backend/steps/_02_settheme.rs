@@ -5,7 +5,7 @@ impl super::Step for SetTheme {
     async fn run(
         &self,
         settings: &crate::backend::settings::Settings,
-        sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
         super::super::theme::set_theme(
             Some(&settings.username),

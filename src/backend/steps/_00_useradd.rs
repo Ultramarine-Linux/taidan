@@ -7,7 +7,7 @@ impl super::Step for UserAdd {
     async fn run(
         &self,
         settings: &crate::backend::settings::Settings,
-        sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
         let crypt_setting = xcrypt::crypt_gensalt(None, 0, None)
             .wrap_err("fail to encrypt password")

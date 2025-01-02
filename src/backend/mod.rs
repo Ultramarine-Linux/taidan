@@ -1,7 +1,7 @@
 use relm4::Sender;
 use steps::Step;
 
-use crate::pages::_11_installing::InstallingPageMsg;
+use crate::pages::InstallingPageMsg;
 
 pub mod dnf;
 pub mod flatpak;
@@ -92,7 +92,7 @@ mod parseutil {
     /// - cannot convert bytes to `&str`
     /// - cannot parse to `u32`
     pub fn send_frac(
-        sender: &relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        sender: &relm4::Sender<crate::pages::InstallingPageMsg>,
         num: &[u8],
         den: &[u8],
     ) {
@@ -102,11 +102,9 @@ mod parseutil {
         }
         let numerator: u32 = core::str::from_utf8(num).unwrap().parse().unwrap();
         sender
-            .send(
-                crate::pages::_11_installing::InstallingPageMsg::UpdFlatpakProg(
-                    f64::from(numerator) / f64::from(denominator),
-                ),
-            )
+            .send(crate::pages::InstallingPageMsg::UpdFlatpakProg(
+                f64::from(numerator) / f64::from(denominator),
+            ))
             .expect("ui sender fails");
     }
 }

@@ -41,7 +41,7 @@ impl super::Step for DriversCodecs {
     async fn run(
         &self,
         settings: &crate::backend::settings::Settings,
-        sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
         Drivers::setup_nvidia().await?;
         Drivers::setup_broadcom().await?;

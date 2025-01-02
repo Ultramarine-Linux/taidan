@@ -5,7 +5,7 @@ impl super::Step for DnfInstallUpdate {
     async fn run(
         &self,
         settings: &crate::backend::settings::Settings,
-        sender: relm4::Sender<crate::pages::_11_installing::InstallingPageMsg>,
+        sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
         if settings.nointernet {
             return Ok(());
