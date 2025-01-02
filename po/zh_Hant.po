@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-02 17:03+0000\n"
+"POT-Creation-Date: 2025-01-02 17:04+0000\n"
 "PO-Revision-Date: 2024-12-31 12:26+0000\n"
 "Last-Translator: sadlerm4 <sad_lerm@hotmail.com>\n"
 "Language-Team: Chinese (Traditional Han script) <https://weblate.fyralabs."
@@ -123,7 +123,7 @@ msgstr "重覆密碼"
 
 #: src/pages/_04_internet.rs:28
 msgid "Let's Get You Online"
-msgstr ""
+msgstr "網絡連線"
 
 #: src/pages/_04_internet.rs:34
 msgid "Connect to the Internet to get the latest and greatest."
@@ -223,31 +223,31 @@ msgstr "正在安裝您的應用程式"
 
 #: src/pages/_12_installing.rs:60
 msgid "This won't take long!"
-msgstr ""
+msgstr "很快就會完成，請稍等吧！"
 
 #: src/pages/_12_installing.rs:68
 msgid "Loading…"
-msgstr ""
+msgstr "加載中…"
 
 #: src/pages/_13_finish.rs:17
 msgid "Your System is Ready"
-msgstr ""
+msgstr "完成"
 
 #: src/pages/_13_finish.rs:23
 msgid "We hope you enjoy your fresh system!"
-msgstr ""
+msgstr "希望您享受您的新系統吧！"
 
 #: src/pages/_13_finish.rs:31 src/pages/_14_error.rs:43
 msgid "Done"
-msgstr ""
+msgstr "完成"
 
 #: src/pages/_14_error.rs:22
 msgid "Error"
-msgstr ""
+msgstr "錯誤"
 
 #: src/pages/_14_error.rs:28
 msgid "We are sorry, but there is an unexpected problem."
-msgstr ""
+msgstr "不好意思，但我們遇到了問題。"
 
 #: src/ui.rs:13
 msgid "Previous"

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-02 17:03+0000\n"
+"POT-Creation-Date: 2025-01-02 17:04+0000\n"
 "PO-Revision-Date: 2024-12-31 12:26+0000\n"
 "Last-Translator: madomado <madonuko@outlook.com>\n"
 "Language-Team: Japanese <https://weblate.fyralabs.com/projects/ultramarine-"
@@ -86,7 +86,7 @@ msgstr ""
 
 #: src/pages/_02_whoareyou.rs:83
 msgid "Who are You?"
-msgstr ""
+msgstr "ユーザー登録"
 
 #: src/pages/_02_whoareyou.rs:92
 msgid "Full Name"
@@ -185,17 +185,19 @@ msgstr ""
 
 #: src/pages/_09_theme.rs:71
 msgid "Choose your theme"
-msgstr ""
+msgstr "テーマ選択"
 
 #: src/pages/_09_theme.rs:78
 msgid ""
 "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
 msgstr ""
+"色の綴でシステムをカスタマイズしましょう。\n"
+"後でシステム設定に変えることもできます。"
 
 #: src/pages/_09_theme.rs:84
 msgid "Some apps may not respect this preference."
-msgstr ""
+msgstr "このオプションは従われない場合もあります。"
 
 #: src/pages/_09_theme.rs:105
 msgid "Light"
@@ -207,7 +209,7 @@ msgstr ""
 
 #: src/pages/_10_browser.rs:64
 msgid "Browser Selection"
-msgstr ""
+msgstr "ブラウザ選択"
 
 #: src/pages/_11_categories.rs:59
 msgid "What Do You Use This Device For?"
@@ -215,44 +217,44 @@ msgstr ""
 
 #: src/pages/_11_categories.rs:78
 msgid "Confirm and Setup System"
-msgstr ""
+msgstr "続きにセットアップ"
 
 #: src/pages/_12_installing.rs:54
 msgid "Installing your Apps"
-msgstr ""
+msgstr "アプリをインストール中"
 
 #: src/pages/_12_installing.rs:60
 msgid "This won't take long!"
-msgstr ""
+msgstr "しばらくお待ちください。"
 
 #: src/pages/_12_installing.rs:68
 msgid "Loading…"
-msgstr ""
+msgstr "ローディング…"
 
 #: src/pages/_13_finish.rs:17
 msgid "Your System is Ready"
-msgstr ""
+msgstr "完成"
 
 #: src/pages/_13_finish.rs:23
 msgid "We hope you enjoy your fresh system!"
-msgstr ""
+msgstr "新しいシステムをお楽しみくださいませ。"
 
 #: src/pages/_13_finish.rs:31 src/pages/_14_error.rs:43
 msgid "Done"
-msgstr ""
+msgstr "完了"
 
 #: src/pages/_14_error.rs:22
 msgid "Error"
-msgstr ""
+msgstr "エラー"
 
 #: src/pages/_14_error.rs:28
 msgid "We are sorry, but there is an unexpected problem."
-msgstr ""
+msgstr "申し訳ございませんが、エラーが発生しました。"
 
 #: src/ui.rs:13
 msgid "Previous"
-msgstr ""
+msgstr "前"
 
 #: src/ui.rs:23
 msgid "Next"
-msgstr ""
+msgstr "次"
