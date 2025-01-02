@@ -65,7 +65,7 @@ fn populate_layouts() -> HashMap<String, Layout> {
 async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> color_eyre::Result<()> {
     let args = [
         "--file",
-        "~/.config/kxkbrc",
+        "kxkbrc",
         "--group",
         "Layout",
         "--key",
@@ -76,7 +76,7 @@ async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> colo
     let variant = variant.unwrap_or("");
     let args = [
         "--file",
-        "~/.config/kxkbrc",
+        "kxkbrc",
         "--group",
         "Layout",
         "--key",

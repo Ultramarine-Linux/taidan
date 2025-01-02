@@ -51,7 +51,7 @@ crate::generate_page!(Keyboard {
             sender.oneshot_command(async move { i18n::set_keymap(None, &layout, None).await.expect("cannot set keymap") });
         },
         VariantSelected => {
-            let row = self.variantbox.selected_row().unwrap();
+            let Some(row) = self.variantbox.selected_row() else { return };
             let variant = (miniblk(&row).subtitle() != "Default").then(|| miniblk(&row).title().to_string());
             SETTINGS.write().kb_variant.clone_from(&variant);
             let layout = SETTINGS.read().kb_layout.clone();
