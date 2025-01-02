@@ -8,69 +8,72 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-12-30 10:46+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: Automatically generated\n"
-"Language-Team: none\n"
+"PO-Revision-Date: 2025-01-02 17:32+0000\n"
+"Last-Translator: Písek Pískovec <pisekpiskovec@gmail.com>\n"
+"Language-Team: Czech <https://weblate.fyralabs.com/projects/"
+"ultramarine-linux/taidan/cs/>\n"
 "Language: cs\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+"X-Generator: Weblate 5.9.2\n"
 
 #: src/backend/steps.rs:98
 msgid "Creating User…"
-msgstr ""
+msgstr "Vytváření uživatele…"
 
 #: src/backend/steps.rs:99
 msgid "Setting Timezone…"
-msgstr ""
+msgstr "Nastavování časového pásma…"
 
 #: src/backend/steps.rs:100
 msgid "Configuring Themes…"
-msgstr ""
+msgstr "Konfigurace motivů…"
 
 #: src/backend/steps.rs:101
 msgid "Downloading System Update…"
-msgstr ""
+msgstr "Stahování systémových aktualizací…"
 
 #: src/backend/steps.rs:102
 msgid "Installing System Update…"
-msgstr ""
+msgstr "Instalace systémových aktualizací…"
 
 #: src/backend/steps.rs:103
 msgid "Downloading User Programs…"
-msgstr ""
+msgstr "Stahování uživatelských programů…"
 
 #: src/backend/steps.rs:104
 msgid "Installing User Programs…"
-msgstr ""
+msgstr "Instalace uživatelských programů…"
 
 #: src/pages/_00_welcome.rs:17 src/main.rs:71
 msgid "Welcome to %s"
-msgstr ""
+msgstr "Vítejte v %s"
 
 #: src/pages/_00_welcome.rs:23
 msgid "Let's get your system ready."
-msgstr ""
+msgstr "Připravme Váš systém."
 
 #: src/pages/_00_welcome.rs:37
 msgid "Skip Configuration"
-msgstr ""
+msgstr "Přeskočit konfiguraci"
 
 #: src/pages/_00_welcome.rs:49
 msgid "Let's Go"
-msgstr ""
+msgstr "Pojďme"
 
 #: src/pages/_01_whoareyou.rs:83
 msgid "Who are You?"
-msgstr ""
+msgstr "Kdo jste?"
 
 #: src/pages/_01_whoareyou.rs:92
 msgid "Full Name"
-msgstr ""
+msgstr "Celé jméno"
 
 #: src/pages/_01_whoareyou.rs:100
 msgid "Username"
-msgstr ""
+msgstr "Uživatelské jméno"
 
 #: src/pages/_01_whoareyou.rs:110
 msgid "Username\n"
@@ -78,145 +81,157 @@ msgid "Username\n"
 "- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)\n"
 "- may optionally end with a dollar sign (<tt>$</tt>)"
 msgstr ""
+"Uživatelské jméno\n"
+"- musí začínat malým písmenem\n"
+"- musí obsahovat pouze písmena a čísla, podtržítko (<tt>_</tt>) nebo pomlčku "
+"(<tt>-</tt>)\n"
+"- může volitelně končit znakem dolaru (<tt>$</tt>)"
 
 #: src/pages/_02_password.rs:34
 msgid "Create a Password"
-msgstr ""
+msgstr "Vytvořte heslo"
 
 #: src/pages/_02_password.rs:44
 msgid "Password"
-msgstr ""
+msgstr "Heslo"
 
 #: src/pages/_02_password.rs:56
 msgid "Repeat Password"
-msgstr ""
+msgstr "Potvrďte heslo"
 
 #: src/pages/_03_internet.rs:28
 msgid "Let's Get You Online"
-msgstr ""
+msgstr "Pojďme Vás připojit"
 
 #: src/pages/_03_internet.rs:34
 msgid "Connect to the Internet to get the latest and greatest."
-msgstr ""
+msgstr "Připojte se k Internetu k získání toho nejnovějšího a nejlepšího."
 
 #: src/pages/_03_internet.rs:42
 msgid "I don't have Internet"
-msgstr ""
+msgstr "Nemám připojení k Internetu"
 
 #: src/pages/_04_analytics.rs:20
 msgid "Analytics and Crash Reporting"
-msgstr ""
+msgstr "Analýza a Hlášení nehod"
 
 #: src/pages/_05_crashreport.rs:24
 msgid "Crash Reporting"
-msgstr ""
+msgstr "Hlášení nehod"
 
 #: src/pages/_05_crashreport.rs:30
 msgid "Allow Fyra Labs to collect crash data to find bugs and assist you."
-msgstr ""
+msgstr "Povolte Fyra Labs sbírání dat o pádech k odhalení chyb a Vaší pomoci."
 
 #: src/pages/_05_crashreport.rs:34
 msgid "All data collected is anonymous and end-to-end encrypted.\n"
 "You will be given a crash ID to help support find what went wrong."
 msgstr ""
+"Všechna sebraná data jsou anonymní a koncově šifrovaná.\n"
+"Dostanete ID havárie, které pomůže technické podpoře zjistit, co se pokazilo."
 
 #: src/pages/_05_crashreport.rs:38
 msgid "Send Crash Data"
-msgstr ""
+msgstr "Poslat data havárie"
 
 #: src/pages/_05_crashreport.rs:39
+#, fuzzy
 msgid "Press next to keep off"
-msgstr ""
+msgstr "Stiskněte další pro vypnutí"
 
 #: src/pages/_06_location.rs:26 src/pages/_06_location.rs:37
 msgid "Location Services"
-msgstr ""
+msgstr "Služby určování polohy"
 
 #: src/pages/_06_location.rs:33
 msgid "Allow apps to request your approximate location with [Mozilla Location Services]"
 msgstr ""
+"Povolit aplikacím žádato o Vaši přibližnou polohu s "
+"[Mozilla Location Services]"
 
 #: src/pages/_07_nightlight.rs:19 src/pages/_07_nightlight.rs:40
 msgid "Night Light"
-msgstr ""
+msgstr "Noční osvětlení"
 
 #: src/pages/_07_nightlight.rs:26
 msgid "Tint the display with a warm tone at night to reduce eyestrain."
-msgstr ""
+msgstr "V noci zbarví obrazovku teplým tónem, pro snížení únavy očí."
 
 #: src/pages/_07_nightlight.rs:31
 msgid "Night Light is not proven to help with difficulty falling sleep."
-msgstr ""
+msgstr "Není prokázáno, že by noční světlo pomáhalo při potížích s usínáním."
 
 #: src/pages/_08_theme.rs:71
 msgid "Choose your theme"
-msgstr ""
+msgstr "Vyberte si motiv"
 
 #: src/pages/_08_theme.rs:78
 msgid "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
 msgstr ""
+"Přizpůsobte si system barevným nádechem.\n"
+"Tuto možnost si můžete později změnit v nastavení."
 
 #: src/pages/_08_theme.rs:84
 msgid "Some apps may not respect this preference."
-msgstr ""
+msgstr "Některé aplikace nemusí toto nastavení respektovat."
 
 #: src/pages/_08_theme.rs:105
 msgid "Light"
-msgstr ""
+msgstr "Světlý"
 
 #: src/pages/_08_theme.rs:120
 msgid "Dark"
-msgstr ""
+msgstr "Tmavý"
 
 #: src/pages/_09_browser.rs:64
 msgid "Browser Selection"
-msgstr ""
+msgstr "Výběr prohlížeče"
 
 #: src/pages/_10_categories.rs:59
 msgid "What Do You Use This Device For?"
-msgstr ""
+msgstr "K čemu toto zařízení využíváte?"
 
 #: src/pages/_10_categories.rs:78
 msgid "Confirm and Setup System"
-msgstr ""
+msgstr "Potvrdit a nastavit systém"
 
 #: src/pages/_11_installing.rs:54
 msgid "Installing your Apps"
-msgstr ""
+msgstr "Instalace Vašich aplikací"
 
 #: src/pages/_11_installing.rs:60
 msgid "This won't take long!"
-msgstr ""
+msgstr "Nepotrvá to dlouho!"
 
 #: src/pages/_11_installing.rs:68
 msgid "Loading…"
-msgstr ""
+msgstr "Načítání…"
 
 #: src/pages/_12_finish.rs:17
 msgid "Your System is Ready"
-msgstr ""
+msgstr "Váš systém je připraven"
 
 #: src/pages/_12_finish.rs:23
 msgid "We hope you enjoy your fresh system!"
-msgstr ""
+msgstr "Doufáme, že si svůj čerstvý systém užijete!"
 
 #: src/pages/_12_finish.rs:31 src/pages/_13_error.rs:43
 msgid "Done"
-msgstr ""
+msgstr "Hotovo"
 
 #: src/pages/_13_error.rs:22
 msgid "Error"
-msgstr ""
+msgstr "Chyba"
 
 #: src/pages/_13_error.rs:28
 msgid "We are sorry, but there is an unexpected problem."
-msgstr ""
+msgstr "Omlouváme se, ale vyskytla se nečekaná chyba."
 
 #: src/ui.rs:13
 msgid "Previous"
-msgstr ""
+msgstr "Předchozí"
 
 #: src/ui.rs:23
 msgid "Next"
-msgstr ""
+msgstr "Další"
