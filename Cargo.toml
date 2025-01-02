@@ -1,3 +1,7 @@
+[workspace]
+
+members = ["taidan_proc_macros"]
+
 [package]
 name = "taidan"
 version = "0.1.2"
@@ -17,6 +21,7 @@ gettext-rs = { version = "=0.7.0", features = ["gettext-system"] }
 itertools = "0.14.0"
 libhelium = "0.10.0"
 paste = "1.0.15"
+phf = { version = "0.11.2", features = ["macros"] }
 relm4 = "0.9.1"
 reqwest = { version = "0.12.9", features = [
     "http2",
@@ -24,6 +29,7 @@ reqwest = { version = "0.12.9", features = [
 ], default-features = false }
 serde = { version = "1.0.216", features = ["derive"] }
 serde_yaml = "0.9.34"
+taidan_proc_macros = { path = "taidan_proc_macros" }
 tempfile = "3.14.0"
 tokio = { version = "1.42.0", features = [
     "fs",

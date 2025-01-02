@@ -14,8 +14,8 @@ crate::generate_page!(Keyboard {
     variantbox: gtk::ListBox,
 }:
     init[layoutbox variantbox](root, sender, model, widgets) {
-        i18n::LAYOUTS.iter()
-            .map(|(layout, i18n::Layout { name, .. })| libhelium::MiniContentBlock::builder().subtitle(name).title(layout).build())
+        i18n::LAYOUTS.entries()
+            .map(|(&layout, i18n::Layout { name, .. })| libhelium::MiniContentBlock::builder().subtitle(*name).title(layout).build())
             .map(|mini_content_block| gtk::ListBoxRow::builder().child(&mini_content_block).build())
             .for_each(|row| model.layoutbox.append(&row));
         model.layoutbox.select_row(model.layoutbox.iter_children().find(|child| miniblk(child).title() == "us").as_ref());
@@ -44,8 +44,8 @@ crate::generate_page!(Keyboard {
             self.variantbox.append(&gtk::ListBoxRow::builder().child(&libhelium::MiniContentBlock::builder().subtitle(gettext("Default")).build()).build());
             let row = self.layoutbox.selected_row().unwrap();
             let layout = miniblk(&row).title().to_string();
-            i18n::LAYOUTS[&layout].variants.iter()
-                .map(|(variant, desc)| gtk::ListBoxRow::builder().child(&libhelium::MiniContentBlock::builder().subtitle(desc).title(variant).build()).build())
+            i18n::LAYOUTS[&layout].variants.entries()
+                .map(|(&variant, &desc)| gtk::ListBoxRow::builder().child(&libhelium::MiniContentBlock::builder().subtitle(desc).title(variant).build()).build())
                 .for_each(|row| self.variantbox.append(&row));
             SETTINGS.write().kb_layout.clone_from(&layout);
             sender.oneshot_command(async move { i18n::set_keymap(None, &layout, None).await.expect("cannot set keymap") });

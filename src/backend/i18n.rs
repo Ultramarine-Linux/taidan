@@ -1,66 +1,6 @@
 use super::theme::pkexec;
-use crate::prelude::*;
-use std::{collections::HashMap, io::BufRead};
 
-#[derive(Clone, Debug, Default)]
-pub struct Layout {
-    pub name: String,
-    pub variants: HashMap<String, String>,
-}
-
-pub static LAYOUTS: std::sync::LazyLock<HashMap<String, Layout>> =
-    std::sync::LazyLock::new(populate_layouts);
-
-fn populate_layouts() -> HashMap<String, Layout> {
-    let f = std::fs::read("/usr/share/X11/xkb/rules/evdev.lst").expect("cannot read evdev.lst");
-    let mut layout_section = true;
-    let mut layouts = HashMap::<String, Layout>::new();
-    for line in f
-        .lines()
-        .skip_while(|line| line.as_ref().is_ok_and(|line| line != "! layout"))
-        .skip(1)
-    {
-        let line = line.unwrap();
-        let line = line.trim_ascii_start();
-        if line.is_empty() {
-            continue;
-        };
-        if line == "! variant" {
-            layout_section = false;
-            continue;
-        }
-        if line == "! option" {
-            break;
-        }
-        if layout_section {
-            let Some((layout, name)) = line.split_once(' ') else {
-                panic!("bad formatted evdev.lst")
-            };
-            let (layout, name) = (layout.to_owned(), name.trim_ascii_start().to_owned());
-            layouts.insert(
-                layout,
-                Layout {
-                    name,
-                    ..Layout::default()
-                },
-            );
-        } else {
-            let Some((variant, (layout, desc))) =
-                line.split_once(' ').and_then(|(variant, right)| {
-                    Some((variant, right.trim_ascii_start().split_once(": ")?))
-                })
-            else {
-                panic!("bad formatted evdev.lst");
-            };
-            layouts
-                .get_mut(layout)
-                .unwrap()
-                .variants
-                .insert(variant.to_owned(), desc.to_owned());
-        }
-    }
-    layouts
-}
+taidan_proc_macros::keymap!(LAYOUTS);
 
 async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> color_eyre::Result<()> {
     let args = [
