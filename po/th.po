@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-12-30 10:46+0000\n"
+"POT-Creation-Date: 2025-01-02 17:03+0000\n"
 "PO-Revision-Date: 2024-12-31 13:21+0000\n"
 "Last-Translator: Cappy <cappy@cappuchino.xyz>\n"
 "Language-Team: Thai <https://weblate.fyralabs.com/projects/ultramarine-linux/"
@@ -19,35 +19,40 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Generator: Weblate 5.9.2\n"
 
-#: src/backend/steps.rs:98
+#: src/backend/steps.rs:103
 msgid "Creating User…"
 msgstr "กำลังสร้างบัญชี…"
 
-#: src/backend/steps.rs:99
+#: src/backend/steps.rs:104
 msgid "Setting Timezone…"
 msgstr "กำลังตั้งเขตเวลา…"
 
-#: src/backend/steps.rs:100
+#: src/backend/steps.rs:105
 msgid "Configuring Themes…"
 msgstr "กำลังตั้งค่าธีม…"
 
-#: src/backend/steps.rs:101
+#: src/backend/steps.rs:106
 msgid "Downloading System Update…"
 msgstr "กำลังดาวน์โหลดอัปเดตระบบ…"
 
-#: src/backend/steps.rs:102
+#: src/backend/steps.rs:107
 msgid "Installing System Update…"
 msgstr "กำลังติดตั้งอัปเดตระบบ…"
 
-#: src/backend/steps.rs:103
+#: src/backend/steps.rs:108
 msgid "Downloading User Programs…"
 msgstr "กำลังดาวน์โหลดโปรแกรม…"
 
-#: src/backend/steps.rs:104
+#: src/backend/steps.rs:109
 msgid "Installing User Programs…"
 msgstr "กำลังติดตั้งโปรแกรม…"
 
-#: src/pages/_00_welcome.rs:17 src/main.rs:71
+#: src/backend/steps.rs:110
+#, fuzzy
+msgid "Installing additional drivers…"
+msgstr "กำลังติดตั้งอัปเดตระบบ…"
+
+#: src/pages/_00_welcome.rs:17 src/main.rs:72
 msgid "Welcome to %s"
 msgstr "ยินดีต้อนรับสู่ %s"
 
@@ -63,22 +68,40 @@ msgstr "ข้ามการตั้งค่า"
 msgid "Let's Go"
 msgstr "ไปกันเถอะ"
 
-#: src/pages/_01_whoareyou.rs:83
+#: src/pages/_01_keyboard.rs:44
+msgid "Default"
+msgstr ""
+
+#: src/pages/_01_keyboard.rs:75
+msgid "Keyboard Layout"
+msgstr ""
+
+#: src/pages/_01_keyboard.rs:102
+msgid "Search keyboard layout…"
+msgstr ""
+
+#: src/pages/_01_keyboard.rs:131
+msgid "Search keyboard variant…"
+msgstr ""
+
+#: src/pages/_02_whoareyou.rs:83
 msgid "Who are You?"
 msgstr "คุณเป็นใคร?"
 
-#: src/pages/_01_whoareyou.rs:92
+#: src/pages/_02_whoareyou.rs:92
 msgid "Full Name"
 msgstr "ชื่อจริง"
 
-#: src/pages/_01_whoareyou.rs:100
+#: src/pages/_02_whoareyou.rs:100
 msgid "Username"
 msgstr "ชื่อผู้ใช้"
 
-#: src/pages/_01_whoareyou.rs:110
-msgid "Username\n"
+#: src/pages/_02_whoareyou.rs:110
+msgid ""
+"Username\n"
 "- must start with lowercase letters\n"
-"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)\n"
+"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</"
+"tt>)\n"
 "- may optionally end with a dollar sign (<tt>$</tt>)"
 msgstr ""
 "ชื่อผู้ใช้\n"
@@ -86,137 +109,141 @@ msgstr ""
 "- ต้องมีแค่เลขหรืออักษรอังกฤษ, อันเดอร์สกอร์ (<tt>_</tt>) หรือยัติภาค(<tt>-</tt>)\n"
 "- อาจจบด้วยเครื่องหมายดอลลาร์ (<tt>$</tt>)"
 
-#: src/pages/_02_password.rs:34
+#: src/pages/_03_password.rs:34
 msgid "Create a Password"
 msgstr "สร้างรหัสผ่าน"
 
-#: src/pages/_02_password.rs:44
+#: src/pages/_03_password.rs:44
 msgid "Password"
 msgstr "รหัสผ่าน"
 
-#: src/pages/_02_password.rs:56
+#: src/pages/_03_password.rs:56
 msgid "Repeat Password"
 msgstr "ใส่รหัสผ่านอีกครั้ง"
 
-#: src/pages/_03_internet.rs:28
+#: src/pages/_04_internet.rs:28
 msgid "Let's Get You Online"
 msgstr "มาต่ออินเตอร์เน็ตกันเถอะ"
 
-#: src/pages/_03_internet.rs:34
+#: src/pages/_04_internet.rs:34
 msgid "Connect to the Internet to get the latest and greatest."
 msgstr ""
 
-#: src/pages/_03_internet.rs:42
+#: src/pages/_04_internet.rs:42
 msgid "I don't have Internet"
 msgstr "ฉันไม่มีอินเตอร์เน็ต"
 
-#: src/pages/_04_analytics.rs:20
+#: src/pages/_05_analytics.rs:20
 msgid "Analytics and Crash Reporting"
 msgstr ""
 
-#: src/pages/_05_crashreport.rs:24
+#: src/pages/_06_crashreport.rs:24
 msgid "Crash Reporting"
 msgstr ""
 
-#: src/pages/_05_crashreport.rs:30
+#: src/pages/_06_crashreport.rs:30
 msgid "Allow Fyra Labs to collect crash data to find bugs and assist you."
 msgstr ""
 
-#: src/pages/_05_crashreport.rs:34
-msgid "All data collected is anonymous and end-to-end encrypted.\n"
+#: src/pages/_06_crashreport.rs:34
+msgid ""
+"All data collected is anonymous and end-to-end encrypted.\n"
 "You will be given a crash ID to help support find what went wrong."
 msgstr ""
 
-#: src/pages/_05_crashreport.rs:38
+#: src/pages/_06_crashreport.rs:38
 msgid "Send Crash Data"
 msgstr ""
 
-#: src/pages/_05_crashreport.rs:39
+#: src/pages/_06_crashreport.rs:39
 msgid "Press next to keep off"
 msgstr ""
 
-#: src/pages/_06_location.rs:26 src/pages/_06_location.rs:37
+#: src/pages/_07_location.rs:26 src/pages/_07_location.rs:37
 msgid "Location Services"
 msgstr ""
 
-#: src/pages/_06_location.rs:33
-msgid "Allow apps to request your approximate location with [Mozilla Location Services]"
+#: src/pages/_07_location.rs:33
+msgid ""
+"Allow apps to request your approximate location with [Mozilla Location "
+"Services]"
 msgstr ""
 
-#: src/pages/_07_nightlight.rs:19 src/pages/_07_nightlight.rs:40
+#: src/pages/_08_nightlight.rs:19 src/pages/_08_nightlight.rs:40
 msgid "Night Light"
 msgstr ""
 
-#: src/pages/_07_nightlight.rs:26
+#: src/pages/_08_nightlight.rs:26
 msgid "Tint the display with a warm tone at night to reduce eyestrain."
 msgstr "ปรับสีจอภาพด้วยโทนสีอุ่นในเวลากลางคืนเพื่อลดอาการปวดตา"
 
-#: src/pages/_07_nightlight.rs:31
+#: src/pages/_08_nightlight.rs:31
 msgid "Night Light is not proven to help with difficulty falling sleep."
 msgstr ""
 
-#: src/pages/_08_theme.rs:71
+#: src/pages/_09_theme.rs:71
 msgid "Choose your theme"
 msgstr ""
 
-#: src/pages/_08_theme.rs:78
-msgid "Make this system your own with a splash of colour.\n"
+#: src/pages/_09_theme.rs:78
+msgid ""
+"Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
 msgstr ""
 
-#: src/pages/_08_theme.rs:84
+#: src/pages/_09_theme.rs:84
 msgid "Some apps may not respect this preference."
 msgstr ""
 
-#: src/pages/_08_theme.rs:105
+#: src/pages/_09_theme.rs:105
 msgid "Light"
 msgstr "สว่าง"
 
-#: src/pages/_08_theme.rs:120
+#: src/pages/_09_theme.rs:120
 msgid "Dark"
 msgstr "มืด"
 
-#: src/pages/_09_browser.rs:64
+#: src/pages/_10_browser.rs:64
 msgid "Browser Selection"
 msgstr ""
 
-#: src/pages/_10_categories.rs:59
+#: src/pages/_11_categories.rs:59
 msgid "What Do You Use This Device For?"
 msgstr "คุณใช้เครื่องนี้ทำอะไร?"
 
-#: src/pages/_10_categories.rs:78
+#: src/pages/_11_categories.rs:78
 msgid "Confirm and Setup System"
 msgstr ""
 
-#: src/pages/_11_installing.rs:54
+#: src/pages/_12_installing.rs:54
 msgid "Installing your Apps"
 msgstr ""
 
-#: src/pages/_11_installing.rs:60
+#: src/pages/_12_installing.rs:60
 msgid "This won't take long!"
 msgstr ""
 
-#: src/pages/_11_installing.rs:68
+#: src/pages/_12_installing.rs:68
 msgid "Loading…"
 msgstr ""
 
-#: src/pages/_12_finish.rs:17
+#: src/pages/_13_finish.rs:17
 msgid "Your System is Ready"
 msgstr ""
 
-#: src/pages/_12_finish.rs:23
+#: src/pages/_13_finish.rs:23
 msgid "We hope you enjoy your fresh system!"
 msgstr ""
 
-#: src/pages/_12_finish.rs:31 src/pages/_13_error.rs:43
+#: src/pages/_13_finish.rs:31 src/pages/_14_error.rs:43
 msgid "Done"
 msgstr ""
 
-#: src/pages/_13_error.rs:22
+#: src/pages/_14_error.rs:22
 msgid "Error"
 msgstr ""
 
-#: src/pages/_13_error.rs:28
+#: src/pages/_14_error.rs:28
 msgid "We are sorry, but there is an unexpected problem."
 msgstr ""
 
