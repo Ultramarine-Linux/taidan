@@ -30,19 +30,20 @@ pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::Sh
 generate_pages!(Page AppModel AppMsg:
     00: Welcome,
     01: Keyboard,
-    02: WhoAreYou,
-    03: Password,
-    04: Internet,
-    05: Analytics,
-    06: CrashReport,
-    07: Location,
-    08: NightLight,
-    09: Theme,
-    10: Browser,
-    11: Categories,
-    12: Installing,
-    13: Finish,
-    14: Error,
+    02: InputMethod,
+    03: WhoAreYou,
+    04: Password,
+    05: Internet,
+    06: Analytics,
+    07: CrashReport,
+    08: Location,
+    09: NightLight,
+    10: Theme,
+    11: Browser,
+    12: Categories,
+    13: Installing,
+    14: Finish,
+    15: Error,
 );
 
 #[derive(Debug)]
@@ -85,6 +86,7 @@ impl SimpleComponent for AppModel {
                 #[name = "stack"]
                 match model.page {
                     Page::Welcome => *model.welcome_page.widget(),
+                    Page::InputMethod => *model.input_method_page.widget(),
                     Page::Keyboard => *model.keyboard_page.widget(),
                     Page::WhoAreYou => *model.who_are_you_page.widget(),
                     Page::Password => *model.password_page.widget(),
@@ -142,12 +144,12 @@ impl SimpleComponent for AppModel {
                 self.run_install(sender, backend::start_install);
             }
             AppMsg::Nav(NavAction::Next) if self.page == Page::Internet => {
-                tracing::trace!("Skipping to page 7 after Page::Internet");
-                self.page = 7.try_into().expect("No page 7!");
+                tracing::trace!("Skipping to page NightLight after Page::Internet");
+                self.page = Page::NightLight;
             }
-            AppMsg::Nav(NavAction::Back) if usize::from(self.page) == 7 => {
-                tracing::trace!("Skipping to page 3");
-                self.page = 3.try_into().expect("No page 3!");
+            AppMsg::Nav(NavAction::Back) if self.page == Page::NightLight => {
+                tracing::trace!("Skipping to page Internet");
+                self.page = Page::Internet;
             }
             AppMsg::Nav(NavAction::GoTo(page)) => self.page = page,
             AppMsg::Nav(NavAction::Quit) => std::process::exit(0),
@@ -170,7 +172,7 @@ impl SimpleComponent for AppModel {
                 self.page = Page::Error;
                 self.error_page
                     .sender()
-                    .send(pages::_14_error::ErrorPageMsg::Receive(msg))
+                    .send(pages::_15_error::ErrorPageMsg::Receive(msg))
                     .expect("sender dropped?");
             }
         }

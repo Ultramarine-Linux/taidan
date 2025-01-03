@@ -62,7 +62,7 @@ crate::generate_page!(Keyboard {
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
         set_spacing: 16,
-        set_vexpand: true,
+        set_margin_bottom: 16,
         set_valign: gtk::Align::Fill,
         set_halign: gtk::Align::Fill,
 

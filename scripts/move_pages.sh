@@ -1,7 +1,8 @@
 for file in src/pages/*; do
     x=`echo $file | sed -E 's@.+/_(..)_.+@\1@'`
+    x=${x#0}
     x=$((x))
-    if [ $x -gt 0 ]; then
+    if [ $x -gt 1 ]; then
         x=$((x+1));
         if [ $x -le 9 ]; then
             x="0$x"
