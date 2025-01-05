@@ -24,7 +24,7 @@ choices:
         state: started
 # todo: Ktailctl and Tailscale Status extension, don't know how to have desktop specific functions here
 
-  - name: ansible
+  - name: Ansible
     provider: Red Hat
     description: |
       Ansible is a radically simple IT automation platform that makes your applications and systems easier to deploy and maintain.
