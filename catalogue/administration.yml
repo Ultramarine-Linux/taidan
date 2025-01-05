@@ -16,9 +16,7 @@ choices:
     provider: Tailscale
     description: |
     actions:
-      - enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo
-      - rpm:tailscale
-      - sh:systemctl enable tailscaled
+      - enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo; rpm:tailscale; sh:systemctl enable tailscaled
 # todo: Ktailctl and Tailscale Status extension, don't know how to have desktop specific functions here
 
   - name: Ansible
@@ -35,5 +33,4 @@ choices:
     description: |
       Software that uses virtualization to create and manage containers.
     actions:
-      - enable_yum_repo:https://download.docker.com/linux/fedora/docker-ce.repo
-      - rpm:docker-compose docker-distribution docker-cli docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      - enable_yum_repo:https://download.docker.com/linux/fedora/docker-ce.repo; rpm:docker-compose docker-distribution docker-cli docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
