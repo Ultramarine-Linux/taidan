@@ -33,7 +33,7 @@ choices:
       Ultramarine also include commonly used ansible collections.
     actions: rpm:ansible;rpm:ansible-collection-ansible-netcommon;rpm:ansible-collection-ansible-utils;rpm:ansible-collection-ansible-posix;rpm:ansible-collection-ansible-windows
 
-  - name: docker
+  - name: Docker
     provider: Docker
     description: |
       Software that uses virtualization to create and manage containers.
