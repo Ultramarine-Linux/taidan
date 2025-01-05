@@ -18,10 +18,7 @@ choices:
     actions:
       - enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo
       - rpm:tailscale
-      services:
-        name: tailscaled
-        enabled: yes
-        state: started
+      - sh:systemctl enable tailscaled
 # todo: Ktailctl and Tailscale Status extension, don't know how to have desktop specific functions here
 
   - name: Ansible
