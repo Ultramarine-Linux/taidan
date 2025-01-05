@@ -34,19 +34,16 @@ choices:
     providor: FreeCAD
     description: |
       FreeCAD is an open-source parametric 3D modeler made primarily to design real-life objects of any size.
-    actions:
-      - flatpak:org.freecad.FreeCAD
+    actions: flatpak:org.freecad.FreeCAD
 
   - name: HandBrake
     providor: HandBrake
     description: |
       Open-source video transcoder.
-    actions:
-      - flatpak:fr.handbrake.ghb
+    actions: flatpak:fr.handbrake.ghb
 
     - name: MusE
     providor: MusE
     description: |
       Digital audio workstation with support for both Audio and MIDI.
-    actions:
-      - rpm:muse
+    actions: rpm:muse
