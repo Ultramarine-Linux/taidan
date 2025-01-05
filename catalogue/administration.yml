@@ -12,8 +12,8 @@ choices:
       Desktop tool for managing virtual machines via libvirt.
     actions: rpm:virt-manager
 
-  - name: tailscale
-    provider: tailscale
+  - name: Tailscale
+    provider: Tailscale
     description: |
     actions:
       - enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo
