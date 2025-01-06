@@ -1,49 +1,44 @@
 category: Media Production
 choices:
   - name: Kdenlive
-    Provider: KDE
+    provider: KDE
     description: |
       Free and open source video editor, based on MLT Framework and KDE Frameworks.
     actions: rpm:kdenlive
 
   - name: Blender
     provider: Blender
-    description: |
-      3D modeling, animation, rendering and post-production
+    description: 3D modeling, animation, rendering and post-production
     actions: rpm:blender
 
   - name: GIMP
     provider: GIMP
-    description: |
-      GNU Image Manipulation Program
+    description: GNU Image Manipulation Program
     actions: rpm:gimp
 
   - name: Audacity
     provider: Audacity
-    description: |
-      multi-track audio editor and recorder
+    description: Multi-track audio editor and recorder
     actions: rpm:audacity
 
   - name: LMMS
-    providor: LMMS
+    provider: LMMS
     description: |
       Linux MultiMedia Studio
-    action: rpm:lmms
+    actions: rpm:lmms
 
   - name: FreeCAD
-    providor: FreeCAD
+    provider: FreeCAD
     description: |
       FreeCAD is an open-source parametric 3D modeler made primarily to design real-life objects of any size.
     actions: flatpak:org.freecad.FreeCAD
 
   - name: HandBrake
-    providor: HandBrake
-    description: |
-      Open-source video transcoder.
+    provider: HandBrake
+    description: Open-source video transcoder.
     actions: flatpak:fr.handbrake.ghb
 
-    - name: MusE
-    providor: MusE
-    description: |
-      Digital audio workstation with support for both Audio and MIDI.
+  - name: MusE
+    provider: MusE
+    description: Digital audio workstation with support for both Audio and MIDI.
     actions: rpm:muse

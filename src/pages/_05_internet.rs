@@ -7,7 +7,7 @@ crate::generate_page!(Internet {
         model.btn_next = widgets.prev_next_btns.next.clone();
     }
     update(self, message, sender) {
-        IsOnline(b: bool) => self.btn_next.set_sensitive(b),
+        IsOnline => self.btn_next.set_sensitive(true),
     } => {}
 
     gtk::Box {
@@ -55,6 +55,7 @@ crate::generate_page!(Internet {
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
+            set_sensitive: false,
             connect_clicked[sender] => move |_| {
                 SETTINGS.write().nointernet = false;
                 sender.input(Self::Input::Nav(NavAction::Next));
@@ -64,25 +65,40 @@ crate::generate_page!(Internet {
 );
 
 async fn check_online(sender: ComponentSender<InternetPage>) {
-    let mut is_online;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .user_agent(crate::APPID)
+        .build()
+        .unwrap();
+    let arch = std::env::consts::ARCH;
+    let edition = &CFG.edition;
     loop {
-        tokio::select! {
-            Ok(200) = async { REQWEST_CLIENT.get("https://fyralabs.com/.well-known/security.txt").send().await.map(|r| r.status().as_u16()) } => {
-                is_online = true;
-            }
-            Ok(200) = async { REQWEST_CLIENT.get("https://security.access.redhat.com/data/meta/v1/security.txt").send().await.map(|r| r.status().as_u16()) } => {
-                is_online = true;
-            }
-            else => {
-                is_online = false;
-            }
+        if let Ok(202) = client
+            .post("https://plausible.fyralabs.com/api/event")
+            .header(
+                "Content-Type",
+                reqwest::header::HeaderValue::from_static("application/json"),
+            )
+            .body(format!(
+                r#"
+                {{
+                    "name": "pageview",
+                    "url": "app://internet/{arch}/{edition}",
+                    "domain": "taidan",
+                    "props": {{
+                        "arch": "{arch}",
+                        "edition": "{edition}"
+                    }}
+                }}
+                "#
+            ))
+            .send()
+            .await
+            .map(|r| r.status().as_u16())
+        {
+            break;
         }
-        sender.input(InternetPageMsg::IsOnline(is_online));
-        tokio::time::sleep(std::time::Duration::from_secs(if is_online {
-            30
-        } else {
-            5
-        }))
-        .await;
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     }
+    sender.input(InternetPageMsg::IsOnline);
 }
