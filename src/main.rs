@@ -86,8 +86,8 @@ impl SimpleComponent for AppModel {
                 #[name = "stack"]
                 match model.page {
                     Page::Welcome => *model.welcome_page.widget(),
-                    Page::InputMethod => *model.input_method_page.widget(),
                     Page::Keyboard => *model.keyboard_page.widget(),
+                    Page::InputMethod => *model.input_method_page.widget(),
                     Page::WhoAreYou => *model.who_are_you_page.widget(),
                     Page::Password => *model.password_page.widget(),
                     Page::Internet => *model.internet_page.widget(),

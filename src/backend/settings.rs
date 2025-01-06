@@ -14,6 +14,8 @@ pub struct Settings {
 
     pub passwd: String,
 
+    pub im_pkgs: Vec<&'static str>,
+
     pub nightlight: bool,
 
     pub theme_is_dark: bool,

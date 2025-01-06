@@ -23,6 +23,7 @@ crate::generate_page!(Location {
         },
 
         gtk::Label {
+            // TRANSLATORS: this is unused, do NOT translate
             set_label: &gettext("Location Services"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -30,10 +31,12 @@ crate::generate_page!(Location {
 
         gtk::Label {
             set_use_markup: true,
+            // TRANSLATORS: this is unused, do NOT translate
             set_label: &gettext("Allow apps to request your approximate location with [Mozilla Location Services]"),
         },
 
         #[template] crate::ui::SwitchBox {
+            // TRANSLATORS: this is unused, do NOT translate
             set_title: &gettext("Location Services"),
             #[template_child] switch {
                 connect_state_set[sender] => move |_, state| {

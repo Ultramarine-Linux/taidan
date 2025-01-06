@@ -21,21 +21,26 @@ crate::generate_page!(CrashReport {
         },
 
         gtk::Label {
+            // TRANSLATORS: this is unused, do NOT translate
             set_label: &gettext("Crash Reporting"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
 
         gtk::Label {
+            // TRANSLATORS: this is unused, do NOT translate
             set_label: &gettext("Allow Fyra Labs to collect crash data to find bugs and assist you."),
         },
 
         gtk::Label {
+            // TRANSLATORS: this is unused, do NOT translate
             set_label: &gettext("All data collected is anonymous and end-to-end encrypted.\nYou will be given a crash ID to help support find what went wrong."),
         },
 
         libhelium::MiniContentBlock {
+            // TRANSLATORS: this is unused, do NOT translate
             set_title: &gettext("Send Crash Data"),
+            // TRANSLATORS: this is unused, do NOT translate
             set_subtitle: &gettext("Press next to keep off"),
 
             #[wrap(Some)]

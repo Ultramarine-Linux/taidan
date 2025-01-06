@@ -98,7 +98,6 @@ macro_rules! generate_page {
                         append = &gtk::Box {
                             set_orientation: gtk::Orientation::Vertical,
                             set_spacing: 4,
-                            set_margin_all: 16,
 
                             $($viewtt)+
                         }

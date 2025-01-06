@@ -5,6 +5,63 @@ use super::theme::pkexec;
 
 taidan_proc_macros::keymap!(LAYOUTS);
 
+macro_rules! im {
+    ($native:ident $ibus:tt$(=>$ibus_pkg:literal)?, $fcitx5:tt$(=>$fcitx5_pkg:literal)?) => {
+        InputMethod {
+            native_name: stringify!($native),
+            ibus_ref: im!(#$ibus),
+            ibus_pkg: im!(@ibus$ibus$($ibus_pkg)?),
+            fcitx5_ref: im!(#$fcitx5),
+            fcitx5_pkg: im!(@fcitx5$fcitx5$($fcitx5_pkg)?),
+        }
+    };
+    (#()) => {None};
+    (#$a:literal) => {Some($a)};
+    (@$imf:ident ()) => {None};
+    (@$imf:ident$a:literal) => {Some(const_format::formatcp!("{}-{}", stringify!($imf), $a))};
+    (@$imf:ident$a:literal $b:literal) => {Some(const_format::formatcp!("{}-{}", stringify!($imf), $b))};
+}
+
+// lang → `InputMethod`
+// TODO: add fcitx5-chinese-addons manually if fcitx5-table-extra (thanks Fedora definitely not a
+// packaging issue)
+// TODO: enable fcitx5 automatically?
+pub const IMS: phf::Map<&'static str, phf::Map<&'static str, InputMethod>> = phf::phf_map! {
+    "Chinese" => phf::phf_map! {
+        // IME                     Native       Ibus(=>pkg)                         Fcitx5(=>pkg)
+        "Pinyin"            => im!(拼音         "pinyin",                           "pinyin"=>"chinese-addons"),
+        // there's also libzhuyin but it's extremely unpopular, sorry
+        "Zhuyin"            => im!(注音         "chewing",                          "chewing"),
+        "Cangjie 3"         => im!(倉頡版本三   "cangjie"=>"table-chinese-cangjie", "cangjie3"=>"table-extra"),
+        "Cangjie 5"         => im!(倉頡版本五   "cangjie"=>"table-chinese-cangjie", "cangjie5"=>"table-extra"),
+        "Quick 3"           => im!(速成版本三   "quick3"=>"table-chinese-quick",    "quick3"=>"table-extra"),
+        "Quick 5"           => im!(速成版本五   "quick5"=>"table-chinese-quick",    "quick5"=>"table-extra"),
+        "Quick Classic"     => im!(速成舊版     "quick5"=>"table-chinese-quick",    "quick-classic"=>"table-extra"),
+        "Rime"              => im!(Rime         "rime",                             "rime"),
+        "Shuangpin"         => im!(双拼         (),                                 "shuangpin"=>"chinese-addons"),
+        "Smart Cangjie 6"   => im!(快倉第六代   "cangjie"=>"table-chinese-scj",     "scj6"=>"table-extra"),
+        "Array 30"          => im!(行列三十     "array"=>"table-chinese-array",     "array30"=>"table-extra"),
+        // 對唔住，超超超垃圾，都唔知係咪俾人用
+        //"Jyutping"          => im!(粵拼         "jyutping"=>"table-chinese-cantonese","jyutping-table"=>"table-extra")
+        // 叫下啲人用 rime 啦
+        "Boshiamy"          => im!(嘸蝦米       (),                                 "boshiamy"=>"table-extra"),
+    },
+    "Japanese" => phf::phf_map! {},
+    "Korean" => phf::phf_map! {},
+    "Vietnamese" => phf::phf_map! {},
+    "Indic" => phf::phf_map! {},
+    "Thai" => phf::phf_map! {},
+};
+
+pub const STR_TO_LANG: phf::Map<&'static str, IMELanguages> = phf::phf_map! {
+    "Chinese" => IMELanguages::Chinese,
+    "Japanese" => IMELanguages::Japanese,
+    "Korean" => IMELanguages::Korean,
+    "Vietnamese" => IMELanguages::Vietnamese,
+    "Indic" => IMELanguages::Indic,
+    "Thai" => IMELanguages::Thai,
+};
+
 /// List of languages that might require IMEs.
 ///
 /// The list is obtained from <https://wiki.ultramarine-linux.org/en/usage/l10n/#list-of-imes-and-ims>.
@@ -16,13 +73,6 @@ pub enum IMELanguages {
     Vietnamese,
     Indic,
     Thai,
-}
-pub struct InputMethod {
-    pub native_name: &'static str,
-    pub ibus_ref: &'static str,
-    pub ibus_pkg: &'static str,
-    pub fcitx5_ref: &'static str,
-    pub fcitx5_pkg: &'static str,
 }
 impl IMELanguages {
     #[must_use]
@@ -54,7 +104,6 @@ impl IMELanguages {
         format!("{self}")
     }
 }
-
 impl std::fmt::Display for IMELanguages {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let native = self.native_append();
@@ -65,6 +114,34 @@ impl std::fmt::Display for IMELanguages {
                 .replace("%lang_name", &self.name())
                 .replace("%native_lang_name", native)
         })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct InputMethod {
+    pub native_name: &'static str,
+    /// how IBus refers to this IME
+    pub ibus_ref: Option<&'static str>,
+    /// the package name of the IME
+    pub ibus_pkg: Option<&'static str>,
+    /// how Fcitx5 refers to tthis IME
+    pub fcitx5_ref: Option<&'static str>,
+    /// the package name of the IME
+    pub fcitx5_pkg: Option<&'static str>,
+}
+
+impl InputMethod {
+    pub fn available(self) -> bool {
+        match &*super::CFG.edition {
+            "plasma" | "kde" => self.fcitx5_ref.is_some(),
+            _ => self.ibus_ref.is_some(),
+        }
+    }
+    pub fn get_pkg(self) -> &'static str {
+        match &*super::CFG.edition {
+            "plasma" | "kde" => self.fcitx5_pkg.unwrap(),
+            _ => self.ibus_pkg.unwrap(),
+        }
     }
 }
 
