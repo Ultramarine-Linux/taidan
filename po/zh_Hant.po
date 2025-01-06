@@ -180,7 +180,7 @@ msgstr "重覆密碼"
 
 #: src/pages/_05_internet.rs:28
 msgid "Let's Get You Online"
-msgstr ""
+msgstr "網絡連線"
 
 #: src/pages/_05_internet.rs:34
 msgid "Connect to the Internet to get the latest and greatest."
@@ -288,31 +288,31 @@ msgstr "正在安裝您的應用程式"
 
 #: src/pages/_13_installing.rs:60
 msgid "This won't take long!"
-msgstr ""
+msgstr "很快就會完成，請稍等吧！"
 
 #: src/pages/_13_installing.rs:68
 msgid "Loading…"
-msgstr ""
+msgstr "加載中…"
 
 #: src/pages/_14_finish.rs:17
 msgid "Your System is Ready"
-msgstr ""
+msgstr "完成"
 
 #: src/pages/_14_finish.rs:23
 msgid "We hope you enjoy your fresh system!"
-msgstr ""
+msgstr "希望您享受您的新系統吧！"
 
 #: src/pages/_14_finish.rs:31 src/pages/_15_error.rs:43
 msgid "Done"
-msgstr ""
+msgstr "完成"
 
 #: src/pages/_15_error.rs:22
 msgid "Error"
-msgstr ""
+msgstr "錯誤"
 
 #: src/pages/_15_error.rs:28
 msgid "We are sorry, but there is an unexpected problem."
-msgstr ""
+msgstr "不好意思，但我們遇到了問題。"
 
 #. TRANSLATORS: this means "Previous page"
 #: src/ui.rs:14
