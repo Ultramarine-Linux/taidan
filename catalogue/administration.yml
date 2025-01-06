@@ -1,7 +1,7 @@
 category: Administration
 choices:
   - name: nmap
-    Provider: nmap
+    provider: nmap
     description: utility for network discovery and security auditing.
     actions: rpm:nmap
 
