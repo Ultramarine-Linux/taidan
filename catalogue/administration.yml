@@ -2,19 +2,17 @@ category: Administration
 choices:
   - name: nmap
     Provider: nmap
-    description: |
-      utility for network discovery and security auditing.
+    description: utility for network discovery and security auditing.
     actions: rpm:nmap
 
   - name: virt-manager
     provider: virt-manager
-    description: |
-      Desktop tool for managing virtual machines via libvirt.
+    description: Desktop tool for managing virtual machines via libvirt.
     actions: rpm:virt-manager
 
   - name: Tailscale
     provider: Tailscale
-    description: |
+    description: Tailscale is a mesh VPN service that streamlines connecting devices and services securely across different networks.
     actions:
       - enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo;rpm:tailscale;sh:systemctl enable tailscaled
 # todo: Ktailctl and Tailscale Status extension, don't know how to have desktop specific functions here
@@ -30,7 +28,6 @@ choices:
 
   - name: Docker
     provider: Docker
-    description: |
-      Software that uses virtualization to create and manage containers.
+    description: Software that uses virtualization to create and manage containers.
     actions:
       - enable_yum_repo:https://download.docker.com/linux/fedora/docker-ce.repo;rpm:docker-compose docker-distribution docker-cli docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
