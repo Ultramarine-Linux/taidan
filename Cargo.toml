@@ -27,8 +27,6 @@ reqwest = { version = "0.12.9", features = [
     "http2",
     "native-tls-vendored",
 ], default-features = false }
-serde = { version = "1.0.216", features = ["derive"] }
-serde_yaml = "0.9.34"
 taidan_catalogue_parser = { path = "taidan_catalogue_parser" }
 taidan_proc_macros = { path = "taidan_proc_macros" }
 tempfile = "3.14.0"
