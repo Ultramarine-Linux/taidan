@@ -1,0 +1,18 @@
+[package]
+name = "taidan_catalogue_parser"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "./lib.rs"
+
+[[bin]]
+name = "taidan-parse-catalogue"
+path = "./main.rs"
+
+[dependencies]
+itertools = "0.14.0"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_yml = "0.0.12"
+thiserror = "2.0.9"
+tracing = "0.1.41"

@@ -29,6 +29,12 @@ pkgconfig(libhelium-1)
 TAIDAN_CATALOGUE_DIR=./catalogue TAIDAN_LOG=trace cargo r
 ```
 
+Also, to test if a catalogue category file can be parsed:
+
+```sh
+cargo run -p taidan_catalogue_parser -- catalogue/browser.yml
+```
+
 ## 📃 License
 
     Copyright © 2024  Fyra Labs & Ultramarine Linux Contributors
