@@ -8,10 +8,10 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2025-01-06 14:19+0000\n"
-"PO-Revision-Date: 2025-01-04 14:45+0000\n"
+"PO-Revision-Date: 2025-01-08 16:45+0000\n"
 "Last-Translator: Písek Pískovec <pisekpiskovec@gmail.com>\n"
-"Language-Team: Czech <https://weblate.fyralabs.com/projects/ultramarine-"
-"linux/taidan/cs/>\n"
+"Language-Team: Czech <https://weblate.fyralabs.com/projects/"
+"ultramarine-linux/taidan/cs/>\n"
 "Language: cs\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -21,31 +21,31 @@ msgstr ""
 
 #: src/backend/i18n.rs:94
 msgid "Chinese"
-msgstr ""
+msgstr "Čínština"
 
 #: src/backend/i18n.rs:95
 msgid "Japanese"
-msgstr ""
+msgstr "Japonština"
 
 #: src/backend/i18n.rs:96
 msgid "Korean"
-msgstr ""
+msgstr "Korejština"
 
 #: src/backend/i18n.rs:97
 msgid "Vietnamese"
-msgstr ""
+msgstr "Vietnamština"
 
 #: src/backend/i18n.rs:98
 msgid "Indic"
-msgstr ""
+msgstr "Indické"
 
 #: src/backend/i18n.rs:99
 msgid "Thai"
-msgstr ""
+msgstr "Thajština"
 
 #: src/backend/i18n.rs:113
 msgid "%lang_name (%native_lang_name)"
-msgstr ""
+msgstr "%lang_name (%native_lang_name)"
 
 #: src/backend/steps.rs:103
 msgid "Creating User…"
@@ -113,7 +113,7 @@ msgstr "Hledat varianty rozložení klávesnice…"
 
 #: src/pages/_02_inputmethod.rs:80
 msgid "Input Method"
-msgstr ""
+msgstr "Metody vstupu"
 
 #. TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
 #. to not translate this part.
@@ -134,11 +134,11 @@ msgstr ""
 
 #: src/pages/_02_inputmethod.rs:127
 msgid "Search language…"
-msgstr ""
+msgstr "Hledat jazyk…"
 
 #: src/pages/_02_inputmethod.rs:156
 msgid "Search IMs/IMEs…"
-msgstr ""
+msgstr "Hledat IMs/IMEs…"
 
 #: src/pages/_03_whoareyou.rs:83
 msgid "Who are You?"
@@ -221,9 +221,8 @@ msgstr "Poslat data havárie"
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_07_crashreport.rs:44
-#, fuzzy
 msgid "Press next to keep off"
-msgstr "Stiskněte další pro vypnutí"
+msgstr ""
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_08_location.rs:27 src/pages/_08_location.rs:40
