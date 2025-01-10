@@ -13,8 +13,12 @@ choices:
 
   - name: GIMP
     provider: GIMP
-    description: GNU Image Manipulation Program
-    actions: rpm:gimp
+    description: GNU Image Manipulation Program.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:gimp
+      - flatpak:org.gimp.GIMP
 
   - name: Audacity
     provider: Audacity
