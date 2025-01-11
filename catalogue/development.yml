@@ -99,7 +99,7 @@ choices:
       mock-core-configs: Mock core config files basic chroots.
       rpmdevtools: Various RPM Development Tools.
       fedora-packager: Tools for setting up a Fedora maintainer environment.
-    actions: rpm:anda;rpm:terra-mock-configs;rpm:rust2rpm;rpm:pyp2rpm;rpm:go2rpm;rpm:rpm-build;rpm:mock;rpm:moce-core-configs;rpm:rpmdevtools;rpm:fedora-packager
+    actions: rpm:anda;rpm:terra-mock-configs;rpm:rust2rpm;rpm:pyp2rpm;rpm:go2rpm;rpm:rpm-build;rpm:mock;rpm:mock-core-configs;rpm:rpmdevtools;rpm:fedora-packager
 
   - name: Rust Toolchain
     provider: The Rust Team, The Fedora Project
