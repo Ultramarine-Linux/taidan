@@ -1,0 +1,28 @@
+on:
+  push:
+  pull_request:
+
+name: Build RPM snapshot package
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/terrapkg/builder:f41
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: dnf builddep -y scripts/taidan.spec
+
+      - name: run rpmbuild
+        run: |
+          git_sha=${{ github.sha }}
+          git_short=${git_sha:0:7}
+          rpmdev-setuptree
+          rpmbuild -ba scripts/taidan.spec --define "gitcommit $git_sha" --define "shortcommit $git_short" --define "_rpmdir $PWD/build" --define "_disable_source_fetch 0"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          path: build/**/*.rpm
