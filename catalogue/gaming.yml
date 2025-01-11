@@ -1,0 +1,66 @@
+category: Gaming
+choices:
+  - name: Steam
+    provider: Valve
+    description: |
+      Steam is a software distribution service with an online store, automated installation, automatic updates, achievements,
+      SteamCloud synchronized savegame and screenshot functionality, and many social features.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:steam
+      - flatpak:com.valvesoftware.Steam
+
+  - name: Minecraft (Prism Launcher)
+    provider: Microsoft/Mojang, Prism Launcher Contributors
+    description: A game about breaking and placing blocks. Prism Launcher is a custom launcher for Minecraft that allows you to easily manage multiple installations of Minecraft at once.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:prismlauncher
+      - flatpak:org.prismlauncher.PrismLauncher
+
+  - name: Heroic Games Launcher
+    provider: Heroic Games Launcher
+    description: An Open Source Epic Games, GOG and Amazon Prime Games Launcher.
+    actions: flatpak:com.heroicgameslauncher.hgl
+
+  - name: itch
+    provider: itch.io
+    description: Install, update and play indie games.
+    actions: flatpak:io.itch.itch
+
+  - name: Bottles
+    provider: Bottles
+    description: Lets you run Windows software on Linux, such as applications and games.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:bottles
+      - flatpak:com.usebottles.bottles
+
+  - name: Cartridges
+    provider: Kramo
+    description: |
+      Cartridges is a simple game launcher for all of your games. It has support for importing games from Steam, Lutris,
+      Heroic and more with no login necessary. You can sort and hide games or download cover art from SteamGridDB.
+    actions: flatpak:page.kramo.Cartridges
+
+  - name: Lutris
+    provider: Lutris Team
+    description: |
+      Lutris helps you install and play video games from all eras and from most gaming systems. By leveraging and combining
+      existing emulators, engine re-implementations and compatibility layers, it gives you a central interface to launch all your games.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:lutris
+      - flatpak:net.lutris.Lutris
+
+  - name: Wine
+    provider: Wine Contributors
+    description: |
+      A compatibility layer for UNIX to run Windows applications. This
+      package includes a program loader, which allows unmodified Windows
+      3.x/9x/NT binaries to run on x86 and x86_64 Unixes.
+    actions: rpm:wine
