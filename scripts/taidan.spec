@@ -54,6 +54,5 @@ done
 %license LICENSE.md LICENSE.dependencies
 %_bindir/taidan
 %_datadir/polkit-1/rules.d/100-taidan.rules
-%_sysconfdir/com.FyraLabs.Taidan/
-%_sysconfdir/com.fyraLabs.Taidan/
+%_sysconfdir/com.fyralabs.Taidan/
 %_sysusersdir/taidan.conf
