@@ -13,7 +13,7 @@ choices:
   - name: Tailscale
     provider: Tailscale
     description: Tailscale is a mesh VPN service that streamlines connecting devices and services securely across different networks.
-    actions: enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo;rpm:tailscale;sh:systemctl enable tailscaled
+    actions: enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo;rpm:tailscale;shell:systemctl enable tailscaled
 # todo: Ktailctl and Tailscale Status extension, don't know how to have desktop specific functions here
 
   - name: Ansible
