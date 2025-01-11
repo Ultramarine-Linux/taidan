@@ -1,0 +1,49 @@
+category: Art
+choices:
+  - name: Krita
+    provider: Krita Foundation
+    description: A full-featured digital art studio. It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:krita
+      - flatpak:org.kde.krita
+
+  - name: Inkscape
+    provider: The Inkscape Community
+    description: |
+      A Free and open source vector graphics editor. It offers a rich set of features and is widely used for both artistic and technical
+      illustrations such as cartoons, clip art, logos, typography, diagramming and flowcharting.
+    options:  
+      - checkbox: flatpak
+    actions:
+      - rpm:inkscape
+      - flatpak:org.inkscape.Inkscape
+
+  - name: GIMP
+    provider: GIMP
+    description: GNU Image Manipulation Program.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:gimp
+      - flatpak:org.gimp.GIMP
+
+  - name: Photoflare
+    provider: Photoflare Developers
+    description: Simple but powerful Cross Platform Image Editor.
+    actions: flatpak:io.photoflare.photoflare
+
+  - name: KolourPaint
+    provider: KDE
+    description: A simple painting program to quickly create raster images. It is useful as a touch-up tool and simple image editing tasks.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:kolourpaint
+      - flatpak:org.kde.kolourpaint
+
+  - name: Voxel Paint
+    provider: James William Fletcher
+    description: Paint in 3D using textured Voxels. 
+    actions: flatpak:com.voxdsp.VoxelPaint
