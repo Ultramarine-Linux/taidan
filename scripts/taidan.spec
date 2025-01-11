@@ -27,7 +27,7 @@ Taidan is a GUI Out-Of-Box-Experience (OOBE) and Welcome App for Ultramarine
 Linux, written in Rust and the Helium toolkit.
 
 %prep
-%autosetup
+%autosetup -n taidan-%gitcommit
 %cargo_prep_online
 
 %build
