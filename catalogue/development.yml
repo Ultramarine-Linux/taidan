@@ -119,7 +119,7 @@ choices:
       nodejs-npm: npm is a package manager for node.js. You can use it to install and publish your node programs. It manages dependencies and does other cool stuff.
       deno: Open-source JavaScript runtime for the modern web.
       bun: An all-in-one JavaScript runtime & toolkit designed for speed, complete with a bundler, test runner, and Node.js-compatible package manager.
-    actions: rpm:nodejs;rpm:nodejs-devel;rpm:nodejs-npm; #sh:npm install -g deno bun - need to implement shell functions proplerly
+    actions: rpm:nodejs;rpm:nodejs-devel;rpm:nodejs-npm;sh:npm install -g deno bun
 
   - name: Nim Language
     provider: Nim Lang Team
