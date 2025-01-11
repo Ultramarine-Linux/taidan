@@ -234,7 +234,7 @@ pub async fn set_keymap(
         tmp = uzers::get_current_username().expect("can't get current username");
         tmp.to_str().unwrap()
     });
-    if (tokio::fs::try_exists("/usr/share/kwriteconfig6").await).is_ok() {
+    if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
         set_kde_keymap(user, layout, variant).await
     } else {
         set_gsettings_keymap(user, layout, variant).await
@@ -252,7 +252,7 @@ pub async fn set_all(
         tmp = uzers::get_current_username().expect("can't get current username");
         tmp.to_str().unwrap()
     });
-    if (tokio::fs::try_exists("/usr/share/kwriteconfig6").await).is_ok() {
+    if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
         set_kde_all(user, layout, variant, im).await
     } else {
         set_gsettings_all(user, layout, variant, im).await
