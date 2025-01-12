@@ -26,7 +26,11 @@ choices:
       RawTherapee is a powerful, cross-platform raw photo processing system, released as Free Software (GPLv3).
       It is designed for developing raw files from a broad range of digital cameras and targeted at users ranging from enthusiast
       newcomers who wish to broaden their understanding of how digital imaging works to professional photographers. 
-    actions: flatpak:com.rawtherapee.RawTherapee
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:rawtherapee
+      - flatpak:com.rawtherapee.RawTherapee
 
   - name: Sly
     provider: Kramo
@@ -43,5 +47,9 @@ choices:
 
   - name: Drawing
     provider: Romain F. T.
-    description: simple image editor, similar to Microsoft Paint. Aimed at the GNOME desktop.
-    actions: flatpak:com.github.maoschanz.drawing
+    description: simple image editor, similar to Microsoft Paint.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:drawing
+      - flatpak:com.github.maoschanz.drawing
