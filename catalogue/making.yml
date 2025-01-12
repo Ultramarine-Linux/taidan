@@ -3,14 +3,22 @@ choices:
   - name: KiCad
     provider: KiCad
     description: A Cross Platform and Open Source Electronics Design Automation Suite
-    actions: rpm:kicad;rpm:kicad-packages3d;rpm:kicad-doc
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:kicad;rpm:kicad-packages3d;rpm:kicad-doc
+      - flatpak:org.kicad.KiCad    
 
   - name: UltiMaker Cura
     provider: UltiMaker
     description: |
       free, easy-to-use 3D printing software trusted by millions of users.
       Fine-tune your 3D model with 400+ settings for the best slicing and printing results. 
-    actions: rpm:cura
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:cura
+      - flatpak:com.ultimaker.cura        
 
   - name: PrusaSlicer
     provider: Prusa Research
