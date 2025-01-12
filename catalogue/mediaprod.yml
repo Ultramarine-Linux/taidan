@@ -2,14 +2,21 @@ category: Media Production
 choices:
   - name: Kdenlive
     provider: KDE
-    description: |
-      Free and open source video editor, based on MLT Framework and KDE Frameworks.
-    actions: rpm:kdenlive
+    description: Free and open source video editor, based on MLT Framework and KDE Frameworks.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:kdenlive
+      - flatpak:org.kde.kdenlive
 
   - name: Blender
     provider: Blender
     description: 3D modeling, animation, rendering and post-production
-    actions: rpm:blender
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:blender
+      - flatpak:org.blender.Blender
 
   - name: GIMP
     provider: GIMP
@@ -21,28 +28,42 @@ choices:
       - flatpak:org.gimp.GIMP
 
   - name: Audacity
-    provider: Audacity
+    provider: Muse Group
     description: Multi-track audio editor and recorder
-    actions: rpm:audacity
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:audacity
+      - flatpak:org.audacityteam.Audacity
 
   - name: LMMS
     provider: LMMS
-    description: |
-      Linux MultiMedia Studio
-    actions: rpm:lmms
+    description: Linux MultiMedia Studio
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:lmms
+      - flatpak:io.lmms.LMMS
 
   - name: FreeCAD
     provider: FreeCAD
-    description: |
-      FreeCAD is an open-source parametric 3D modeler made primarily to design real-life objects of any size.
+    description: FreeCAD is an open-source parametric 3D modeler made primarily to design real-life objects of any size.
     actions: flatpak:org.freecad.FreeCAD
 
   - name: HandBrake
     provider: HandBrake
     description: Open-source video transcoder.
-    actions: flatpak:fr.handbrake.ghb
+    options:
+      - checkbox: flatpak
+    actions: 
+      - rpm:HandBrake
+      - flatpak:fr.handbrake.ghb
 
   - name: MusE
     provider: MusE
     description: Digital audio workstation with support for both Audio and MIDI.
-    actions: rpm:muse
+    options:
+      - checkbox: flatpak
+    actions: 
+      - rpm:muse
+      - flatpak:io.github.muse_sequencer.Muse
