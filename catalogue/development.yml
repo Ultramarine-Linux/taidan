@@ -13,6 +13,15 @@ choices:
     description: A high-performance, multiplayer code editor
     actions: rpm:zed
 
+  - name: GNOME Builder
+    provider: Christian Hergert
+    description: An IDE for writing software for GNOME. Does not try to be a generic IDE, but one specialized for writing GNOME software.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:gnome-builder
+      - flatpak:org.gnome.Builder
+
   - name: Kate
     provider: KDE
     description: |
