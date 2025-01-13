@@ -140,4 +140,4 @@ choices:
       - checkbox: flatpak
     actions:
       - rpm:godot
-      - flatpak:org.darktable.Darktable
+      - flatpak:org.godotengine.Godot
