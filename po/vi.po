@@ -19,33 +19,33 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Generator: Weblate 5.9.2\n"
 
-#: src/backend/i18n.rs:109
+#: src/backend/i18n.rs:94
 msgid "Chinese"
-msgstr ""
+msgstr "Tiếng Trung"
 
-#: src/backend/i18n.rs:110
+#: src/backend/i18n.rs:95
 msgid "Japanese"
-msgstr ""
+msgstr "Tiếng Nhật"
 
-#: src/backend/i18n.rs:111
+#: src/backend/i18n.rs:96
 msgid "Korean"
-msgstr ""
+msgstr "Tiếng Hàn"
 
-#: src/backend/i18n.rs:112
+#: src/backend/i18n.rs:97
 msgid "Vietnamese"
-msgstr ""
+msgstr "Tiếng Việt"
+
+#: src/backend/i18n.rs:98
+msgid "Indic"
+msgstr "Tiếng Ấn Độ"
+
+#: src/backend/i18n.rs:99
+msgid "Thai"
+msgstr "Tiếng Thái"
 
 #: src/backend/i18n.rs:113
-msgid "Indic"
-msgstr ""
-
-#: src/backend/i18n.rs:114
-msgid "Thai"
-msgstr ""
-
-#: src/backend/i18n.rs:128
 msgid "%lang_name (%native_lang_name)"
-msgstr ""
+msgstr "%lang_name (%native_lang_name)"
 
 #: src/backend/steps.rs:103
 msgid "Creating User…"
@@ -113,7 +113,7 @@ msgstr "Tìm kiếm biến thể bàn phím…"
 
 #: src/pages/_02_inputmethod.rs:80
 msgid "Input Method"
-msgstr ""
+msgstr "Phương thức nhập"
 
 #. TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
 #. to not translate this part.
@@ -137,13 +137,13 @@ msgid ""
 "org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
 
-#: src/pages/_02_inputmethod.rs:130
+#: src/pages/_02_inputmethod.rs:127
 msgid "Search language…"
-msgstr ""
+msgstr "Tìm kiếm ngôn ngữ…"
 
-#: src/pages/_02_inputmethod.rs:159
+#: src/pages/_02_inputmethod.rs:156
 msgid "Search IMs/IMEs…"
-msgstr ""
+msgstr "Tìm kiếm IMs/IMEs…"
 
 #: src/pages/_03_whoareyou.rs:83
 msgid "Who are You?"
@@ -328,3 +328,32 @@ msgstr "Trước"
 #: src/ui.rs:25
 msgid "Next"
 msgstr "Sau"
+
+#. TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
+#. to not translate this part.
+#: src/pages/_02_inputmethod.rs:92
+msgid ""
+"You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-"
+"linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor "
+"(IME)</a>. This allows you to type in other specific languages.This change "
+"will take effect after you login into your user account.\n"
+"\n"
+"More Chinese input method options may be available with the <a href='https://"
+"rime.im/'>Rime</a> engine, but this requires advanced configuration and is "
+"therefore not recommended to beginners.\n"
+"\n"
+"You may find out more information on <a href='https://wiki.ultramarine-linux."
+"org/en/usage/l10n/'>the wiki</a>."
+msgstr ""
+"Bạn có thể <b>tùy chọn</b>cài đặt thêm <a href='https://wiki.ultramarine-"
+"linux.org/en/usage/l10n/#inputting-in-another-language'>trình điều khiểu "
+"phương thức nhập (IME)</a>. Điều này giúp cho bạn có thể nhập ở một số ngôn "
+"ngữ nhất định Thay đổi này sẽ có hiệu lực sau khi bạn đăng nhập vào tài "
+"khoản của mình.\n"
+"\n"
+"More Chinese input method options may be available with the <a href='https://"
+"rime.im/'>Rime</a> engine, but this requires advanced configuration and is "
+"therefore not recommended to beginners.\n"
+"\n"
+"Bạn có thể tìm hiểu thêm thông tin ở <a href='https://wiki.ultramarine-linux."
+"org/en/usage/l10n/'>wiki</a>."
