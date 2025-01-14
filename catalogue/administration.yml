@@ -54,4 +54,4 @@ choices:
   - name: Docker
     provider: Docker
     description: Software that uses virtualization to create and manage containers.
-    actions: enable_yum_repo:https://download.docker.com/linux/fedora/docker-ce.repo;rpm:docker-compose docker-distribution docker-cli docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    actions: enable_yum_repo:https://download.docker.com/linux/fedora/docker-ce.repo;rpm:docker-compose;rpm:docker-distribution;rpm:docker-cli;rpm:docker-ce;rpm:docker-ce-cli;rpm:containerd.io;rpm:docker-buildx-plugin;rpm:docker-compose-plugin
