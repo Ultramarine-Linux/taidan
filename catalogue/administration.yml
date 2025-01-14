@@ -27,7 +27,7 @@ choices:
     provider: Fabian Köhler
     editions: [gnome]
     description: An unofficial Gnome Extension to manage and check the status of tailscale-cli.
-    actions: # todo
+    actions: rpm:gnome-shell-extension-tailscale-status #currently in the process of being packaged
 
 #other desktop Tailscale GUI application
   - name: Trayscale
