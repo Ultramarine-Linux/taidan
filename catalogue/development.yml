@@ -9,7 +9,8 @@ choices:
     options:
       - checkbox: rpm
     actions: 
-      - shell:rpm --import https://packages.microsoft.com/keys/microsoft.asc;echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" | sudo tee /etc/yum.repos.d/vscode.repo > /dev/null;dnf check-update;rpm:code
+      - flatpak:com.visualstudio.code
+      - shell:rpm --import https://packages.microsoft.com/keys/microsoft.asc;shell:echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" | tee /etc/yum.repos.d/vscode.repo;shell:dnf in -y code
 
   - name: Zed
     provider: Zed Industries
