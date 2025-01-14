@@ -33,10 +33,13 @@ choices:
       - flatpak:org.mozilla.Thunderbird
 
   - name: Notejot
-    provider: Lains
-    description: |
-      Notejot is a modern notes app with notebooks and simple formatting.
-    actions: flatpak:io.github.lainsce.Notejot
+    provider: Lainsce
+    description: A stupidly-simple notes application for any type of short term notes or ideas.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:notejot
+      - flatpak:io.github.lainsce.Notejot
 
   - name: Rnote
     provider: Flxzt
