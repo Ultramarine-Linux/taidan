@@ -26,6 +26,8 @@ macro_rules! im {
 // TODO: add fcitx5-chinese-addons manually if fcitx5-table-extra (thanks Fedora definitely not a
 // packaging issue)
 // TODO: enable fcitx5 automatically?
+// NOTE: some characters may not be displayed properly on your device, please make sure you have
+// the corresponding fonts installed.
 pub const IMS: phf::Map<&'static str, phf::Map<&'static str, InputMethod>> = phf::phf_map! {
     "Chinese" => phf::phf_map! {
         // IME                     Native       Ibus(=>pkg)                         Fcitx5(=>pkg)
@@ -46,11 +48,24 @@ pub const IMS: phf::Map<&'static str, phf::Map<&'static str, InputMethod>> = phf
         // 叫下啲人用 rime 啦
         "Boshiamy"          => im!(嘸蝦米       (),                                 "boshiamy"=>"table-extra"),
     },
-    "Japanese" => phf::phf_map! {},
-    "Korean" => phf::phf_map! {},
-    "Vietnamese" => phf::phf_map! {},
-    "Indic" => phf::phf_map! {},
-    "Thai" => phf::phf_map! {},
+    "Japanese" => phf::phf_map! {
+        "Mozc"              => im!(Mozc         "mozc",                             "mozc"),
+        "Anthy"             => im!(Anthy        "anthy",                            "anthy"),
+    },
+    "Korean" => phf::phf_map! {
+        "libhangul"         => im!(한글         "hangul",                           "hangul"),
+    },
+    "Vietnamese" => phf::phf_map! {
+        "Unikey"            => im!(Unikey       "unikey",                           "unikey"),
+        "ViQR"              => im!(ViQR         "viqr"=>"table-tv",                 "viqr"=>"m17n"),
+    },
+    "Indic" => phf::phf_map! {
+        "OpenBangla"        => im!(বাংলা        "openbangla",                       "openbangla"),
+        "Sayura Sinhara"    => im!(සිංහල         "sayura",                           "sayura"),
+    },
+    "Thai" => phf::phf_map! {
+        "Thai"              => im!(ภาษาไทย      "thai"=>"table-tv",                 "libthai"=>"libthai")
+    },
 };
 
 pub const STR_TO_LANG: phf::Map<&'static str, IMELanguages> = phf::phf_map! {

@@ -97,6 +97,9 @@ crate::generate_page!(InputMethod {
             More Chinese input method options may be available with the \
             <a href='https://rime.im/'>Rime</a> engine, but this requires advanced configuration \
             and is therefore not recommended to beginners.\n\n\
+            For Japanese IMEs, we recommend Mozc for KDE Plasma users. Users on other editions and \
+            DEs may choose both Anthy and Mozc. Anthy is outdated and unmaintained, but it matches \
+            the user interface provided by IBus, while Mozc provides better conversions.\n\n\
             You may find out more information on \
             <a href='https://wiki.ultramarine-linux.org/en/usage/l10n/'>the wiki</a>."),
             set_justify: gtk::Justification::Center,
