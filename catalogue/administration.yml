@@ -14,7 +14,33 @@ choices:
     provider: Tailscale
     description: Tailscale is a mesh VPN service that streamlines connecting devices and services securely across different networks.
     actions: enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo;rpm:tailscale;shell:systemctl enable tailscaled
-# todo: Ktailctl and Tailscale Status extension, don't know how to have desktop specific functions here
+
+#plasma Tailscale GUI application
+  - name: Ktailctl
+    provider: Fabian Köhler
+    editions: [plasma]
+    description: Provides a graphical interface for the Tailscale mesh network with easy access to settings, host information as well as the ability to send/receive files.
+    actions: flatpak:org.fkoehler.KTailctl
+
+#gnome Tailscale GUI application
+  - name: Tailscale Status (Extension)
+    provider: Fabian Köhler
+    editions: [gnome]
+    description: An unofficial Gnome Extension to manage and check the status of tailscale-cli.
+    actions: # todo
+
+#other desktop Tailscale GUI application
+  - name: Trayscale
+    provider: Fabian Köhler
+    editions: [flagship, xfce]
+    description: |
+      An unofficial GUI interface for the Tailscale daemon particularly for use on Linux, as no official Linux GUI client exists.
+      It provides a basic system tray icon and a fairly comprehensive UI with support for many of Tailscale's features. 
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:trayscale
+      - flatpak:dev.deedles.Trayscale
 
   - name: Ansible
     provider: Red Hat
