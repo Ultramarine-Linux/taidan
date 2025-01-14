@@ -11,6 +11,8 @@ name = "taidan-parse-catalogue"
 path = "./main.rs"
 
 [dependencies]
+# not needed for lib but needed for the binary
+color-eyre = "0.6.3"
 itertools = "0.14.0"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_yml = "0.0.12"

@@ -1,4 +1,5 @@
 fn main() {
+    color_eyre::install().unwrap();
     let mut args = std::env::args();
     let bin = args.next().unwrap();
     if args.len() == 0 {
