@@ -101,10 +101,11 @@ impl FactoryComponent for CategoryBtn {
             add_controller: ctl,
 
             libhelium::ContentBlockImage {
-                // FIXME: image doesn't display, probably libhelium bug
-                set_file: &format!("ctlg-{}", self.category),
-                set_requested_height: 100,
-                set_requested_width: 100*1920/1080,
+                set_file: &format!("resource:///com/fyralabs/Taidan/ctlg-{}.svg", self.category),
+                set_height_request: 64,
+                set_width_request: 64,
+                set_halign: gtk::Align::Center,
+                set_valign: gtk::Align::Center,
             },
             gtk::Label {
                 set_label: &*gettext(&self.category),
