@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-06 14:19+0000\n"
+"POT-Creation-Date: 2025-01-15 04:21+0000\n"
 "PO-Revision-Date: 2024-12-31 12:26+0000\n"
 "Last-Translator: sadlerm4 <sad_lerm@hotmail.com>\n"
 "Language-Team: Chinese (Traditional Han script) <https://weblate.fyralabs."
@@ -19,31 +19,31 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Generator: Weblate 5.9.2\n"
 
-#: src/backend/i18n.rs:94
+#: src/backend/i18n.rs:109
 msgid "Chinese"
 msgstr ""
 
-#: src/backend/i18n.rs:95
+#: src/backend/i18n.rs:110
 msgid "Japanese"
 msgstr ""
 
-#: src/backend/i18n.rs:96
+#: src/backend/i18n.rs:111
 msgid "Korean"
 msgstr ""
 
-#: src/backend/i18n.rs:97
+#: src/backend/i18n.rs:112
 msgid "Vietnamese"
 msgstr ""
 
-#: src/backend/i18n.rs:98
+#: src/backend/i18n.rs:113
 msgid "Indic"
 msgstr ""
 
-#: src/backend/i18n.rs:99
+#: src/backend/i18n.rs:114
 msgid "Thai"
 msgstr ""
 
-#: src/backend/i18n.rs:113
+#: src/backend/i18n.rs:128
 msgid "%lang_name (%native_lang_name)"
 msgstr ""
 
@@ -122,22 +122,27 @@ msgstr ""
 msgid ""
 "You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-"
 "linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor "
-"(IME)</a>. This allows you to type in other specific languages.This change "
+"(IME)</a>. This allows you to type in other specific languages. This change "
 "will take effect after you login into your user account.\n"
 "\n"
 "More Chinese input method options may be available with the <a href='https://"
 "rime.im/'>Rime</a> engine, but this requires advanced configuration and is "
 "therefore not recommended to beginners.\n"
 "\n"
+"For Japanese IMEs, we recommend Mozc for KDE Plasma users. Users on other "
+"editions and DEs may choose both Anthy and Mozc. Anthy is outdated and "
+"unmaintained, but it matches the user interface provided by IBus, while Mozc "
+"provides better conversions.\n"
+"\n"
 "You may find out more information on <a href='https://wiki.ultramarine-linux."
 "org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
 
-#: src/pages/_02_inputmethod.rs:127
+#: src/pages/_02_inputmethod.rs:130
 msgid "Search language…"
 msgstr ""
 
-#: src/pages/_02_inputmethod.rs:156
+#: src/pages/_02_inputmethod.rs:159
 msgid "Search IMs/IMEs…"
 msgstr ""
 
