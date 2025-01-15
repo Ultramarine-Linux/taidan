@@ -14,7 +14,33 @@ choices:
     provider: Tailscale
     description: Tailscale is a mesh VPN service that streamlines connecting devices and services securely across different networks.
     actions: enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo;rpm:tailscale;shell:systemctl enable tailscaled
-# todo: Ktailctl and Tailscale Status extension, don't know how to have desktop specific functions here
+
+#plasma Tailscale GUI application
+  - name: Ktailctl
+    provider: Fabian Köhler
+    editions: [plasma]
+    description: Provides a graphical interface for the Tailscale mesh network with easy access to settings, host information as well as the ability to send/receive files.
+    actions: flatpak:org.fkoehler.KTailctl
+
+#gnome Tailscale GUI application
+  - name: Tailscale Status (Extension)
+    provider: Fabian Köhler
+    editions: [gnome]
+    description: An unofficial Gnome Extension to manage and check the status of tailscale-cli.
+    actions: rpm:gnome-shell-extension-tailscale-status #currently in the process of being packaged
+
+#other desktop Tailscale GUI application
+  - name: Trayscale
+    provider: Fabian Köhler
+    editions: [flagship, xfce]
+    description: |
+      An unofficial GUI interface for the Tailscale daemon particularly for use on Linux, as no official Linux GUI client exists.
+      It provides a basic system tray icon and a fairly comprehensive UI with support for many of Tailscale's features. 
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:trayscale
+      - flatpak:dev.deedles.Trayscale
 
   - name: Ansible
     provider: Red Hat
@@ -28,4 +54,4 @@ choices:
   - name: Docker
     provider: Docker
     description: Software that uses virtualization to create and manage containers.
-    actions: enable_yum_repo:https://download.docker.com/linux/fedora/docker-ce.repo;rpm:docker-compose docker-distribution docker-cli docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    actions: enable_yum_repo:https://download.docker.com/linux/fedora/docker-ce.repo;rpm:docker-compose;rpm:docker-distribution;rpm:docker-cli;rpm:docker-ce;rpm:docker-ce-cli;rpm:containerd.io;rpm:docker-buildx-plugin;rpm:docker-compose-plugin
