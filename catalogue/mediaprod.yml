@@ -11,7 +11,7 @@ choices:
 
   - name: Blender
     provider: Blender
-    description: 3D modeling, animation, rendering and post-production
+    description: 3D modeling, animation, rendering and post-production.
     options:
       - checkbox: flatpak
     actions:
@@ -29,7 +29,7 @@ choices:
 
   - name: Audacity
     provider: Muse Group
-    description: Multi-track audio editor and recorder
+    description: Multi-track audio editor and recorder.
     options:
       - checkbox: flatpak
     actions:
@@ -38,7 +38,7 @@ choices:
 
   - name: LMMS
     provider: LMMS
-    description: Linux MultiMedia Studio
+    description: Linux MultiMedia Studio.
     options:
       - checkbox: flatpak
     actions:

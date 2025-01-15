@@ -2,7 +2,7 @@ category: Making
 choices:
   - name: KiCad
     provider: KiCad
-    description: A Cross Platform and Open Source Electronics Design Automation Suite
+    description: A Cross Platform and Open Source Electronics Design Automation Suite.
     options:
       - checkbox: flatpak
     actions:
