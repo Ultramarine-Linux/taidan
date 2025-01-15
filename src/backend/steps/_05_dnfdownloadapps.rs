@@ -37,6 +37,18 @@ impl super::Step for DnfDownloadApps {
                 .iter()
                 .map(ToString::to_string),
         );
+
+        settings.actions[1].extend(
+            (settings.ims.iter())
+                .filter_map(|im| {
+                    crate::backend::i18n::IMS
+                        .values()
+                        .find_map(|ims| ims.get(im))
+                })
+                .map(|im| im.get_pkg().to_owned())
+                .unique(),
+        );
+
         Ok(())
     }
     #[tracing::instrument]
