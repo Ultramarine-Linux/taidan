@@ -92,7 +92,7 @@ crate::generate_page!(InputMethod {
             set_label: &gettext("You may <b>optionally</b> choose to add an \
             <a href='https://wiki.ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language'>\
                 input method editor (IME)\
-            </a>. This allows you to type in other specific languages.\
+            </a>. This allows you to type in other specific languages. \
             This change will take effect after you login into your user account.\n\n\
             More Chinese input method options may be available with the \
             <a href='https://rime.im/'>Rime</a> engine, but this requires advanced configuration \
