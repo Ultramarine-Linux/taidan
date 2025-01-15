@@ -35,9 +35,7 @@ choices:
     description: Lets you run Windows software on Linux, such as applications and games.
     options:
       - checkbox: flatpak
-    actions:
-      - rpm:bottles
-      - flatpak:com.usebottles.bottles
+    actions: flatpak:com.usebottles.bottles
 
   - name: Cartridges
     provider: Kramo
