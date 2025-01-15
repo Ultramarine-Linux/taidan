@@ -100,10 +100,9 @@ impl FactoryComponent for CategoryBtn {
             set_orientation: gtk::Orientation::Vertical,
             add_controller: ctl,
 
-            libhelium::ContentBlockImage {
-                set_file: &format!("resource:///com/fyralabs/Taidan/ctlg-{}.svg", self.category),
-                set_height_request: 64,
-                set_width_request: 64,
+            gtk::Image {
+                set_icon_name: Some(&format!("ctlg-{}", self.category)),
+                set_icon_size: gtk::IconSize::Large,
                 set_halign: gtk::Align::Center,
                 set_valign: gtk::Align::Center,
             },

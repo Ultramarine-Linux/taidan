@@ -14,10 +14,6 @@
         <file preprocess="xml-stripblanks" alias="ctlg-browser-edge.svg">catalogue/browser/edge.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-browser-chrome.svg">catalogue/browser/chrome.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-browser-chromium.svg">catalogue/browser/chromium.svg</file>
-    </gresource>
-    <gresource prefix="/com/fyralabs/Taidan/">
-        <file alias="background-light.webp">icons/background-light.webp</file>
-        <file alias="background-dark.webp">icons/background-dark.webp</file>
 
         <file preprocess="xml-stripblanks" alias="ctlg-Productivity.svg">icons/applications-office-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-Gaming.svg">icons/applications-games-symbolic.svg</file>
@@ -28,6 +24,9 @@
         <file preprocess="xml-stripblanks" alias="ctlg-Media Production.svg">icons/camera-video-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-Photography.svg">icons/camera-photo-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-Art.svg">icons/input-tablet-symbolic.svg</file>
-
+    </gresource>
+    <gresource prefix="/com/fyralabs/Taidan/">
+        <file alias="background-light.webp">icons/background-light.webp</file>
+        <file alias="background-dark.webp">icons/background-dark.webp</file>
     </gresource>
 </gresources>

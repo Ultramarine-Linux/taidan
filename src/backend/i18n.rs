@@ -62,6 +62,7 @@ pub const IMS: phf::Map<&'static str, phf::Map<&'static str, InputMethod>> = phf
     "Indic" => phf::phf_map! {
         "OpenBangla"        => im!(বাংলা        "openbangla",                       "openbangla"),
         "Sayura Sinhara"    => im!(සිංහල         "sayura",                           "sayura"),
+        // "Others"            => im!(Others       "m17n",                             "m17n"),
     },
     "Thai" => phf::phf_map! {
         "Thai"              => im!(ภาษาไทย      "thai"=>"table-tv",                 "libthai"=>"libthai")
