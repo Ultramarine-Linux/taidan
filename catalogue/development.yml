@@ -14,7 +14,7 @@ choices:
 
   - name: Zed
     provider: Zed Industries
-    description: A high-performance, multiplayer code editor
+    description: A high-performance, multiplayer code editor.
     actions: rpm:zed
 
   - name: GNOME Builder
