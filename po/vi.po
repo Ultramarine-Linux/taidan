@@ -19,31 +19,31 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Generator: Weblate 5.9.2\n"
 
-#: src/backend/i18n.rs:94
+#: src/backend/i18n.rs:109
 msgid "Chinese"
 msgstr "Tiếng Trung"
 
-#: src/backend/i18n.rs:95
+#: src/backend/i18n.rs:110
 msgid "Japanese"
 msgstr "Tiếng Nhật"
 
-#: src/backend/i18n.rs:96
+#: src/backend/i18n.rs:111
 msgid "Korean"
 msgstr "Tiếng Hàn"
 
-#: src/backend/i18n.rs:97
+#: src/backend/i18n.rs:112
 msgid "Vietnamese"
 msgstr "Tiếng Việt"
 
-#: src/backend/i18n.rs:98
+#: src/backend/i18n.rs:113
 msgid "Indic"
 msgstr "Tiếng Ấn Độ"
 
-#: src/backend/i18n.rs:99
+#: src/backend/i18n.rs:114
 msgid "Thai"
 msgstr "Tiếng Thái"
 
-#: src/backend/i18n.rs:113
+#: src/backend/i18n.rs:128
 msgid "%lang_name (%native_lang_name)"
 msgstr "%lang_name (%native_lang_name)"
 
@@ -137,11 +137,11 @@ msgid ""
 "org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
 
-#: src/pages/_02_inputmethod.rs:127
+#: src/pages/_02_inputmethod.rs:130
 msgid "Search language…"
 msgstr "Tìm kiếm ngôn ngữ…"
 
-#: src/pages/_02_inputmethod.rs:156
+#: src/pages/_02_inputmethod.rs:159
 msgid "Search IMs/IMEs…"
 msgstr "Tìm kiếm IMs/IMEs…"
 
@@ -329,31 +329,29 @@ msgstr "Trước"
 msgid "Next"
 msgstr "Sau"
 
-#. TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
-#. to not translate this part.
-#: src/pages/_02_inputmethod.rs:92
-msgid ""
-"You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-"
-"linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor "
-"(IME)</a>. This allows you to type in other specific languages.This change "
-"will take effect after you login into your user account.\n"
-"\n"
-"More Chinese input method options may be available with the <a href='https://"
-"rime.im/'>Rime</a> engine, but this requires advanced configuration and is "
-"therefore not recommended to beginners.\n"
-"\n"
-"You may find out more information on <a href='https://wiki.ultramarine-linux."
-"org/en/usage/l10n/'>the wiki</a>."
-msgstr ""
-"Bạn có thể <b>tùy chọn</b>cài đặt thêm <a href='https://wiki.ultramarine-"
-"linux.org/en/usage/l10n/#inputting-in-another-language'>trình điều khiểu "
-"phương thức nhập (IME)</a>. Điều này giúp cho bạn có thể nhập ở một số ngôn "
-"ngữ nhất định Thay đổi này sẽ có hiệu lực sau khi bạn đăng nhập vào tài "
-"khoản của mình.\n"
-"\n"
-"More Chinese input method options may be available with the <a href='https://"
-"rime.im/'>Rime</a> engine, but this requires advanced configuration and is "
-"therefore not recommended to beginners.\n"
-"\n"
-"Bạn có thể tìm hiểu thêm thông tin ở <a href='https://wiki.ultramarine-linux."
-"org/en/usage/l10n/'>wiki</a>."
+#~ msgid ""
+#~ "You may <b>optionally</b> choose to add an <a href='https://wiki."
+#~ "ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language'>input "
+#~ "method editor (IME)</a>. This allows you to type in other specific "
+#~ "languages.This change will take effect after you login into your user "
+#~ "account.\n"
+#~ "\n"
+#~ "More Chinese input method options may be available with the <a "
+#~ "href='https://rime.im/'>Rime</a> engine, but this requires advanced "
+#~ "configuration and is therefore not recommended to beginners.\n"
+#~ "\n"
+#~ "You may find out more information on <a href='https://wiki.ultramarine-"
+#~ "linux.org/en/usage/l10n/'>the wiki</a>."
+#~ msgstr ""
+#~ "Bạn có thể <b>tùy chọn</b>cài đặt thêm <a href='https://wiki.ultramarine-"
+#~ "linux.org/en/usage/l10n/#inputting-in-another-language'>trình điều khiểu "
+#~ "phương thức nhập (IME)</a>. Điều này giúp cho bạn có thể nhập ở một số "
+#~ "ngôn ngữ nhất định Thay đổi này sẽ có hiệu lực sau khi bạn đăng nhập vào "
+#~ "tài khoản của mình.\n"
+#~ "\n"
+#~ "More Chinese input method options may be available with the <a "
+#~ "href='https://rime.im/'>Rime</a> engine, but this requires advanced "
+#~ "configuration and is therefore not recommended to beginners.\n"
+#~ "\n"
+#~ "Bạn có thể tìm hiểu thêm thông tin ở <a href='https://wiki.ultramarine-"
+#~ "linux.org/en/usage/l10n/'>wiki</a>."
