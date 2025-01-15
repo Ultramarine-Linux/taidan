@@ -1,0 +1,156 @@
+category: Development
+choices:
+  - name: Visual Studio Code
+    provider: Microsoft
+    description: |
+      Visual Studio Code combines the simplicity of a code editor with what developers need for their core edit-build-debug cycle.
+      It provides comprehensive code editing, navigation, and understanding support along with lightweight debugging,
+      a rich extensibility model, and lightweight integration with existing tools.
+    options:
+      - checkbox: rpm
+    actions: 
+      - flatpak:com.visualstudio.code
+      - shell:rpm --import https://packages.microsoft.com/keys/microsoft.asc;shell:echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" | tee /etc/yum.repos.d/vscode.repo;shell:dnf in -y code
+
+  - name: Zed
+    provider: Zed Industries
+    description: A high-performance, multiplayer code editor
+    actions: rpm:zed
+
+  - name: GNOME Builder
+    provider: Christian Hergert
+    description: An IDE for writing software for GNOME. Does not try to be a generic IDE, but one specialized for writing GNOME software.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:gnome-builder
+      - flatpak:org.gnome.Builder
+
+  - name: Kate
+    provider: KDE
+    description: |
+      Kate is packed with features that will make it easier for you to view and edit all your text files.
+      Kate lets you to edit and view many files at the same time, both in tabs and split views, and comes with a wide variety of plugins,
+      including an embedded terminal that lets you launch console commands directly from Kate, powerful search and replace plugins,
+      and a preview plugin that can show you what your MD, HTML and even SVG will look like.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:kate
+      - flatpak:org.kde.kate
+
+  - name: Turtle
+    provider: Philipp Unger
+    description: |
+      Turtle provides a command line tool, which opens a dialog for some git actions, i.e. commit, log, etc.
+      It also provides a plugin for Nautilus (and other file managers), which adds emblems and context menu entries. 
+    actions: flatpak:de.philippun1.turtle
+
+  - name: Pods
+    provider: Marcus Behrendt
+    description: Pods is a frontend for podman. It uses libadwaita for its user interface. 
+    actions: flatpak:com.github.marhkb.Pods
+
+  - name: Dev Toolbox
+    provider: Marcus Behrendt
+    description: |
+      Dev tools at your fingertips. If you're tired of endlessly looking online for the right tool,
+      or to find again that website of which you don't recall the name just for a quick conversion,
+      this is the right app for you. This is a collection of powerful yet simple-to-use tools to solve the most common daily development problems.
+    actions: flatpak:me.iepure.devtoolbox
+
+  - name: KDE Toolchain
+    provider: KDE
+    description: |
+      Various tools and utilities for KDE development.
+      qt: The Qt software toolkit for developing applications.
+      qt3: The shared library for the Qt 3 GUI toolkit.
+      dbus-qt3: Qt3 DBus Bindings.
+      kf5-kross: KDE Frameworks 5 Tier 3 solution for multi-language application scripting.
+      phonon-qt4: Multimedia framework api for Qt4.
+      kdevelop: Integrated Development Environment for C++/C.
+      kdevelop-php: Php language and documentation plugins for KDevelop.
+      kdevelop-pg-qt: parser-generator used for common KDE languages.
+      falkon-kde: KDE Frameworks Integration plugin for falkon.
+      kde-dev-utils: Utilities for developers using KDE.
+      kde-dev-scripts: KDE SDK scripts.
+      kde-cli-tools: Tools based on KDE Frameworks 5 to better interact with the system.
+    actions: rpm:qt;rpm:qt3;rpm:dbus-qt3;rpm:kf5-kross;rpm:phonon-qt4;rpm:kdevelop;rpm:kdevelop-php;rpm:kdevelop-pg-qt;rpm:falkon-kde;rpm:kde-dev-utils;rpm:kde-dev-scripts;rpm:kde-cli-tools
+
+  - name: Helium Toolchain
+    provider: Fyra Labs
+    description: |
+      Various libraries for Helium development.
+      libhelium: The Application Framework for tauOS apps.
+      libhelium-devel: Development package for libhelium.
+      tau-helium: tauOS GTK/GNOME Shell Themes.
+      helium-gtk-theme: tauOS GTK/GNOME Shell Themes.
+    actions: rpm:libhelium;rpm:libhelium-devel;rpm:tau-helium;rpm:helium-gtk-theme
+
+  - name: Ultramarine Toolchain
+    provider: Fyra Labs
+    description: |
+      Various libraries for Ultramarine development.
+      anda: A package build toolchain written in Rust. It is designed to simplify building various types of packages.
+      terra-mock-configs: Mock configs for Terra repositories.
+      katsu: A tool for building bootable images from RPM based systems. It is an alternative to Lennart Poettering's mkosi tool, designed to be robust, fast, and easy to use while still providing many output formats.
+      libhelium: The Application Framework for tauOS apps.
+      libhelium-devel: Development package for libhelium.
+    actions: rpm:anda;rpm:terra-mock-configs;rpm:katsu;rpm:libhelium;rpm:libhelium-devel
+
+  - name: Packaging Toolchain
+    provider: Fyra Labs, The Fedora Project
+    description: |
+      Various tools for packaging applications and software.
+      anda: A package build toolchain written in Rust. It is designed to simplify building various types of packages.
+      terra-mock-configs: Mock configs for Terra repositories.
+      rust2rpm: A tool that automates the generation of RPM spec files for Rust crates.
+      pyp2rpm: A tool that automates the generation of RPM spec files for Python packages.
+      go2rpm: A tool that automates the generation of RPM spec files for Go packages.
+      rpm-build: Scripts and executable programs used to build packages.
+      mock: Builds packages inside chroots.
+      mock-core-configs: Mock core config files basic chroots.
+      rpmdevtools: Various RPM Development Tools.
+      fedora-packager: Tools for setting up a Fedora maintainer environment.
+    actions: rpm:anda;rpm:terra-mock-configs;rpm:rust2rpm;rpm:pyp2rpm;rpm:go2rpm;rpm:rpm-build;rpm:mock;rpm:mock-core-configs;rpm:rpmdevtools;rpm:fedora-packager
+
+  - name: Rust Toolchain
+    provider: The Rust Team, The Fedora Project
+    description: | 
+      Various packages and tools for Rust development.
+      rust: The Rust Programming Language.
+      cargo: A tool that allows Rust projects to declare their various dependencies and ensure that you'll always get a repeatable build.
+      rust-analyzer: An implementation of Language Server Protocol for Rust. It provides features like completion and goto definition for many code editors, including VS Code, Emacs and Vim.
+      rustfmt: A tool for formatting Rust code according to style guidelines.
+      rust2rpm: A tool that automates the generation of RPM spec files for Rust crates.
+    actions: rpm:rust;rpm:cargo;rpm:rust-analyzer;rpm:rustfmt;rpm:rust2rpm
+
+  - name: NodeJS Toolchain
+    provider: NodeJS, Bun, Deno
+    description: |
+      Various packages and tools for NodeJS development.
+      nodejs: A platform built on Chrome's JavaScript runtime for easily building fast, scalable network applications.
+      nodejs-devel: Development headers for the Node.js JavaScript runtime.
+      nodejs-npm: npm is a package manager for node.js. You can use it to install and publish your node programs. It manages dependencies and does other cool stuff.
+      deno: Open-source JavaScript runtime for the modern web.
+      bun: An all-in-one JavaScript runtime & toolkit designed for speed, complete with a bundler, test runner, and Node.js-compatible package manager.
+    actions: rpm:nodejs;rpm:nodejs-devel;rpm:nodejs-npm;shell:npm install -g deno bun
+
+  - name: Vala Toolchain
+    provider: GNOME Project
+    description: Includes vala, a modern programming language for GNOME. Also includes the vala-language-server, which provides code intelligence for Vala (and also Genie), used with an editor and a plugin that supports the Language Server Protocol.
+    actions: rpm:vala;rpm:vala-language-server
+    
+  - name: Nim Language
+    provider: Nim Lang Team
+    description: An Imperative, multi-paradigm, compiled programming language.
+    actions: rpm:nim
+
+  - name: Godot
+    provider: Godot
+    description: Multi-platform 2D and 3D game engine with a feature-rich editor
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:godot
+      - flatpak:org.godotengine.Godot
