@@ -42,25 +42,13 @@ crate::generate_page!(InputMethod {
     update(self, message, sender) {
         LangSelected => {
             self.imbox.remove_all();
-            self.imbox.append(&gtk::ListBoxRow::builder().child(&libhelium::MiniContentBlock::builder().subtitle(gettext("Default")).build()).build());
             let row = self.langbox.selected_row().unwrap();
             let lang = miniblk(&row).subtitle().to_string();
             i18n::IMS[&lang].entries()
                 .filter(|(_, im)| im.available())
-                .map(|(imname, im)| gtk::ListBoxRow::builder().child(&libhelium::MiniContentBlock::builder().title(im.native_name).subtitle(*imname).build()).build())
+                .map(|(imname, im)| im.make_listboxrow(imname))
                 .for_each(|row| self.imbox.append(&row));
             CHOSEN_LANG.write().clone_from(&lang);
-        },
-        IMESelected => {
-            let Some(row) = self.imbox.selected_row() else { return };
-            let im = miniblk(&row).subtitle();
-            let pkg = i18n::IMS[&CHOSEN_LANG.read()][im.as_str()].get_pkg();
-            let value = SETTINGS.read().im_pkgs.iter().position(|&s| s == pkg);
-            if let Some(i) = value {
-                SETTINGS.write().im_pkgs.swap_remove(i);
-            } else {
-                SETTINGS.write().im_pkgs.push(pkg);
-            }
         },
     } => {}
 
@@ -163,9 +151,8 @@ crate::generate_page!(InputMethod {
                 #[local_ref]
                 imbox -> gtk::ListBox {
                     add_css_class: "content-list",
-                    set_selection_mode: gtk::SelectionMode::Single,
+                    set_selection_mode: gtk::SelectionMode::None,
                     set_vexpand: true,
-                    connect_selected_rows_changed => Self::Input::IMESelected,
                 }
             },
         },

@@ -146,17 +146,55 @@ pub struct InputMethod {
 }
 
 impl InputMethod {
+    #[must_use]
     pub fn available(self) -> bool {
         match &*super::CFG.edition {
             "plasma" | "kde" => self.fcitx5_ref.is_some(),
             _ => self.ibus_ref.is_some(),
         }
     }
+    #[must_use]
     pub fn get_pkg(self) -> &'static str {
         match &*super::CFG.edition {
             "plasma" | "kde" => self.fcitx5_pkg.unwrap(),
             _ => self.ibus_pkg.unwrap(),
         }
+    }
+    pub fn handle_switch_state(
+        self,
+        imname: &'static str,
+    ) -> impl Fn(&relm4::gtk::Switch, bool) -> libhelium::glib::Propagation + 'static {
+        use crate::prelude::*;
+        move |_, state| {
+            if state {
+                SETTINGS.write().ims.push(imname);
+            } else {
+                let value = SETTINGS.read().ims.iter().position(|&s| s == imname);
+                if let Some(i) = value {
+                    SETTINGS.write().ims.swap_remove(i);
+                } else {
+                    tracing::warn!(?imname, "cannot find unselected IM");
+                }
+            }
+            glib::Propagation::Proceed
+        }
+    }
+    pub fn make_listboxrow(self, imname: &'static str) -> relm4::gtk::ListBoxRow {
+        let ims = SETTINGS.read().ims.clone();
+        use crate::prelude::*;
+        gtk::ListBoxRow::builder()
+            .child(&libhelium::MiniContentBlock::with_details(
+                Some(self.native_name),
+                Some(imname),
+                None::<&libhelium::Button>,
+                Some(&{
+                    let switch = gtk::Switch::new();
+                    switch.set_active(ims.contains(&imname));
+                    switch.connect_state_set(self.handle_switch_state(imname));
+                    switch
+                }),
+            ))
+            .build()
     }
 }
 

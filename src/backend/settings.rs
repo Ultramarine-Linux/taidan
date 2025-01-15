@@ -14,7 +14,7 @@ pub struct Settings {
 
     pub passwd: String,
 
-    pub im_pkgs: Vec<&'static str>,
+    pub ims: Vec<&'static str>,
 
     pub nightlight: bool,
 
