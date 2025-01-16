@@ -1,4 +1,4 @@
-use relm4::{RelmIterChildrenExt, RelmRemoveAllExt, SharedState};
+use relm4::{RelmRemoveAllExt, SharedState};
 
 use crate::backend::i18n;
 

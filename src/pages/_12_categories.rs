@@ -103,6 +103,8 @@ impl FactoryComponent for CategoryBtn {
             gtk::Image {
                 set_icon_name: Some(&format!("ctlg-{}", self.category)),
                 set_icon_size: gtk::IconSize::Large,
+                #[watch]
+                inline_css: if SETTINGS.read().theme_is_dark { "color: rgb(192, 199, 207)" } else { "color: rgb(0, 52, 75)" },
                 set_halign: gtk::Align::Center,
                 set_valign: gtk::Align::Center,
             },

@@ -23,7 +23,7 @@ crate::generate_page!(Theme:
             gesture.set_state(gtk::EventSequenceState::Claimed);
             SETTINGS.write().theme_is_dark = false;
             // TODO: accent?
-            s0.oneshot_command(async { theme::set_theme(None, false, None).await.unwrap()});
+            s0.oneshot_command(async { theme::set_theme(None, false, None).await.unwrap() });
             light0.inline_css("border-radius: 16px");
             dark1.inline_css("border-radius: 0px");
         });
@@ -31,7 +31,7 @@ crate::generate_page!(Theme:
             gesture.set_state(gtk::EventSequenceState::Claimed);
             SETTINGS.write().theme_is_dark = true;
             // TODO: accent?
-            s1.oneshot_command(async { theme::set_theme(None, true, None).await.unwrap()});
+            s1.oneshot_command(async { theme::set_theme(None, true, None).await.unwrap() });
             dark0.inline_css("border-radius: 16px");
             light1.inline_css("border-radius: 0px");
         });

@@ -60,9 +60,11 @@ impl AccentColor {
     /// # Errors
     /// - cannot apply color scheme / accent via pkexec
     pub async fn plasma(self, user: &str, is_dark: bool) -> color_eyre::Result<()> {
+        xhost_local().await?;
         let theme = if is_dark { "BreezeDark" } else { "BreezeLight" };
         let color = self.w3_color_keywords();
-        pkexec(user, "plasma-apply-colorscheme", &[theme, "-a", color]).await?;
+        let args = ["DISPLAY=:0", "plasma-apply-colorscheme", theme, "-a", color];
+        pkexec(user, "env", &args).await?;
         Ok(())
     }
 }
@@ -70,8 +72,10 @@ impl AccentColor {
 /// # Errors
 /// - cannot apply color scheme via pkexec
 pub async fn plasma_set_theme_only(user: &str, is_dark: bool) -> color_eyre::Result<()> {
+    xhost_local().await?;
     let theme = if is_dark { "BreezeDark" } else { "BreezeLight" };
-    pkexec(user, "plasma-apply-colorscheme", &[theme]).await?;
+    let args = ["DISPLAY=:0", "plasma-apply-colorscheme", theme];
+    pkexec(user, "env", &args).await?;
     Ok(())
 }
 
@@ -151,4 +155,10 @@ pub async fn pkexec(user: &str, name: &str, args: &[&str]) -> color_eyre::Result
         return Err(eyre!("`{name}` failed").note(format!("Exit code: {:?}", p.code())));
     }
     Ok(())
+}
+
+async fn xhost_local() -> color_eyre::Result<()> {
+    super::steps::acmd("xhost", &["+", "local:"])
+        .await
+        .wrap_err("cannot run xhost to pass display; is the current user in group wheel?")
 }
