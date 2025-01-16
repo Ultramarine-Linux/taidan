@@ -39,25 +39,19 @@ choices:
       - rpm:kate
       - flatpak:org.kde.kate
 
-  - name: Turtle
-    provider: Philipp Unger
-    description: |
-      Turtle provides a command line tool, which opens a dialog for some git actions, i.e. commit, log, etc.
-      It also provides a plugin for Nautilus (and other file managers), which adds emblems and context menu entries. 
-    actions: flatpak:de.philippun1.turtle
+  - name: Docker
+    provider: Docker
+    description: Software that uses virtualization to create and manage containers.
+    actions: enable_yum_repo:https://download.docker.com/linux/fedora/docker-ce.repo;rpm:docker-compose;rpm:docker-distribution;rpm:docker-cli;rpm:docker-ce;rpm:docker-ce-cli;rpm:containerd.io;rpm:docker-buildx-plugin;rpm:docker-compose-plugin
 
-  - name: Pods
-    provider: Marcus Behrendt
-    description: Pods is a frontend for podman. It uses libadwaita for its user interface. 
-    actions: flatpak:com.github.marhkb.Pods
-
-  - name: Dev Toolbox
-    provider: Marcus Behrendt
-    description: |
-      Dev tools at your fingertips. If you're tired of endlessly looking online for the right tool,
-      or to find again that website of which you don't recall the name just for a quick conversion,
-      this is the right app for you. This is a collection of powerful yet simple-to-use tools to solve the most common daily development problems.
-    actions: flatpak:me.iepure.devtoolbox
+  - name: Godot
+    provider: Godot
+    description: Multi-platform 2D and 3D game engine with a feature-rich editor
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:godot
+      - flatpak:org.godotengine.Godot
 
   - name: KDE Toolchain
     provider: KDE
@@ -145,12 +139,3 @@ choices:
     provider: Nim Lang Team
     description: An Imperative, multi-paradigm, compiled programming language.
     actions: rpm:nim
-
-  - name: Godot
-    provider: Godot
-    description: Multi-platform 2D and 3D game engine with a feature-rich editor
-    options:
-      - checkbox: flatpak
-    actions:
-      - rpm:godot
-      - flatpak:org.godotengine.Godot
