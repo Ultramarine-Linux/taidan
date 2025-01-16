@@ -5,6 +5,8 @@ Linux, written in Rust and the [Helium] toolkit.
 
 ## 📦 Dependencies
 
+For an up-to-date list, see `scripts/taidan.spec`.
+
 ```
 libhelium
 gsettings or (plasma-apply-colorscheme and kwriteconfig6)
