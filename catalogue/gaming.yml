@@ -33,18 +33,7 @@ choices:
   - name: Bottles
     provider: Bottles
     description: Lets you run Windows software on Linux, such as applications and games.
-    options:
-      - checkbox: flatpak
-    actions:
-      - rpm:bottles
-      - flatpak:com.usebottles.bottles
-
-  - name: Cartridges
-    provider: Kramo
-    description: |
-      Cartridges is a simple game launcher for all of your games. It has support for importing games from Steam, Lutris,
-      Heroic and more with no login necessary. You can sort and hide games or download cover art from SteamGridDB.
-    actions: flatpak:page.kramo.Cartridges
+    actions: flatpak:com.usebottles.bottles
 
   - name: Lutris
     provider: Lutris Team

@@ -18,16 +18,7 @@ choices:
       - checkbox: flatpak
     actions:
       - rpm:cura
-      - flatpak:com.ultimaker.cura        
-
-  - name: PrusaSlicer
-    provider: Prusa Research
-    description: open-source, feature-rich, frequently updated tool that contains everything you need to export the perfect print.
-    options:
-      - checkbox: flatpak
-    actions:
-      - rpm:prusa-slicer
-      - flatpak:com.prusa3d.PrusaSlicer
+      - flatpak:com.ultimaker.cura       
 
   - name: FreeCAD
     provider: The FreeCAD Team
