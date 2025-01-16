@@ -26,12 +26,6 @@ choices:
       - rpm:evolution
       - flatpak:org.gnome.Evolution
 
-  - name: Merkuro
-    provider: KDE
-    editions: [plasma]
-    description: An application suite designed to make handling your emails, calendars, contacts, and tasks simple.
-    actions: rpm:merkuro
-
   - name: Notejot
     provider: Lainsce
     description: A stupidly-simple notes application for any type of short term notes or ideas.
