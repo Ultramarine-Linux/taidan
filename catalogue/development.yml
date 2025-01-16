@@ -53,6 +53,14 @@ choices:
       - rpm:godot
       - flatpak:org.godotengine.Godot
 
+  - name: Dev Toolbox
+    provider: Marcus Behrendt
+    description: |
+      Dev tools at your fingertips. If you're tired of endlessly looking online for the right tool,
+      or to find again that website of which you don't recall the name just for a quick conversion,
+      this is the right app for you. This is a collection of powerful yet simple-to-use tools to solve the most common daily development problems.
+    actions: flatpak:me.iepure.devtoolbox
+
   - name: KDE Toolchain
     provider: KDE
     description: |
