@@ -12,7 +12,7 @@ choices:
       - checkbox: Install GUI
     actions: 
       - enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo;rpm:tailscale;shell:systemctl enable tailscaled
-      - rpm:trayscale
+      - flatpak:dev.deedles.Trayscale
 
   - name: Docker
     provider: Docker
