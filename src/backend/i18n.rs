@@ -1,5 +1,4 @@
 use gettextrs::gettext;
-use itertools::Itertools;
 
 use super::theme::pkexec;
 
@@ -133,6 +132,11 @@ impl std::fmt::Display for IMELanguages {
     }
 }
 
+/// Turns the IM name written in [`IMS`] to the [`InputMethod`] object.
+///
+/// # Panics
+/// This panics if and only if the IM name is invalid.
+#[must_use]
 pub fn str_to_im(s: &str) -> InputMethod {
     *IMS.values().find_map(|ims| ims.get(s)).expect("invalid im")
 }
@@ -140,7 +144,7 @@ pub fn str_to_im(s: &str) -> InputMethod {
 #[derive(Debug, Clone, Copy)]
 pub struct InputMethod {
     pub native_name: &'static str,
-    /// how IBus refers to this IME
+    /// how `IBus` refers to this IME
     pub ibus_ref: Option<&'static str>,
     /// the package name of the IME
     pub ibus_pkg: Option<&'static str>,
@@ -158,6 +162,10 @@ impl InputMethod {
             _ => self.ibus_ref.is_some(),
         }
     }
+    /// Gets the package for the current edition
+    ///
+    /// # Panics
+    /// Panics if and only if this IM is not available for the current edition.
     #[must_use]
     pub fn get_pkg(self) -> &'static str {
         match &*super::CFG.edition {
@@ -165,6 +173,10 @@ impl InputMethod {
             _ => self.ibus_pkg.unwrap(),
         }
     }
+    /// Gets the internal reference of the IM for the current edition
+    ///
+    /// # Panics
+    /// Panics if and only if this IM is not available for the current edition.
     #[must_use]
     pub fn get_ref(self) -> &'static str {
         match &*super::CFG.edition {
@@ -192,8 +204,8 @@ impl InputMethod {
         }
     }
     pub fn make_listboxrow(self, imname: &'static str) -> relm4::gtk::ListBoxRow {
-        let ims = SETTINGS.read().ims.clone();
         use crate::prelude::*;
+        let ims = SETTINGS.read().ims.clone();
         gtk::ListBoxRow::builder()
             .child(&libhelium::MiniContentBlock::with_details(
                 Some(self.native_name),
@@ -259,36 +271,8 @@ async fn set_gsettings_keymap(
     Ok(())
 }
 
-async fn set_kde_all(
-    user: &str,
-    layout: &str,
-    variant: Option<&str>,
-    im: &[&str],
-) -> color_eyre::Result<()> {
-    set_kde_keymap(user, layout, variant).await?;
-    Ok(todo!())
-}
-async fn set_gsettings_all(
-    user: &str,
-    layout: &str,
-    variant: Option<&str>,
-    im: &[&str],
-) -> color_eyre::Result<()> {
-    // gsettings describe org.gnome.desktop.input-sources sources
-    // List of input source identifiers available. Each source is specified as a tuple of 2 strings. The first string is the type and can be one of “xkb” or “ibus”. For “xkb” sources the second string is “xkb_layout+xkb_variant” or just “xkb_layout” if a XKB variant isn’t needed. For “ibus” sources the second string is the IBus engine name. An empty list means that the X server’s current XKB layout and variant won’t be touched and IBus won’t be used.
-    let name = format!(
-        "{layout}{}",
-        variant.map(|v| format!("+{v}")).unwrap_or_default()
-    );
-    let ims = im.iter().map(|s| format!(", ('ibus', '{s}')")).join("");
-    let args = [
-        ["set", "org.gnome.desktop.input-sources"],
-        ["sources", &format!("[('xck', '{name}'){ims}]",)],
-    ];
-    pkexec(user, "gsettings", &args.concat()).await?;
-    Ok(())
-}
-
+#[allow(clippy::equatable_if_let)]
+#[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 pub async fn set_keymap(
     user: Option<&str>,
     layout: &str,
@@ -303,23 +287,5 @@ pub async fn set_keymap(
         set_kde_keymap(user, layout, variant).await
     } else {
         set_gsettings_keymap(user, layout, variant).await
-    }
-}
-
-pub async fn set_all(
-    user: Option<&str>,
-    layout: &str,
-    variant: Option<&str>,
-    im: &[&str],
-) -> color_eyre::Result<()> {
-    let mut tmp = std::ffi::OsString::default();
-    let user = user.unwrap_or_else(|| {
-        tmp = uzers::get_current_username().expect("can't get current username");
-        tmp.to_str().unwrap()
-    });
-    if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
-        set_kde_all(user, layout, variant, im).await
-    } else {
-        set_gsettings_all(user, layout, variant, im).await
     }
 }

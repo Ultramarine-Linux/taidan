@@ -17,7 +17,7 @@ color-eyre = "0.6.3"
 const_format = "0.2.34"
 enum_dispatch = "0.3.13"
 futures = "0.3.31"
-gettext-rs = { version = "=0.7.0", features = ["gettext-system"] }
+gettext-rs = { version = "0.7.2", features = ["gettext-system"] }
 itertools = "0.14.0"
 libhelium = "0.10.0"
 paste = "1.0.15"

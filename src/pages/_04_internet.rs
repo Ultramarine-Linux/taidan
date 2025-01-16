@@ -64,6 +64,7 @@ crate::generate_page!(Internet {
     }
 );
 
+#[allow(clippy::equatable_if_let)]
 async fn check_online(sender: ComponentSender<InternetPage>) {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
