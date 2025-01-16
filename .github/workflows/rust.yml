@@ -10,4 +10,4 @@ jobs:
     with:
       test-container: '{"image": "ghcr.io/tau-os/builder:main"}'
       test-pre: |
-        dnf install -y openssl-devel libhelium-devel gtk4-devel 'pkgconfig(libattr)' 'pkgconfig(gnome-desktop-4)' clang-libs
+        dnf install -y openssl-devel libhelium-devel gtk4-devel 'pkgconfig(libattr)' 'pkgconfig(gnome-desktop-4)' clang-libs perl-FindBin
