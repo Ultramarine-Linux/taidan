@@ -10,4 +10,4 @@ jobs:
     with:
       test-container: '{"image": "ghcr.io/terrapkg/builder:f41"}'
       test-pre: |
-        dnf install -y openssl-devel libhelium-devel gtk4-devel 'pkgconfig(libattr)' 'pkgconfig(gnome-desktop-4)' clang-libs perl-FindBin
+        dnf install -y openssl-devel libhelium-devel gtk4-devel 'pkgconfig(libattr)' 'pkgconfig(gnome-desktop-4)' clang-libs perl-FindBin gcc make clang
