@@ -133,6 +133,10 @@ impl std::fmt::Display for IMELanguages {
     }
 }
 
+pub fn str_to_im(s: &str) -> InputMethod {
+    *IMS.values().find_map(|ims| ims.get(s)).expect("invalid im")
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct InputMethod {
     pub native_name: &'static str,
@@ -159,6 +163,13 @@ impl InputMethod {
         match &*super::CFG.edition {
             "plasma" | "kde" => self.fcitx5_pkg.unwrap(),
             _ => self.ibus_pkg.unwrap(),
+        }
+    }
+    #[must_use]
+    pub fn get_ref(self) -> &'static str {
+        match &*super::CFG.edition {
+            "plasma" | "kde" => self.fcitx5_ref.unwrap(),
+            _ => self.ibus_ref.unwrap(),
         }
     }
     pub fn handle_switch_state(

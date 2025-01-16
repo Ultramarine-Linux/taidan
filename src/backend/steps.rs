@@ -6,6 +6,7 @@ mod _04_dnfinstallupdate;
 mod _05_dnfdownloadapps;
 mod _06_dnfinstallapps;
 mod _07_drivers_codecs;
+mod _08_setup_imf;
 
 use crate::prelude::*;
 use gettextrs::gettext;
@@ -14,7 +15,7 @@ use crate::backend::steps::{
     _00_useradd::UserAdd, _01_settime::SetTime, _02_settheme::SetTheme,
     _03_dnfdownloadupdate::DnfDownloadUpdate, _04_dnfinstallupdate::DnfInstallUpdate,
     _05_dnfdownloadapps::DnfDownloadApps, _06_dnfinstallapps::DnfInstallApps,
-    _07_drivers_codecs::DriversCodecs,
+    _07_drivers_codecs::DriversCodecs, _08_setup_imf::SetupImf,
 };
 
 #[allow(async_fn_in_trait, clippy::unused_async)]
@@ -35,7 +36,7 @@ pub trait Step {
     }
 }
 
-pub const NUM_STAGES: usize = 8;
+pub const NUM_STAGES: usize = 9;
 
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone, Copy, Debug)]
@@ -48,6 +49,7 @@ pub enum Stage {
     DnfDownloadApps,
     DnfInstallApps,
     DriversCodecs,
+    SetupImf,
 }
 
 impl Stage {
@@ -72,6 +74,7 @@ impl Stage {
             Self::DnfDownloadApps(DnfDownloadApps),
             Self::DnfInstallApps(DnfInstallApps),
             Self::DriversCodecs(DriversCodecs),
+            Self::SetupImf(SetupImf),
         ]
     }
 }
@@ -93,6 +96,7 @@ impl From<Stage> for u8 {
             Stage::DnfDownloadApps(_) => 5,
             Stage::DnfInstallApps(_) => 6,
             Stage::DriversCodecs(_) => 7,
+            Stage::SetupImf(_) => 8,
         }
     }
 }
@@ -108,6 +112,8 @@ impl From<Stage> for String {
             Stage::DnfDownloadApps(_) => gettext("Downloading User Programs…"),
             Stage::DnfInstallApps(_) => gettext("Installing User Programs…"),
             Stage::DriversCodecs(_) => gettext("Installing additional drivers…"),
+            // TRANSLATORS: IMF = input method framework
+            Stage::SetupImf(_) => gettext("Setting up IMFs…"),
         }
     }
 }
