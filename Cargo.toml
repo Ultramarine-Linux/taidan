@@ -25,7 +25,7 @@ phf = { version = "0.11.2", features = ["macros"] }
 relm4 = "0.9.1"
 reqwest = { version = "0.12.9", features = [
     "http2",
-    "native-tls-vendored",
+    "native-tls",
 ], default-features = false }
 taidan_catalogue_parser = { path = "taidan_catalogue_parser" }
 taidan_proc_macros = { path = "taidan_proc_macros" }
