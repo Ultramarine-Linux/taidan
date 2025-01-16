@@ -28,6 +28,7 @@ choices:
 
   - name: Notejot
     provider: Lainsce
+    editions: [gnome, flagship, xfce]
     description: A stupidly-simple notes application for any type of short term notes or ideas.
     actions: flatpak:io.github.lainsce.Notejot
 
