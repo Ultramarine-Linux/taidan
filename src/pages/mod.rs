@@ -6,13 +6,13 @@
 #![allow(clippy::semicolon_outside_block)] // bug from relm4 component macro
 pub mod _00_welcome;
 pub mod _01_keyboard;
-pub mod _02_inputmethod;
-pub mod _03_whoareyou;
-pub mod _04_password;
-pub mod _05_internet;
-pub mod _06_analytics;
-pub mod _07_crashreport;
-pub mod _08_location;
+pub mod _02_whoareyou;
+pub mod _03_password;
+pub mod _04_internet;
+pub mod _05_analytics;
+pub mod _06_crashreport;
+pub mod _07_location;
+pub mod _08_inputmethod;
 pub mod _09_nightlight;
 pub mod _10_theme;
 pub mod _11_browser;

@@ -30,13 +30,13 @@ pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::Sh
 generate_pages!(Page AppModel AppMsg:
     00: Welcome,
     01: Keyboard,
-    02: InputMethod,
-    03: WhoAreYou,
-    04: Password,
-    05: Internet,
-    06: Analytics,
-    07: CrashReport,
-    08: Location,
+    02: WhoAreYou,
+    03: Password,
+    04: Internet,
+    05: Analytics,
+    06: CrashReport,
+    07: Location,
+    08: InputMethod,
     09: NightLight,
     10: Theme,
     11: Browser,
@@ -87,13 +87,13 @@ impl SimpleComponent for AppModel {
                 match model.page {
                     Page::Welcome => *model.welcome_page.widget(),
                     Page::Keyboard => *model.keyboard_page.widget(),
-                    Page::InputMethod => *model.input_method_page.widget(),
                     Page::WhoAreYou => *model.who_are_you_page.widget(),
                     Page::Password => *model.password_page.widget(),
                     Page::Internet => *model.internet_page.widget(),
                     Page::Analytics => *model.analytics_page.widget(),
                     Page::CrashReport => *model.crash_report_page.widget(),
                     Page::Location => *model.location_page.widget(),
+                    Page::InputMethod => *model.input_method_page.widget(),
                     Page::NightLight => *model.night_light_page.widget(),
                     Page::Theme => *model.theme_page.widget(),
                     Page::Browser => *model.browser_page.widget(),
@@ -144,10 +144,10 @@ impl SimpleComponent for AppModel {
                 self.run_install(sender, backend::start_install);
             }
             AppMsg::Nav(NavAction::Next) if self.page == Page::Internet => {
-                tracing::trace!("Skipping to page NightLight after Page::Internet");
-                self.page = Page::NightLight;
+                tracing::trace!("Skipping to page InputMethod after Page::Internet");
+                self.page = Page::InputMethod;
             }
-            AppMsg::Nav(NavAction::Back) if self.page == Page::NightLight => {
+            AppMsg::Nav(NavAction::Back) if self.page == Page::InputMethod => {
                 tracing::trace!("Skipping to page Internet");
                 self.page = Page::Internet;
             }
