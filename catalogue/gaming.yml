@@ -33,8 +33,6 @@ choices:
   - name: Bottles
     provider: Bottles
     description: Lets you run Windows software on Linux, such as applications and games.
-    options:
-      - checkbox: flatpak
     actions: flatpak:com.usebottles.bottles
 
   - name: Cartridges
