@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-15 04:21+0000\n"
+"POT-Creation-Date: 2025-01-16 16:29+0000\n"
 "PO-Revision-Date: 2025-01-04 14:45+0000\n"
 "Last-Translator: huuquockiet <huuquockietn@gmail.com>\n"
 "Language-Team: Vietnamese <https://weblate.fyralabs.com/projects/ultramarine-"
@@ -47,37 +47,46 @@ msgstr "Tiếng Thái"
 msgid "%lang_name (%native_lang_name)"
 msgstr "%lang_name (%native_lang_name)"
 
-#: src/backend/steps.rs:103
+#: src/backend/steps/_08_setup_imf.rs:37 src/pages/_01_keyboard.rs:44
+msgid "Default"
+msgstr "Mặc định"
+
+#: src/backend/steps.rs:107
 msgid "Creating User…"
 msgstr "Đang tạo người dùng…"
 
-#: src/backend/steps.rs:104
+#: src/backend/steps.rs:108
 msgid "Setting Timezone…"
 msgstr "Đặt múi giờ…"
 
-#: src/backend/steps.rs:105
+#: src/backend/steps.rs:109
 msgid "Configuring Themes…"
 msgstr "Cấu hình chủ đề…"
 
-#: src/backend/steps.rs:106
+#: src/backend/steps.rs:110
 msgid "Downloading System Update…"
 msgstr "Đang tải xuống các cập nhật hệ thống…"
 
-#: src/backend/steps.rs:107
+#: src/backend/steps.rs:111
 msgid "Installing System Update…"
 msgstr "Đang cài đặt các cập nhật hệ thống…"
 
-#: src/backend/steps.rs:108
+#: src/backend/steps.rs:112
 msgid "Downloading User Programs…"
 msgstr "Đang tải xuống các ứng dụng…"
 
-#: src/backend/steps.rs:109
+#: src/backend/steps.rs:113
 msgid "Installing User Programs…"
 msgstr "Đang cài đặt các ứng dụng…"
 
-#: src/backend/steps.rs:110
+#: src/backend/steps.rs:114
 msgid "Installing additional drivers…"
 msgstr "Đang cài đặt các trình điều khiển bổ sung…"
+
+#. TRANSLATORS: IMF = input method framework
+#: src/backend/steps.rs:116
+msgid "Setting up IMFs…"
+msgstr ""
 
 #: src/pages/_00_welcome.rs:17 src/main.rs:73
 msgid "Welcome to %s"
@@ -95,10 +104,6 @@ msgstr "Bỏ qua bước cấu hình"
 msgid "Let's Go"
 msgstr "Bắt đầu nào"
 
-#: src/pages/_01_keyboard.rs:44 src/pages/_02_inputmethod.rs:45
-msgid "Default"
-msgstr "Mặc định"
-
 #: src/pages/_01_keyboard.rs:75
 msgid "Keyboard Layout"
 msgstr "Bố cục bàn phím"
@@ -111,13 +116,107 @@ msgstr "Tìm kiếm bố cục bàn phím…"
 msgid "Search keyboard variant…"
 msgstr "Tìm kiếm biến thể bàn phím…"
 
-#: src/pages/_02_inputmethod.rs:80
+#: src/pages/_02_whoareyou.rs:83
+msgid "Who are You?"
+msgstr "Giới thiệu bạn là ai?"
+
+#: src/pages/_02_whoareyou.rs:92
+msgid "Full Name"
+msgstr "Tên đầy đủ"
+
+#: src/pages/_02_whoareyou.rs:100
+msgid "Username"
+msgstr "Tên người dùng"
+
+#: src/pages/_02_whoareyou.rs:110
+msgid ""
+"Username\n"
+"- must start with lowercase letters\n"
+"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</"
+"tt>)\n"
+"- may optionally end with a dollar sign (<tt>$</tt>)"
+msgstr ""
+"Tên người dùng\n"
+"- phải bắt đầu bằng chữ thường\n"
+"- chỉ được chứa chữ cái và số, dấu gạch dưới (<tt>_</tt>) hoặc dấu gạch "
+"ngang (<tt>-</tt>)\n"
+"- có thể kết thúc bằng dấu đô la (<tt>$</tt>)"
+
+#: src/pages/_03_password.rs:34
+msgid "Create a Password"
+msgstr "Hãy đặt mật khẩu"
+
+#: src/pages/_03_password.rs:44
+msgid "Password"
+msgstr "Mật khẩu"
+
+#: src/pages/_03_password.rs:56
+msgid "Repeat Password"
+msgstr "Nhập lại mật khẩu"
+
+#: src/pages/_04_internet.rs:28
+msgid "Let's Get You Online"
+msgstr "Hãy đưa bạn lên mạng"
+
+#: src/pages/_04_internet.rs:34
+msgid "Connect to the Internet to get the latest and greatest."
+msgstr "Kết nối mạng để có được điều tuyệt nhất và mới nhất."
+
+#: src/pages/_04_internet.rs:42
+msgid "I don't have Internet"
+msgstr "Tôi không có mạng"
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_05_analytics.rs:21
+msgid "Analytics and Crash Reporting"
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_06_crashreport.rs:25
+msgid "Crash Reporting"
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_06_crashreport.rs:32
+msgid "Allow Fyra Labs to collect crash data to find bugs and assist you."
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_06_crashreport.rs:37
+msgid ""
+"All data collected is anonymous and end-to-end encrypted.\n"
+"You will be given a crash ID to help support find what went wrong."
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_06_crashreport.rs:42
+msgid "Send Crash Data"
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_06_crashreport.rs:44
+msgid "Press next to keep off"
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_07_location.rs:27 src/pages/_07_location.rs:40
+msgid "Location Services"
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_07_location.rs:35
+msgid ""
+"Allow apps to request your approximate location with [Mozilla Location "
+"Services]"
+msgstr ""
+
+#: src/pages/_08_inputmethod.rs:68
 msgid "Input Method"
 msgstr "Phương thức nhập"
 
 #. TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
 #. to not translate this part.
-#: src/pages/_02_inputmethod.rs:92
+#: src/pages/_08_inputmethod.rs:80
 msgid ""
 "You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-"
 "linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor "
@@ -137,107 +236,13 @@ msgid ""
 "org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
 
-#: src/pages/_02_inputmethod.rs:130
+#: src/pages/_08_inputmethod.rs:118
 msgid "Search language…"
 msgstr "Tìm kiếm ngôn ngữ…"
 
-#: src/pages/_02_inputmethod.rs:159
+#: src/pages/_08_inputmethod.rs:147
 msgid "Search IMs/IMEs…"
 msgstr "Tìm kiếm IMs/IMEs…"
-
-#: src/pages/_03_whoareyou.rs:83
-msgid "Who are You?"
-msgstr "Giới thiệu bạn là ai?"
-
-#: src/pages/_03_whoareyou.rs:92
-msgid "Full Name"
-msgstr "Tên đầy đủ"
-
-#: src/pages/_03_whoareyou.rs:100
-msgid "Username"
-msgstr "Tên người dùng"
-
-#: src/pages/_03_whoareyou.rs:110
-msgid ""
-"Username\n"
-"- must start with lowercase letters\n"
-"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</"
-"tt>)\n"
-"- may optionally end with a dollar sign (<tt>$</tt>)"
-msgstr ""
-"Tên người dùng\n"
-"- phải bắt đầu bằng chữ thường\n"
-"- chỉ được chứa chữ cái và số, dấu gạch dưới (<tt>_</tt>) hoặc dấu gạch "
-"ngang (<tt>-</tt>)\n"
-"- có thể kết thúc bằng dấu đô la (<tt>$</tt>)"
-
-#: src/pages/_04_password.rs:34
-msgid "Create a Password"
-msgstr "Hãy đặt mật khẩu"
-
-#: src/pages/_04_password.rs:44
-msgid "Password"
-msgstr "Mật khẩu"
-
-#: src/pages/_04_password.rs:56
-msgid "Repeat Password"
-msgstr "Nhập lại mật khẩu"
-
-#: src/pages/_05_internet.rs:28
-msgid "Let's Get You Online"
-msgstr "Hãy đưa bạn lên mạng"
-
-#: src/pages/_05_internet.rs:34
-msgid "Connect to the Internet to get the latest and greatest."
-msgstr "Kết nối mạng để có được điều tuyệt nhất và mới nhất."
-
-#: src/pages/_05_internet.rs:42
-msgid "I don't have Internet"
-msgstr "Tôi không có mạng"
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_06_analytics.rs:21
-msgid "Analytics and Crash Reporting"
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_07_crashreport.rs:25
-msgid "Crash Reporting"
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_07_crashreport.rs:32
-msgid "Allow Fyra Labs to collect crash data to find bugs and assist you."
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_07_crashreport.rs:37
-msgid ""
-"All data collected is anonymous and end-to-end encrypted.\n"
-"You will be given a crash ID to help support find what went wrong."
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_07_crashreport.rs:42
-msgid "Send Crash Data"
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_07_crashreport.rs:44
-msgid "Press next to keep off"
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_08_location.rs:27 src/pages/_08_location.rs:40
-msgid "Location Services"
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_08_location.rs:35
-msgid ""
-"Allow apps to request your approximate location with [Mozilla Location "
-"Services]"
-msgstr ""
 
 #: src/pages/_09_nightlight.rs:19 src/pages/_09_nightlight.rs:40
 msgid "Night Light"

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-15 04:21+0000\n"
+"POT-Creation-Date: 2025-01-16 16:29+0000\n"
 "PO-Revision-Date: 2024-12-31 12:26+0000\n"
 "Last-Translator: sadlerm4 <sad_lerm@hotmail.com>\n"
 "Language-Team: Chinese (Traditional Han script) <https://weblate.fyralabs."
@@ -47,38 +47,47 @@ msgstr ""
 msgid "%lang_name (%native_lang_name)"
 msgstr ""
 
-#: src/backend/steps.rs:103
+#: src/backend/steps/_08_setup_imf.rs:37 src/pages/_01_keyboard.rs:44
+msgid "Default"
+msgstr ""
+
+#: src/backend/steps.rs:107
 msgid "Creating User…"
 msgstr "製作用戶中…"
 
-#: src/backend/steps.rs:104
+#: src/backend/steps.rs:108
 msgid "Setting Timezone…"
 msgstr "設定時區中…"
 
-#: src/backend/steps.rs:105
+#: src/backend/steps.rs:109
 msgid "Configuring Themes…"
 msgstr "設定主題中…"
 
-#: src/backend/steps.rs:106
+#: src/backend/steps.rs:110
 msgid "Downloading System Update…"
 msgstr "下載系統更新中…"
 
-#: src/backend/steps.rs:107
+#: src/backend/steps.rs:111
 msgid "Installing System Update…"
 msgstr "安裝系統更新中…"
 
-#: src/backend/steps.rs:108
+#: src/backend/steps.rs:112
 msgid "Downloading User Programs…"
 msgstr "下載用户應用程式中…"
 
-#: src/backend/steps.rs:109
+#: src/backend/steps.rs:113
 msgid "Installing User Programs…"
 msgstr "安裝用户應用程式中…"
 
-#: src/backend/steps.rs:110
+#: src/backend/steps.rs:114
 #, fuzzy
 msgid "Installing additional drivers…"
 msgstr "安裝系統更新中…"
+
+#. TRANSLATORS: IMF = input method framework
+#: src/backend/steps.rs:116
+msgid "Setting up IMFs…"
+msgstr ""
 
 #: src/pages/_00_welcome.rs:17 src/main.rs:73
 msgid "Welcome to %s"
@@ -96,10 +105,6 @@ msgstr "略過系統配置"
 msgid "Let's Go"
 msgstr "開始"
 
-#: src/pages/_01_keyboard.rs:44 src/pages/_02_inputmethod.rs:45
-msgid "Default"
-msgstr ""
-
 #: src/pages/_01_keyboard.rs:75
 msgid "Keyboard Layout"
 msgstr ""
@@ -112,13 +117,106 @@ msgstr ""
 msgid "Search keyboard variant…"
 msgstr ""
 
-#: src/pages/_02_inputmethod.rs:80
+#: src/pages/_02_whoareyou.rs:83
+msgid "Who are You?"
+msgstr "創建新用戶帳號"
+
+#: src/pages/_02_whoareyou.rs:92
+msgid "Full Name"
+msgstr "名字"
+
+#: src/pages/_02_whoareyou.rs:100
+msgid "Username"
+msgstr "用戶名稱"
+
+#: src/pages/_02_whoareyou.rs:110
+msgid ""
+"Username\n"
+"- must start with lowercase letters\n"
+"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</"
+"tt>)\n"
+"- may optionally end with a dollar sign (<tt>$</tt>)"
+msgstr ""
+"用戶名稱\n"
+"- 首個字母須為小楷\n"
+"- 必須只以數字、英文字母、底線(<tt>_</tt>)或連接號(<tt>-</tt>)組成\n"
+"- 最尾可以為<tt>$</tt>"
+
+#: src/pages/_03_password.rs:34
+msgid "Create a Password"
+msgstr "創建密碼"
+
+#: src/pages/_03_password.rs:44
+msgid "Password"
+msgstr "密碼"
+
+#: src/pages/_03_password.rs:56
+msgid "Repeat Password"
+msgstr "重覆密碼"
+
+#: src/pages/_04_internet.rs:28
+msgid "Let's Get You Online"
+msgstr "網絡連線"
+
+#: src/pages/_04_internet.rs:34
+msgid "Connect to the Internet to get the latest and greatest."
+msgstr "連接互聯網，取得最新、最好的。"
+
+#: src/pages/_04_internet.rs:42
+msgid "I don't have Internet"
+msgstr "我不能連上網"
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_05_analytics.rs:21
+msgid "Analytics and Crash Reporting"
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_06_crashreport.rs:25
+msgid "Crash Reporting"
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_06_crashreport.rs:32
+msgid "Allow Fyra Labs to collect crash data to find bugs and assist you."
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_06_crashreport.rs:37
+msgid ""
+"All data collected is anonymous and end-to-end encrypted.\n"
+"You will be given a crash ID to help support find what went wrong."
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_06_crashreport.rs:42
+msgid "Send Crash Data"
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_06_crashreport.rs:44
+msgid "Press next to keep off"
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_07_location.rs:27 src/pages/_07_location.rs:40
+msgid "Location Services"
+msgstr ""
+
+#. TRANSLATORS: this is unused, do NOT translate
+#: src/pages/_07_location.rs:35
+msgid ""
+"Allow apps to request your approximate location with [Mozilla Location "
+"Services]"
+msgstr ""
+
+#: src/pages/_08_inputmethod.rs:68
 msgid "Input Method"
 msgstr ""
 
 #. TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
 #. to not translate this part.
-#: src/pages/_02_inputmethod.rs:92
+#: src/pages/_08_inputmethod.rs:80
 msgid ""
 "You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-"
 "linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor "
@@ -138,105 +236,12 @@ msgid ""
 "org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
 
-#: src/pages/_02_inputmethod.rs:130
+#: src/pages/_08_inputmethod.rs:118
 msgid "Search language…"
 msgstr ""
 
-#: src/pages/_02_inputmethod.rs:159
+#: src/pages/_08_inputmethod.rs:147
 msgid "Search IMs/IMEs…"
-msgstr ""
-
-#: src/pages/_03_whoareyou.rs:83
-msgid "Who are You?"
-msgstr "創建新用戶帳號"
-
-#: src/pages/_03_whoareyou.rs:92
-msgid "Full Name"
-msgstr "名字"
-
-#: src/pages/_03_whoareyou.rs:100
-msgid "Username"
-msgstr "用戶名稱"
-
-#: src/pages/_03_whoareyou.rs:110
-msgid ""
-"Username\n"
-"- must start with lowercase letters\n"
-"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</"
-"tt>)\n"
-"- may optionally end with a dollar sign (<tt>$</tt>)"
-msgstr ""
-"用戶名稱\n"
-"- 首個字母須為小楷\n"
-"- 必須只以數字、英文字母、底線(<tt>_</tt>)或連接號(<tt>-</tt>)組成\n"
-"- 最尾可以為<tt>$</tt>"
-
-#: src/pages/_04_password.rs:34
-msgid "Create a Password"
-msgstr "創建密碼"
-
-#: src/pages/_04_password.rs:44
-msgid "Password"
-msgstr "密碼"
-
-#: src/pages/_04_password.rs:56
-msgid "Repeat Password"
-msgstr "重覆密碼"
-
-#: src/pages/_05_internet.rs:28
-msgid "Let's Get You Online"
-msgstr "網絡連線"
-
-#: src/pages/_05_internet.rs:34
-msgid "Connect to the Internet to get the latest and greatest."
-msgstr "連接互聯網，取得最新、最好的。"
-
-#: src/pages/_05_internet.rs:42
-msgid "I don't have Internet"
-msgstr "我不能連上網"
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_06_analytics.rs:21
-msgid "Analytics and Crash Reporting"
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_07_crashreport.rs:25
-msgid "Crash Reporting"
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_07_crashreport.rs:32
-msgid "Allow Fyra Labs to collect crash data to find bugs and assist you."
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_07_crashreport.rs:37
-msgid ""
-"All data collected is anonymous and end-to-end encrypted.\n"
-"You will be given a crash ID to help support find what went wrong."
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_07_crashreport.rs:42
-msgid "Send Crash Data"
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_07_crashreport.rs:44
-msgid "Press next to keep off"
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_08_location.rs:27 src/pages/_08_location.rs:40
-msgid "Location Services"
-msgstr ""
-
-#. TRANSLATORS: this is unused, do NOT translate
-#: src/pages/_08_location.rs:35
-msgid ""
-"Allow apps to request your approximate location with [Mozilla Location "
-"Services]"
 msgstr ""
 
 #: src/pages/_09_nightlight.rs:19 src/pages/_09_nightlight.rs:40
