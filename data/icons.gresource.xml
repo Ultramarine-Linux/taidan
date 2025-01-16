@@ -17,16 +17,10 @@
 
         <file preprocess="xml-stripblanks" alias="ctlg-Productivity.svg">icons/applications-office-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-Gaming.svg">icons/applications-games-symbolic.svg</file>
-        <file preprocess="xml-stripblanks" alias="ctlg-School.svg">icons/view-dual-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-Development.svg">icons/utilities-terminal-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-Administration.svg">icons/network-server-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-Making.svg">icons/application-x-firmware-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-Media Production.svg">icons/camera-video-symbolic.svg</file>
-        <file preprocess="xml-stripblanks" alias="ctlg-Photography.svg">icons/camera-photo-symbolic.svg</file>
-        <file preprocess="xml-stripblanks" alias="ctlg-Art.svg">icons/input-tablet-symbolic.svg</file>
-    </gresource>
-    <gresource prefix="/com/fyralabs/Taidan/">
-        <file alias="background-light.webp">icons/background-light.webp</file>
-        <file alias="background-dark.webp">icons/background-dark.webp</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-Photography-and-Art.svg">icons/camera-photo-symbolic.svg</file>
     </gresource>
 </gresources>
