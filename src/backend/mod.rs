@@ -50,6 +50,10 @@ pub async fn start_simple_install(
     steps::Stage::SetTime(Default::default())
         .run(&settings, sender.clone())
         .await?;
+    tracing::info!("Running DriversCodecs");
+    steps::Stage::DriversCodecs(Default::default())
+        .run(&settings, sender.clone())
+        .await?;
     sender
         .send(InstallingPageMsg::Finish)
         .expect("sender dropped?");
