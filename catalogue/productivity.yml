@@ -17,7 +17,7 @@ choices:
     actions: flatpak:org.onlyoffice.desktopeditors
 
   - name: Thunderbird
-    provider: The Mozilla Foundation
+    provider: Mozilla
     description: Thunderbird is a FOSS email, newsfeed, chat, and calendar client built on the same technology as Firefox.
     options:
       - checkbox: flatpak
