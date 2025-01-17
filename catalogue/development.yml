@@ -39,6 +39,16 @@ choices:
       - rpm:kate
       - flatpak:org.kde.kate
 
+  - name: virt-manager
+    provider: virt-manager
+    description: Desktop tool for managing virtual machines via libvirt.
+    actions: rpm:virt-manager
+
+  - name: Tailscale
+    provider: Tailscale
+    description: Tailscale is a mesh VPN service that streamlines connecting devices and services securely across different networks.
+    actions: enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo;rpm:tailscale;shell:systemctl enable tailscaled
+
   - name: Docker
     provider: Docker
     description: Software that uses virtualization to create and manage containers.
