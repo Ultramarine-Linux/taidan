@@ -15,6 +15,7 @@ pub type Catalogue = HashMap<String, Category>;
 pub struct Category {
     #[serde(rename = "category")]
     pub name: String,
+    // pub icon: String,
     pub choices: Vec<Choice>,
 }
 

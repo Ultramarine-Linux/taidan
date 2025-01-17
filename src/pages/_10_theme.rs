@@ -15,23 +15,23 @@ crate::generate_page!(Theme:
         let (light0, dark0) = (widgets.lightbox.clone(), widgets.darkbox.clone());
         let (light1, dark1) = (widgets.lightbox.clone(), widgets.darkbox.clone());
         let (ctl_light, ctl_dark) = (gtk::GestureClick::new(), gtk::GestureClick::new());
-        let (s0, s1) = (sender.clone(), sender);
+        let (s0, s1) = (sender.clone(), sender.clone());
         ctl_light.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
         ctl_dark.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
         // FIXME: WHY IS THERE NO BORDER
         ctl_light.connect_pressed(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
             SETTINGS.write().theme_is_dark = false;
-            // TODO: accent?
-            s0.oneshot_command(async { theme::set_theme(None, false, None).await.unwrap() });
+            let accent = SETTINGS.read().accent;
+            s0.oneshot_command(async move { theme::set_theme(None, false, accent).await.unwrap() });
             light0.inline_css("border-radius: 16px");
             dark1.inline_css("border-radius: 0px");
         });
         ctl_dark.connect_pressed(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
             SETTINGS.write().theme_is_dark = true;
-            // TODO: accent?
-            s1.oneshot_command(async { theme::set_theme(None, true, None).await.unwrap() });
+            let accent = SETTINGS.read().accent;
+            s1.oneshot_command(async move { theme::set_theme(None, true, accent).await.unwrap() });
             dark0.inline_css("border-radius: 16px");
             light1.inline_css("border-radius: 0px");
         });
@@ -40,14 +40,14 @@ crate::generate_page!(Theme:
         let first = gtk::CheckButton::new();
         first.add_css_class("accent-mode");
         first.inline_css(&DISABLED_ACCENT_BTN_CSS.replace("@color", theme::AccentColor::all()[0].w3_color_keywords()));
-        first.connect_toggled(on_accent_toggled(theme::AccentColor::all()[0]));
+        first.connect_toggled(on_accent_toggled(sender.clone(), theme::AccentColor::all()[0]));
         widgets.accentbox.append(&first);
         theme::AccentColor::all().iter().skip(1).for_each(|&color| {
             let btn = gtk::CheckButton::new();
             btn.set_group(Some(&first));
             btn.add_css_class("accent-mode");
             btn.inline_css(&DISABLED_ACCENT_BTN_CSS.replace("@color", color.w3_color_keywords()));
-            btn.connect_toggled(on_accent_toggled(color));
+            btn.connect_toggled(on_accent_toggled(sender.clone(), color));
             widgets.accentbox.append(&btn);
         });
     }
@@ -160,13 +160,24 @@ crate::generate_page!(Theme:
     }
 );
 
-fn on_accent_toggled(accent: theme::AccentColor) -> impl Fn(&gtk::CheckButton) {
+fn on_accent_toggled(
+    sender: ComponentSender<ThemePage>,
+    accent: theme::AccentColor,
+) -> impl Fn(&gtk::CheckButton) {
     move |b: &gtk::CheckButton| {
         if b.is_active() {
             SETTINGS.write().accent = Some(accent);
             b.inline_css(&ENABLED_ACCENT_BTN_CSS.replace("@color", accent.w3_color_keywords()));
+            let is_dark = SETTINGS.read().theme_is_dark;
+            sender.oneshot_command(async move {
+                theme::set_theme(None, is_dark, Some(accent)).await.unwrap();
+            });
         } else {
             b.inline_css(&DISABLED_ACCENT_BTN_CSS.replace("@color", accent.w3_color_keywords()));
+            let is_dark = SETTINGS.read().theme_is_dark;
+            sender.oneshot_command(
+                async move { theme::set_theme(None, is_dark, None).await.unwrap() },
+            );
         }
     }
 }

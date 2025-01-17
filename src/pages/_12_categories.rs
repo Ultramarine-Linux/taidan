@@ -103,7 +103,6 @@ impl FactoryComponent for CategoryBtn {
             gtk::Image {
                 set_icon_name: Some(&format!("ctlg-{}", self.category)),
                 set_icon_size: gtk::IconSize::Large,
-                #[watch]
                 inline_css: if SETTINGS.read().theme_is_dark { "color: rgb(192, 199, 207)" } else { "color: rgb(0, 52, 75)" },
                 set_halign: gtk::Align::Center,
                 set_valign: gtk::Align::Center,
@@ -211,6 +210,10 @@ crate::generate_component!(CategoryWindow {
             // If the window is destroyed, the window cannot be shown properly next time.
             libhelium::AppBar {},
 
+            gtk::Image {
+                set_icon_name: Some(&format!("ctlg-{init}")),
+                inline_css: "-gtk-icon-size: 64px",
+            },
             gtk::Label {
                 set_label: &gettext(&init),
                 add_css_class: "view-subtitle",
