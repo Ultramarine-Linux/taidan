@@ -56,7 +56,7 @@ choices:
 
   - name: Godot
     provider: Godot
-    description: Multi-platform 2D and 3D game engine with a feature-rich editor
+    description: Multi-platform 2D and 3D game engine with a feature-rich editor.
     options:
       - checkbox: flatpak
     actions:
