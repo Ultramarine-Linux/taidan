@@ -4,11 +4,7 @@ choices:
     provider: Mozilla
     description: Firefox is an open source web browser using the Gecko engine. Firefox has historically been the default in Ultramarine.
     note: Some features like WebUSB may be unavailable.
-    options:
-      - checkbox: flatpak
-    actions:
-      - rpm:firefox
-      - flatpak:org.mozilla.firefox
+    actions: ;
 
   - name: Edge
     provider: Microsoft
