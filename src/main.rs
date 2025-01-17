@@ -36,14 +36,15 @@ generate_pages!(Page AppModel AppMsg:
     05: Analytics,
     06: CrashReport,
     07: Location,
-    08: InputMethod,
-    09: NightLight,
-    10: Theme,
-    11: Browser,
-    12: Categories,
-    13: Installing,
-    14: Finish,
-    15: Error,
+    08: Codecs,
+    09: InputMethod,
+    10: NightLight,
+    11: Theme,
+    12: Browser,
+    13: Categories,
+    14: Installing,
+    15: Finish,
+    16: Error,
 );
 
 #[derive(Debug)]
@@ -93,6 +94,7 @@ impl SimpleComponent for AppModel {
                     Page::Analytics => *model.analytics_page.widget(),
                     Page::CrashReport => *model.crash_report_page.widget(),
                     Page::Location => *model.location_page.widget(),
+                    Page::Codecs => *model.codecs_page.widget(),
                     Page::InputMethod => *model.input_method_page.widget(),
                     Page::NightLight => *model.night_light_page.widget(),
                     Page::Theme => *model.theme_page.widget(),
@@ -144,10 +146,10 @@ impl SimpleComponent for AppModel {
                 self.run_install(sender, backend::start_install);
             }
             AppMsg::Nav(NavAction::Next) if self.page == Page::Internet => {
-                tracing::trace!("Skipping to page InputMethod after Page::Internet");
-                self.page = Page::InputMethod;
+                tracing::trace!("Skipping to page Codecs after Page::Internet");
+                self.page = Page::Codecs;
             }
-            AppMsg::Nav(NavAction::Back) if self.page == Page::InputMethod => {
+            AppMsg::Nav(NavAction::Back) if self.page == Page::Codecs => {
                 tracing::trace!("Skipping to page Internet");
                 self.page = Page::Internet;
             }
@@ -172,7 +174,7 @@ impl SimpleComponent for AppModel {
                 self.page = Page::Error;
                 self.error_page
                     .sender()
-                    .send(pages::_15_error::ErrorPageMsg::Receive(msg))
+                    .send(pages::_16_error::ErrorPageMsg::Receive(msg))
                     .expect("sender dropped?");
             }
         }

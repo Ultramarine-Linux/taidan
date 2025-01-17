@@ -84,3 +84,12 @@ impl WidgetTemplate for Category {
         }
     }
 }
+
+pub trait PageTrig {
+    /// Handler triggered when the page is visited.
+    /// Returns true if this page should be skipped, false otherwise.
+    #[must_use]
+    fn arrive(&self) -> bool {
+        false
+    }
+}

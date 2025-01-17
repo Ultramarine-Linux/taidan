@@ -14,6 +14,8 @@ pub struct Settings {
 
     pub passwd: String,
 
+    pub install_codecs_drivers: bool,
+
     pub ims: Vec<&'static str>,
 
     pub nightlight: bool,

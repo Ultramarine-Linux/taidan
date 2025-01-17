@@ -9,6 +9,7 @@
         <file preprocess="xml-stripblanks" alias="web-browser-symbolic.svg">icons/web-browser-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="dialog-error-symbolic.svg">icons/dialog-error-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="input-keyboard-symbolic.svg">icons/input-keyboard-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="computer-laptop-symbolic.svg">icons/computer-laptop-symbolic.svg</file>
 
         <file preprocess="xml-stripblanks" alias="ctlg-browser-firefox.svg">catalogue/browser/firefox.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-browser-edge.svg">catalogue/browser/edge.svg</file>

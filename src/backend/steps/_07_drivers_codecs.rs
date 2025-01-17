@@ -43,6 +43,9 @@ impl super::Step for DriversCodecs {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
+        if !settings.install_codecs_drivers {
+            return Ok(());
+        }
         Drivers::setup_nvidia().await?;
         Drivers::setup_broadcom().await?;
         // FIXME: refactor this to somewhere else not in this file
@@ -84,11 +87,6 @@ impl Codecs {
             "x264",
             "x265",
         ]
-    }
-    async fn install_codecs() -> color_eyre::Result<()> {
-        let mut args = vec!["in", "-y"];
-        args.extend(Self::codecs());
-        acmd("dnf", &args).await.wrap_err("cannot install codecs")
     }
 }
 

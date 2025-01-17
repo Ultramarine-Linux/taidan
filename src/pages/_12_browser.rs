@@ -1,6 +1,8 @@
 #![allow(clippy::significant_drop_tightening, clippy::indexing_slicing)]
 use relm4::RelmRemoveAllExt;
 
+const BROWSER_CATEGORY: &'static str = "Browsers";
+
 crate::generate_page!(Browser {
     browser_rows: Vec<relm4::Controller<BrowserRow>>,
     optlist: gtk::ListBox,
@@ -8,7 +10,7 @@ crate::generate_page!(Browser {
 }:
     init[optlist](root, sender, model, widgets) {
         let browser_category = CFG.catalogue.iter()
-            .find(|category| category.name == "Browser")
+            .find(|category| category.name == "Browsers")
             .expect("No browser category");
         model.browser_rows = browser_category.choices.iter().cloned().enumerate()
             .map(|(index, choice)| {
@@ -33,12 +35,12 @@ crate::generate_page!(Browser {
                 if let Some(opts) = browsers.get(&index) {
                     row.model().populate_optlist(&self.optlist, index, &opts.iter().copied());
                 } else {
-                    browsers.insert(index, vec![0;CFG.catalogue.iter().find(|c| c.name == "Browser").expect("can't find category").choices[index].options.len()]);
+                    browsers.insert(index, vec![0;CFG.catalogue.iter().find(|c| c.name == BROWSER_CATEGORY).expect("can't find category").choices[index].options.len()]);
                     row.model().populate_optlist(&self.optlist, index, &std::iter::empty());
                 }
             } else {
                 let mut map = std::collections::HashMap::new();
-                map.insert(index, vec![0;CFG.catalogue.iter().find(|c| c.name == "Browser").expect("can't find category").choices[index].options.len()]);
+                map.insert(index, vec![0;CFG.catalogue.iter().find(|c| c.name == BROWSER_CATEGORY).expect("can't find category").choices[index].options.len()]);
                 ctlg.insert("browser".into(), map);
                 row.model().populate_optlist(&self.optlist, index, &std::iter::empty());
             }

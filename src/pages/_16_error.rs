@@ -37,12 +37,42 @@ crate::generate_page!(Error {
         set_buffer: Some(&model.buf),
     },
 
+
     libhelium::Button {
         set_is_pill: true,
         set_halign: gtk::Align::End,
         set_label: &gettext("Done"),
         inline_css: "padding-left: 48px; padding-right: 48px",
-        add_css_class: "suggested-action",
         connect_clicked => Self::Input::Nav(NavAction::Quit),
+    },
+    gtk::Box {
+        set_valign: gtk::Align::End,
+        set_halign: gtk::Align::Fill,
+        set_hexpand: true,
+        set_orientation: gtk::Orientation::Horizontal,
+
+        libhelium::Button {
+            set_is_textual: true,
+            set_halign: gtk::Align::Start,
+            set_label: &gettext("Retry"),
+            connect_clicked[sender] => move |_| {
+                sender.input(Self::Input::Nav(NavAction::GoTo(crate::Page::Categories)));
+                sender.input(Self::Input::Nav(NavAction::Next));
+            },
+        },
+
+        gtk::Box { set_halign: gtk::Align::Fill, set_hexpand: true },
+
+        libhelium::Button {
+            set_is_pill: true,
+            set_halign: gtk::Align::End,
+            set_label: &gettext("Let's Go"),
+            inline_css: "padding-left: 48px; padding-right: 48px",
+            add_css_class: "suggested-action",
+            connect_clicked[sender] => move |_| {
+                SETTINGS.write().skipconfig = false;
+                sender.input(Self::Input::Nav(NavAction::Next));
+            },
+        },
     },
 );
