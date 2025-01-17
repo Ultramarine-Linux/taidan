@@ -46,11 +46,3 @@ choices:
     actions:
       - rpm:lutris
       - flatpak:net.lutris.Lutris
-
-  - name: Wine
-    provider: Wine Contributors
-    description: |
-      A compatibility layer for UNIX to run Windows applications. This
-      package includes a program loader, which allows unmodified Windows
-      3.x/9x/NT binaries to run on x86 and x86_64 Unixes.
-    actions: rpm:wine
