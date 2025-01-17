@@ -38,7 +38,8 @@ async fn write_fcitx5_profile(
     tokio::fs::create_dir_all(format!("/home/{username}/.config/fcitx5/"))
         .await
         .wrap_err("cannot create ~/.config/fcitx5/")?;
-    let mut profile = tokio::fs::File::create(format!("/home/{username}/.config/fcitx5/profile"))
+    let profile_path = format!("/home/{username}/.config/fcitx5/profile");
+    let mut profile = tokio::fs::File::create(&profile_path)
         .await
         .wrap_err("cannot make/open ~/.config/fcitx5/profile")?;
 
@@ -69,6 +70,18 @@ async fn write_fcitx5_profile(
     }
 
     awrite!(profile <- "[GroupOrder]\n0={default_group_name}\n")?;
+
+    drop(profile);
+
+    let user = uzers::get_user_by_name(username).expect("can't find user");
+
+    std::os::unix::fs::chown(
+        &profile_path,
+        Some(user.uid()),
+        Some(user.primary_group_id()),
+    )
+    .wrap_err("cannot chown file")
+    .with_note(|| format!("Path: {profile_path}"))?;
 
     Ok(())
 }
