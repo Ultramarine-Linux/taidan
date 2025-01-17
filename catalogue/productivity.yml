@@ -16,15 +16,14 @@ choices:
     description: OnlyOffice is an office suite designed to behave like Microsoft Office, with familiar design and collaboration features.
     actions: flatpak:org.onlyoffice.desktopeditors
 
-  - name: Evolution
-    provider: The GNOME Project
-    editions: [gnome, flagship, xfce]
-    description: A powerful personal information manager and email client with support for IMAP, POP3, and Exchange, similar to Microsoft Outlook.
+  - name: Thunderbird
+    provider: The Mozilla Foundation
+    description: A free and open source email, newsfeed, chat, and calendaring client, that’s easy to set up and customize.
     options:
       - checkbox: flatpak
     actions:
-      - rpm:evolution
-      - flatpak:org.gnome.Evolution
+      - rpm:thunderbird
+      - flatpak:org.mozilla.Thunderbird
 
   - name: Notejot
     provider: Lainsce
