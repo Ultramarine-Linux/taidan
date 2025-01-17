@@ -6,15 +6,9 @@ choices:
     actions: rpm:virt-manager
 
   - name: Tailscale
-    provider: Tailscale, DeedleFake
-    description: | 
-      Tailscale is a mesh VPN service that streamlines connecting devices and services securely across different networks.
-      Trayscale is an unofficial GUI interface for Tailscale. It provides a basic system tray icon and a comprehensive UI with support for many of Tailscale's features. 
-    options:
-      - checkbox: Install third party GUI
-    actions: 
-      - enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo;rpm:tailscale;shell:systemctl enable tailscaled
-      - flatpak:dev.deedles.Trayscale
+    provider: Tailscale
+    description: Tailscale is a mesh VPN service that streamlines connecting devices and services securely across different networks.
+    actions: enable_yum_repo:https://pkgs.tailscale.com/stable/fedora/tailscale.repo;rpm:tailscale;shell:systemctl enable tailscaled
 
   - name: Docker
     provider: Docker
