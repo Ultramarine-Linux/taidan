@@ -57,3 +57,5 @@ crate::generate_page!(Welcome:
 
     }
 );
+
+impl crate::ui::PageTrig for WelcomePage {}

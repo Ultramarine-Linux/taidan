@@ -168,3 +168,5 @@ crate::generate_page!(InputMethod {
         },
     }
 );
+
+crate::skipconfig_skip_page!(InputMethod);

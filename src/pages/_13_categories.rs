@@ -338,3 +338,5 @@ fn on_choice_toggled(
         }
     }
 }
+
+crate::skipconfig_skip_page!(Categories);

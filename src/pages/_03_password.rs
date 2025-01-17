@@ -73,3 +73,5 @@ crate::generate_page!(Password {
         },
     }
 );
+
+impl crate::ui::PageTrig for PasswordPage {}

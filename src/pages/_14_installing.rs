@@ -74,3 +74,5 @@ crate::generate_page!(Installing {
     #[local_ref] flatpak_progress_bar ->
     gtk::ProgressBar { },
 );
+
+impl crate::ui::PageTrig for InstallingPage {}

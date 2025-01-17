@@ -76,3 +76,5 @@ crate::generate_page!(Error {
         },
     },
 );
+
+impl crate::ui::PageTrig for ErrorPage {}

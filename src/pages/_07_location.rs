@@ -56,3 +56,5 @@ crate::generate_page!(Location {
         },
     }
 );
+
+crate::always_skip_page!(Location);

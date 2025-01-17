@@ -18,25 +18,6 @@ crate::generate_page!(Theme:
         let (s0, s1) = (sender.clone(), sender.clone());
         ctl_light.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
         ctl_dark.set_button(gtk::gdk::ffi::GDK_BUTTON_PRIMARY as u32);
-        // FIXME: WHY IS THERE NO BORDER
-        ctl_light.connect_pressed(move |gesture, _, _, _| {
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-            SETTINGS.write().theme_is_dark = false;
-            let accent = SETTINGS.read().accent;
-            s0.oneshot_command(async move { theme::set_theme(None, false, accent).await.unwrap() });
-            light0.inline_css("border-radius: 16px");
-            dark1.inline_css("border-radius: 0px");
-        });
-        ctl_dark.connect_pressed(move |gesture, _, _, _| {
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-            SETTINGS.write().theme_is_dark = true;
-            let accent = SETTINGS.read().accent;
-            s1.oneshot_command(async move { theme::set_theme(None, true, accent).await.unwrap() });
-            dark0.inline_css("border-radius: 16px");
-            light1.inline_css("border-radius: 0px");
-        });
-        widgets.lightbox.add_controller(ctl_light);
-        widgets.darkbox.add_controller(ctl_dark);
         let first = gtk::CheckButton::new();
         first.add_css_class("accent-mode");
         first.inline_css(&DISABLED_ACCENT_BTN_CSS.replace("@color", theme::AccentColor::all()[0].w3_color_keywords()));
@@ -50,6 +31,30 @@ crate::generate_page!(Theme:
             btn.connect_toggled(on_accent_toggled(sender.clone(), color));
             widgets.accentbox.append(&btn);
         });
+        // FIXME: WHY IS THERE NO BORDER
+        let first0 = first.clone();
+        ctl_light.connect_pressed(move |gesture, _, _, _| {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            SETTINGS.write().theme_is_dark = false;
+            SETTINGS.write().accent = None;
+            first0.set_active(true);
+            first0.set_active(false);
+            s0.oneshot_command(async move { theme::set_theme(None, false, None).await.unwrap() });
+            light0.inline_css("border-radius: 16px");
+            dark1.inline_css("border-radius: 0px");
+        });
+        ctl_dark.connect_pressed(move |gesture, _, _, _| {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            SETTINGS.write().theme_is_dark = true;
+            SETTINGS.write().accent = None;
+            first.set_active(true);
+            first.set_active(false);
+            s1.oneshot_command(async move { theme::set_theme(None, true, None).await.unwrap() });
+            dark0.inline_css("border-radius: 16px");
+            light1.inline_css("border-radius: 0px");
+        });
+        widgets.lightbox.add_controller(ctl_light);
+        widgets.darkbox.add_controller(ctl_dark);
     }
     update(self, message, sender) {} => {}
 
@@ -124,6 +129,7 @@ crate::generate_page!(Theme:
 
         #[name(accentbox)]
         gtk::Box {
+            set_visible: ["gnome", "plasma", "kde"].contains(&&*CFG.edition),
             set_orientation: gtk::Orientation::Horizontal,
             set_halign: gtk::Align::Center,
             // ? https://github.com/tau-OS/fusebox/blob/286522b7d8f1017e8cd1379396407f29e0c83789/data/style.css#L29
@@ -181,3 +187,5 @@ fn on_accent_toggled(
         }
     }
 }
+
+crate::skipconfig_skip_page!(Theme);

@@ -53,3 +53,5 @@ crate::generate_page!(Codecs:
         },
     }
 );
+
+impl crate::ui::PageTrig for CodecsPage {}

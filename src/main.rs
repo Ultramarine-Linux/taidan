@@ -131,7 +131,9 @@ impl SimpleComponent for AppModel {
     }
 
     fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>) {
+        let s0 = sender.clone();
         tracing::trace!(?message, "AppModel: Received message");
+        let origpage = self.page;
         match message {
             AppMsg::Nav(NavAction::Next)
                 if self.page == Page::Password && SETTINGS.read().skipconfig =>
@@ -177,6 +179,9 @@ impl SimpleComponent for AppModel {
                     .send(pages::_16_error::ErrorPageMsg::Receive(msg))
                     .expect("sender dropped?");
             }
+        }
+        if origpage != self.page && self.page_trig_arrive() {
+            s0.input(AppMsg::Nav(NavAction::Next));
         }
     }
 }

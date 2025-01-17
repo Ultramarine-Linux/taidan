@@ -93,3 +93,9 @@ pub trait PageTrig {
         false
     }
 }
+
+impl<P: PageTrig> PageTrig for &P {
+    fn arrive(&self) -> bool {
+        (**self).arrive()
+    }
+}

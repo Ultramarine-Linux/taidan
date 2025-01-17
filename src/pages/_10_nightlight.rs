@@ -57,3 +57,9 @@ crate::generate_page!(NightLight:
         },
     }
 );
+
+impl crate::ui::PageTrig for NightLightPage {
+    fn arrive(&self) -> bool {
+        SETTINGS.read().skipconfig || CFG.edition == "xfce"
+    }
+}

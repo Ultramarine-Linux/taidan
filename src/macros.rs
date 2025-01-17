@@ -46,6 +46,12 @@ macro_rules! generate_pages {
                         .forward(sender.input_sender(), generate_pages!(@$page $AppMsg $($forward)?)),
                 )+
             }}
+            fn page_trig_arrive(&self) -> bool {
+                use $crate::ui::PageTrig;
+                match self.page {
+                    $($Page::[<$page:camel>] => self.[<$page:snake _page>].model().arrive(),)+
+                }
+            }
         }
     }};
     (@$page:ident $AppMsg:ident) => {paste::paste! {
@@ -286,4 +292,26 @@ macro_rules! generate_component {
         ) -> ComponentParts<Self> { $body }
     };
     (@do_nothing $($tt:tt)+) => { $($tt:tt)+ };
+}
+
+#[macro_export]
+macro_rules! skipconfig_skip_page {
+    ($page:ident) => {
+        ::paste::paste! {
+            impl $crate::ui::PageTrig for [<$page Page>] {
+                fn arrive(&self) -> bool { $crate::SETTINGS.read().skipconfig }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! always_skip_page {
+    ($page:ident) => {
+        ::paste::paste! {
+            impl $crate::ui::PageTrig for [<$page Page>] {
+                fn arrive(&self) -> bool { true }
+            }
+        }
+    };
 }

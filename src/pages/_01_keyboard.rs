@@ -153,3 +153,5 @@ crate::generate_page!(Keyboard {
         },
     }
 );
+
+impl crate::ui::PageTrig for KeyboardPage {}

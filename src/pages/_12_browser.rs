@@ -207,3 +207,5 @@ fn on_choice_toggled(browser_index: usize, i: usize, k: usize) -> impl Fn(&gtk::
         }
     }
 }
+
+crate::skipconfig_skip_page!(Browser);
