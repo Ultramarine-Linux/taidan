@@ -134,7 +134,7 @@ impl SimpleComponent for AppModel {
         let s0 = sender.clone();
         tracing::trace!(?message, "AppModel: Received message");
         let origpage = self.page;
-        match message {
+        match &message {
             AppMsg::Nav(NavAction::Next)
                 if self.page == Page::Password && SETTINGS.read().skipconfig =>
             {
@@ -155,7 +155,7 @@ impl SimpleComponent for AppModel {
                 tracing::trace!("Skipping to page Internet");
                 self.page = Page::Internet;
             }
-            AppMsg::Nav(NavAction::GoTo(page)) => self.page = page,
+            AppMsg::Nav(NavAction::GoTo(page)) => self.page = *page,
             AppMsg::Nav(NavAction::Quit) => std::process::exit(0),
             AppMsg::Nav(NavAction::Next) => {
                 self.page = usize::from(self.page)
@@ -176,12 +176,12 @@ impl SimpleComponent for AppModel {
                 self.page = Page::Error;
                 self.error_page
                     .sender()
-                    .send(pages::_16_error::ErrorPageMsg::Receive(msg))
+                    .send(pages::_16_error::ErrorPageMsg::Receive(msg.clone()))
                     .expect("sender dropped?");
             }
         }
         if origpage != self.page && self.page_trig_arrive() {
-            s0.input(AppMsg::Nav(NavAction::Next));
+            s0.input(message);
         }
     }
 }
