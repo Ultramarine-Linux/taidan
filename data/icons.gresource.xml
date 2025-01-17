@@ -16,12 +16,12 @@
         <file preprocess="xml-stripblanks" alias="ctlg-browser-chrome.svg">catalogue/browser/chrome.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-browser-chromium.svg">catalogue/browser/chromium.svg</file>
 
-        <file preprocess="xml-stripblanks" alias="ctlg-Productivity.svg">icons/applications-office-symbolic.svg</file>
-        <file preprocess="xml-stripblanks" alias="ctlg-Gaming.svg">icons/applications-games-symbolic.svg</file>
-        <file preprocess="xml-stripblanks" alias="ctlg-Development.svg">icons/utilities-terminal-symbolic.svg</file>
-        <file preprocess="xml-stripblanks" alias="ctlg-Making.svg">icons/application-x-firmware-symbolic.svg</file>
-        <file preprocess="xml-stripblanks" alias="ctlg-Media Production.svg">icons/camera-video-symbolic.svg</file>
-        <file preprocess="xml-stripblanks" alias="ctlg-Art and Photography.svg">icons/camera-photo-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="applications-office-symbolic.svg">icons/applications-office-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="applications-games-symbolic.svg">icons/applications-games-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="utilities-terminal-symbolic.svg">icons/utilities-terminal-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="application-x-firmware-symbolic.svg">icons/application-x-firmware-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="camera-video-symbolic.svg">icons/camera-video-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="camera-photo-symbolic.svg">icons/camera-photo-symbolic.svg</file>
     </gresource>
     <gresource prefix="/com/fyralabs/Taidan/">
         <file alias="background-light.webp">icons/background-light.webp</file>

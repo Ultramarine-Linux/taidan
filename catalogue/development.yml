@@ -1,4 +1,5 @@
 category: Development
+icon: utilities-terminal-symbolic
 choices:
   - name: Visual Studio Code
     provider: Microsoft
@@ -8,7 +9,7 @@ choices:
       a rich extensibility model, and lightweight integration with existing tools.
     options:
       - checkbox: rpm
-    actions: 
+    actions:
       - flatpak:com.visualstudio.code
       - shell:rpm --import https://packages.microsoft.com/keys/microsoft.asc;shell:echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" | tee /etc/yum.repos.d/vscode.repo;shell:dnf in -y code
 
@@ -129,7 +130,7 @@ choices:
 
   - name: Rust Toolchain
     provider: The Rust Team, The Fedora Project
-    description: | 
+    description: |
       Various packages and tools for Rust development.
       rust: The Rust Programming Language.
       cargo: A tool that allows Rust projects to declare their various dependencies and ensure that you'll always get a repeatable build.
@@ -153,7 +154,7 @@ choices:
     provider: GNOME Project
     description: Includes vala, a modern programming language for GNOME. Also includes the vala-language-server, which provides code intelligence for Vala (and also Genie), used with an editor and a plugin that supports the Language Server Protocol.
     actions: rpm:vala;rpm:vala-language-server
-    
+
   - name: Nim Language
     provider: Nim Lang Team
     description: An Imperative, multi-paradigm, compiled programming language.
