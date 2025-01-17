@@ -38,7 +38,7 @@ choices:
 
   - name: LMMS
     provider: LMMS
-    description: Linux MultiMedia Studio.
+    description: A music production and multimedia studio.
     options:
       - checkbox: flatpak
     actions:

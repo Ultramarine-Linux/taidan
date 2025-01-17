@@ -1,5 +1,37 @@
-category: Art
+category: Art and Photography
 choices:
+  - name: GIMP
+    provider: GIMP
+    description: GNU Image Manipulation Program.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:gimp
+      - flatpak:org.gimp.GIMP
+
+  - name: Darktable
+    provider: Darktable
+    description: |
+      open source photography workflow application and raw developer. A virtual lighttable and darkroom for photographers.
+      It manages your digital negatives in a database, lets you view them through a zoomable lighttable and enables you to develop raw images and enhance them.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:darktable
+      - flatpak:org.darktable.Darktable
+
+  - name: RawTherapee
+    provider: The RawTherapee Team
+    description: |
+      RawTherapee is a powerful, cross-platform raw photo processing system.
+      It is designed for developing raw files from a broad range of digital cameras and targeted at users ranging from enthusiast
+      newcomers who wish to broaden their understanding of how digital imaging works to professional photographers. 
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:rawtherapee
+      - flatpak:com.rawtherapee.RawTherapee
+
   - name: Krita
     provider: Krita Foundation
     description: A full-featured digital art studio. It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.
@@ -20,18 +52,9 @@ choices:
       - rpm:inkscape
       - flatpak:org.inkscape.Inkscape
 
-  - name: GIMP
-    provider: GIMP
-    description: GNU Image Manipulation Program.
-    options:
-      - checkbox: flatpak
-    actions:
-      - rpm:gimp
-      - flatpak:org.gimp.GIMP
-
   - name: Photoflare
     provider: Photoflare Developers
-    description: Simple but powerful Cross Platform Image Editor.
+    description: Simple but powerful Image Editor.
     actions: flatpak:io.photoflare.photoflare
 
   - name: KolourPaint
