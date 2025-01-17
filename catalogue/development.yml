@@ -52,6 +52,7 @@ choices:
   - name: Docker
     provider: Docker
     description: Software that uses virtualization to create and manage containers.
+    note: Podman, another container manager, is included with Ultramarine by default and supports Docker containers.
     actions: enable_yum_repo:https://download.docker.com/linux/fedora/docker-ce.repo;rpm:docker-compose;rpm:docker-distribution;rpm:docker-cli;rpm:docker-ce;rpm:docker-ce-cli;rpm:containerd.io;rpm:docker-buildx-plugin;rpm:docker-compose-plugin
 
   - name: Godot
