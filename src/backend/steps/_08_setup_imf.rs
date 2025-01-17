@@ -12,6 +12,9 @@ impl super::Step for SetupImf {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
+        if settings.ims.is_empty() {
+            return Ok(());
+        }
         match &*CFG.edition {
             "plasma" | "kde" => write_fcitx5_profile(settings).await,
             _ => write_ibus_profile(settings).await,

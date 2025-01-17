@@ -38,6 +38,17 @@ impl super::Step for DnfDownloadApps {
                 .map(ToString::to_string),
         );
 
+        if !settings.ims.is_empty() {
+            let pkgs: &[&str] = match &*CFG.edition {
+                "plasma" | "kde" => &[
+                    ["fcitx5-autostart", "fcitx5-qt5", "fcitx5-qt6"],
+                    ["fcitx5-gtk", "kcm-fcitx5", "fcitx5-configtool"],
+                ]
+                .concat(),
+                _ => &["ibus-wayland", "ibus-qt", "ibus-gtk3", "ibus-gtk4"],
+            };
+            settings.actions[1].extend(pkgs.iter().map(|&s| s.to_owned()));
+        }
         settings.actions[1].extend(
             (settings.ims.iter())
                 .filter_map(|im| {
