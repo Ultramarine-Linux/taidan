@@ -18,7 +18,7 @@ choices:
 
   - name: Thunderbird
     provider: The Mozilla Foundation
-    description: A free and open source email, newsfeed, chat, and calendaring client, that’s easy to set up and customize.
+    description: Thunderbird is a FOSS email, newsfeed, chat, and calendar client built on the same technology as Firefox.
     options:
       - checkbox: flatpak
     actions:
