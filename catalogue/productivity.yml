@@ -16,15 +16,6 @@ choices:
     description: OnlyOffice is an office suite designed to behave like Microsoft Office, with familiar design and collaboration features.
     actions: flatpak:org.onlyoffice.desktopeditors
 
-  - name: Evolution
-    provider: The GNOME Project
-    description: Evolution is a powerful personal information manager and email client with support for IMAP, POP3, and Exchange.
-    options:
-      - checkbox: flatpak
-    actions:
-      - rpm:evolution
-      - flatpak:org.gnome.Evolution
-
   - name: Thunderbird
     provider: Mozilla
     description: Thunderbird is a FOSS email, newsfeed, chat, and calendar client built on the same technology as Firefox.
@@ -36,12 +27,9 @@ choices:
 
   - name: Notejot
     provider: Lainsce
+    editions: [gnome, flagship, xfce]
     description: A stupidly-simple notes application for any type of short term notes or ideas.
-    options:
-      - checkbox: flatpak
-    actions:
-      - rpm:notejot
-      - flatpak:io.github.lainsce.Notejot
+    actions: flatpak:io.github.lainsce.Notejot
 
   - name: Rnote
     provider: Flxzt
@@ -52,7 +40,25 @@ choices:
       - rpm:rnote
       - flatpak:com.github.flxzt.rnote
 
-  - name: Obsidian
-    provider: Obsidian
-    description: Obsidian is a powerful knowledge base that works on top of a local folder of plain text Markdown files.
-    actions: flatpak:md.obsidian.Obsidian
+  - name: Folio
+    provider: Greg Ross/Toolstack
+    description: A beautiful markdown note-taking app.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:folio
+      - flatpak:com.toolstack.Folio
+
+  - name: Foliate
+    provider: John Factotum
+    description: Modern e-book reader.
+    options:
+      - checkbox: flatpak
+    actions:
+      - rpm:foliate
+      - flatpak:com.github.johnfactotum.Foliate
+
+  - name: PDF Arranger
+    provider: The PDF Arranger Team
+    description: A small application, which helps the user to merge or split pdf documents and rotate, crop and rearrange their pages using an interactive and intuitive graphical interface.
+    actions: flatpak:com.github.jeromerobert.pdfarranger

@@ -1,14 +1,10 @@
-category: Browser
+category: Browsers
 choices:
   - name: Firefox
     provider: Mozilla
     description: Firefox is an open source web browser using the Gecko engine. Firefox has historically been the default in Ultramarine.
     note: Some features like WebUSB may be unavailable.
-    options:
-      - checkbox: flatpak
-    actions:
-      - rpm:firefox
-      - flatpak:org.mozilla.firefox
+    actions: ;
 
   - name: Edge
     provider: Microsoft
@@ -33,23 +29,10 @@ choices:
     description: Chromium is Chrome without the Google, everything should be similar, but no tracking and no accounts.
     actions: rpm:chromium
 
-  - name: GNOME Web (Epiphany)
-    provider: GNOME Foundation
-    description: GNOME Web is a WebKit based browser for the GNOME Desktop. Web is simple and well integrated with the GNOME Desktop.
-    note: Some websites may not load or perform properly in GNOME Web, and some features like extensions aren't implemented yet.
-    actions: rpm:epiphany
-
   - name: Zen Browser
     provider: Zen
     description: Zen is a browser based on Firefox with optimized code for specific CPU micro-architectures and additional extension support.
     note: May not provide Widevine DRM support, due to licensing costs.
-    actions: todo
-
-  - name: LibreWolf
-    provider: LibreWolf Community
-    description: LibreWolf is a privacy-oriented browser based on Firefox. LibreWolf protects your privacy with anti-fingerprinting and tracking features.
-    note: LibreWolf's privacy features may break some sites, and DRM is entirely broken (on purpose.)
-    options:
     actions: todo
 
   - name: Vivaldi
@@ -57,17 +40,5 @@ choices:
     description: |
       Vivaldi is a Chromium-based browser that comes with everything AND the kitchen sink. From a built-in mail client, 
       to automations and deep personalization. Vivaldi will cover more than just your browsing needs.
-    options:
-    actions: todo
-
-  - name: Floorp
-    provider: Ablaze
-    description: Floorp is a Firefox-based browser from Japan with improved customization and privacy features.
-    options:
-    actions: todo
-
-  - name: Brave
-    provider: Brave Software
-    description: Brave is a Chromium-based browser with a built in ad-blocker, cryptocurrency features, and it's own search engine.
     options:
     actions: todo
