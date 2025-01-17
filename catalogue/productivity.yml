@@ -19,7 +19,7 @@ choices:
   - name: Evolution
     provider: The GNOME Project
     editions: [gnome, flagship, xfce]
-    description: Evolution is a powerful personal information manager and email client with support for IMAP, POP3, and Exchange.
+    description: A powerful personal information manager and email client with support for IMAP, POP3, and Exchange, similar to Microsoft Outlook.
     options:
       - checkbox: flatpak
     actions:
