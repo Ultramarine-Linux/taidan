@@ -22,9 +22,6 @@ macro_rules! im {
 }
 
 // lang → `InputMethod`
-// TODO: add fcitx5-chinese-addons manually if fcitx5-table-extra (thanks Fedora definitely not a
-// packaging issue)
-// TODO: enable fcitx5 automatically?
 // NOTE: some characters may not be displayed properly on your device, please make sure you have
 // the corresponding fonts installed.
 pub const IMS: phf::Map<&'static str, phf::Map<&'static str, InputMethod>> = phf::phf_map! {

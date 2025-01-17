@@ -48,6 +48,13 @@ impl super::Step for DnfDownloadApps {
                 .map(|im| im.get_pkg().to_owned())
                 .unique(),
         );
+        // Fedora didn't package `fcitx5-table-extra` properly, it's missing the
+        // `fcitx5-chinese-addons` dependency, so we manually add it here.
+        if settings.actions[1].contains(&"fcitx5-table-extra".to_owned())
+            && !settings.actions[1].contains(&"fcitx5-chinese-addons".to_owned())
+        {
+            settings.actions[1].push("fcitx5-chinese-addons".to_owned());
+        }
 
         Ok(())
     }
