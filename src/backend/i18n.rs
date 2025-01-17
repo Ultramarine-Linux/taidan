@@ -125,6 +125,18 @@ impl std::fmt::Display for IMELanguages {
         f.write_str(&if native.is_empty() {
             self.name()
         } else {
+            // TRANSLATORS: This is intentional and you are required to fill in this field.
+            // TRANSLATORS: %lang_name is the language name you probably have just translated (see
+            // TRANSLATORS: the nearby strings above this). %native_lang_name is the language name
+            // TRANSLATORS: in its corresponding language. For example, when displaying in English:
+            //
+            // TRANSLATORS: Chinese (中文)
+            // TRANSLATORS: Japanese (日本語)
+            // TRANSLATORS: Korean (한국어)
+            // TRANSLATORS: ...
+            //
+            // TRANSLATORS: In other languages, you might need to change the order around and maybe
+            // TRANSLATORS: use different brackets, etc.
             gettext("%lang_name (%native_lang_name)")
                 .replace("%lang_name", &self.name())
                 .replace("%native_lang_name", native)

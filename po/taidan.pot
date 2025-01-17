@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.5\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-16 16:31+0000\n"
+"POT-Creation-Date: 2025-01-17 03:54+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -41,7 +41,19 @@ msgstr ""
 msgid "Thai"
 msgstr ""
 
-#: src/backend/i18n.rs:128
+#. TRANSLATORS: This is intentional and you are required to fill in this field.
+#. TRANSLATORS: %lang_name is the language name you probably have just translated (see
+#. TRANSLATORS: the nearby strings above this). %native_lang_name is the language name
+#. TRANSLATORS: in its corresponding language. For example, when displaying in English:
+#. 
+#. TRANSLATORS: Chinese (中文)
+#. TRANSLATORS: Japanese (日本語)
+#. TRANSLATORS: Korean (한국어)
+#. TRANSLATORS: ...
+#. 
+#. TRANSLATORS: In other languages, you might need to change the order around and maybe
+#. TRANSLATORS: use different brackets, etc.
+#: src/backend/i18n.rs:140
 msgid "%lang_name (%native_lang_name)"
 msgstr ""
 
