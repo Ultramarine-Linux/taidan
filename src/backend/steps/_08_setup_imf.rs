@@ -1,4 +1,4 @@
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 use super::super::i18n;
 use crate::prelude::*;
@@ -25,6 +25,13 @@ macro_rules! awrite {
     };
 }
 
+// kwinrc config for selecting fcitx5 as the virtual input
+const KWINRC_FCITX5: &[u8] = b"
+[Wayland]
+InputMethod[$e]=/usr/share/applications/fcitx5-wayland-launcher.desktop
+VirtualKeyboardEnabled=true
+";
+
 async fn write_fcitx5_profile(
     crate::backend::settings::Settings {
         username,
@@ -34,14 +41,20 @@ async fn write_fcitx5_profile(
         ..
     }: &crate::backend::settings::Settings,
 ) -> color_eyre::Result<()> {
+    // TODO: should we put these in /etc/skel/ instead? Problem: user has already been created
+    // before this step…
     let default_group_name = gettext("Default");
     tokio::fs::create_dir_all(format!("/home/{username}/.config/fcitx5/"))
         .await
         .wrap_err("cannot create ~/.config/fcitx5/")?;
     let profile_path = format!("/home/{username}/.config/fcitx5/profile");
-    let mut profile = tokio::fs::File::create(&profile_path)
+    let mut openopts = tokio::fs::OpenOptions::new();
+    openopts.write(true).truncate(false);
+    let mut profile = openopts
+        .open(&profile_path)
         .await
         .wrap_err("cannot make/open ~/.config/fcitx5/profile")?;
+    profile.seek(std::io::SeekFrom::End(0)).await?;
 
     awrite!(profile <-
         "\
@@ -73,16 +86,27 @@ async fn write_fcitx5_profile(
 
     drop(profile);
 
+    // https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg?ref_type=heads
+    let kwinrc_path = format!("/home/{username}/.config/kwinrc");
+    let mut kwinrc = openopts
+        .open(&kwinrc_path)
+        .await
+        .wrap_err("cannot make/open ~/.config/kwinrc")?;
+    kwinrc.seek(std::io::SeekFrom::End(0)).await?;
+    kwinrc.write_all(KWINRC_FCITX5).await?;
+    drop(kwinrc);
+
     let user = uzers::get_user_by_name(username).expect("can't find user");
+    chown(&profile_path, &user)?;
+    chown(&kwinrc_path, &user)?;
 
-    std::os::unix::fs::chown(
-        &profile_path,
-        Some(user.uid()),
-        Some(user.primary_group_id()),
-    )
-    .wrap_err("cannot chown file")
-    .with_note(|| format!("Path: {profile_path}"))?;
+    Ok(())
+}
 
+fn chown(path: &str, user: &uzers::User) -> Result<(), color_eyre::eyre::Error> {
+    std::os::unix::fs::chown(path, Some(user.uid()), Some(user.primary_group_id()))
+        .wrap_err("cannot chown file")
+        .with_note(|| format!("Path: {path}"))?;
     Ok(())
 }
 
