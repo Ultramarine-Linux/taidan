@@ -149,11 +149,16 @@ pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::R
         ];
         pkexec(user, "kwriteconfig6", &args.concat()).await?;
     } else {
+        xhost_local().await?;
         let args = [
+            ["DISPLAY=:0", "gsettings"],
             ["set", "org.gnome.settings-daemon.plugins.color"],
-            ["night-light-enabled", if enabled { "1" } else { "0" }],
+            [
+                "night-light-enabled",
+                if enabled { "true" } else { "false" },
+            ],
         ];
-        pkexec(user, "gsettings", &args.concat()).await?;
+        pkexec(user, "env", &args.concat()).await?;
     }
     Ok(())
 }
