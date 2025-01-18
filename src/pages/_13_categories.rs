@@ -145,7 +145,7 @@ crate::generate_component!(CategoryWindow {
     optlist: gtk::ListBox,
     last_select_row: Option<usize>,
 }:
-    init[optlist](_root, sender, model, widgets) for init: String {
+    init[optlist](root, sender, model, widgets) for init: String {
         let category = (CFG.catalogue.iter())
             .find(|category| category.name == init)
             .expect("no such category");
@@ -232,6 +232,15 @@ crate::generate_component!(CategoryWindow {
                         set_halign: gtk::Align::Center,
                     },
                 },
+            },
+
+            libhelium::Button {
+                set_is_pill: true,
+                set_halign: gtk::Align::End,
+                set_label: &gettext("Done"),
+                inline_css: "padding-left: 48px; padding-right: 48px",
+                add_css_class: "suggested-action",
+                connect_clicked[root] => move |_| root.set_visible(false),
             },
         },
     }
