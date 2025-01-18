@@ -1,6 +1,6 @@
 use gettextrs::gettext;
 
-use super::theme::pkexec;
+use super::pkexec;
 
 taidan_proc_macros::keymap!(LAYOUTS);
 

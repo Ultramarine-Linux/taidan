@@ -113,3 +113,19 @@ mod parseutil {
             .expect("ui sender fails");
     }
 }
+
+/// # Errors
+/// - command failed to run
+/// - command exited with non-zero status code
+pub async fn pkexec(user: &str, name: &str, args: &[&str]) -> color_eyre::Result<()> {
+    let p = tokio::process::Command::new("pkexec")
+        .args(["--user", user, name])
+        .args(args)
+        .status()
+        .await
+        .wrap_err(format!("fail to run `{name}`"))?;
+    if !p.success() {
+        return Err(eyre!("`{name}` failed").note(format!("Exit code: {:?}", p.code())));
+    }
+    Ok(())
+}
