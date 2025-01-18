@@ -46,7 +46,7 @@ pub const IMS: phf::Map<&'static str, phf::Map<&'static str, InputMethod>> = phf
     },
     "Japanese" => phf::phf_map! {
         "Mozc"              => im!(Mozc         "mozc",                             "mozc"),
-        "Anthy"             => im!(Anthy        "anthy",                            "anthy"),
+        // "Anthy"             => im!(Anthy        "anthy",                            "anthy"),
     },
     "Korean" => phf::phf_map! {
         "libhangul"         => im!(한글         "hangul",                           "hangul"),
