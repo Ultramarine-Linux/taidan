@@ -40,26 +40,28 @@ impl AccentColor {
     /// - cannot apply color-scheme/accent-color/gtk-theme via pkexec
     pub async fn gsettings(self, user: &str, is_dark: bool) -> color_eyre::Result<()> {
         let args = [
+            ["DISPLAY=:0", "gsettings"],
             ["set", "org.gnome.desktop.interface"],
             ["accent-color", self.into()],
         ];
-        pkexec(user, "gsettings", &args.concat()).await?;
+        pkexec(user, "env", &args.concat()).await?;
 
         let args = [
-            "set",
-            "org.gnome.desktop.interface",
-            "color-scheme",
-            if is_dark { "prefer-dark" } else { "default" },
+            ["DISPLAY=:0", "gsettings"],
+            ["set", "org.gnome.desktop.interface"],
+            [
+                "color-scheme",
+                if is_dark { "prefer-dark" } else { "default" },
+            ],
         ];
-        pkexec(user, "gsettings", &args).await?;
+        pkexec(user, "env", &args.concat()).await?;
 
         let args = [
-            "set",
-            "org.gnome.desktop.interface",
-            "gtk-theme",
-            Self::theme(is_dark),
+            ["DISPLAY=:0", "gsettings"],
+            ["set", "org.gnome.desktop.interface"],
+            ["gtk-theme", Self::theme(is_dark)],
         ];
-        pkexec(user, "gsettings", &args).await?;
+        pkexec(user, "env", &args.concat()).await?;
 
         Ok(())
     }
@@ -74,7 +76,6 @@ impl AccentColor {
     /// # Errors
     /// - cannot apply color scheme / accent via pkexec
     pub async fn plasma(self, user: &str, is_dark: bool) -> color_eyre::Result<()> {
-        xhost_local().await?;
         let theme = if is_dark { "BreezeDark" } else { "BreezeLight" };
         let color = self.w3_color_keywords();
         let args = ["DISPLAY=:0", "plasma-apply-colorscheme", theme, "-a", color];
@@ -104,6 +105,7 @@ pub async fn set_theme(
     is_dark: bool,
     accent: Option<AccentColor>,
 ) -> color_eyre::Result<()> {
+    xhost_local().await?;
     let mut tmp = std::ffi::OsString::default();
     let user = user.unwrap_or_else(|| {
         tmp = uzers::get_current_username().expect("can't get current username");
@@ -132,6 +134,7 @@ pub async fn set_theme(
 /// # Panics
 /// - cannot get current username (only when `user` is not supplied)
 pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::Result<()> {
+    xhost_local().await?;
     let mut tmp = std::ffi::OsString::default();
     let user = user.unwrap_or_else(|| {
         tmp = uzers::get_current_username().expect("can't get current username");
@@ -155,7 +158,7 @@ pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::R
     Ok(())
 }
 
-async fn xhost_local() -> color_eyre::Result<()> {
+pub async fn xhost_local() -> color_eyre::Result<()> {
     super::steps::acmd("xhost", &["+", "local:"])
         .await
         .wrap_err("cannot run xhost to pass display; is the current user in group wheel?")

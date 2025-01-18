@@ -273,10 +273,11 @@ async fn set_gsettings_keymap(
         variant.map(|v| format!("+{v}")).unwrap_or_default()
     );
     let args = [
+        ["DISPLAY=:0", "gsettings"],
         ["set", "org.gnome.desktop.input-sources"],
         ["sources", &format!("[('xkb', '{name}')]")],
     ];
-    pkexec(user, "gsettings", &args.concat()).await?;
+    pkexec(user, "env", &args.concat()).await?;
     Ok(())
 }
 
@@ -287,6 +288,7 @@ pub async fn set_keymap(
     layout: &str,
     variant: Option<&str>,
 ) -> color_eyre::Result<()> {
+    super::theme::xhost_local().await?;
     let mut tmp = std::ffi::OsString::default();
     let user = user.unwrap_or_else(|| {
         tmp = uzers::get_current_username().expect("can't get current username");
