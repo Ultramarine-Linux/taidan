@@ -22,6 +22,19 @@ macro_rules! gen_accent_color_enum {
 gen_accent_color_enum!(blue teal green yellow orange red pink purple slate);
 
 impl AccentColor {
+    #[must_use]
+    pub fn theme(is_dark: bool) -> &'static str {
+        match &*CFG.edition {
+            "gnome" if is_dark => "Adwaita-dark",
+            "gnome" => "Adwaita",
+            "budgie" | "flagship" if is_dark => "Fluent-dark",
+            "budgie" | "flagship" => "Fluent",
+            "xfce" if is_dark => "Materia-dark",
+            "xfce" => "Materia-light",
+            _ => "",
+        }
+    }
+
     /// # Errors
     /// - cannot apply color-scheme/accent-color/gtk-theme via pkexec
     pub async fn gsettings(self, user: &str, is_dark: bool) -> color_eyre::Result<()> {
@@ -43,7 +56,7 @@ impl AccentColor {
             "set",
             "org.gnome.desktop.interface",
             "gtk-theme",
-            if is_dark { "Adwaita-dark" } else { "Adwaita" },
+            Self::theme(is_dark),
         ];
         pkexec(user, "gsettings", &args).await?;
 
