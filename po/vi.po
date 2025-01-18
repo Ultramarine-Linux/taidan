@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-17 03:54+0000\n"
+"POT-Creation-Date: 2025-01-18 06:58+0000\n"
 "PO-Revision-Date: 2025-01-18 06:40+0000\n"
 "Last-Translator: huuquockiet <huuquockietn@gmail.com>\n"
 "Language-Team: Vietnamese <https://weblate.fyralabs.com/projects/"
@@ -19,47 +19,47 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Generator: Weblate 5.9.2\n"
 
-#: src/backend/i18n.rs:109
+#: src/backend/i18n.rs:106
 msgid "Chinese"
 msgstr "Tiếng Trung"
 
-#: src/backend/i18n.rs:110
+#: src/backend/i18n.rs:107
 msgid "Japanese"
 msgstr "Tiếng Nhật"
 
-#: src/backend/i18n.rs:111
+#: src/backend/i18n.rs:108
 msgid "Korean"
 msgstr "Tiếng Hàn"
 
-#: src/backend/i18n.rs:112
+#: src/backend/i18n.rs:109
 msgid "Vietnamese"
 msgstr "Tiếng Việt"
 
-#: src/backend/i18n.rs:113
+#: src/backend/i18n.rs:110
 msgid "Indic"
 msgstr "Tiếng Ấn Độ"
 
-#: src/backend/i18n.rs:114
+#: src/backend/i18n.rs:111
 msgid "Thai"
 msgstr "Tiếng Thái"
 
-#. TRANSLATORS: This is intentional and you are required to fill in this field.
-#. TRANSLATORS: %lang_name is the language name you probably have just translated (see
-#. TRANSLATORS: the nearby strings above this). %native_lang_name is the language name
-#. TRANSLATORS: in its corresponding language. For example, when displaying in English:
+#. This is intentional and you are required to fill in this field.
+#. %lang_name is the language name you probably have just translated (see
+#. the nearby strings above this). %native_lang_name is the language name
+#. in its corresponding language. For example, when displaying in English:
 #.
-#. TRANSLATORS: Chinese (中文)
-#. TRANSLATORS: Japanese (日本語)
-#. TRANSLATORS: Korean (한국어)
-#. TRANSLATORS: ...
+#. Chinese (中文)
+#. Japanese (日本語)
+#. Korean (한국어)
+#. ...
 #.
-#. TRANSLATORS: In other languages, you might need to change the order around and maybe
-#. TRANSLATORS: use different brackets, etc.
-#: src/backend/i18n.rs:140
+#. In other languages, you might need to change the order around and maybe
+#. use different brackets, etc.
+#: src/backend/i18n.rs:137
 msgid "%lang_name (%native_lang_name)"
 msgstr "%lang_name (%native_lang_name)"
 
-#: src/backend/steps/_08_setup_imf.rs:37 src/pages/_01_keyboard.rs:44
+#: src/backend/steps/_08_setup_imf.rs:49 src/pages/_01_keyboard.rs:44
 msgid "Default"
 msgstr "Mặc định"
 
@@ -100,7 +100,7 @@ msgstr "Đang cài đặt các trình điều khiển bổ sung…"
 msgid "Setting up IMFs…"
 msgstr "Đang cấu hình IMFs…"
 
-#: src/pages/_00_welcome.rs:17 src/main.rs:73
+#: src/pages/_00_welcome.rs:17 src/main.rs:74
 msgid "Welcome to %s"
 msgstr "Chào mừng đến với %s"
 
@@ -112,7 +112,7 @@ msgstr "Cùng chuẩn bị hệ thống mới của bạn."
 msgid "Skip Configuration"
 msgstr "Bỏ qua bước cấu hình"
 
-#: src/pages/_00_welcome.rs:49
+#: src/pages/_00_welcome.rs:49 src/pages/_16_error.rs:69
 msgid "Let's Go"
 msgstr "Bắt đầu nào"
 
@@ -222,13 +222,34 @@ msgid ""
 "Services]"
 msgstr ""
 
-#: src/pages/_08_inputmethod.rs:68
+#: src/pages/_08_codecs.rs:19
+msgid "Codecs and Drivers"
+msgstr ""
+
+#: src/pages/_08_codecs.rs:27
+msgid ""
+"Install proprietary media codecs and drivers for your device.\n"
+"\n"
+"Consult the <a href='https://wiki.ultramarine-linux.org/en/setup/"
+"postinstall/'>wiki</a> if you don't have an Internet connection."
+msgstr ""
+
+#: src/pages/_08_codecs.rs:35
+msgid "Install Codecs and Drivers"
+msgstr ""
+
+#: src/pages/_08_codecs.rs:36
+msgid "Press next to skip installation"
+msgstr ""
+
+#: src/pages/_09_inputmethod.rs:68
 msgid "Input Method"
 msgstr "Phương thức nhập"
 
 #. TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
 #. to not translate this part.
-#: src/pages/_08_inputmethod.rs:80
+#: src/pages/_09_inputmethod.rs:80
+#, fuzzy
 msgid ""
 "You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-"
 "linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor "
@@ -239,40 +260,47 @@ msgid ""
 "rime.im/'>Rime</a> engine, but this requires advanced configuration and is "
 "therefore not recommended to beginners.\n"
 "\n"
-"For Japanese IMEs, we recommend Mozc for KDE Plasma users. Users on other "
-"editions and DEs may choose both Anthy and Mozc. Anthy is outdated and "
-"unmaintained, but it matches the user interface provided by IBus, while Mozc "
-"provides better conversions.\n"
-"\n"
 "You may find out more information on <a href='https://wiki.ultramarine-linux."
 "org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
+"Bạn có thể <b>tùy chọn</b>cài đặt thêm <a href='https://wiki.ultramarine-"
+"linux.org/en/usage/l10n/#inputting-in-another-language'>trình điều khiểu "
+"phương thức nhập (IME)</a>. Điều này giúp cho bạn có thể nhập ở một số ngôn "
+"ngữ nhất định Thay đổi này sẽ có hiệu lực sau khi bạn đăng nhập vào tài "
+"khoản của mình.\n"
+"\n"
+"More Chinese input method options may be available with the <a href='https://"
+"rime.im/'>Rime</a> engine, but this requires advanced configuration and is "
+"therefore not recommended to beginners.\n"
+"\n"
+"Bạn có thể tìm hiểu thêm thông tin ở <a href='https://wiki.ultramarine-linux."
+"org/en/usage/l10n/'>wiki</a>."
 
-#: src/pages/_08_inputmethod.rs:118
+#: src/pages/_09_inputmethod.rs:115
 msgid "Search language…"
 msgstr "Tìm kiếm ngôn ngữ…"
 
-#: src/pages/_08_inputmethod.rs:147
+#: src/pages/_09_inputmethod.rs:144
 msgid "Search IMs/IMEs…"
 msgstr "Tìm kiếm IMs/IMEs…"
 
-#: src/pages/_09_nightlight.rs:19 src/pages/_09_nightlight.rs:40
+#: src/pages/_10_nightlight.rs:19 src/pages/_10_nightlight.rs:40
 msgid "Night Light"
 msgstr "Ánh sáng đêm"
 
-#: src/pages/_09_nightlight.rs:26
+#: src/pages/_10_nightlight.rs:26
 msgid "Tint the display with a warm tone at night to reduce eyestrain."
 msgstr "Phủ màn hình bằng tông màu ấm vào ban đêm để giảm mỏi mắt."
 
-#: src/pages/_09_nightlight.rs:31
+#: src/pages/_10_nightlight.rs:31
 msgid "Night Light is not proven to help with difficulty falling sleep."
 msgstr "Ánh sáng đêm không được chứng minh là hỗ trợ việc mất ngủ."
 
-#: src/pages/_10_theme.rs:71
+#: src/pages/_11_theme.rs:76
 msgid "Choose your theme"
 msgstr "Chọn chủ đề bạn muốn"
 
-#: src/pages/_10_theme.rs:78
+#: src/pages/_11_theme.rs:83
 msgid ""
 "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
@@ -280,61 +308,66 @@ msgstr ""
 "Biến hệ thống này thành của riêng bạn với một chút màu sắc.\n"
 "Bạn có thể thay đổi tùy chọn này sau trong phần cài đặt."
 
-#: src/pages/_10_theme.rs:84
+#: src/pages/_11_theme.rs:89
 msgid "Some apps may not respect this preference."
 msgstr "Một số ứng dụng sẽ không tuân theo tùy chọn này."
 
-#: src/pages/_10_theme.rs:105
+#: src/pages/_11_theme.rs:110
 msgid "Light"
 msgstr "Sáng"
 
-#: src/pages/_10_theme.rs:120
+#: src/pages/_11_theme.rs:125
 msgid "Dark"
 msgstr "Tối"
 
-#: src/pages/_11_browser.rs:64
+#: src/pages/_12_browser.rs:66
 msgid "Browser Selection"
 msgstr "Chọn trình duyệt"
 
-#: src/pages/_12_categories.rs:59
+#: src/pages/_13_categories.rs:59
 msgid "What Do You Use This Device For?"
 msgstr "Bạn sẽ dùng thiết bị này như thế nào?"
 
-#: src/pages/_12_categories.rs:78
+#: src/pages/_13_categories.rs:78
 msgid "Confirm and Setup System"
 msgstr "Xác nhận và cài đặt hệ thống"
 
-#: src/pages/_13_installing.rs:54
-msgid "Installing your Apps"
-msgstr "Dang cài đặt các ứng dụng"
-
-#: src/pages/_13_installing.rs:60
-msgid "This won't take long!"
-msgstr "Sẽ không lâu lắm đâu!"
-
-#: src/pages/_13_installing.rs:68
-msgid "Loading…"
-msgstr "Đang tải…"
-
-#: src/pages/_14_finish.rs:17
-msgid "Your System is Ready"
-msgstr "Hệ thống của bạn đã sẵn sàng"
-
-#: src/pages/_14_finish.rs:23
-msgid "We hope you enjoy your fresh system!"
-msgstr "Tận hưởng hệ thống mới của bạn!"
-
-#: src/pages/_14_finish.rs:31 src/pages/_15_error.rs:43
+#: src/pages/_13_categories.rs:240 src/pages/_15_finish.rs:31
+#: src/pages/_16_error.rs:44
 msgid "Done"
 msgstr "Xong"
 
-#: src/pages/_15_error.rs:22
+#: src/pages/_14_installing.rs:54
+msgid "Installing your Apps"
+msgstr "Dang cài đặt các ứng dụng"
+
+#: src/pages/_14_installing.rs:60
+msgid "This won't take long!"
+msgstr "Sẽ không lâu lắm đâu!"
+
+#: src/pages/_14_installing.rs:68
+msgid "Loading…"
+msgstr "Đang tải…"
+
+#: src/pages/_15_finish.rs:17
+msgid "Your System is Ready"
+msgstr "Hệ thống của bạn đã sẵn sàng"
+
+#: src/pages/_15_finish.rs:23
+msgid "We hope you enjoy your fresh system!"
+msgstr "Tận hưởng hệ thống mới của bạn!"
+
+#: src/pages/_16_error.rs:22
 msgid "Error"
 msgstr "Lỗi"
 
-#: src/pages/_15_error.rs:28
+#: src/pages/_16_error.rs:28
 msgid "We are sorry, but there is an unexpected problem."
 msgstr "Rất tiếc, đã có lỗi xảy ra."
+
+#: src/pages/_16_error.rs:57
+msgid "Retry"
+msgstr ""
 
 #. TRANSLATORS: this means "Previous page"
 #: src/ui.rs:14
@@ -345,30 +378,3 @@ msgstr "Trước"
 #: src/ui.rs:25
 msgid "Next"
 msgstr "Sau"
-
-#~ msgid ""
-#~ "You may <b>optionally</b> choose to add an <a href='https://wiki."
-#~ "ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language'>input "
-#~ "method editor (IME)</a>. This allows you to type in other specific "
-#~ "languages.This change will take effect after you login into your user "
-#~ "account.\n"
-#~ "\n"
-#~ "More Chinese input method options may be available with the <a "
-#~ "href='https://rime.im/'>Rime</a> engine, but this requires advanced "
-#~ "configuration and is therefore not recommended to beginners.\n"
-#~ "\n"
-#~ "You may find out more information on <a href='https://wiki.ultramarine-"
-#~ "linux.org/en/usage/l10n/'>the wiki</a>."
-#~ msgstr ""
-#~ "Bạn có thể <b>tùy chọn</b>cài đặt thêm <a href='https://wiki.ultramarine-"
-#~ "linux.org/en/usage/l10n/#inputting-in-another-language'>trình điều khiểu "
-#~ "phương thức nhập (IME)</a>. Điều này giúp cho bạn có thể nhập ở một số "
-#~ "ngôn ngữ nhất định Thay đổi này sẽ có hiệu lực sau khi bạn đăng nhập vào "
-#~ "tài khoản của mình.\n"
-#~ "\n"
-#~ "More Chinese input method options may be available with the <a "
-#~ "href='https://rime.im/'>Rime</a> engine, but this requires advanced "
-#~ "configuration and is therefore not recommended to beginners.\n"
-#~ "\n"
-#~ "Bạn có thể tìm hiểu thêm thông tin ở <a href='https://wiki.ultramarine-"
-#~ "linux.org/en/usage/l10n/'>wiki</a>."
