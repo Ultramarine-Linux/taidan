@@ -11,7 +11,7 @@ crate::generate_page!(NightLight:
         set_halign: gtk::Align::Fill,
 
         gtk::Image {
-            set_icon_name: Some("dialog-question-symbolic"),
+            set_icon_name: Some("display-brightness-symbolic"),
             inline_css: "-gtk-icon-size: 64px",
         },
 
