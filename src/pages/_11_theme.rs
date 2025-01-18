@@ -36,20 +36,30 @@ crate::generate_page!(Theme:
         ctl_light.connect_pressed(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
             SETTINGS.write().theme_is_dark = false;
-            SETTINGS.write().accent = None;
-            first0.set_active(true);
-            first0.set_active(false);
-            s0.oneshot_command(async move { theme::set_theme(None, false, None).await.unwrap() });
+            let accent = if CFG.edition == "plasma" || CFG.edition == "kde" {
+                SETTINGS.write().accent = None;
+                first0.set_active(true);
+                first0.set_active(false);
+                None
+            } else {
+                SETTINGS.read().accent
+            };
+            s0.oneshot_command(async move { theme::set_theme(None, false, accent).await.unwrap() });
             light0.inline_css("border-radius: 16px");
             dark1.inline_css("border-radius: 0px");
         });
         ctl_dark.connect_pressed(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
             SETTINGS.write().theme_is_dark = true;
-            SETTINGS.write().accent = None;
-            first.set_active(true);
-            first.set_active(false);
-            s1.oneshot_command(async move { theme::set_theme(None, true, None).await.unwrap() });
+            let accent = if CFG.edition == "plasma" || CFG.edition == "kde" {
+                SETTINGS.write().accent = None;
+                first.set_active(true);
+                first.set_active(false);
+                None
+            } else {
+                SETTINGS.read().accent
+            };
+            s1.oneshot_command(async move { theme::set_theme(None, true, accent).await.unwrap() });
             dark0.inline_css("border-radius: 16px");
             light1.inline_css("border-radius: 0px");
         });
