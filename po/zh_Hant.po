@@ -8,8 +8,8 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2025-01-18 06:58+0000\n"
-"PO-Revision-Date: 2024-12-31 12:26+0000\n"
-"Last-Translator: sadlerm4 <sad_lerm@hotmail.com>\n"
+"PO-Revision-Date: 2025-01-18 06:40+0000\n"
+"Last-Translator: madomado <madonuko@outlook.com>\n"
 "Language-Team: Chinese (Traditional Han script) <https://weblate.fyralabs."
 "com/projects/ultramarine-linux/taidan/zh_Hant/>\n"
 "Language: zh_Hant\n"
@@ -21,19 +21,19 @@ msgstr ""
 
 #: src/backend/i18n.rs:106
 msgid "Chinese"
-msgstr ""
+msgstr "中文"
 
 #: src/backend/i18n.rs:107
 msgid "Japanese"
-msgstr ""
+msgstr "日文"
 
 #: src/backend/i18n.rs:108
 msgid "Korean"
-msgstr ""
+msgstr "韓文"
 
 #: src/backend/i18n.rs:109
 msgid "Vietnamese"
-msgstr ""
+msgstr "越南語"
 
 #: src/backend/i18n.rs:110
 msgid "Indic"
@@ -41,7 +41,7 @@ msgstr ""
 
 #: src/backend/i18n.rs:111
 msgid "Thai"
-msgstr ""
+msgstr "泰文"
 
 #. This is intentional and you are required to fill in this field.
 #. %lang_name is the language name you probably have just translated (see
@@ -61,7 +61,7 @@ msgstr ""
 
 #: src/backend/steps/_08_setup_imf.rs:49 src/pages/_01_keyboard.rs:44
 msgid "Default"
-msgstr ""
+msgstr "預設值"
 
 #: src/backend/steps.rs:107
 msgid "Creating User…"
