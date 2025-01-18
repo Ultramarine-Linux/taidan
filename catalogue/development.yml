@@ -97,8 +97,8 @@ choices:
       Various libraries for Helium development.
       libhelium: The Application Framework for tauOS apps.
       libhelium-devel: Development package for libhelium.
-      tau-helium: tauOS GTK/GNOME Shell Themes.
-      helium-gtk-theme: tauOS GTK/GNOME Shell Themes.
+      hydrogen-icon-theme: Helium Icon Theme.
+      helium-gtk-theme: Helium GTK/GNOME Shell Themes.
     actions: rpm:libhelium;rpm:libhelium-devel;rpm:tau-helium;rpm:helium-gtk-theme
 
   - name: Ultramarine Toolchain
