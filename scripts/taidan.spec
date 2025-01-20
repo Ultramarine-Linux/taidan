@@ -37,16 +37,7 @@ Linux, written in Rust and the Helium toolkit.
 
 %install
 %cargo_install
-for category in catalogue/*; do
-    install -Dpm644 $category -t %buildroot%_sysconfdir/com.fyralabs.Taidan/catalogue/
-done
-install -Dpm644 data/sysusers.d/taidan.conf -t %buildroot%_sysusersdir
-install -Dpm644 data/polkit-1/rules.d/100-taidan.rules -t %buildroot%_datadir/polkit-1/rules.d/
-
-for langfile in po/*.po; do
-    install -Dd %buildroot%_datadir/locale/$(basename $langfile .po)/LC_MESSAGES
-    msgfmt $langfile -o %buildroot%_datadir/locale/$(basename $langfile .po)/LC_MESSAGES/com.fyralabs.Taidan.mo
-done
+DESTDIR=%buildroot ./scripts/install.sh
 
 %find_lang com.fyralabs.Taidan
 
