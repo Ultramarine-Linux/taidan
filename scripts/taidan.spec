@@ -51,3 +51,5 @@ DESTDIR=%buildroot ./scripts/install.sh
 %_libexecdir/taidan/
 %_sysconfdir/com.fyralabs.Taidan/
 %_sysusersdir/taidan.conf
+%_unitdir/taidan-initial-setup.service
+%_unitdir/taidan-initial-setup-reconfiguration.service
