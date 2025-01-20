@@ -1,0 +1,31 @@
+#!/bin/bash
+
+#IS_TEXT="/usr/libexec/taidan/initial-setup-text"
+IS_GRAPHICAL="/usr/libexec/taidan/initial-setup-graphical"
+IS_UNIT=taidan-initial-setup.service
+
+# systemd targets
+GRAPHICAL_TARGET=/usr/lib/systemd/system/graphical.target
+CURRENT_DEFAULT_TARGET=$(readlink -e /etc/systemd/system/default.target)
+
+START_GUI_COMMAND="/usr/libexec/taidan/run-gui-backend ${IS_GRAPHICAL} --no-stdout-log"
+
+export XDG_RUNTIME_DIR=$(mktemp --directory --suffix="-initial-setup-runtime-dir")
+chmod 700 "$XDG_RUNTIME_DIR"
+
+echo "Starting Initial Setup GUI" | systemd-cat -t taidan-initial-setup -p 6
+${START_GUI_COMMAND}
+res=$?
+
+rm -rf "$XDG_RUNTIME_DIR"
+
+# check if the Initial Setup run was successful by looking at the return code
+if [ $res -eq 0 ]; then
+    echo "Initial Setup finished successfully, disabling" | systemd-cat -t taidan-initial-setup -p 6
+    systemctl -q is-enabled $IS_UNIT && systemctl disable $IS_UNIT
+    echo "Initial Setup has been disabled" | systemd-cat -t taidan-initial-setup -p 6
+    exit 0
+else
+    echo "Initial Setup failed, keeping enabled" | systemd-cat -t taidan-initial-setup -p 3
+    exit 1
+fi

@@ -59,4 +59,8 @@ The rust code is licensed under `GPL-3.0-or-later`.
 
 However, some sources of Taidan are separately licensed, notably:
 
-- `scripts/libexec/` (`GPL-2.0-or-later`, see `scripts/libexe/README.md`)
+- `scripts/libexec/` (`GPL-2.0-or-later`, see `scripts/libexec/README.md`)
+- `data/window-manager/` (`GPL-2.0-or-later`, see `data/window-manager/README.md`)
+
+In order words, most files are licensed under `GPL-3.0-or-later`, but Taidan
+is strictly `GPL-3.0-or-later AND GPL-2.0-or-later`.

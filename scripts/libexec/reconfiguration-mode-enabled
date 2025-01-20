@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo "The /.unconfigured file has been detected, enabling Taidan in reconfiguration mode." | systemd-cat -t taidan-initial-setup -p 6

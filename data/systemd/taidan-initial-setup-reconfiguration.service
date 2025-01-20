@@ -1,0 +1,26 @@
+[Unit]
+Description=Taidan Initial Setup reconfiguration mode trigger service
+After=livesys.service plymouth-quit-wait.service
+After=systemd-vconsole-setup.service
+# getty-pre.target is a pasive target, we need to request it before we can use it
+Wants=getty-pre.target
+# prevent getty from running on any consoles before we are done
+Before=getty-pre.target
+Before=display-manager.service
+Before=taidan-initial-setup.service
+Conflicts=plymouth-quit-wait.service initial-setup-reconfiguration.service
+ConditionKernelCommandLine=!rd.live.image
+ConditionPathExists=/.unconfigured
+Requires=taidan-initial-setup.service
+
+[Service]
+Type=oneshot
+TimeoutSec=0
+RemainAfterExit=yes
+ExecStart=/usr/libexec/taidan/reconfiguration-mode-enabled
+TimeoutSec=0
+RemainAfterExit=no
+
+[Install]
+WantedBy=graphical.target
+WantedBy=multi-user.target
