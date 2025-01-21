@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-18 06:58+0000\n"
+"POT-Creation-Date: 2025-01-21 06:03+0000\n"
 "PO-Revision-Date: 2024-12-31 12:26+0000\n"
 "Last-Translator: sadlerm4 <sad_lerm@hotmail.com>\n"
 "Language-Team: Chinese (Simplified Han script) <https://weblate.fyralabs.com/"
@@ -283,11 +283,11 @@ msgstr ""
 msgid "Night Light is not proven to help with difficulty falling sleep."
 msgstr "护眼模式並未证实能改善睡眠。"
 
-#: src/pages/_11_theme.rs:76
+#: src/pages/_11_theme.rs:86
 msgid "Choose your theme"
 msgstr "选择主题"
 
-#: src/pages/_11_theme.rs:83
+#: src/pages/_11_theme.rs:93
 msgid ""
 "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
@@ -295,15 +295,15 @@ msgstr ""
 "选择主题色彩。\n"
 "您可以随时在设定更改此选项。"
 
-#: src/pages/_11_theme.rs:89
+#: src/pages/_11_theme.rs:99
 msgid "Some apps may not respect this preference."
 msgstr "部分应用并不会对此设定有所反应。"
 
-#: src/pages/_11_theme.rs:110
+#: src/pages/_11_theme.rs:120
 msgid "Light"
 msgstr "浅色"
 
-#: src/pages/_11_theme.rs:125
+#: src/pages/_11_theme.rs:135
 msgid "Dark"
 msgstr "深色"
 

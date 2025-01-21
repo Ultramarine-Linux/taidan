@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-18 06:58+0000\n"
+"POT-Creation-Date: 2025-01-21 06:03+0000\n"
 "PO-Revision-Date: 2025-01-17 03:30+0000\n"
 "Last-Translator: Písek Pískovec <pisekpiskovec@gmail.com>\n"
 "Language-Team: Czech <https://weblate.fyralabs.com/projects/ultramarine-"
@@ -287,11 +287,11 @@ msgstr "V noci zbarví obrazovku teplým tónem, pro snížení únavy očí."
 msgid "Night Light is not proven to help with difficulty falling sleep."
 msgstr "Není prokázáno, že by noční světlo pomáhalo při potížích s usínáním."
 
-#: src/pages/_11_theme.rs:76
+#: src/pages/_11_theme.rs:86
 msgid "Choose your theme"
 msgstr "Vyberte si motiv"
 
-#: src/pages/_11_theme.rs:83
+#: src/pages/_11_theme.rs:93
 msgid ""
 "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
@@ -299,15 +299,15 @@ msgstr ""
 "Přizpůsobte si system barevným nádechem.\n"
 "Tuto možnost si můžete později změnit v nastavení."
 
-#: src/pages/_11_theme.rs:89
+#: src/pages/_11_theme.rs:99
 msgid "Some apps may not respect this preference."
 msgstr "Některé aplikace nemusí toto nastavení respektovat."
 
-#: src/pages/_11_theme.rs:110
+#: src/pages/_11_theme.rs:120
 msgid "Light"
 msgstr "Světlý"
 
-#: src/pages/_11_theme.rs:125
+#: src/pages/_11_theme.rs:135
 msgid "Dark"
 msgstr "Tmavý"
 

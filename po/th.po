@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-18 06:58+0000\n"
+"POT-Creation-Date: 2025-01-21 06:03+0000\n"
 "PO-Revision-Date: 2025-01-01 13:45+0000\n"
 "Last-Translator: Co9ski <co9ski@gmail.com>\n"
 "Language-Team: Thai <https://weblate.fyralabs.com/projects/ultramarine-linux/"
@@ -284,11 +284,11 @@ msgstr "ปรับสีจอภาพด้วยโทนสีอุ่น
 msgid "Night Light is not proven to help with difficulty falling sleep."
 msgstr ""
 
-#: src/pages/_11_theme.rs:76
+#: src/pages/_11_theme.rs:86
 msgid "Choose your theme"
 msgstr ""
 
-#: src/pages/_11_theme.rs:83
+#: src/pages/_11_theme.rs:93
 msgid ""
 "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
@@ -296,15 +296,15 @@ msgstr ""
 "ตั้งธีมให้ตรงใจคุณ\n"
 "คุณยังกลับมาที่การตั้งค่าเพื่อเปลี่ยนตรงนี้ทีหลังได้"
 
-#: src/pages/_11_theme.rs:89
+#: src/pages/_11_theme.rs:99
 msgid "Some apps may not respect this preference."
 msgstr "บางแอพพลิเคชันอาจไม่ปรับสีให้ตามธีม"
 
-#: src/pages/_11_theme.rs:110
+#: src/pages/_11_theme.rs:120
 msgid "Light"
 msgstr "สว่าง"
 
-#: src/pages/_11_theme.rs:125
+#: src/pages/_11_theme.rs:135
 msgid "Dark"
 msgstr "มืด"
 

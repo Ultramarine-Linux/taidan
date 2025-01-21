@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-18 06:58+0000\n"
+"POT-Creation-Date: 2025-01-21 06:03+0000\n"
 "PO-Revision-Date: 2025-01-18 06:40+0000\n"
 "Last-Translator: huuquockiet <huuquockietn@gmail.com>\n"
 "Language-Team: Vietnamese <https://weblate.fyralabs.com/projects/ultramarine-"
@@ -296,11 +296,11 @@ msgstr "Phủ màn hình bằng tông màu ấm vào ban đêm để giảm mỏ
 msgid "Night Light is not proven to help with difficulty falling sleep."
 msgstr "Ánh sáng đêm không được chứng minh là hỗ trợ việc mất ngủ."
 
-#: src/pages/_11_theme.rs:76
+#: src/pages/_11_theme.rs:86
 msgid "Choose your theme"
 msgstr "Chọn chủ đề bạn muốn"
 
-#: src/pages/_11_theme.rs:83
+#: src/pages/_11_theme.rs:93
 msgid ""
 "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
@@ -308,15 +308,15 @@ msgstr ""
 "Biến hệ thống này thành của riêng bạn với một chút màu sắc.\n"
 "Bạn có thể thay đổi tùy chọn này sau trong phần cài đặt."
 
-#: src/pages/_11_theme.rs:89
+#: src/pages/_11_theme.rs:99
 msgid "Some apps may not respect this preference."
 msgstr "Một số ứng dụng sẽ không tuân theo tùy chọn này."
 
-#: src/pages/_11_theme.rs:110
+#: src/pages/_11_theme.rs:120
 msgid "Light"
 msgstr "Sáng"
 
-#: src/pages/_11_theme.rs:125
+#: src/pages/_11_theme.rs:135
 msgid "Dark"
 msgstr "Tối"
 
