@@ -8,10 +8,10 @@ msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2025-01-21 06:03+0000\n"
-"PO-Revision-Date: 2025-01-18 06:40+0000\n"
+"PO-Revision-Date: 2025-01-19 13:31+0000\n"
 "Last-Translator: huuquockiet <huuquockietn@gmail.com>\n"
-"Language-Team: Vietnamese <https://weblate.fyralabs.com/projects/ultramarine-"
-"linux/taidan/vi/>\n"
+"Language-Team: Vietnamese <https://weblate.fyralabs.com/projects/"
+"ultramarine-linux/taidan/vi/>\n"
 "Language: vi\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -224,7 +224,7 @@ msgstr ""
 
 #: src/pages/_08_codecs.rs:19
 msgid "Codecs and Drivers"
-msgstr ""
+msgstr "Codec và trình điều khiển"
 
 #: src/pages/_08_codecs.rs:27
 msgid ""
@@ -233,14 +233,18 @@ msgid ""
 "Consult the <a href='https://wiki.ultramarine-linux.org/en/setup/"
 "postinstall/'>wiki</a> if you don't have an Internet connection."
 msgstr ""
+"Cài đặt codec và trình điều khiển thiết bị độc quyền cho thiết bị của bạn.\n"
+"\n"
+"Tham khảo <a href='https://wiki.ultramarine-linux.org/en/setup/postinstall/"
+"'>wiki</a> nếu bạn không có kết nối Internet."
 
 #: src/pages/_08_codecs.rs:35
 msgid "Install Codecs and Drivers"
-msgstr ""
+msgstr "Cài đặt Codec và trình điều khiển"
 
 #: src/pages/_08_codecs.rs:36
 msgid "Press next to skip installation"
-msgstr ""
+msgstr "Nhấn tiếp để bỏ qua việc cài đặt"
 
 #: src/pages/_09_inputmethod.rs:68
 msgid "Input Method"
@@ -249,7 +253,6 @@ msgstr "Phương thức nhập"
 #. TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
 #. to not translate this part.
 #: src/pages/_09_inputmethod.rs:80
-#, fuzzy
 msgid ""
 "You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-"
 "linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor "
@@ -263,18 +266,18 @@ msgid ""
 "You may find out more information on <a href='https://wiki.ultramarine-linux."
 "org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
-"Bạn có thể <b>tùy chọn</b>cài đặt thêm <a href='https://wiki.ultramarine-"
-"linux.org/en/usage/l10n/#inputting-in-another-language'>trình điều khiểu "
-"phương thức nhập (IME)</a>. Điều này giúp cho bạn có thể nhập ở một số ngôn "
-"ngữ nhất định Thay đổi này sẽ có hiệu lực sau khi bạn đăng nhập vào tài "
-"khoản của mình.\n"
+"Bạn có thể <b>tùy chọn</b>cài đặt thêm <a href='https://"
+"wiki.ultramarine-linux.org/en/usage/l10n/#inputting-in-another-"
+"language'>trình điều khiểu phương thức nhập (IME)</a>. Điều này giúp cho bạn "
+"có thể nhập ở một số ngôn ngữ nhất định Thay đổi này sẽ có hiệu lực sau khi "
+"bạn đăng nhập vào tài khoản của mình.\n"
 "\n"
-"More Chinese input method options may be available with the <a href='https://"
-"rime.im/'>Rime</a> engine, but this requires advanced configuration and is "
-"therefore not recommended to beginners.\n"
+"Nhiều tùy chọn phương thức nhập tiếng Trung có thể khả dụng hơn với công cụ "
+"<a href='https://rime.im/'>Rime</a>, nhưng điều này yêu cầu cấu hình nâng "
+"cao và do đó không được khuyến nghị cho người mới bắt đầu.\n"
 "\n"
-"Bạn có thể tìm hiểu thêm thông tin ở <a href='https://wiki.ultramarine-linux."
-"org/en/usage/l10n/'>wiki</a>."
+"Bạn có thể tìm hiểu thêm thông tin ở <a href='https://"
+"wiki.ultramarine-linux.org/en/usage/l10n/'>wiki</a>."
 
 #: src/pages/_09_inputmethod.rs:115
 msgid "Search language…"
@@ -367,7 +370,7 @@ msgstr "Rất tiếc, đã có lỗi xảy ra."
 
 #: src/pages/_16_error.rs:57
 msgid "Retry"
-msgstr ""
+msgstr "Thử lại"
 
 #. TRANSLATORS: this means "Previous page"
 #: src/ui.rs:14

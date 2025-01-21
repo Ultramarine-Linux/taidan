@@ -5,207 +5,202 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Taidan 0.1.2\n"
+"Project-Id-Version: Taidan 0.1.6\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-21 06:03+0000\n"
-"PO-Revision-Date: 2025-01-19 13:31+0000\n"
-"Last-Translator: Písek Pískovec <pisekpiskovec@gmail.com>\n"
-"Language-Team: Czech <https://weblate.fyralabs.com/projects/"
-"ultramarine-linux/taidan/cs/>\n"
-"Language: cs\n"
+"POT-Creation-Date: 2025-01-18 06:58+0000\n"
+"PO-Revision-Date: 2025-01-19 17:42+0000\n"
+"Last-Translator: Alany Benavides <janitogamer21@gmail.com>\n"
+"Language-Team: Spanish <https://weblate.fyralabs.com/projects/"
+"ultramarine-linux/taidan/es/>\n"
+"Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
 "X-Generator: Weblate 5.9.2\n"
 
 #: src/backend/i18n.rs:106
 msgid "Chinese"
-msgstr "Čínština"
+msgstr "Chino"
 
 #: src/backend/i18n.rs:107
 msgid "Japanese"
-msgstr "Japonština"
+msgstr "Japonés"
 
 #: src/backend/i18n.rs:108
 msgid "Korean"
-msgstr "Korejština"
+msgstr "Coreano"
 
 #: src/backend/i18n.rs:109
 msgid "Vietnamese"
-msgstr "Vietnamština"
+msgstr "Vietnamita"
 
 #: src/backend/i18n.rs:110
 msgid "Indic"
-msgstr "Indické"
+msgstr ""
 
 #: src/backend/i18n.rs:111
 msgid "Thai"
-msgstr "Thajština"
+msgstr "Tailandés"
 
 #. This is intentional and you are required to fill in this field.
 #. %lang_name is the language name you probably have just translated (see
 #. the nearby strings above this). %native_lang_name is the language name
 #. in its corresponding language. For example, when displaying in English:
-#.
+#. 
 #. Chinese (中文)
 #. Japanese (日本語)
 #. Korean (한국어)
 #. ...
-#.
+#. 
 #. In other languages, you might need to change the order around and maybe
 #. use different brackets, etc.
 #: src/backend/i18n.rs:137
 msgid "%lang_name (%native_lang_name)"
-msgstr "%lang_name (%native_lang_name)"
+msgstr ""
 
 #: src/backend/steps/_08_setup_imf.rs:49 src/pages/_01_keyboard.rs:44
 msgid "Default"
-msgstr "Výchozí"
+msgstr "Por Defecto"
 
 #: src/backend/steps.rs:107
 msgid "Creating User…"
-msgstr "Vytváření uživatele…"
+msgstr "Creando Usuario…"
 
 #: src/backend/steps.rs:108
 msgid "Setting Timezone…"
-msgstr "Nastavování časového pásma…"
+msgstr "Configurando Zona Horaria…"
 
 #: src/backend/steps.rs:109
 msgid "Configuring Themes…"
-msgstr "Konfigurace motivů…"
+msgstr "Configurando Temas…"
 
 #: src/backend/steps.rs:110
 msgid "Downloading System Update…"
-msgstr "Stahování systémových aktualizací…"
+msgstr "Descargando Actualización del Sistema…"
 
 #: src/backend/steps.rs:111
 msgid "Installing System Update…"
-msgstr "Instalace systémových aktualizací…"
+msgstr "Instalando Actualización del Sistema…"
 
 #: src/backend/steps.rs:112
 msgid "Downloading User Programs…"
-msgstr "Stahování uživatelských programů…"
+msgstr "Descargando Programas del Usuario…"
 
 #: src/backend/steps.rs:113
 msgid "Installing User Programs…"
-msgstr "Instalace uživatelských programů…"
+msgstr "Instalando Programas del Usuario…"
 
 #: src/backend/steps.rs:114
 msgid "Installing additional drivers…"
-msgstr "Instalace dodatečných ovladačů…"
+msgstr "Instalando controladores adicionales…"
 
 #. TRANSLATORS: IMF = input method framework
 #: src/backend/steps.rs:116
 msgid "Setting up IMFs…"
-msgstr "Nastavení rámců vstupních metod…"
+msgstr "Preparando IMFs…"
 
 #: src/pages/_00_welcome.rs:17 src/main.rs:74
 msgid "Welcome to %s"
-msgstr "Vítejte v %s"
+msgstr "Bienvenid@ a %s"
 
 #: src/pages/_00_welcome.rs:23
 msgid "Let's get your system ready."
-msgstr "Připravme Váš systém."
+msgstr "Vamos a alistar tu sistema."
 
 #: src/pages/_00_welcome.rs:37
 msgid "Skip Configuration"
-msgstr "Přeskočit konfiguraci"
+msgstr "Saltar Configuración"
 
 #: src/pages/_00_welcome.rs:49 src/pages/_16_error.rs:69
 msgid "Let's Go"
-msgstr "Pojďme"
+msgstr "Vamos"
 
 #: src/pages/_01_keyboard.rs:75
 msgid "Keyboard Layout"
-msgstr "Rozložení klávesnice"
+msgstr "Layout de teclado"
 
 #: src/pages/_01_keyboard.rs:102
 msgid "Search keyboard layout…"
-msgstr "Hledat rozložení klávesnice…"
+msgstr "Busca tu layout de teclado…"
 
 #: src/pages/_01_keyboard.rs:131
 msgid "Search keyboard variant…"
-msgstr "Hledat varianty rozložení klávesnice…"
+msgstr "Buscar tu variante de teclado…"
 
 #: src/pages/_02_whoareyou.rs:83
 msgid "Who are You?"
-msgstr "Kdo jste?"
+msgstr "Quién eres?"
 
 #: src/pages/_02_whoareyou.rs:92
 msgid "Full Name"
-msgstr "Celé jméno"
+msgstr "Nombre Completo"
 
 #: src/pages/_02_whoareyou.rs:100
 msgid "Username"
-msgstr "Uživatelské jméno"
+msgstr "Nombre de Usuario"
 
 #: src/pages/_02_whoareyou.rs:110
-msgid ""
-"Username\n"
+msgid "Username\n"
 "- must start with lowercase letters\n"
-"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</"
-"tt>)\n"
+"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)\n"
 "- may optionally end with a dollar sign (<tt>$</tt>)"
 msgstr ""
-"Uživatelské jméno\n"
-"- musí začínat malým písmenem\n"
-"- musí obsahovat pouze písmena a čísla, podtržítko (<tt>_</tt>) nebo pomlčku "
-"(<tt>-</tt>)\n"
-"- může volitelně končit znakem dolaru (<tt>$</tt>)"
+"Nombre de Usuario\n"
+"- Iniciar con letras minúsculas\n"
+"- Solo contener caracteres alfanuméricos, guión bajo (<tt>_<tt>) o guión "
+"(<tt>-<tt>)\n"
+"- (Opcional) Terminar con un símbolo de dinero (<tt>$<tt>)"
 
 #: src/pages/_03_password.rs:34
 msgid "Create a Password"
-msgstr "Vytvořte heslo"
+msgstr "Crear una contraseña"
 
 #: src/pages/_03_password.rs:44
 msgid "Password"
-msgstr "Heslo"
+msgstr "Contraseña"
 
 #: src/pages/_03_password.rs:56
 msgid "Repeat Password"
-msgstr "Potvrďte heslo"
+msgstr "Repetir Contraseña"
 
 #: src/pages/_04_internet.rs:28
 msgid "Let's Get You Online"
-msgstr "Pojďme Vás připojit"
+msgstr "Vamos a ponerte en linea"
 
 #: src/pages/_04_internet.rs:34
 msgid "Connect to the Internet to get the latest and greatest."
-msgstr "Připojte se k Internetu k získání toho nejnovějšího a nejlepšího."
+msgstr "Conéctate al internet para obtener lo último y mejor."
 
 #: src/pages/_04_internet.rs:42
 msgid "I don't have Internet"
-msgstr "Nemám připojení k Internetu"
+msgstr "No tengo Internet"
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_05_analytics.rs:21
 msgid "Analytics and Crash Reporting"
-msgstr "Analýza a Hlášení nehod"
+msgstr ""
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_06_crashreport.rs:25
 msgid "Crash Reporting"
-msgstr "Hlášení nehod"
+msgstr ""
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_06_crashreport.rs:32
 msgid "Allow Fyra Labs to collect crash data to find bugs and assist you."
-msgstr "Povolte Fyra Labs sbírání dat o pádech k odhalení chyb a Vaší pomoci."
+msgstr ""
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_06_crashreport.rs:37
-msgid ""
-"All data collected is anonymous and end-to-end encrypted.\n"
+msgid "All data collected is anonymous and end-to-end encrypted.\n"
 "You will be given a crash ID to help support find what went wrong."
 msgstr ""
-"Všechna sebraná data jsou anonymní a koncově šifrovaná.\n"
-"Dostanete ID havárie, které pomůže technické podpoře zjistit, co se pokazilo."
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_06_crashreport.rs:42
 msgid "Send Crash Data"
-msgstr "Poslat data havárie"
+msgstr ""
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_06_crashreport.rs:44
@@ -215,157 +210,149 @@ msgstr ""
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_07_location.rs:27 src/pages/_07_location.rs:40
 msgid "Location Services"
-msgstr "Služby určování polohy"
+msgstr ""
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_07_location.rs:35
-msgid ""
-"Allow apps to request your approximate location with [Mozilla Location "
-"Services]"
+msgid "Allow apps to request your approximate location with [Mozilla Location Services]"
 msgstr ""
-"Povolit aplikacím žádato o Vaši přibližnou polohu s [Mozilla Location "
-"Services]"
 
 #: src/pages/_08_codecs.rs:19
 msgid "Codecs and Drivers"
-msgstr "Kodeky a ovladače"
+msgstr "Códecs y Controladores"
 
 #: src/pages/_08_codecs.rs:27
-msgid ""
-"Install proprietary media codecs and drivers for your device.\n"
+msgid "Install proprietary media codecs and drivers for your device.\n"
 "\n"
-"Consult the <a href='https://wiki.ultramarine-linux.org/en/setup/"
-"postinstall/'>wiki</a> if you don't have an Internet connection."
+"Consult the <a href='https://wiki.ultramarine-linux.org/en/setup/postinstall/'>wiki</a> if you don't have an Internet connection."
 msgstr ""
+"Instalar controladores y códecs multimedia propietarios para tu dispositivo."
+"\n"
+"\n"
+"Consulta <a href='https://wiki.ultramarine-linux.org/en/setup/postinstall/"
+"'>wiki</a> si no tienes una conexión a Internet."
 
 #: src/pages/_08_codecs.rs:35
 msgid "Install Codecs and Drivers"
-msgstr "Nainstalovat kodeky a ovladače"
+msgstr "Instalar Códecs y Controladores"
 
 #: src/pages/_08_codecs.rs:36
 msgid "Press next to skip installation"
-msgstr "Stiskněte další pro přeskočení instalace"
+msgstr "Presiona Siguiente para saltar instalación"
 
 #: src/pages/_09_inputmethod.rs:68
 msgid "Input Method"
-msgstr "Metody vstupu"
+msgstr "Método de Entrada"
 
 #. TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
 #. to not translate this part.
 #: src/pages/_09_inputmethod.rs:80
-msgid ""
-"You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-"
-"linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor "
-"(IME)</a>. This allows you to type in other specific languages. This change "
-"will take effect after you login into your user account.\n"
+msgid "You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor (IME)</a>. This allows you to type in other specific languages. This change will take effect after you login into your user account.\n"
 "\n"
-"More Chinese input method options may be available with the <a href='https://"
-"rime.im/'>Rime</a> engine, but this requires advanced configuration and is "
-"therefore not recommended to beginners.\n"
+"More Chinese input method options may be available with the <a href='https://rime.im/'>Rime</a> engine, but this requires advanced configuration and is therefore not recommended to beginners.\n"
 "\n"
-"You may find out more information on <a href='https://wiki.ultramarine-linux."
-"org/en/usage/l10n/'>the wiki</a>."
+"You may find out more information on <a href='https://wiki.ultramarine-linux.org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
 
 #: src/pages/_09_inputmethod.rs:115
 msgid "Search language…"
-msgstr "Hledat jazyk…"
+msgstr "Buscar lenguaje…"
 
 #: src/pages/_09_inputmethod.rs:144
 msgid "Search IMs/IMEs…"
-msgstr "Hledat IMs/IMEs…"
+msgstr "Buscar IMs/IMEs…"
 
 #: src/pages/_10_nightlight.rs:19 src/pages/_10_nightlight.rs:40
 msgid "Night Light"
-msgstr "Noční osvětlení"
+msgstr "Luz Nocturna"
 
 #: src/pages/_10_nightlight.rs:26
 msgid "Tint the display with a warm tone at night to reduce eyestrain."
-msgstr "V noci zbarví obrazovku teplým tónem, pro snížení únavy očí."
+msgstr ""
+"Entinta la pantalla con un tono cálido en la noche para reducir cansancio "
+"ocular."
 
 #: src/pages/_10_nightlight.rs:31
 msgid "Night Light is not proven to help with difficulty falling sleep."
-msgstr "Není prokázáno, že by noční světlo pomáhalo při potížích s usínáním."
+msgstr "Luz Nocturna no está confirmado con ayudar con la dificultad de dormir."
 
-#: src/pages/_11_theme.rs:86
+#: src/pages/_11_theme.rs:76
 msgid "Choose your theme"
-msgstr "Vyberte si motiv"
+msgstr "Elige tu tema"
 
-#: src/pages/_11_theme.rs:93
-msgid ""
-"Make this system your own with a splash of colour.\n"
+#: src/pages/_11_theme.rs:83
+msgid "Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
 msgstr ""
-"Přizpůsobte si system barevným nádechem.\n"
-"Tuto možnost si můžete později změnit v nastavení."
+"Haz este sistema el tuyo con un toque de color.\n"
+"Puedes cambiar esta opción después en Configuración."
 
-#: src/pages/_11_theme.rs:99
+#: src/pages/_11_theme.rs:89
 msgid "Some apps may not respect this preference."
-msgstr "Některé aplikace nemusí toto nastavení respektovat."
+msgstr "Algunas aplicaciones podrían no respetar esta preferencia."
 
-#: src/pages/_11_theme.rs:120
+#: src/pages/_11_theme.rs:110
 msgid "Light"
-msgstr "Světlý"
+msgstr "Claro"
 
-#: src/pages/_11_theme.rs:135
+#: src/pages/_11_theme.rs:125
 msgid "Dark"
-msgstr "Tmavý"
+msgstr "Oscuro"
 
 #: src/pages/_12_browser.rs:66
 msgid "Browser Selection"
-msgstr "Výběr prohlížeče"
+msgstr "Selección de Navegador"
 
 #: src/pages/_13_categories.rs:59
 msgid "What Do You Use This Device For?"
-msgstr "K čemu toto zařízení využíváte?"
+msgstr "Para que usarás este dispositivo?"
 
 #: src/pages/_13_categories.rs:78
 msgid "Confirm and Setup System"
-msgstr "Potvrdit a nastavit systém"
+msgstr "Confirmar y Configurar Sistema"
 
-#: src/pages/_13_categories.rs:240 src/pages/_15_finish.rs:31
-#: src/pages/_16_error.rs:44
+#: src/pages/_13_categories.rs:240 src/pages/_15_finish.rs:31 src/pages/_16_error.rs:44
 msgid "Done"
-msgstr "Hotovo"
+msgstr "Hecho"
 
 #: src/pages/_14_installing.rs:54
 msgid "Installing your Apps"
-msgstr "Instalace Vašich aplikací"
+msgstr "Instalando tus Aplicaciones"
 
 #: src/pages/_14_installing.rs:60
 msgid "This won't take long!"
-msgstr "Nepotrvá to dlouho!"
+msgstr "Esto no tomará mucho!"
 
 #: src/pages/_14_installing.rs:68
 msgid "Loading…"
-msgstr "Načítání…"
+msgstr "Cargando…"
 
 #: src/pages/_15_finish.rs:17
 msgid "Your System is Ready"
-msgstr "Váš systém je připraven"
+msgstr "Tu Sistema está listo"
 
 #: src/pages/_15_finish.rs:23
 msgid "We hope you enjoy your fresh system!"
-msgstr "Doufáme, že si svůj čerstvý systém užijete!"
+msgstr "Esperamos que disfrutes tu nuevo sistema!"
 
 #: src/pages/_16_error.rs:22
 msgid "Error"
-msgstr "Chyba"
+msgstr "Error"
 
 #: src/pages/_16_error.rs:28
 msgid "We are sorry, but there is an unexpected problem."
-msgstr "Omlouváme se, ale vyskytla se nečekaná chyba."
+msgstr "Lo sentimos, pero hay un problema inesperado."
 
 #: src/pages/_16_error.rs:57
 msgid "Retry"
-msgstr "Opakovat"
+msgstr "Reintentar"
 
 #. TRANSLATORS: this means "Previous page"
 #: src/ui.rs:14
 msgid "Previous"
-msgstr "Předchozí"
+msgstr "Previo"
 
 #. TRANSLATORS: this means "Next page"
 #: src/ui.rs:25
 msgid "Next"
-msgstr "Další"
+msgstr "Siguiente"
