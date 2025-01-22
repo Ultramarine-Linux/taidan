@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-21 06:03+0000\n"
+"POT-Creation-Date: 2025-01-22 04:20+0000\n"
 "PO-Revision-Date: 2024-12-31 12:26+0000\n"
 "Last-Translator: sadlerm4 <sad_lerm@hotmail.com>\n"
 "Language-Team: Chinese (Simplified Han script) <https://weblate.fyralabs.com/"
@@ -121,11 +121,11 @@ msgstr "开始"
 msgid "Keyboard Layout"
 msgstr ""
 
-#: src/pages/_01_keyboard.rs:102
+#: src/pages/_01_keyboard.rs:101
 msgid "Search keyboard layout…"
 msgstr ""
 
-#: src/pages/_01_keyboard.rs:131
+#: src/pages/_01_keyboard.rs:129
 msgid "Search keyboard variant…"
 msgstr ""
 
@@ -166,16 +166,25 @@ msgstr "密码"
 msgid "Repeat Password"
 msgstr "重复密码"
 
-#: src/pages/_04_internet.rs:28
+#: src/pages/_04_internet.rs:32
 msgid "Let's Get You Online"
 msgstr ""
 
-#: src/pages/_04_internet.rs:34
+#: src/pages/_04_internet.rs:39
 msgid "Connect to the Internet to get the latest and greatest."
 msgstr ""
 
-#: src/pages/_04_internet.rs:42
+#: src/pages/_04_internet.rs:46
 msgid "I don't have Internet"
+msgstr ""
+
+#: src/pages/_04_internet.rs:56
+msgid "Codecs, drivers and other user programs will not be installed."
+msgstr ""
+
+#. set_icon: Some("network-wireless-symbolic"),
+#: src/pages/_04_internet.rs:64
+msgid "Open Wi-Fi connection applet"
 msgstr ""
 
 #. TRANSLATORS: this is unused, do NOT translate
@@ -263,11 +272,11 @@ msgid ""
 "org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
 
-#: src/pages/_09_inputmethod.rs:115
+#: src/pages/_09_inputmethod.rs:114
 msgid "Search language…"
 msgstr ""
 
-#: src/pages/_09_inputmethod.rs:144
+#: src/pages/_09_inputmethod.rs:142
 msgid "Search IMs/IMEs…"
 msgstr ""
 
@@ -307,7 +316,7 @@ msgstr "浅色"
 msgid "Dark"
 msgstr "深色"
 
-#: src/pages/_12_browser.rs:66
+#: src/pages/_12_browser.rs:70
 msgid "Browser Selection"
 msgstr "选择浏览器"
 
@@ -319,7 +328,7 @@ msgstr "您会如何使用此设备？"
 msgid "Confirm and Setup System"
 msgstr "确定并装配系统"
 
-#: src/pages/_13_categories.rs:240 src/pages/_15_finish.rs:31
+#: src/pages/_13_categories.rs:256 src/pages/_15_finish.rs:31
 #: src/pages/_16_error.rs:44
 msgid "Done"
 msgstr ""
@@ -357,11 +366,11 @@ msgid "Retry"
 msgstr ""
 
 #. TRANSLATORS: this means "Previous page"
-#: src/ui.rs:14
+#: src/ui.rs:13
 msgid "Previous"
 msgstr ""
 
 #. TRANSLATORS: this means "Next page"
-#: src/ui.rs:25
+#: src/ui.rs:23
 msgid "Next"
 msgstr ""

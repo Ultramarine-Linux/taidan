@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.6\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-21 06:03+0000\n"
+"POT-Creation-Date: 2025-01-22 04:20+0000\n"
 "PO-Revision-Date: 2025-01-19 17:42+0000\n"
 "Last-Translator: Alany Benavides <janitogamer21@gmail.com>\n"
 "Language-Team: Spanish <https://weblate.fyralabs.com/projects/ultramarine-"
@@ -120,11 +120,11 @@ msgstr "Vamos"
 msgid "Keyboard Layout"
 msgstr "Layout de teclado"
 
-#: src/pages/_01_keyboard.rs:102
+#: src/pages/_01_keyboard.rs:101
 msgid "Search keyboard layout…"
 msgstr "Busca tu layout de teclado…"
 
-#: src/pages/_01_keyboard.rs:131
+#: src/pages/_01_keyboard.rs:129
 msgid "Search keyboard variant…"
 msgstr "Buscar tu variante de teclado…"
 
@@ -166,17 +166,26 @@ msgstr "Contraseña"
 msgid "Repeat Password"
 msgstr "Repetir Contraseña"
 
-#: src/pages/_04_internet.rs:28
+#: src/pages/_04_internet.rs:32
 msgid "Let's Get You Online"
 msgstr "Vamos a ponerte en linea"
 
-#: src/pages/_04_internet.rs:34
+#: src/pages/_04_internet.rs:39
 msgid "Connect to the Internet to get the latest and greatest."
 msgstr "Conéctate al internet para obtener lo último y mejor."
 
-#: src/pages/_04_internet.rs:42
+#: src/pages/_04_internet.rs:46
 msgid "I don't have Internet"
 msgstr "No tengo Internet"
+
+#: src/pages/_04_internet.rs:56
+msgid "Codecs, drivers and other user programs will not be installed."
+msgstr ""
+
+#. set_icon: Some("network-wireless-symbolic"),
+#: src/pages/_04_internet.rs:64
+msgid "Open Wi-Fi connection applet"
+msgstr ""
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_05_analytics.rs:21
@@ -268,11 +277,11 @@ msgid ""
 "org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
 
-#: src/pages/_09_inputmethod.rs:115
+#: src/pages/_09_inputmethod.rs:114
 msgid "Search language…"
 msgstr "Buscar lenguaje…"
 
-#: src/pages/_09_inputmethod.rs:144
+#: src/pages/_09_inputmethod.rs:142
 msgid "Search IMs/IMEs…"
 msgstr "Buscar IMs/IMEs…"
 
@@ -315,7 +324,7 @@ msgstr "Claro"
 msgid "Dark"
 msgstr "Oscuro"
 
-#: src/pages/_12_browser.rs:66
+#: src/pages/_12_browser.rs:70
 msgid "Browser Selection"
 msgstr "Selección de Navegador"
 
@@ -327,7 +336,7 @@ msgstr "Para que usarás este dispositivo?"
 msgid "Confirm and Setup System"
 msgstr "Confirmar y Configurar Sistema"
 
-#: src/pages/_13_categories.rs:240 src/pages/_15_finish.rs:31
+#: src/pages/_13_categories.rs:256 src/pages/_15_finish.rs:31
 #: src/pages/_16_error.rs:44
 msgid "Done"
 msgstr "Hecho"
@@ -365,11 +374,11 @@ msgid "Retry"
 msgstr "Reintentar"
 
 #. TRANSLATORS: this means "Previous page"
-#: src/ui.rs:14
+#: src/ui.rs:13
 msgid "Previous"
 msgstr "Previo"
 
 #. TRANSLATORS: this means "Next page"
-#: src/ui.rs:25
+#: src/ui.rs:23
 msgid "Next"
 msgstr "Siguiente"
