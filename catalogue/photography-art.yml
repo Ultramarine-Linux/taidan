@@ -66,8 +66,3 @@ choices:
     actions:
       - rpm:kolourpaint
       - flatpak:org.kde.kolourpaint
-
-  - name: Voxel Paint
-    provider: James William Fletcher
-    description: Paint in 3D using textured Voxels.
-    actions: flatpak:com.voxdsp.VoxelPaint
