@@ -7,11 +7,11 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Taidan 0.1.6\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-18 06:58+0000\n"
+"POT-Creation-Date: 2025-01-21 06:03+0000\n"
 "PO-Revision-Date: 2025-01-19 17:42+0000\n"
 "Last-Translator: Alany Benavides <janitogamer21@gmail.com>\n"
-"Language-Team: Spanish <https://weblate.fyralabs.com/projects/"
-"ultramarine-linux/taidan/es/>\n"
+"Language-Team: Spanish <https://weblate.fyralabs.com/projects/ultramarine-"
+"linux/taidan/es/>\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -47,12 +47,12 @@ msgstr "Tailandés"
 #. %lang_name is the language name you probably have just translated (see
 #. the nearby strings above this). %native_lang_name is the language name
 #. in its corresponding language. For example, when displaying in English:
-#. 
+#.
 #. Chinese (中文)
 #. Japanese (日本語)
 #. Korean (한국어)
 #. ...
-#. 
+#.
 #. In other languages, you might need to change the order around and maybe
 #. use different brackets, etc.
 #: src/backend/i18n.rs:137
@@ -141,9 +141,11 @@ msgid "Username"
 msgstr "Nombre de Usuario"
 
 #: src/pages/_02_whoareyou.rs:110
-msgid "Username\n"
+msgid ""
+"Username\n"
 "- must start with lowercase letters\n"
-"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)\n"
+"- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</"
+"tt>)\n"
 "- may optionally end with a dollar sign (<tt>$</tt>)"
 msgstr ""
 "Nombre de Usuario\n"
@@ -193,7 +195,8 @@ msgstr ""
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_06_crashreport.rs:37
-msgid "All data collected is anonymous and end-to-end encrypted.\n"
+msgid ""
+"All data collected is anonymous and end-to-end encrypted.\n"
 "You will be given a crash ID to help support find what went wrong."
 msgstr ""
 
@@ -214,7 +217,9 @@ msgstr ""
 
 #. TRANSLATORS: this is unused, do NOT translate
 #: src/pages/_07_location.rs:35
-msgid "Allow apps to request your approximate location with [Mozilla Location Services]"
+msgid ""
+"Allow apps to request your approximate location with [Mozilla Location "
+"Services]"
 msgstr ""
 
 #: src/pages/_08_codecs.rs:19
@@ -222,15 +227,17 @@ msgid "Codecs and Drivers"
 msgstr "Códecs y Controladores"
 
 #: src/pages/_08_codecs.rs:27
-msgid "Install proprietary media codecs and drivers for your device.\n"
+msgid ""
+"Install proprietary media codecs and drivers for your device.\n"
 "\n"
-"Consult the <a href='https://wiki.ultramarine-linux.org/en/setup/postinstall/'>wiki</a> if you don't have an Internet connection."
+"Consult the <a href='https://wiki.ultramarine-linux.org/en/setup/"
+"postinstall/'>wiki</a> if you don't have an Internet connection."
 msgstr ""
-"Instalar controladores y códecs multimedia propietarios para tu dispositivo."
+"Instalar controladores y códecs multimedia propietarios para tu "
+"dispositivo.\n"
 "\n"
-"\n"
-"Consulta <a href='https://wiki.ultramarine-linux.org/en/setup/postinstall/"
-"'>wiki</a> si no tienes una conexión a Internet."
+"Consulta <a href='https://wiki.ultramarine-linux.org/en/setup/"
+"postinstall/'>wiki</a> si no tienes una conexión a Internet."
 
 #: src/pages/_08_codecs.rs:35
 msgid "Install Codecs and Drivers"
@@ -247,11 +254,18 @@ msgstr "Método de Entrada"
 #. TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
 #. to not translate this part.
 #: src/pages/_09_inputmethod.rs:80
-msgid "You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor (IME)</a>. This allows you to type in other specific languages. This change will take effect after you login into your user account.\n"
+msgid ""
+"You may <b>optionally</b> choose to add an <a href='https://wiki.ultramarine-"
+"linux.org/en/usage/l10n/#inputting-in-another-language'>input method editor "
+"(IME)</a>. This allows you to type in other specific languages. This change "
+"will take effect after you login into your user account.\n"
 "\n"
-"More Chinese input method options may be available with the <a href='https://rime.im/'>Rime</a> engine, but this requires advanced configuration and is therefore not recommended to beginners.\n"
+"More Chinese input method options may be available with the <a href='https://"
+"rime.im/'>Rime</a> engine, but this requires advanced configuration and is "
+"therefore not recommended to beginners.\n"
 "\n"
-"You may find out more information on <a href='https://wiki.ultramarine-linux.org/en/usage/l10n/'>the wiki</a>."
+"You may find out more information on <a href='https://wiki.ultramarine-linux."
+"org/en/usage/l10n/'>the wiki</a>."
 msgstr ""
 
 #: src/pages/_09_inputmethod.rs:115
@@ -274,28 +288,30 @@ msgstr ""
 
 #: src/pages/_10_nightlight.rs:31
 msgid "Night Light is not proven to help with difficulty falling sleep."
-msgstr "Luz Nocturna no está confirmado con ayudar con la dificultad de dormir."
+msgstr ""
+"Luz Nocturna no está confirmado con ayudar con la dificultad de dormir."
 
-#: src/pages/_11_theme.rs:76
+#: src/pages/_11_theme.rs:86
 msgid "Choose your theme"
 msgstr "Elige tu tema"
 
-#: src/pages/_11_theme.rs:83
-msgid "Make this system your own with a splash of colour.\n"
+#: src/pages/_11_theme.rs:93
+msgid ""
+"Make this system your own with a splash of colour.\n"
 "You can change this option later in settings."
 msgstr ""
 "Haz este sistema el tuyo con un toque de color.\n"
 "Puedes cambiar esta opción después en Configuración."
 
-#: src/pages/_11_theme.rs:89
+#: src/pages/_11_theme.rs:99
 msgid "Some apps may not respect this preference."
 msgstr "Algunas aplicaciones podrían no respetar esta preferencia."
 
-#: src/pages/_11_theme.rs:110
+#: src/pages/_11_theme.rs:120
 msgid "Light"
 msgstr "Claro"
 
-#: src/pages/_11_theme.rs:125
+#: src/pages/_11_theme.rs:135
 msgid "Dark"
 msgstr "Oscuro"
 
@@ -311,7 +327,8 @@ msgstr "Para que usarás este dispositivo?"
 msgid "Confirm and Setup System"
 msgstr "Confirmar y Configurar Sistema"
 
-#: src/pages/_13_categories.rs:240 src/pages/_15_finish.rs:31 src/pages/_16_error.rs:44
+#: src/pages/_13_categories.rs:240 src/pages/_15_finish.rs:31
+#: src/pages/_16_error.rs:44
 msgid "Done"
 msgstr "Hecho"
 
