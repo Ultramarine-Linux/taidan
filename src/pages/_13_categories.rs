@@ -144,8 +144,9 @@ crate::generate_component!(CategoryWindow {
     rows: Vec<relm4::Controller<CatRow>>,
     optlist: gtk::ListBox,
     last_select_row: Option<usize>,
+    img: libhelium::ContentBlockImage,
 }:
-    init[optlist](root, sender, model, widgets) for init: String {
+    init[optlist img](root, sender, model, widgets) for init: String {
         let category = (CFG.catalogue.iter())
             .find(|category| category.name == init)
             .expect("no such category");
@@ -179,6 +180,9 @@ crate::generate_component!(CategoryWindow {
             let row = self.rows.get(index).expect("row not exist called window");
             let mut sett = SETTINGS.write();
             let ctlg = &mut sett.catalogue;
+            let selection = row.model().choice.name.to_ascii_lowercase().replace(' ', "-");
+            self.img.set_file(&format!("resource:///com/fyralabs/Taidan/screenshots/ss-{}-{selection}.png", self.category));
+            self.img.set_visible(true);
             if let Some(apps) = ctlg.get_mut(&self.category) {
                 if let Some(opts) = apps.get(&index) {
                     row.model().populate_optlist(&self.optlist, &self.category, index, &opts.iter().copied());
@@ -222,16 +226,28 @@ crate::generate_component!(CategoryWindow {
 
             #[name(viewdual)] #[template] crate::ui::Category {
                 #[template_child] optlist {
-                    #[local_ref] optlist ->
-                    gtk::ListBox {
-                        add_css_class: "content-list",
-                        set_selection_mode: gtk::SelectionMode::Single,
-                        set_vexpand: true,
-                        set_hexpand: true,
-                        set_valign: gtk::Align::Center,
-                        set_halign: gtk::Align::Center,
+                    gtk::Box {
+                        set_orientation: gtk::Orientation::Vertical,
+
+                        // BUG: gtk refuses to update the image automatically???
+                        #[local_ref] img ->
+                        libhelium::ContentBlockImage {
+                            set_requested_height: 150,
+                            set_requested_width: 150*1920/1080,
+                            set_valign: gtk::Align::Center,
+                            set_halign: gtk::Align::Center,
+                        },
+
+                        #[local_ref] optlist ->
+                        gtk::ListBox {
+                            add_css_class: "content-list",
+                            set_vexpand: true,
+                            set_hexpand: true,
+                            set_valign: gtk::Align::Center,
+                            set_halign: gtk::Align::Center,
+                        }
                     },
-                },
+                }
             },
 
             libhelium::Button {

@@ -29,4 +29,29 @@
         <file alias="background-light.webp">icons/background-light.webp</file>
         <file alias="background-dark.webp">icons/background-dark.webp</file>
     </gresource>
+    <gresource prefix="/com/fyralabs/Taidan/screenshots/">
+        <file alias="ss-browser-chrome.png">screenshots/browsers/chrome.png</file>
+        <file alias="ss-browser-chromium.png">screenshots/browsers/chrome.png</file>
+        <file alias="ss-browser-firefox.png">screenshots/browsers/firefox.png</file>
+        <file alias="ss-browser-vivaldi.png">screenshots/browsers/vivaldi.png</file>
+        <file alias="ss-browser-zen-browser.png">screenshots/browsers/zen.png</file>
+        <file alias="ss-development-gnome-builder.png">screenshots/development/builder.png</file>
+        <file alias="ss-development-dev-toolbox.png">screenshots/development/devtoolbox.png</file>
+        <file alias="ss-development-docker.png">screenshots/development/docker.png</file>
+        <file alias="ss-development-godot.png">screenshots/development/godot.png</file>
+        <file alias="ss-development-kate.png">screenshots/development/kate.png</file>
+        <file alias="ss-development-nim-language.png">screenshots/development/nim.png</file>
+        <file alias="ss-development-rust.png">screenshots/development/rust.png</file>
+        <file alias="ss-development-tailscale.png">screenshots/development/tailscale.png</file>
+        <file alias="ss-development-vala-toolchain.png">screenshots/development/vala.png</file>
+        <file alias="ss-development-virt-manager.png">screenshots/development/virtman.png</file>
+        <file alias="ss-development-visual-studio-code.png">screenshots/development/vsc.png</file>
+        <file alias="ss-development-zed.png">screenshots/development/zed.png</file>
+        <file alias="ss-gaming-bottles.png">screenshots/gaming/bottles.png</file>
+        <file alias="ss-gaming-steam.png">screenshots/gaming/steam.png</file>
+        <file alias="ss-gaming-heroic-games-launcher.png">screenshots/gaming/heroic.png</file>
+        <file alias="ss-gaming-itch.png">screenshots/gaming/itchio.png</file>
+        <file alias="ss-gaming-lutris.png">screenshots/gaming/lutris.png</file>
+        <file alias="ss-gaming-minecraft-(prism-launcher).png">screenshots/gaming/prism.png</file>
+    </gresource>
 </gresources>
