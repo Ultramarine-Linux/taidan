@@ -9,7 +9,6 @@ impl WidgetTemplate for PrevNextBtns {
             #[name = "prev"]
             libhelium::Button {
                 set_is_pill: true,
-                #[watch]
                 // TRANSLATORS: this means "Previous page"
                 set_label: &gettext("Previous"),
                 inline_css: "padding-left: 48px; padding-right: 48px",
@@ -20,7 +19,6 @@ impl WidgetTemplate for PrevNextBtns {
             #[name = "next"]
             libhelium::Button {
                 set_is_pill: true,
-                #[watch]
                 // TRANSLATORS: this means "Next page"
                 set_label: &gettext("Next"),
                 inline_css: "padding-left: 48px; padding-right: 48px",

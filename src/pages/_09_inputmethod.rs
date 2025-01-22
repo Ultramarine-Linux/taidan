@@ -111,7 +111,6 @@ crate::generate_page!(InputMethod {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
-                #[watch]
                 set_placeholder_text: Some(&gettext("Search language…")),
             },
             gtk::ScrolledWindow {
@@ -140,7 +139,6 @@ crate::generate_page!(InputMethod {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
-                #[watch]
                 set_placeholder_text: Some(&gettext("Search IMs/IMEs…")),
             },
             gtk::ScrolledWindow {

@@ -1,13 +1,17 @@
 crate::generate_page!(Internet {
     btn_next: libhelium::Button,
+    lbl_warn: gtk::Label,
 }:
-    init(root, sender, model, widgets) {
+    init[lbl_warn](root, sender, model, widgets) {
         let sender1 = sender.clone();
         sender.oneshot_command(async move { check_online(sender1).await });
         model.btn_next = widgets.prev_next_btns.next.clone();
     }
     update(self, message, sender) {
-        IsOnline => self.btn_next.set_sensitive(true),
+        IsOnline => {
+            self.btn_next.set_sensitive(true);
+            self.lbl_warn.set_visible(false);
+        }
     } => {}
 
     gtk::Box {
@@ -31,22 +35,35 @@ crate::generate_page!(Internet {
         },
 
         gtk::Label {
+            set_justify: gtk::Justification::Center,
             set_label: &gettext("Connect to the Internet to get the latest and greatest."),
         },
 
         libhelium::Button {
-            //set_is_pill: true,
+            set_is_textual: true,
             set_halign: gtk::Align::Center,
             set_hexpand: false,
-            #[watch]
             set_label: &gettext("I don't have Internet"),
             inline_css: "padding-left: 48px; padding-right: 48px",
             connect_clicked[sender] => move |_| {
                 SETTINGS.write().nointernet = true;
                 sender.input(Self::Input::Nav(NavAction::Next));
             },
-        }
+        },
 
+        #[local_ref] lbl_warn ->
+        gtk::Label {
+            set_label: &gettext("Codecs, drivers and other user programs will not be installed."),
+            add_css_class: "warning",
+        },
+
+        libhelium::Button {
+            set_is_pill: true,
+            set_halign: gtk::Align::Center,
+            // set_icon: Some("network-wireless-symbolic"),
+            set_label: &gettext("Open Wi-Fi connection applet"),
+            connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("nm-connection-editor", &[]).await.unwrap() }),
+        }
     },
 
     #[name(prev_next_btns)]
