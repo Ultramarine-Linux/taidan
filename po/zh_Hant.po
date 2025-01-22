@@ -9,7 +9,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2025-01-22 04:20+0000\n"
 "PO-Revision-Date: 2025-01-22 14:23+0000\n"
-"Last-Translator: madomado <madonuko@outlook.com>\n"
+"Last-Translator: sadlerm4 <sad_lerm@hotmail.com>\n"
 "Language-Team: Chinese (Traditional Han script) <https://"
 "weblate.fyralabs.com/projects/ultramarine-linux/taidan/zh_Hant/>\n"
 "Language: zh_Hant\n"
@@ -89,7 +89,7 @@ msgstr "下載使用者程式中…"
 
 #: src/backend/steps.rs:113
 msgid "Installing User Programs…"
-msgstr "安裝用户應用程式中…"
+msgstr "安裝用户程式中…"
 
 #: src/backend/steps.rs:114
 #, fuzzy
