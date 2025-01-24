@@ -37,7 +37,7 @@ choices:
     provider: Zen
     description: Zen is a browser based on Firefox with optimized code for specific CPU micro-architectures and additional extension support.
     note: May not provide Widevine DRM support, due to licensing costs.
-    actions: todo
+    actions: flatpak:io.github.zen_browser.zen
 
   - name: Vivaldi
     provider: Vivaldi Technologies
