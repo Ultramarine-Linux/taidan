@@ -12,7 +12,10 @@ choices:
     description: Edge is a Chromium-based browser centered around the Microsoft ecosystem, including many convenient and AI features.
     options:
       - radio: [Edge Stable, Edge Dev, Edge Beta]
-    actions: todo
+    actions: 
+      - shell:rpm --import https://packages.microsoft.com/keys/microsoft.asc;shell:dnf config-manager addrepo --from-repofile=https://packages.microsoft.com/yumrepos/edge/config.repo;rpm:microsoft-edge-stable
+      - shell:rpm --import https://packages.microsoft.com/keys/microsoft.asc;shell:dnf config-manager addrepo --from-repofile=https://packages.microsoft.com/yumrepos/edge/config.repo;rpm:microsoft-edge-dev
+      - shell:rpm --import https://packages.microsoft.com/keys/microsoft.asc;shell:dnf config-manager addrepo --from-repofile=https://packages.microsoft.com/yumrepos/edge/config.repo;rpm:microsoft-edge-beta
 
   - name: Chrome
     provider: Google
