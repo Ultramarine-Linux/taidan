@@ -30,7 +30,7 @@ macro_rules! kurage_page_pre {
 }
 pub(crate) use kurage_page_pre;
 
-kurage::generate_generator! { generate_page =>
+kurage::generate_generator! { generate_page => [<$name Page>] =>
     libhelium::ViewMono {
         append = &gtk::Box {
             set_orientation: gtk::Orientation::Vertical,

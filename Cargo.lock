@@ -1115,7 +1115,7 @@ dependencies = [
 [[package]]
 name = "kurage"
 version = "0.1.0"
-source = "git+https://github.com/FyraLabs/kurage#a8277695ccb220c97ea3091c63dabf31619df8f3"
+source = "git+https://github.com/FyraLabs/kurage#6dcad77832dbe2edf3b665b90c2829d0c8210648"
 dependencies = [
  "kurage_proc_macros",
  "paste",
@@ -1126,7 +1126,7 @@ dependencies = [
 [[package]]
 name = "kurage_proc_macros"
 version = "0.1.0"
-source = "git+https://github.com/FyraLabs/kurage#a8277695ccb220c97ea3091c63dabf31619df8f3"
+source = "git+https://github.com/FyraLabs/kurage#6dcad77832dbe2edf3b665b90c2829d0c8210648"
 dependencies = [
  "proc-macro2",
  "quote",
