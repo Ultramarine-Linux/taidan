@@ -42,17 +42,6 @@ choices:
       and picotool, a tool for working with RP2040/RP2350 binaries, and interacting with RP2040/RP2350 devices.
     actions: rpm:rpi-utils;rpm:picotool
 
-  - name: Arduino Tools
-    provider: Arduino
-    description: |
-      A collection of tools for working with Arduino devices.
-      arduino-cli: An all-in-one solution that provides Boards/Library Managers, sketch builder, board detection, uploader,
-      and many other tools needed to use any Arduino compatible board and platform from command line or machine interfaces.
-      arduino-fwuploader: A Command Line Tool made to update the firmware and/or add SSL certificates for any Arduino board equipped with WINC or NINA Wi-Fi module. 
-      arduino-language-server: An Arduino Language Server based on Clangd to Arduino code autocompletion. Useful for the Arduino IDE, but can be used for other IDEs as well through the Language Server Protocol.
-      arduino-lint: A command line debug tool that checks for common problems in Arduino projects.
-    actions: rpm:arduino-cli;rpm:arduino-fwuploader;rpm:arduino-language-server;rpm:arduino-lint
-
   - name: Thonny
     provider: Thonny
     description: A Python IDE meant for learning programming.
