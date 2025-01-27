@@ -181,7 +181,7 @@ crate::generate_component!(CategoryWindow {
             let mut sett = SETTINGS.write();
             let ctlg = &mut sett.catalogue;
             let selection = row.model().choice.name.to_ascii_lowercase().replace(' ', "-");
-            self.img.set_file(&format!("resource:///com/fyralabs/Taidan/screenshots/ss-{}-{selection}.png", self.category));
+            self.img.set_file(&format!("resource:///com/fyralabs/Taidan/screenshots/ss-{}-{selection}.png", self.category.to_ascii_lowercase()));
             self.img.set_visible(true);
             if let Some(apps) = ctlg.get_mut(&self.category) {
                 if let Some(opts) = apps.get(&index) {
