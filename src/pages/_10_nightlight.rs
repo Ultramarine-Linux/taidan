@@ -1,4 +1,5 @@
-crate::generate_page!(NightLight:
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(NightLight:
     update(self, message, sender) {} => {}
 
     gtk::Box {

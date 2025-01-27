@@ -1,4 +1,5 @@
-crate::generate_page!(Welcome:
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Welcome:
     update(self, message, sender) {} => {}
 
     gtk::Box {
@@ -54,7 +55,6 @@ crate::generate_page!(Welcome:
                 sender.input(Self::Input::Nav(NavAction::Next));
             },
         },
-
     }
 );
 

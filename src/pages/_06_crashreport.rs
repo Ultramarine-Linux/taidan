@@ -1,4 +1,5 @@
-crate::generate_page!(CrashReport {
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(CrashReport {
     pub toggle: bool,
 }:
     update(self, message, sender) {

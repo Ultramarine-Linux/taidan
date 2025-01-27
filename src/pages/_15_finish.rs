@@ -1,4 +1,5 @@
-crate::generate_page!(Finish:
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Finish:
     update(self, message, sender) {} => {}
 
     gtk::Box {

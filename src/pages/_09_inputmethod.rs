@@ -1,3 +1,4 @@
+use crate::macros::{generate_page, kurage_page_pre};
 use relm4::{RelmRemoveAllExt, SharedState};
 
 use crate::backend::i18n;
@@ -10,7 +11,7 @@ static SEARCH_LAYOUT: SharedState<libhelium::glib::GString> = SharedState::new()
 static SEARCH_VARIANT: SharedState<libhelium::glib::GString> = SharedState::new();
 static CHOSEN_LANG: SharedState<String> = SharedState::new();
 
-crate::generate_page!(InputMethod {
+generate_page!(InputMethod {
     langbox: gtk::ListBox,
     imbox: gtk::ListBox,
 }:

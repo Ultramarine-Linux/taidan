@@ -1113,6 +1113,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "kurage"
+version = "0.1.0"
+dependencies = [
+ "kurage_proc_macros",
+ "paste",
+ "relm4",
+ "tracing",
+]
+
+[[package]]
+name = "kurage_proc_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1646,17 +1665,10 @@ dependencies = [
  "futures",
  "gtk4",
  "once_cell",
- "relm4-css",
  "relm4-macros",
  "tokio",
  "tracing",
 ]
-
-[[package]]
-name = "relm4-css"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d3b924557df1cddc687b60b313c4b76620fdbf0e463afa4b29f67193ccf37f9"
 
 [[package]]
 name = "relm4-macros"
@@ -2054,6 +2066,7 @@ dependencies = [
  "gettext-rs",
  "glib-build-tools",
  "itertools 0.14.0",
+ "kurage",
  "libhelium",
  "paste",
  "phf",

@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-
 pub mod backend;
 pub mod cfg;
 pub mod macros;
@@ -27,7 +26,7 @@ pub static CFG: std::sync::LazyLock<cfg::Config> = std::sync::LazyLock::new(|| {
 
 pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::SharedState::new();
 
-generate_pages!(Page AppModel AppMsg:
+kurage::generate_pages!(Page AppModel AppMsg:
     00: Welcome,
     01: Keyboard,
     02: WhoAreYou,
@@ -47,7 +46,7 @@ generate_pages!(Page AppModel AppMsg:
     16: Error,
 );
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NavAction {
     GoTo(Page),
     Next,
@@ -59,6 +58,23 @@ pub enum NavAction {
 pub enum AppMsg {
     Nav(NavAction),
     InstallError(String),
+}
+
+impl AppModel {
+    fn page_trig_arrive(&self) -> bool {
+        use crate::ui::PageTrig;
+        macro_rules! meow {
+            ($Page:ident $($page:ident),+$(,)?) => { kurage::paste::paste! {
+                match self.page {
+                    $($Page::[<$page:camel>] => self.[<$page:snake _page>].model().arrive(),)+
+                }
+            }}
+        }
+        meow!(Page
+            Welcome, Keyboard, WhoAreYou, Password, Internet, Analytics, CrashReport, Location,
+            Codecs, InputMethod, NightLight, Theme, Browser, Categories, Installing, Finish, Error,
+        )
+    }
 }
 
 #[allow(clippy::str_to_string)]

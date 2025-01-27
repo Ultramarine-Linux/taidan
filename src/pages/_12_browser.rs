@@ -1,9 +1,10 @@
 #![allow(clippy::significant_drop_tightening, clippy::indexing_slicing)]
 use relm4::RelmRemoveAllExt;
 
-const BROWSER_CATEGORY: &'static str = "Browsers";
+const BROWSER_CATEGORY: &str = "Browsers";
 
-crate::generate_page!(Browser {
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Browser {
     browser_rows: Vec<relm4::Controller<BrowserRow>>,
     optlist: gtk::ListBox,
     btn_next: libhelium::Button,

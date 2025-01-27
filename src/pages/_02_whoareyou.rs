@@ -13,7 +13,8 @@ fn valid_entry(en: &gtk::Text) -> bool {
         .is_valid()
 }
 
-crate::generate_page!(WhoAreYou {
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(WhoAreYou {
     lbl_error: gtk::Label,
     btn_next: libhelium::Button,
 }:

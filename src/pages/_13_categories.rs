@@ -2,7 +2,8 @@
 use relm4::RelmRemoveAllExt;
 use std::rc::Rc;
 
-crate::generate_page!(Categories {
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Categories {
     categories: Option<FactoryVecDeque<CategoryBtn>>,
     windows: Vec<Option<Rc<Controller<CategoryWindow>>>>,
 }:
@@ -139,7 +140,7 @@ impl FactoryComponent for CategoryBtn {
     }
 }
 
-crate::generate_component!(CategoryWindow {
+kurage::generate_component!(CategoryWindow {
     category: String,
     rows: Vec<relm4::Controller<CatRow>>,
     optlist: gtk::ListBox,
@@ -262,7 +263,7 @@ crate::generate_component!(CategoryWindow {
     }
 );
 
-crate::generate_component!(CatRow {
+kurage::generate_component!(CatRow {
     index: usize,
     choice: crate::cfg::Choice,
     category: String,

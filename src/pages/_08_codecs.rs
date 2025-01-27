@@ -1,4 +1,5 @@
-crate::generate_page!(Codecs:
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Codecs:
     update(self, message, sender) {} => {}
 
     gtk::Box {

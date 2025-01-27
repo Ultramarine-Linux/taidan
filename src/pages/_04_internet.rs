@@ -1,4 +1,5 @@
-crate::generate_page!(Internet {
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Internet {
     btn_next: libhelium::Button,
     lbl_warn: gtk::Label,
 }:

@@ -1,4 +1,5 @@
-crate::generate_page!(Error {
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Error {
     buf: gtk::TextBuffer,
 }:
     init(root, sender, model, widgets) {}

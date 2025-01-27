@@ -1,5 +1,6 @@
 #![allow(unused_variables)]
-crate::generate_page!(Analytics:
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Analytics:
     update(self, message, sender) {} => {}
 
     gtk::Box {

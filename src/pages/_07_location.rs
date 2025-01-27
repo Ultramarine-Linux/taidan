@@ -1,4 +1,5 @@
-crate::generate_page!(Location {
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Location {
     pub service: bool,
 }:
     update(self, message, sender) {

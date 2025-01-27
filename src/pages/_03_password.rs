@@ -1,4 +1,5 @@
-crate::generate_page!(Password {
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Password {
     btn_next: libhelium::Button,
     tf_repeat: gtk::PasswordEntry,
 }:

@@ -10,7 +10,8 @@ background: alpha(@color, 0.18);
 color: transparent;
 box-shadow: inset 0 0 0 3px alpha(@color, 0.32);";
 
-crate::generate_page!(Theme:
+use crate::macros::{generate_page, kurage_page_pre};
+generate_page!(Theme:
     init(root, sender, model, widgets) {
         let (light0, dark0) = (widgets.lightbox.clone(), widgets.darkbox.clone());
         let (light1, dark1) = (widgets.lightbox.clone(), widgets.darkbox.clone());
