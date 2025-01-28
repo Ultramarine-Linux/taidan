@@ -1,4 +1,4 @@
-use crate::macros::{generate_page, kurage_page_pre};
+use crate::prelude::*;
 generate_page!(Location {
     pub service: bool,
 }:

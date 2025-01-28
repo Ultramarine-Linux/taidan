@@ -2,7 +2,7 @@
 use relm4::RelmRemoveAllExt;
 use std::rc::Rc;
 
-use crate::macros::{generate_page, kurage_page_pre};
+use crate::prelude::*;
 generate_page!(Categories {
     categories: Option<FactoryVecDeque<CategoryBtn>>,
     windows: Vec<Option<Rc<Controller<CategoryWindow>>>>,

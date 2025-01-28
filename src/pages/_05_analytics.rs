@@ -1,5 +1,4 @@
-#![allow(unused_variables)]
-use crate::macros::{generate_page, kurage_page_pre};
+use crate::prelude::*;
 generate_page!(Analytics:
     update(self, message, sender) {} => {}
 

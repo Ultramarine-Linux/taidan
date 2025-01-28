@@ -1,6 +1,5 @@
 use crate::backend::steps::Stage;
-
-use crate::macros::{generate_page, kurage_page_pre};
+use crate::prelude::*;
 generate_page!(Installing {
     main_progress_bar: gtk::ProgressBar,
     dnf_progress_bar: gtk::ProgressBar,

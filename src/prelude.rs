@@ -13,6 +13,7 @@ pub use relm4::{
     prelude::*,
 };
 
+pub(crate) use crate::macros::generate_page;
 pub use crate::{NavAction, CFG, SETTINGS};
 
 pub(crate) static REQWEST_CLIENT: std::sync::LazyLock<reqwest::Client> =

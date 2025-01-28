@@ -1,5 +1,6 @@
 #![allow(clippy::indexing_slicing)]
 use crate::backend::theme;
+use crate::prelude::*;
 
 const ENABLED_ACCENT_BTN_CSS: &str = "
 background: @color;
@@ -10,7 +11,6 @@ background: alpha(@color, 0.18);
 color: transparent;
 box-shadow: inset 0 0 0 3px alpha(@color, 0.32);";
 
-use crate::macros::{generate_page, kurage_page_pre};
 generate_page!(Theme:
     init(root, sender, model, widgets) {
         let (light0, dark0) = (widgets.lightbox.clone(), widgets.darkbox.clone());

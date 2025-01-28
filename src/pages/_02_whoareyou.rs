@@ -1,3 +1,4 @@
+use crate::prelude::*;
 /// Check if the entry (assume inside [`libhelium::TextField`]) is valid.
 ///
 /// # Panics
@@ -13,7 +14,6 @@ fn valid_entry(en: &gtk::Text) -> bool {
         .is_valid()
 }
 
-use crate::macros::{generate_page, kurage_page_pre};
 generate_page!(WhoAreYou {
     lbl_error: gtk::Label,
     btn_next: libhelium::Button,

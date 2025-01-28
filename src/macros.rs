@@ -22,15 +22,11 @@ macro_rules! always_skip_page {
 
 kurage::kurage_gen_macros!();
 
-macro_rules! kurage_page_pre {
-    () => {
-        use crate::prelude::*;
-        use relm4::{ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent};
-    };
-}
-pub(crate) use kurage_page_pre;
+kurage::generate_generator! { generate_page => [<$name Page>]:
+    update: {
+        Nav(action: NavAction) => $sender.output(Self::Output::Nav(action)).unwrap(),
+    } => { Nav(NavAction) }
 
-kurage::generate_generator! { generate_page => [<$name Page>] =>
     libhelium::ViewMono {
         append = &gtk::Box {
             set_orientation: gtk::Orientation::Vertical,

@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use relm4::{RelmIterChildrenExt, RelmRemoveAllExt, SharedState};
 
 use crate::backend::i18n;
@@ -9,7 +10,6 @@ fn miniblk(row: &gtk::ListBoxRow) -> libhelium::MiniContentBlock {
 static SEARCH_LAYOUT: SharedState<libhelium::glib::GString> = SharedState::new();
 static SEARCH_VARIANT: SharedState<libhelium::glib::GString> = SharedState::new();
 
-use crate::macros::{generate_page, kurage_page_pre};
 generate_page!(Keyboard {
     layoutbox: gtk::ListBox,
     variantbox: gtk::ListBox,

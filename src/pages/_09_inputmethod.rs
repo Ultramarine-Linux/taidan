@@ -1,4 +1,4 @@
-use crate::macros::{generate_page, kurage_page_pre};
+use crate::prelude::*;
 use relm4::{RelmRemoveAllExt, SharedState};
 
 use crate::backend::i18n;
