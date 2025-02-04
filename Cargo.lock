@@ -1115,7 +1115,6 @@ dependencies = [
 [[package]]
 name = "kurage"
 version = "0.1.0"
-source = "git+https://github.com/FyraLabs/kurage#260612a6b8ec27f01b1a67becd367fa7625cd858"
 dependencies = [
  "kurage_macro_rules",
  "kurage_proc_macros",
@@ -1124,7 +1123,6 @@ dependencies = [
 [[package]]
 name = "kurage_macro_rules"
 version = "0.1.0"
-source = "git+https://github.com/FyraLabs/kurage#260612a6b8ec27f01b1a67becd367fa7625cd858"
 dependencies = [
  "paste",
  "relm4",
@@ -1134,7 +1132,6 @@ dependencies = [
 [[package]]
 name = "kurage_proc_macros"
 version = "0.1.0"
-source = "git+https://github.com/FyraLabs/kurage#260612a6b8ec27f01b1a67becd367fa7625cd858"
 dependencies = [
  "proc-macro2",
  "quote",

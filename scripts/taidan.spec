@@ -53,3 +53,4 @@ DESTDIR=%buildroot ./scripts/install.sh
 %_sysusersdir/taidan.conf
 %_unitdir/taidan-initial-setup.service
 %_unitdir/taidan-initial-setup-reconfiguration.service
+%_sysconfdir/pam.d/taidan

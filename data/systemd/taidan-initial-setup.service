@@ -28,7 +28,7 @@ RemainAfterExit=no
 # setup session
 User=taidan
 Group=taidan
-PAMName=initial-setup
+PAMName=taidan
 TTYPath=/dev/tty7
 TTYReset=yes
 TTYVHangup=yes
