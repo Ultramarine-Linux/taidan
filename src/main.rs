@@ -219,7 +219,7 @@ impl AppModel {
         let (ss, sett) = (sender.clone(), SETTINGS.read().clone());
         sender.oneshot_command(async move {
             if let Err(e) = f(sett, inst_sender).await {
-                ss.input(AppMsg::InstallError(format!("{e:#?}")));
+                ss.input(AppMsg::InstallError(format!("{e:?}")));
             }
         });
     }

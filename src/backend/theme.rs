@@ -163,6 +163,8 @@ pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::R
     Ok(())
 }
 
+/// # Errors
+/// - cannot run xhost because idk
 pub async fn xhost_local() -> color_eyre::Result<()> {
     super::steps::acmd("xhost", &["+", "local:"])
         .await

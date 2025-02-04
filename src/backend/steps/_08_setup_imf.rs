@@ -15,10 +15,13 @@ impl super::Step for SetupImf {
         if settings.ims.is_empty() {
             return Ok(());
         }
-        match &*CFG.edition {
+        if let Err(e) = match &*CFG.edition {
             "plasma" | "kde" => write_fcitx5_profile(settings).await,
             _ => write_ibus_profile(settings).await,
+        } {
+            tracing::warn!(?e, "cannot setup IMFs");
         }
+        Ok(())
     }
 }
 
