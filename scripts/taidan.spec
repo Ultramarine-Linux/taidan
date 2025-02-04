@@ -15,6 +15,7 @@ Requires:       flatpak
 Requires:       libwebp
 Requires:       webp-pixbuf-loader
 Requires:       xhost
+Requires:       taidan-gui-backend
 BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl
 BuildRequires:  pkgconfig(libhelium-1)
 BuildRequires:  pkgconfig(openssl)
@@ -26,6 +27,24 @@ BuildRequires:  pkgconfig(gnome-desktop-4)
 %description
 Taidan is a GUI Out-Of-Box-Experience (OOBE) and Welcome App for Ultramarine
 Linux, written in Rust and the Helium toolkit.
+
+%package guiweston
+Summary:        Taidan with weston GUI backend
+Provides:       taidan-gui-backend
+Conflicts:      taidan-gui-backend
+RemovePathPostFixes: .guiweston
+
+%description guiweston
+Taidan with weston GUI backend.
+
+%package guixorg
+Summary:        Taidan with Xorg backend
+Provides:       taidan-gui-backend
+Conflicts:      taidan-gui-backend
+RemovePathPostFixes: .guixorg
+
+%description guixorg
+Taidan with Xorg backend.
 
 %prep
 %autosetup -n taidan-%gitcommit
@@ -49,8 +68,18 @@ DESTDIR=%buildroot ./scripts/install.sh
 %_datadir/polkit-1/rules.d/100-taidan.rules
 %_datadir/taidan/
 %_libexecdir/taidan/
+%_libexecdir/taidan/firstboot-windowmanager
+%_libexecdir/taidan/initial-setup-graphical
+%_libexecdir/taidan/reconfiguration-mode-enabled
+%_libexecdir/taidan/run-initial-setup
 %_sysconfdir/com.fyralabs.Taidan/
 %_sysusersdir/taidan.conf
 %_unitdir/taidan-initial-setup.service
 %_unitdir/taidan-initial-setup-reconfiguration.service
 %_sysconfdir/pam.d/taidan
+
+%files guiweston
+%_libexecdir/taidan/run-gui-backend.guiweston
+
+%files guixorg
+%_libexecdir/taidan/run-gui-backend.guixorg

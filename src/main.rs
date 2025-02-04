@@ -172,7 +172,12 @@ impl SimpleComponent for AppModel {
                 self.page = Page::Internet;
             }
             AppMsg::Nav(NavAction::GoTo(page)) => self.page = *page,
-            AppMsg::Nav(NavAction::Quit) => std::process::exit(0),
+            AppMsg::Nav(NavAction::Quit) => {
+                if let Err(e) = std::fs::remove_file("/.unconfigured") {
+                    tracing::error!(?e, "cannot remove /.unconfigured; exiting anyway");
+                }
+                std::process::exit(0);
+            }
             AppMsg::Nav(NavAction::Next) => {
                 self.page = usize::from(self.page)
                     .wrapping_add(1)
