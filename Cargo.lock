@@ -1151,6 +1151,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
+name = "libappstream"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d77ca47abe2438561de48259bd5ac16b1ef63de59ffb39cef83e0042b29d8c58"
+dependencies = [
+ "gio",
+ "glib",
+ "libappstream-sys",
+ "libc",
+]
+
+[[package]]
+name = "libappstream-sys"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3655804181563dd6bdfdb51c46e15990fe45931bf758687fe7bbf044f9a6c238"
+dependencies = [
+ "gio-sys",
+ "glib-sys",
+ "gobject-sys",
+ "libc",
+ "system-deps",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.169"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2080,6 +2105,7 @@ dependencies = [
  "glib-build-tools",
  "itertools 0.14.0",
  "kurage",
+ "libappstream",
  "libhelium",
  "paste",
  "phf",

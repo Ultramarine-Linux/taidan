@@ -109,6 +109,8 @@ impl FactoryComponent for CategoryBtn {
             },
             gtk::Label {
                 set_label: &*gettext(&self.category),
+                // BUG: why is the text and icon unreadable
+                add_css_class: "taidan-category-lbl",
             },
         },
     }

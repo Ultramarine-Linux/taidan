@@ -28,6 +28,7 @@
     <gresource prefix="/com/fyralabs/Taidan/">
         <file alias="background-light.webp">icons/background-light.webp</file>
         <file alias="background-dark.webp">icons/background-dark.webp</file>
+        <file>style.css</file>
     </gresource>
     <gresource prefix="/com/fyralabs/Taidan/screenshots/">
         <file alias="ss-browser-chrome.png">screenshots/browsers/chrome.png</file>

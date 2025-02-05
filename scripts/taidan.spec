@@ -73,10 +73,10 @@ DESTDIR=%buildroot ./scripts/install.sh
 %_libexecdir/taidan/reconfiguration-mode-enabled
 %_libexecdir/taidan/run-initial-setup
 %_sysconfdir/com.fyralabs.Taidan/
+%_sysconfdir/pam.d/taidan
 %_sysusersdir/taidan.conf
 %_unitdir/taidan-initial-setup.service
 %_unitdir/taidan-initial-setup-reconfiguration.service
-%_sysconfdir/pam.d/taidan
 
 %files guiweston
 %_libexecdir/taidan/run-gui-backend.guiweston
