@@ -19,7 +19,7 @@ RemainAfterExit=yes
 # with interfering with the Initial Setup TUI potentially running there
 ExecStartPre=/bin/kill -SIGRTMIN+21 1
 ExecStartPre=-/bin/plymouth quit
-ExecStart=/usr/libexec/taidan/run-initial-setup
+ExecStart=/usr/share/cage /usr/bin/taidan
 # re-enable systemd console logging once Initial Setup is done
 ExecStartPost=/bin/kill -SIGRTMIN+20 1
 TimeoutSec=0

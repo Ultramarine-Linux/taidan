@@ -14,11 +14,4 @@ for langfile in po/*.po; do
   msgfmt $langfile -o $DESTDIR/usr/share/locale/$(basename $langfile .po)/LC_MESSAGES/$appid.mo
 done
 
-install -Dpm755 scripts/libexec/* -t $DESTDIR/usr/libexec/taidan/
-# is this a good idea?
-rm $DESTDIR/usr/libexec/taidan/README.md
-rm $DESTDIR/usr/libexec/taidan/COPYING
-
-./data/window-manager/install.sh
-
 install -Dpm644 data/pam.d/taidan -t $DESTDIR/etc/pam.d/
