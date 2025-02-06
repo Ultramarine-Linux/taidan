@@ -58,6 +58,13 @@ pub struct Choice {
     #[serde(skip)]
     pub actions: ChoiceActions,
     pub editions: Option<Vec<String>>,
+    _icon: Option<String>,
+    /// Icon for an app.
+    /// This is auto-detected from presence of `flatpak:…` in `.actions`, and can be manually
+    /// specified with `icon:`.
+    ///
+    /// TODO: pre-download these icons during build-time?
+    pub icon: String,
 }
 
 #[derive(Debug, Clone)]
@@ -352,11 +359,37 @@ impl Choice {
         }
     }
 
+    fn recurse_find_flatpak(choice_actions: &ChoiceActions) -> Option<String> {
+        match choice_actions {
+            ChoiceActions::Traverse(v) => v.iter().find_map(Self::recurse_find_flatpak),
+            ChoiceActions::List(v) => v.iter().find_map(|v| {
+                if let Action::Flatpak(f) = v {
+                    Some(format!("flatpak:{f}"))
+                } else {
+                    None
+                }
+            }),
+            ChoiceActions::Todo => None,
+            ChoiceActions::Action(Action::Flatpak(f)) => Some(format!("flatpak:{f}")),
+            ChoiceActions::Action(_) => None,
+        }
+    }
+
+    fn mangle_icon(&mut self) {
+        self.icon = self._icon.take().unwrap_or_else(|| {
+            Self::recurse_find_flatpak(&self.actions).unwrap_or_else(|| {
+                tracing::warn!(name=?self.name, "Missing icon");
+                "icon:dialog-question-symbolic".to_owned()
+            })
+        });
+    }
+
     #[tracing::instrument]
     fn parse_after_yaml(&mut self, cat: &str) -> Res {
         self.populate_options(cat)?;
         self.populate_actions(cat)?;
         self.mangle_description_and_note();
+        self.mangle_icon();
         Ok(())
     }
 }
