@@ -58,12 +58,14 @@ pub struct Choice {
     #[serde(skip)]
     pub actions: ChoiceActions,
     pub editions: Option<Vec<String>>,
+    #[serde(rename = "icon")]
     _icon: Option<String>,
     /// Icon for an app.
     /// This is auto-detected from presence of `flatpak:…` in `.actions`, and can be manually
     /// specified with `icon:`.
     ///
     /// TODO: pre-download these icons during build-time?
+    #[serde(skip)]
     pub icon: String,
 }
 
