@@ -68,3 +68,18 @@ pub fn keymap(static_name: TokenStream) -> TokenStream {
     }
     .into()
 }
+
+#[proc_macro]
+pub fn list_langs_by_langpacks(_: TokenStream) -> TokenStream {
+    let cmd = std::process::Command::new("sh").arg("-c").arg(r#"
+        dnf search langpacks | sed -nE '/langpacks-[A-Za-z_]+\.noarch/{s/ langpacks-//; s/\.noarch:.+$//p}'
+    "#).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped()).output();
+    if let Err(e) = cmd {
+        let e = format!("failed to run dnf ({e:?})");
+        return quote! { compiler_error!(#e) }.into();
+    }
+    let cmd = cmd.unwrap();
+    let langs = String::from_utf8(cmd.stdout).expect("dnf gave non valid utf8");
+    let langs = langs.split('\n');
+    quote! { [#(#langs),*] }.into()
+}

@@ -13,25 +13,28 @@ impl super::Step for DnfDownloadApps {
         if settings.nointernet {
             return Ok(());
         }
-        let mut it = settings.catalogue.iter().flat_map(|(cat_name, category)| {
-            let app_list = CFG.catalogue.iter().find(|cat| &cat.name == cat_name);
-            let app_list = &*app_list.expect("cannot find category").choices;
-            let it = category.iter().map(move |(&appidx, opts)| {
-                (app_list[appidx].actions.get_action(opts))
-                    .map(Iterator::cloned)
-                    .ok_or_else(|| {
-                        eyre!("cannot get action").note(format!(
-                            "appidx={appidx}, category={cat_name}, opts={opts:?}"
-                        ))
-                    })
-            });
-            it.flatten_ok()
-        });
-        it.try_for_each(|action| {
-            action.map(|action| {
-                settings.actions[action.as_int()].push(action.consume_inner_str());
+        settings
+            .catalogue
+            .iter()
+            .flat_map(|(cat_name, category)| {
+                let app_list = CFG.catalogue.iter().find(|cat| &cat.name == cat_name);
+                let app_list = &*app_list.expect("cannot find category").choices;
+                let it = category.iter().map(move |(&appidx, opts)| {
+                    (app_list[appidx].actions.get_action(opts))
+                        .map(Iterator::cloned)
+                        .ok_or_else(|| {
+                            eyre!("cannot get action").note(format!(
+                                "appidx={appidx}, category={cat_name}, opts={opts:?}"
+                            ))
+                        })
+                });
+                it.flatten_ok()
             })
-        })?;
+            .try_for_each(|action| {
+                action.map(|action| {
+                    settings.actions[action.as_int()].push(action.consume_inner_str());
+                })
+            })?;
         settings.actions[1].extend(
             super::_07_drivers_codecs::Codecs::codecs()
                 .iter()
@@ -65,6 +68,10 @@ impl super::Step for DnfDownloadApps {
             && !settings.actions[1].contains(&"fcitx5-chinese-addons".to_owned())
         {
             settings.actions[1].push("fcitx5-chinese-addons".to_owned());
+        }
+
+        if let Some(lang) = crate::backend::i18n::get_lang().await {
+            settings.actions[1].push(format!("ultramarine-langpacks-{lang}"));
         }
 
         Ok(())
