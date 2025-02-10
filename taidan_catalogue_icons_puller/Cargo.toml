@@ -1,0 +1,21 @@
+[package]
+name = "taidan_catalogue_icons_puller"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "taidan-ctlg-pull-icons"
+path = "./main.rs"
+
+[dependencies]
+color-eyre = "0.6.3"
+libappstream = "0.3.0"
+reqwest = { version = "0.12.9", features = [
+    "http2",
+    "native-tls",
+    "json",
+], default-features = false }
+taidan_catalogue_parser = { path = "../taidan_catalogue_parser" }
+futures = "0.3.31"
+serde_json = "1.0.138"
+tokio = { version = "1.43.0", features = ["fs", "io-std", "macros", "rt-multi-thread"] }

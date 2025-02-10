@@ -1,6 +1,10 @@
 [workspace]
 
-members = ["taidan_proc_macros", "taidan_catalogue_parser"]
+members = [
+    "taidan_proc_macros",
+    "taidan_catalogue_parser",
+    "taidan_catalogue_icons_puller",
+]
 
 [package]
 name = "taidan"
