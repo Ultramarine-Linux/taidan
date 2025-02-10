@@ -39,7 +39,7 @@ cargo run -p taidan_catalogue_parser -- catalogue/browser.yml
 
 ## 📃 License
 
-The rust code is licensed under `GPL-3.0-or-later`.
+`GPL-3.0-or-later`
 
     Copyright © 2024~2025  Fyra Labs & Ultramarine Linux Contributors
 
@@ -56,11 +56,3 @@ The rust code is licensed under `GPL-3.0-or-later`.
     You should have received a copy of the GNU General Public License along
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-However, some sources of Taidan are separately licensed, notably:
-
-- `scripts/libexec/` (`GPL-2.0-or-later`, see `scripts/libexec/README.md`)
-- `data/window-manager/` (`GPL-2.0-or-later`, see `data/window-manager/README.md`)
-
-In order words, most files are licensed under `GPL-3.0-or-later`, but Taidan
-is strictly `GPL-3.0-or-later AND GPL-2.0-or-later`.
