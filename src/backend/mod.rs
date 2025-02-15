@@ -19,12 +19,12 @@ pub async fn start_install(
 ) -> color_eyre::Result<()> {
     tracing::info!("Starting installation");
     for stage in steps::Stage::all() {
-        tracing::debug!(?stage, "Running pre()");
-        stage.pre(&mut settings, sender.clone()).await?;
-        tracing::info!(?stage, "Running stage");
         sender
             .send(InstallingPageMsg::UpdStage(*stage))
             .expect("sender dropped?");
+        tracing::debug!(?stage, "Running pre()");
+        stage.pre(&mut settings, sender.clone()).await?;
+        tracing::info!(?stage, "Running stage");
         (stage.run(&settings, sender.clone()).await)
             .wrap_err("stage failed")
             .with_note(|| format!("Stage: {stage:?}"))?;
@@ -46,8 +46,8 @@ pub async fn start_simple_install(
     steps::Stage::UserAdd(Default::default())
         .run(&settings, sender.clone())
         .await?;
-    tracing::info!("Running SetTime");
-    steps::Stage::SetTime(Default::default())
+    tracing::info!("Running Script");
+    steps::Stage::Script(Default::default())
         .run(&settings, sender.clone())
         .await?;
     tracing::info!("Running DriversCodecs");

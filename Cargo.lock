@@ -2097,6 +2097,8 @@ dependencies = [
  "phf",
  "relm4",
  "reqwest",
+ "serde",
+ "serde_json",
  "taidan_catalogue_parser",
  "taidan_proc_macros",
  "tempfile",

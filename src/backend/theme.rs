@@ -4,7 +4,7 @@ use crate::prelude::*;
 
 macro_rules! gen_accent_color_enum {
     ($($x:ident)*) => { ::paste::paste! {
-        #[derive(Clone, Copy, Debug, Default)]
+        #[derive(Clone, Copy, Debug, Default, serde::Serialize)]
         pub enum AccentColor { #[default] $([<$x:camel>]),* }
         impl From<AccentColor> for &str {
             fn from(value: AccentColor) -> Self {

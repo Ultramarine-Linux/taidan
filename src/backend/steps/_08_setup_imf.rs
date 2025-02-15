@@ -1,6 +1,7 @@
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 use super::super::i18n;
+use crate::awrite;
 use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -23,12 +24,6 @@ impl super::Step for SetupImf {
         }
         Ok(())
     }
-}
-
-macro_rules! awrite {
-    ($f:ident <- $s:literal $($args:tt)*)=> {
-        $f.write_all(format!($s $($args)*).as_bytes()).await
-    };
 }
 
 // kwinrc config for selecting fcitx5 as the virtual input

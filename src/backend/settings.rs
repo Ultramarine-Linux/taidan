@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub skipconfig: bool,
