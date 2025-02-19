@@ -9,7 +9,6 @@ mod _07_drivers_codecs;
 mod _08_setup_imf;
 
 use crate::prelude::*;
-use gettextrs::gettext;
 
 use crate::backend::steps::{
     _00_useradd::UserAdd, _01_settheme::SetTheme, _02_dnfdownloadupdate::DnfDownloadUpdate,
@@ -104,16 +103,13 @@ impl From<Stage> for u8 {
 impl From<Stage> for String {
     fn from(value: Stage) -> Self {
         match value {
-            Stage::UserAdd(_) => gettext("Creating User…"),
-            Stage::SetTheme(_) => gettext("Configuring Themes…"),
-            Stage::DnfDownloadUpdate(_) => gettext("Downloading System Update…"),
-            Stage::DnfInstallUpdate(_) => gettext("Installing System Update…"),
-            Stage::Script(_) => gettext("Running Distribution scriptlet…"),
-            Stage::DnfDownloadApps(_) => gettext("Downloading User Programs…"),
-            Stage::DnfInstallApps(_) => gettext("Installing User Programs…"),
-            Stage::DriversCodecs(_) => gettext("Installing additional drivers…"),
-            // TRANSLATORS: IMF = input method framework
-            Stage::SetupImf(_) => gettext("Setting up IMFs…"),
+            Stage::DnfDownloadUpdate(_) => t!("steps", "dnfdownloadupdate"),
+            Stage::DnfInstallUpdate(_) => t!("steps", "dnfinstallupdate"),
+            Stage::Script(_) => t!("steps", "script"),
+            Stage::DnfDownloadApps(_) => t!("steps", "dnfdownloadapps"),
+            Stage::DnfInstallApps(_) => t!("steps", "dnfinstallapps"),
+            Stage::DriversCodecs(_) => t!("steps", "driverscodecs"),
+            _ => t!("page-installing", "loading"),
         }
     }
 }

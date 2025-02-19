@@ -44,7 +44,7 @@ async fn write_fcitx5_profile(
 ) -> color_eyre::Result<()> {
     // TODO: should we put these in /etc/skel/ instead? Problem: user has already been created
     // before this step…
-    let default_group_name = gettext("Default");
+    let default_group_name = t!("default");
     tokio::fs::create_dir_all(format!("/home/{username}/.config/fcitx5/"))
         .await
         .wrap_err("cannot create ~/.config/fcitx5/")?;

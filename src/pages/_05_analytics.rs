@@ -18,7 +18,7 @@ generate_page!(Analytics:
 
         gtk::Label {
             // TRANSLATORS: this is unused, do NOT translate
-            set_label: &gettext("Analytics and Crash Reporting"),
+            set_label: &t!("page-analytics"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },

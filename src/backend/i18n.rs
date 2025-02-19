@@ -1,4 +1,4 @@
-use gettextrs::gettext;
+use crate::t;
 
 use super::pkexec;
 
@@ -103,12 +103,12 @@ impl IMELanguages {
     #[must_use]
     pub fn name(self) -> String {
         match self {
-            Self::Chinese => gettext("Chinese"),
-            Self::Japanese => gettext("Japanese"),
-            Self::Korean => gettext("Korean"),
-            Self::Vietnamese => gettext("Vietnamese"),
-            Self::Indic => gettext("Indic"),
-            Self::Thai => gettext("Thai"),
+            Self::Chinese => t!("imelangs", "ch"),
+            Self::Japanese => t!("imelangs", "ja"),
+            Self::Korean => t!("imelangs", "ko"),
+            Self::Vietnamese => t!("imelangs", "vi"),
+            Self::Indic => t!("imelangs", "in"),
+            Self::Thai => t!("imelangs", "th"),
         }
     }
     #[must_use]
@@ -122,21 +122,12 @@ impl std::fmt::Display for IMELanguages {
         f.write_str(&if native.is_empty() {
             self.name()
         } else {
-            // This is intentional and you are required to fill in this field.
-            // %lang_name is the language name you probably have just translated (see
-            // the nearby strings above this). %native_lang_name is the language name
-            // in its corresponding language. For example, when displaying in English:
-            //
-            // Chinese (中文)
-            // Japanese (日本語)
-            // Korean (한국어)
-            // ...
-            //
-            // In other languages, you might need to change the order around and maybe
-            // use different brackets, etc.
-            gettext("%lang_name (%native_lang_name)")
-                .replace("%lang_name", &self.name())
-                .replace("%native_lang_name", native)
+            t!(
+                "imelangs",
+                "display",
+                lang_name = self.name(),
+                native_lang_name = native
+            )
         })
     }
 }

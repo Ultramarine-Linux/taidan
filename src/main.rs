@@ -92,7 +92,7 @@ impl SimpleComponent for AppModel {
 
     view! {
         libhelium::ApplicationWindow {
-            set_title: Some(&t!("welcome-to", distro = CFG.distro.to_owned())),
+            set_title: Some(&t!("page-welcome", distro = CFG.distro.to_owned())),
             set_default_width: 600,
             set_default_height: 500,
             set_vexpand: true,

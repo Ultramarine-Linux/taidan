@@ -1,5 +1,40 @@
 # shown on places like "keyboard layout variant: Default"
 default = Default
+# btn (previous page)
+prev = Previous
+# btn (next page)
+next = Next
+
+# shown on the progress bar
+steps =
+    .dnfdownloadupdate = Downloading System Update…
+    .dnfinstallupdate = Install System Update…
+    .script = Running Distribution scriptlet…
+    .dnfdownloadapps = Downloading User Programs…
+    .dnfinstallapps = Installing User Programs…
+    .driverscodecs = Installing additional drivers…
+
+imelangs =
+    .ch = Chinese
+    .ja = Japanese
+    .ko = Korean
+    .vi = Vietnamese
+    .in = Indic
+    .th = Thai
+
+    # This is intentional and you are required to fill in this field.
+    # $lang_name is the language name you probably have just translated (see
+    # the nearby strings above this). $native_lang_name is the language name
+    # in its corresponding language. For example, when displaying in English:
+    #
+    # Chinese (中文)
+    # Japanese (日本語)
+    # Korean (한국어)
+    # ...
+    #
+    # In other languages, you might need to change the order around and maybe
+    # use different brackets, etc.
+    .display = {$lang_name} ({$native_lang_name})
 
 ## page: Welcome
 
@@ -125,7 +160,7 @@ page-categories = What Do You Use This Device For?
 # the list of categories is available at 
 # https://github.com/Ultramarine-Linux/taidan/tree/master/catalogue
 # open each yml file, check the first line for the name
-categories = $cat
+categories = {$cat}
 
 ## page: Installing
 page-installing = Installing Your Apps
