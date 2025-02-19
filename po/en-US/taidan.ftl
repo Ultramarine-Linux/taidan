@@ -138,6 +138,7 @@ page-theme = Choose Your Theme
     .note = Some apps may not respect this preference.
     # Light Theme
     .light = Light
+    # Dark Theme
     .dark = Dark
 
 ## page: Browser Selection
@@ -180,5 +181,3 @@ page-error = Error
     .done = Done
     # btn
     .retry = Retry
-    # btn
-    .close = 
