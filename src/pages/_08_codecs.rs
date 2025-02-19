@@ -17,7 +17,7 @@ generate_page!(Codecs:
         },
 
         gtk::Label {
-            set_label: &gettext("Codecs and Drivers"),
+            set_label: &t!("page-codecs"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
@@ -25,16 +25,13 @@ generate_page!(Codecs:
         gtk::Label {
             set_use_markup: true,
             set_justify: gtk::Justification::Center,
-            set_label: &gettext("\
-                Install proprietary media codecs and drivers for your device.\n\n\
-                Consult the \
-                <a href='https://wiki.ultramarine-linux.org/en/setup/postinstall/'>wiki</a> \
-                if you don't have an Internet connection."),
+            // FIXME: someone tell me how to do this properly
+            set_label: &format!("{}\n\n{}", t!("page-codecs", "desc1"), t!("page-codecs", "desc2", wiki = format!("<a href='https://wiki.ultramarine-linux.org/en/setup/postinstall/'>{}</a>", t!("page-codecs", "wiki")))),
         },
 
         #[template] crate::ui::SwitchBox {
-            set_title: &gettext("Install Codecs and Drivers"),
-            set_subtitle: &gettext("Press next to skip installation"),
+            set_title: &t!("switch-codecs"),
+            set_subtitle: &t!("switch-codecs", "desc"),
             #[template_child] switch {
                 set_active: true,
                 connect_state_set => move |_, state| {

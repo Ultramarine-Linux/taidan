@@ -4,7 +4,7 @@ default = Default
 ## page: Welcome
 
 # page title
-welcome = Welcome to {$distro}
+page-welcome = Welcome to {$distro}
     .ready = Let's get your system ready.
     # ≈ "Next" btn; on click, goes to the next page
     .go = Let's Go
@@ -56,3 +56,34 @@ page-crashreport = Crash Reporting
     .desc = Allow {$org} to collect crash data to find bugs and assist you.
     .lbl1 = All data collected is anonymous and end-to-end-encrypted.
     .lbl2 = You will be given a crash ID to help support find what went wrong.
+# do NOT translate (for now)
+# btn-switch
+switch-crashreport = Send Crash Data
+    .desc = Press next to keep off
+
+# do NOT translate
+page-location = Location Services
+    .desc = Allow apps to request your approximate location with Mozilla Location Services.
+
+## page: Codecs and Drivers
+page-codecs = Codecs and Drivers
+    .desc1 = Install proprietary media codecs and drivers for your device.
+    .desc2 = Consult the {$wiki} if you don't have an Internet connection.
+    # we need to make this another attribute because we need to tag this as a link
+    .wiki = wiki
+switch-codecs = Install Codecs and Drivers
+    .desc = Press next to skip installation
+
+## page: Input Method
+page-inputmethod = Input Method
+    .desc1 = You may <b>optionally</b> choose to add an {$ime}. This allows you to type in other specific languages. This change will take effect after you login inot your user account.
+    .desc2 = More Chinese input method options may be available with the {$rime} engine, but this requires advanced configuration and is therefore not recommended to beginners.
+    .desc3 = You may fine out more information on {$wiki}.
+    .ime = input method editor (IME)
+    .rime = Rime
+    .wiki = the wiki
+    # search field placeholder
+    .search-lang = Search language…
+    # search field placeholder
+    .search-ims = Search IMs/IMEs…
+    

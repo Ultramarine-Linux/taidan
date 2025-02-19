@@ -10,6 +10,9 @@ fn miniblk(row: &gtk::ListBoxRow) -> libhelium::MiniContentBlock {
 static SEARCH_LAYOUT: SharedState<libhelium::glib::GString> = SharedState::new();
 static SEARCH_VARIANT: SharedState<libhelium::glib::GString> = SharedState::new();
 static CHOSEN_LANG: SharedState<String> = SharedState::new();
+const UMWIKI_INPUT_OTHER_LANG: &str =
+    "https://wiki.ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language";
+const UMWIKI_L10N: &str = "https://wiki.ultramarine-linux.org/en/usage/l10n/";
 
 generate_page!(InputMethod {
     langbox: gtk::ListBox,
@@ -66,7 +69,7 @@ generate_page!(InputMethod {
         },
 
         gtk::Label {
-            set_label: &gettext("Input Method"),
+            set_label: &t!("page-inputmethod"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
@@ -76,18 +79,17 @@ generate_page!(InputMethod {
             set_use_markup: true,
             set_wrap: true,
             set_wrap_mode: gtk::pango::WrapMode::Word,
-            // TRANSLATORS: the section regarding Chinese input methods is optional. You may choose
-            // to not translate this part.
-            set_label: &gettext("You may <b>optionally</b> choose to add an \
-            <a href='https://wiki.ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language'>\
-                input method editor (IME)\
-            </a>. This allows you to type in other specific languages. \
-            This change will take effect after you login into your user account.\n\n\
-            More Chinese input method options may be available with the \
-            <a href='https://rime.im/'>Rime</a> engine, but this requires advanced configuration \
-            and is therefore not recommended to beginners.\n\n\
-            You may find out more information on \
-            <a href='https://wiki.ultramarine-linux.org/en/usage/l10n/'>the wiki</a>."),
+            set_label: &format!("{}\n\n{}\n\n{}",
+                t!("page-inputmethod", "desc1",
+                    ime = format!("<a href='{UMWIKI_IM_URL}'>{}</a>", t!("page-inputmethod", "ime"))
+                ),
+                t!("page-inputmethod", "desc2",
+                    rime = format!("<a href='https://rime.im/'>{}</a>", t!("page-inputmethod", "rime"))
+                ),
+                t!("page-inputmethod", "desc3",
+                    wiki = format!("<a href='{UMWIKI_L10N}'>{}</a>", t!("page-inputmethod", "wiki"))
+                ),
+            ),
             set_justify: gtk::Justification::Center,
         },
     },
@@ -112,7 +114,7 @@ generate_page!(InputMethod {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
-                set_placeholder_text: Some(&gettext("Search language…")),
+                set_placeholder_text: Some(&t!("page-inputmethod", "search-lang")),
             },
             gtk::ScrolledWindow {
                 set_hscrollbar_policy: gtk::PolicyType::Never,
@@ -140,7 +142,7 @@ generate_page!(InputMethod {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
-                set_placeholder_text: Some(&gettext("Search IMs/IMEs…")),
+                set_placeholder_text: Some(&t!("page-inputmethod", "search-ims")),
             },
             gtk::ScrolledWindow {
                 set_hscrollbar_policy: gtk::PolicyType::Never,
