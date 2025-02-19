@@ -15,13 +15,13 @@ generate_page!(Welcome:
         },
 
         gtk::Label {
-            set_label: &gettext("Welcome to %s").replace("%s", &CFG.distro),
+            set_label: &t!("page-welcome", distro = CFG.distro.to_owned()),
             add_css_class: "view-title",
             inline_css: "font-weight: bold",
         },
 
         gtk::Label {
-            set_label: &gettext("Let's get your system ready."),
+            set_label: &t!("page-welcome", "ready"),
             inline_css: "font-size: 1.25rem",
         },
     },
@@ -35,7 +35,7 @@ generate_page!(Welcome:
         libhelium::Button {
             set_is_textual: true,
             set_halign: gtk::Align::Start,
-            set_label: &gettext("Skip Configuration"),
+            set_label: &t!("page-welcome", "skipcfg"),
             connect_clicked[sender] => move |_| {
                 SETTINGS.write().skipconfig = true;
                 sender.input(Self::Input::Nav(NavAction::Next));
@@ -47,7 +47,7 @@ generate_page!(Welcome:
         libhelium::Button {
             set_is_pill: true,
             set_halign: gtk::Align::End,
-            set_label: &gettext("Let's Go"),
+            set_label: &t!("page-welcome", "go"),
             inline_css: "padding-left: 48px; padding-right: 48px",
             add_css_class: "suggested-action",
             connect_clicked[sender] => move |_| {

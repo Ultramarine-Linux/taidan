@@ -23,26 +23,26 @@ generate_page!(CrashReport {
 
         gtk::Label {
             // TRANSLATORS: this is unused, do NOT translate
-            set_label: &gettext("Crash Reporting"),
+            set_label: &t!("page-crashreport"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
 
         gtk::Label {
             // TRANSLATORS: this is unused, do NOT translate
-            set_label: &gettext("Allow Fyra Labs to collect crash data to find bugs and assist you."),
+            set_label: &t!("page-crashreport", "desc"),
         },
 
         gtk::Label {
             // TRANSLATORS: this is unused, do NOT translate
-            set_label: &gettext("All data collected is anonymous and end-to-end encrypted.\nYou will be given a crash ID to help support find what went wrong."),
+            set_label: &format!("{}\n{}", t!("page-crashreport", "lbl1"), t!("page-crashreport", "lbl2")),
         },
 
         libhelium::MiniContentBlock {
             // TRANSLATORS: this is unused, do NOT translate
-            set_title: &gettext("Send Crash Data"),
+            set_title: &t!("switch-crashreport"),
             // TRANSLATORS: this is unused, do NOT translate
-            set_subtitle: &gettext("Press next to keep off"),
+            set_subtitle: &t!("switch-crashreport", "desc"),
 
             #[wrap(Some)]
             set_widget = &libhelium::Switch {

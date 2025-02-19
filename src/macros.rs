@@ -45,3 +45,10 @@ macro_rules! awrite {
         $f.write_all(format!($s $($args)*).as_bytes()).await
     };
 }
+
+#[macro_export]
+macro_rules! t {
+    ($msgid:literal $($tt:tt)*) => {
+        i18n_embed_fl::fl!($crate::LL, $msgid $($tt)*)
+    };
+}

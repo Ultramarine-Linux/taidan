@@ -42,7 +42,7 @@ generate_page!(Keyboard {
     update(self, message, sender) {
         LayoutSelected => {
             self.variantbox.remove_all();
-            self.variantbox.append(&gtk::ListBoxRow::builder().child(&libhelium::MiniContentBlock::builder().subtitle(gettext("Default")).build()).build());
+            self.variantbox.append(&gtk::ListBoxRow::builder().child(&libhelium::MiniContentBlock::builder().subtitle(t!("default")).build()).build());
             let row = self.layoutbox.selected_row().unwrap();
             let layout = miniblk(&row).title().to_string();
             i18n::LAYOUTS[&layout].variants.entries()
@@ -53,7 +53,7 @@ generate_page!(Keyboard {
         },
         VariantSelected => {
             let Some(row) = self.variantbox.selected_row() else { return };
-            let variant = (miniblk(&row).subtitle() != "Default").then(|| miniblk(&row).title().to_string());
+            let variant = (miniblk(&row).subtitle() != t!("default")).then(|| miniblk(&row).title().to_string());
             SETTINGS.write().kb_variant.clone_from(&variant);
             let layout = SETTINGS.read().kb_layout.clone();
             sender.oneshot_command(async move { i18n::set_keymap(None, &layout, variant.as_deref()).await.expect("cannot set keymap") });
@@ -73,7 +73,7 @@ generate_page!(Keyboard {
         },
 
         gtk::Label {
-            set_label: &gettext("Keyboard Layout"),
+            set_label: &t!("keyboard-layout"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
@@ -99,7 +99,7 @@ generate_page!(Keyboard {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
-                set_placeholder_text: Some(&gettext("Search keyboard layout…")),
+                set_placeholder_text: Some(&t!("keyboard-search-layout")),
             },
             gtk::ScrolledWindow {
                 set_hscrollbar_policy: gtk::PolicyType::Never,
@@ -127,7 +127,7 @@ generate_page!(Keyboard {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
-                set_placeholder_text: Some(&gettext("Search keyboard variant…")),
+                set_placeholder_text: Some(&t!("keyboard-search-variant")),
             },
             gtk::ScrolledWindow {
                 set_hscrollbar_policy: gtk::PolicyType::Never,

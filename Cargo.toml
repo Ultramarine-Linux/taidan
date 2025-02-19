@@ -17,7 +17,8 @@ color-eyre = "0.6.3"
 const_format = "0.2.34"
 enum_dispatch = "0.3.13"
 futures = "0.3.31"
-gettext-rs = { version = "0.7.2", features = ["gettext-system"] }
+i18n-embed = { version = "0.15.3", features = ["desktop-requester", "fluent-system"] }
+i18n-embed-fl = "0.9.3"
 itertools = "0.14.0"
 kurage = { version = "0.1.0" }
 # libappstream = "0.3.0"
@@ -29,6 +30,7 @@ reqwest = { version = "0.12.9", features = [
     "http2",
     "native-tls",
 ], default-features = false }
+rust-embed = "8.5.0"
 serde = "1.0.217"
 serde_json = "1.0.138"
 taidan_catalogue_parser = { path = "taidan_catalogue_parser" }

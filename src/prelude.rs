@@ -2,7 +2,6 @@ pub use color_eyre::{
     eyre::{eyre, Context},
     Section,
 };
-pub use gettextrs::gettext;
 pub use itertools::{Either, Itertools};
 pub use libhelium::{
     glib::{self, prelude::*},
@@ -14,7 +13,7 @@ pub use relm4::{
 };
 
 pub(crate) use crate::macros::generate_page;
-pub use crate::{NavAction, CFG, SETTINGS};
+pub use crate::{t, NavAction, CFG, SETTINGS};
 
 pub(crate) static REQWEST_CLIENT: std::sync::LazyLock<reqwest::Client> =
     std::sync::LazyLock::new(reqwest::Client::new);

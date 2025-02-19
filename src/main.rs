@@ -23,8 +23,13 @@ pub static CFG: std::sync::LazyLock<cfg::Config> = std::sync::LazyLock::new(|| {
     tracing::debug!("Populated cfg::Config (turn on `trace` to see body)");
     cfg
 });
-
 pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::SharedState::new();
+pub static LL: std::sync::LazyLock<i18n_embed::fluent::FluentLanguageLoader> =
+    std::sync::LazyLock::new(handle_l10n);
+
+#[derive(rust_embed::RustEmbed)]
+#[folder = "po/"]
+struct Localizations;
 
 kurage::generate_pages!(Page AppModel AppMsg:
     00: Welcome,
@@ -87,7 +92,7 @@ impl SimpleComponent for AppModel {
 
     view! {
         libhelium::ApplicationWindow {
-            set_title: Some(&gettext("Welcome to %s").replace("%s", &CFG.distro)),
+            set_title: Some(&t!("welcome-to", distro = CFG.distro.to_owned())),
             set_default_width: 600,
             set_default_height: 500,
             set_vexpand: true,
@@ -225,13 +230,41 @@ impl AppModel {
     }
 }
 
+fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
+    use i18n_embed::{
+        fluent::fluent_language_loader, unic_langid::subtags::Script, LanguageLoader,
+    };
+    let loader = fluent_language_loader!();
+    let available_langs = loader.available_languages(&Localizations).unwrap();
+    let mut langs = i18n_embed::DesktopLanguageRequester::requested_languages()
+        .into_iter()
+        .update(|li| {
+            if li.language == "zh" {
+                if available_langs.iter().contains(li) {
+                } else if li.script.is_some() {
+                    li.clear_variants();
+                } else if li
+                    .region
+                    .is_some_and(|region| ["HK", "TW", "MO"].contains(&region.as_str()))
+                {
+                    li.script = Some(Script::from_bytes(b"Hant").unwrap());
+                } else {
+                    li.script = Some(Script::from_bytes(b"Hans").unwrap());
+                }
+            }
+        })
+        .collect_vec();
+    if langs.is_empty() {
+        langs = vec![loader.fallback_language().clone()];
+    }
+    loader.load_languages(&Localizations, &langs).unwrap();
+    loader
+}
+
 #[allow(clippy::missing_errors_doc)]
 #[allow(clippy::missing_panics_doc)]
 fn main() -> std::io::Result<()> {
     let _guard = setup_logs_and_install_panic_hook();
-
-    gettextrs::textdomain(APPID)?;
-    gettextrs::bind_textdomain_codeset(APPID, "UTF-8")?;
 
     gtk::gio::resources_register_include!("icons.gresource").unwrap();
 

@@ -81,7 +81,7 @@ generate_page!(WhoAreYou {
         },
 
         gtk::Label {
-            set_label: &gettext("Who are You?"),
+            set_label: &t!("page-whoareyou"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
@@ -90,7 +90,7 @@ generate_page!(WhoAreYou {
         libhelium::TextField {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
-            set_placeholder_text: Some(&gettext("Full Name")),
+            set_placeholder_text: Some(&t!("page-whoareyou", "fullname")),
             set_is_outline: true,
         },
 
@@ -98,17 +98,17 @@ generate_page!(WhoAreYou {
         libhelium::TextField {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
-            set_placeholder_text: Some(&gettext("Username")),
+            set_placeholder_text: Some(&t!("page-whoareyou", "username")),
             set_is_outline: true,
             set_needs_validation: true,
-            set_regex: &libhelium::glib::Regex::new(r"^[a-z][-a-z0-9_]*\$?$", gtk::glib::RegexCompileFlags::DEFAULT, gtk::glib::RegexMatchFlags::DEFAULT).unwrap().unwrap(),
+            set_regex: &libhelium::glib::Regex::new("^[a-z][-a-z0-9_]*$", gtk::glib::RegexCompileFlags::DEFAULT, gtk::glib::RegexMatchFlags::DEFAULT).unwrap().unwrap(),
 
             connect_activate[sender] => move |en| if en.is_valid() { sender.output(Self::Output::Nav(NavAction::Next)).unwrap(); },
         },
 
         #[local_ref]
         lbl_error -> gtk::Label {
-            set_label: &gettext("Username\n- must start with lowercase letters\n- must contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)\n- may optionally end with a dollar sign (<tt>$</tt>)"),
+            set_label: &t!("page-whoareyou", "error"),
             set_use_markup: true,
             set_visible: false,
             add_css_class: "error",
