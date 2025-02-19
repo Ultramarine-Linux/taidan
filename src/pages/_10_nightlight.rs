@@ -17,28 +17,22 @@ generate_page!(NightLight:
         },
 
         gtk::Label {
-            set_label: &gettext("Night Light"),
+            set_label: &t!("page-nightlight"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
 
         gtk::Label {
-            set_use_markup: true,
-            set_label: &gettext("Tint the display with a warm tone at night to reduce eyestrain."),
+            set_label: &t!("page-nightlight", "lbl1"),
         },
 
         gtk::Label {
             set_use_markup: true,
-            set_label: &gettext("Night Light is not proven to help with difficulty falling sleep."),
+            set_label: &t!("page-nightlight", "lbl2"),
         },
 
-        // gtk::Label {
-        //     set_use_markup: true,
-        //     set_label: &gettext("(Night Light is also known as Night Color on KDE Plasma.)"),
-        // },
-
         #[template] crate::ui::SwitchBox {
-            set_title: &gettext("Night Light"),
+            set_title: &t!("switch-nightlight"),
             #[template_child] switch {
                 connect_state_set[sender] => move |_, state| {
                     SETTINGS.write().nightlight = state;

@@ -75,6 +75,7 @@ switch-codecs = Install Codecs and Drivers
     .desc = Press next to skip installation
 
 ## page: Input Method
+# page title
 page-inputmethod = Input Method
     .desc1 = You may <b>optionally</b> choose to add an {$ime}. This allows you to type in other specific languages. This change will take effect after you login inot your user account.
     .desc2 = More Chinese input method options may be available with the {$rime} engine, but this requires advanced configuration and is therefore not recommended to beginners.
@@ -86,4 +87,63 @@ page-inputmethod = Input Method
     .search-lang = Search language…
     # search field placeholder
     .search-ims = Search IMs/IMEs…
-    
+
+## page: Nightlight
+# page title
+page-nightlight = Night Light
+    .lbl1 = Tint the display with a warm tone at night to reduce eyestrain.
+    .lbl2 = Night Light is not proven to help with difficulty falling sleep.
+
+switch-nightlight = Night Light
+
+## page: Choose Your Theme
+# page title
+page-theme = Choose Your Theme
+    .desc = Make this system your own with a splash of colour.\nYou can change this option later in settings.
+    .note = Some apps may not respect this preference.
+    # Light Theme
+    .light = Light
+    .dark = Dark
+
+## page: Browser Selection
+page-browser = Browser Selection
+
+## page: Categories
+## this page shows different categories in the app catalogue (e.g. Productivity, Gaming, Media Prod., etc.)
+page-categories = What Do You Use This Device For?
+    # btn
+    .confirm = Confirm and Setup System
+    # btn; shown on new windows for closing
+    .done = Done
+
+# category names
+# you should use a selector; e.g.
+# { $cat ->
+#   [Productivity] -> projdsalkaj;cjzkpqi
+#   [...]
+# }
+# the list of categories is available at 
+# https://github.com/Ultramarine-Linux/taidan/tree/master/catalogue
+# open each yml file, check the first line for the name
+categories = $cat
+
+## page: Installing
+page-installing = Installing Your Apps
+    .desc = This won't take long!
+    .loading = Loading…
+
+## page: Finish
+page-finish = Your System is Ready
+    .desc = We hope you enjoy your fresh system!
+    # btn; closes the entire application
+    .done = Done
+
+## page: Error
+page-error = Error
+    .desc = We are sorry, but there is an unexpected problem.
+    # btn; closes the entire application
+    .done = Done
+    # btn
+    .retry = Retry
+    # btn
+    .close = 

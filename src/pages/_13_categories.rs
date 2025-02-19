@@ -11,7 +11,7 @@ generate_page!(Categories {
         let mut catfactory: FactoryVecDeque<CategoryBtn>
             = FactoryVecDeque::builder().launch(widgets.flowbox.clone()).forward(sender.input_sender(), CategoriesPageMsg::BtnClick);
         let mut catf = catfactory.guard();
-        CFG.catalogue.iter().filter(|cat| cat.name != "Browser")
+        CFG.catalogue.iter().filter(|cat| cat.name != "browser")
             .for_each(|cat| _ = catf.push_back(CategoryBtn {
                 category: cat.name.clone(),
             }));
@@ -57,7 +57,7 @@ generate_page!(Categories {
         },
 
         gtk::Label {
-            set_label: &gettext("What Do You Use This Device For?"),
+            set_label: &t!("page-categories"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
@@ -76,7 +76,7 @@ generate_page!(Categories {
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
-            set_label: &gettext("Confirm and Setup System"),
+            set_label: &t!("page-categories", "confirm"),
             remove_css_class: "suggested-action",
             add_css_class: "destructive-action",
             connect_clicked => Self::Input::Nav(NavAction::Next),
@@ -108,7 +108,7 @@ impl FactoryComponent for CategoryBtn {
                 set_valign: gtk::Align::Center,
             },
             gtk::Label {
-                set_label: &*gettext(&self.category),
+                set_label: &t!("categories", cat = self.category),
                 // BUG: why is the text and icon unreadable
                 add_css_class: "taidan-category-lbl",
             },
@@ -221,7 +221,7 @@ kurage::generate_component!(CategoryWindow {
                 inline_css: "-gtk-icon-size: 64px",
             },
             gtk::Label {
-                set_label: &gettext(&init),
+                set_label: &t!("categories", cat = init),
                 add_css_class: "view-subtitle",
                 inline_css: "font-weight: bold",
                 set_margin_bottom: 20,
@@ -256,7 +256,7 @@ kurage::generate_component!(CategoryWindow {
             libhelium::Button {
                 set_is_pill: true,
                 set_halign: gtk::Align::End,
-                set_label: &gettext("Done"),
+                set_label: &t!("page-categories", "done"),
                 inline_css: "padding-left: 48px; padding-right: 48px",
                 add_css_class: "suggested-action",
                 connect_clicked[root] => move |_| root.set_visible(false),

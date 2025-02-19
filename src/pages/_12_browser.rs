@@ -68,7 +68,7 @@ generate_page!(Browser {
         },
 
         gtk::Label {
-            set_label: &gettext("Browser Selection"),
+            set_label: &t!("page-browser"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },

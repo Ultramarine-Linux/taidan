@@ -51,13 +51,13 @@ generate_page!(Installing {
         },
 
         gtk::Label {
-            set_label: &gettext("Installing your Apps"),
+            set_label: &t!("page-installing"),
             add_css_class: "view-title",
             inline_css: "font-weight: bold",
         },
 
         gtk::Label {
-            set_label: &gettext("This won't take long!"),
+            set_label: &t!("page-installing", "desc"),
             inline_css: "font-size: 1.25rem",
         },
     },
@@ -65,7 +65,7 @@ generate_page!(Installing {
     // FIXME: libhelium::ProgressBar
     #[local_ref] main_progress_bar ->
     gtk::ProgressBar {
-        set_text: Some(&*gettext("Loading…")),
+        set_text: Some(&t!("page-installing", "loading")),
     },
 
     #[local_ref] dnf_progress_bar ->

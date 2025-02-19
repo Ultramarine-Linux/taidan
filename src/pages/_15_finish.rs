@@ -15,13 +15,13 @@ generate_page!(Finish:
         },
 
         gtk::Label {
-            set_label: &gettext("Your System is Ready"),
+            set_label: &t!("page-finish"),
             add_css_class: "view-title",
             inline_css: "font-weight: bold",
         },
 
         gtk::Label {
-            set_label: &gettext("We hope you enjoy your fresh system!"),
+            set_label: &t!("page-finish", "desc"),
             inline_css: "font-size: 1.25rem",
         },
     },
@@ -29,7 +29,7 @@ generate_page!(Finish:
     libhelium::Button {
         set_is_pill: true,
         set_halign: gtk::Align::End,
-        set_label: &gettext("Done"),
+        set_label: &t!("page-finish", "done"),
         inline_css: "padding-left: 48px; padding-right: 48px",
         add_css_class: "suggested-action",
         connect_clicked => Self::Input::Nav(NavAction::Quit),

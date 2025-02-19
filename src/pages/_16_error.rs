@@ -20,13 +20,13 @@ generate_page!(Error {
         },
 
         gtk::Label {
-            set_label: &gettext("Error"),
+            set_label: &t!("page-error"),
             add_css_class: "view-title",
             inline_css: "font-weight: bold",
         },
 
         gtk::Label {
-            set_label: &gettext("We are sorry, but there is an unexpected problem."),
+            set_label: &t!("page-error", "desc"),
             inline_css: "font-size: 1.25rem",
         },
     },
@@ -38,14 +38,6 @@ generate_page!(Error {
         set_buffer: Some(&model.buf),
     },
 
-
-    libhelium::Button {
-        set_is_pill: true,
-        set_halign: gtk::Align::End,
-        set_label: &gettext("Done"),
-        inline_css: "padding-left: 48px; padding-right: 48px",
-        connect_clicked => Self::Input::Nav(NavAction::Quit),
-    },
     gtk::Box {
         set_valign: gtk::Align::End,
         set_halign: gtk::Align::Fill,
@@ -55,7 +47,7 @@ generate_page!(Error {
         libhelium::Button {
             set_is_textual: true,
             set_halign: gtk::Align::Start,
-            set_label: &gettext("Retry"),
+            set_label: &t!("page-error", "retry"),
             connect_clicked[sender] => move |_| {
                 sender.input(Self::Input::Nav(NavAction::GoTo(crate::Page::Categories)));
                 sender.input(Self::Input::Nav(NavAction::Next));
@@ -67,13 +59,9 @@ generate_page!(Error {
         libhelium::Button {
             set_is_pill: true,
             set_halign: gtk::Align::End,
-            set_label: &gettext("Let's Go"),
+            set_label: &t!("page-error", "done"),
             inline_css: "padding-left: 48px; padding-right: 48px",
-            add_css_class: "suggested-action",
-            connect_clicked[sender] => move |_| {
-                SETTINGS.write().skipconfig = false;
-                sender.input(Self::Input::Nav(NavAction::Next));
-            },
+            connect_clicked => Self::Input::Nav(NavAction::Quit),
         },
     },
 );

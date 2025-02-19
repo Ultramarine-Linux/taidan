@@ -84,20 +84,20 @@ generate_page!(Theme:
         },
 
         gtk::Label {
-            set_label: &gettext("Choose your theme"),
+            set_label: &t!("page-theme"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
 
         gtk::Label {
             set_use_markup: true,
-            set_label: &gettext("Make this system your own with a splash of colour.\nYou can change this option later in settings."),
+            set_label: &t!("page-theme", "desc"),
             set_justify: gtk::Justification::Center,
         },
 
         gtk::Label {
             set_use_markup: true,
-            set_label: &gettext("Some apps may not respect this preference."),
+            set_label: &t!("page-theme", "note"),
             add_css_class: "caption",
         },
 
@@ -118,7 +118,7 @@ generate_page!(Theme:
                     set_requested_width: 150*1920/1080,
                 },
                 gtk::Label {
-                    set_label: &*gettext("Light"),
+                    set_label: &t!("page-theme", "light"),
                 },
             },
             #[name(darkbox)]
@@ -133,7 +133,7 @@ generate_page!(Theme:
                     set_requested_width: 150*1920/1080,
                 },
                 gtk::Label {
-                    set_label: &*gettext("Dark"),
+                    set_label: &t!("page-theme", "dark"),
                 },
             },
         },
