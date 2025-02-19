@@ -92,7 +92,7 @@ impl SimpleComponent for AppModel {
 
     view! {
         libhelium::ApplicationWindow {
-            set_title: Some(&t!("page-welcome", distro = CFG.distro.to_owned())),
+            set_title: Some(&t!("page-welcome", distro = CFG.distro.clone())),
             set_default_width: 600,
             set_default_height: 500,
             set_vexpand: true,
@@ -263,7 +263,7 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
 
 #[allow(clippy::missing_errors_doc)]
 #[allow(clippy::missing_panics_doc)]
-fn main() -> std::io::Result<()> {
+fn main() {
     let _guard = setup_logs_and_install_panic_hook();
 
     gtk::gio::resources_register_include!("icons.gresource").unwrap();
@@ -285,7 +285,6 @@ fn main() -> std::io::Result<()> {
 
     tracing::debug!("Starting Taidan");
     RelmApp::from_app(app).run::<AppModel>(());
-    Ok(())
 }
 
 /// Returns a logging guard.

@@ -15,7 +15,7 @@ generate_page!(Welcome:
         },
 
         gtk::Label {
-            set_label: &t!("page-welcome", distro = CFG.distro.to_owned()),
+            set_label: &t!("page-welcome", distro = CFG.distro.clone()),
             add_css_class: "view-title",
             inline_css: "font-weight: bold",
         },

@@ -108,7 +108,7 @@ impl FactoryComponent for CategoryBtn {
                 set_valign: gtk::Align::Center,
             },
             gtk::Label {
-                set_label: &t!("categories", cat = self.category),
+                set_label: &t!("categories", cat = self.category.clone()),
                 // BUG: why is the text and icon unreadable
                 add_css_class: "taidan-category-lbl",
             },
@@ -150,8 +150,9 @@ kurage::generate_component!(CategoryWindow {
     img: libhelium::ContentBlockImage,
 }:
     init[optlist img](root, sender, model, widgets) for init: String {
+        let init_cloned = init.clone();
         let category = (CFG.catalogue.iter())
-            .find(|category| category.name == init)
+            .find(move |category| category.name == init_cloned)
             .expect("no such category");
         model.rows = (category.choices.iter().cloned().enumerate())
             .map(|(index, choice)| {
@@ -221,7 +222,7 @@ kurage::generate_component!(CategoryWindow {
                 inline_css: "-gtk-icon-size: 64px",
             },
             gtk::Label {
-                set_label: &t!("categories", cat = init),
+                set_label: &t!("categories", cat = init.clone()),
                 add_css_class: "view-subtitle",
                 inline_css: "font-weight: bold",
                 set_margin_bottom: 20,

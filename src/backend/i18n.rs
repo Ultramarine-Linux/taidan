@@ -308,5 +308,5 @@ pub async fn get_lang() -> Option<String> {
                     .filter(|s| langs.contains(s))
             })
         })
-        .map(|s| s.to_owned())
+        .map(ToOwned::to_owned)
 }

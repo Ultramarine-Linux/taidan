@@ -81,7 +81,7 @@ generate_page!(InputMethod {
             set_wrap_mode: gtk::pango::WrapMode::Word,
             set_label: &format!("{}\n\n{}\n\n{}",
                 t!("page-inputmethod", "desc1",
-                    ime = format!("<a href='{UMWIKI_IM_URL}'>{}</a>", t!("page-inputmethod", "ime"))
+                    ime = format!("<a href='{UMWIKI_INPUT_OTHER_LANG}'>{}</a>", t!("page-inputmethod", "ime"))
                 ),
                 t!("page-inputmethod", "desc2",
                     rime = format!("<a href='https://rime.im/'>{}</a>", t!("page-inputmethod", "rime"))
