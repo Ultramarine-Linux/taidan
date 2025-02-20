@@ -131,7 +131,7 @@ page-nightlight = Ánh sáng đêm
     .lbl1 = Phủ màn hình bằng tông màu ấm vào ban đêm để giảm mỏi mắt.
     .lbl2 = Ánh sáng đêm không được chứng minh là hỗ trợ việc mất ngủ.
 
-switch-nightlight = {$page-nightlight}
+switch-nightlight = {page-nightlight}
 
 ## page: Choose Your Theme
 # page title
@@ -175,12 +175,12 @@ page-installing = Dang cài đặt các ứng dụng
 page-finish = Hệ thống của bạn đã sẵn sàng
     .desc = Tận hưởng hệ thống mới của bạn!
     # btn; closes the entire application
-    .done = {$page-categories.done}
+    .done = {page-categories.done}
 
 ## page: Error
 page-error = Lỗi
     .desc = Rất tiếc, đã có lỗi xảy ra.
     # btn; closes the entire application
-    .done = {$page-categories.done}
+    .done = {page-categories.done}
     # btn
     .retry = Thử lại

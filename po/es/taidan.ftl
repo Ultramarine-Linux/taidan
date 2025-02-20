@@ -174,12 +174,12 @@ page-installing = Instalando tus Aplicaciones
 page-finish = Tu Sistema está listo
     .desc = Esperamos que disfrutes tu nuevo sistema!
     # btn; closes the entire application
-    .done = {$page-categories.done}
+    .done = {
 
 ## page: Error
 page-error = Error
     .desc = Lo sentimos, pero hay un problema inesperado.
     # btn; closes the entire application
-    .done = {$page-categories.done}
+    .done = {page-categories.done}
     # btn
     .retry = Reintentar

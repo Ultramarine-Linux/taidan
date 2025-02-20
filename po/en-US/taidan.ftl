@@ -14,6 +14,19 @@ steps =
     .dnfinstallapps = Installing User Programs…
     .driverscodecs = Installing additional drivers…
 
+# .display:
+# This is intentional and you are required to fill in this field.
+# $lang_name is the language name you probably have just translated (see
+# the nearby strings above this). $native_lang_name is the language name
+# in its corresponding language. For example, when displaying in English:
+#
+# Chinese (中文)
+# Japanese (日本語)
+# Korean (한국어)
+# ...
+#
+# In other languages, you might need to change the order around and maybe
+# use different brackets, etc.
 imelangs =
     .ch = Chinese
     .ja = Japanese
@@ -21,48 +34,34 @@ imelangs =
     .vi = Vietnamese
     .in = Indic
     .th = Thai
-
-    # This is intentional and you are required to fill in this field.
-    # $lang_name is the language name you probably have just translated (see
-    # the nearby strings above this). $native_lang_name is the language name
-    # in its corresponding language. For example, when displaying in English:
-    #
-    # Chinese (中文)
-    # Japanese (日本語)
-    # Korean (한국어)
-    # ...
-    #
-    # In other languages, you might need to change the order around and maybe
-    # use different brackets, etc.
     .display = {$lang_name} ({$native_lang_name})
 
 ## page: Welcome
 
 # page title
+# .ready: ≈ "Next" btn; on click, goes to the next page
+# .skipcfg: also a "Next" btn, but skips some pages
 page-welcome = Welcome to {$distro}
     .ready = Let's get your system ready.
-    # ≈ "Next" btn; on click, goes to the next page
     .go = Let's Go
-    # also a "Next" btn, but skips some pages
     .skipcfg = Skip Configuration
 
 ## page: Keyboard Layout
 # page title
+# .search*: search field placeholder
 page-keyboard = Keyboard Layout
-    # search field placeholder
     .search-layout = Search keyboard layout…
-    # search field placeholder
     .search-variant = Search keyboard variant…
 
 ## page: Who are You?
 # page title
 # remember, if you can't translate things literally, think of what makes sense here as a page heading
+# .fullname: text field placeholder
+# .username: text field placeholder
+# .error: multiline, explanation pops out if invalid username
 page-whoareyou = Who are You?
-    # text field placeholder
     .fullname = Full Name
-    # text field placeholder
     .username = Username
-    # multiline, explanation pops out if invalid username
     .error = Username must start with lowercase letters and contain only alphanumericals, underscore (<tt>_</tt>) or dash (<tt>-</tt>)
 
 ## page: Create a Password
@@ -75,12 +74,12 @@ page-password = Create a Password
 
 ## page: Internet
 # page title
+# .skip: btn
+# .open: btn
 page-internet = Let's Get You Online
     .desc = Connect to the Internet to get the latest and greatest.
-    # btn
     .skip = I don't have Internet
     .warn = Codecs, drivers and other user programs will not be installed.
-    # btn
     .open = Open Wi-Fi connection applet
 
 # do NOT translate (for now)
@@ -111,6 +110,7 @@ switch-codecs = Install Codecs and Drivers
 
 ## page: Input Method
 # page title
+# .search*: search field placeholder
 page-inputmethod = Input Method
     .desc1 = You may <b>optionally</b> choose to add an {$ime}. This allows you to type in other specific languages. This change will take effect after you login inot your user account.
     .desc2 = More Chinese input method options may be available with the {$rime} engine, but this requires advanced configuration and is therefore not recommended to beginners.
@@ -118,9 +118,7 @@ page-inputmethod = Input Method
     .ime = input method editor (IME)
     .rime = Rime
     .wiki = the wiki
-    # search field placeholder
     .search-lang = Search language…
-    # search field placeholder
     .search-ims = Search IMs/IMEs…
 
 ## page: Nightlight
@@ -133,13 +131,13 @@ switch-nightlight = Night Light
 
 ## page: Choose Your Theme
 # page title
+# .light: Light Theme
+# .dark: Dark Theme
 page-theme = Choose Your Theme
     .desc = Make this system your own with a splash of colour.
             You can change this option later in settings.
     .note = Some apps may not respect this preference.
-    # Light Theme
     .light = Light
-    # Dark Theme
     .dark = Dark
 
 ## page: Browser Selection
@@ -147,10 +145,10 @@ page-browser = Browser Selection
 
 ## page: Categories
 ## this page shows different categories in the app catalogue (e.g. Productivity, Gaming, Media Prod., etc.)
+# .confirm: btn
+# .done: btn; shown on new windows for closing
 page-categories = What Do You Use This Device For?
-    # btn
     .confirm = Confirm and Setup System
-    # btn; shown on new windows for closing
     .done = Done
 
 # category names
@@ -170,15 +168,15 @@ page-installing = Installing Your Apps
     .loading = Loading…
 
 ## page: Finish
+# .done: btn; closes the entire application
 page-finish = Your System is Ready
     .desc = We hope you enjoy your fresh system!
-    # btn; closes the entire application
     .done = Done
 
 ## page: Error
+# .done: btn; closes the entire application
+# .retry: btn
 page-error = Error
     .desc = We are sorry, but there is an unexpected problem.
-    # btn; closes the entire application
     .done = Done
-    # btn
     .retry = Retry

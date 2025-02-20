@@ -130,7 +130,7 @@ page-nightlight = Noční osvětlení
     .lbl1 = V noci zbarví obrazovku teplým tónem, pro snížení únavy očí.
     .lbl2 = Není prokázáno, že by noční světlo pomáhalo při potížích s usínáním.
 
-switch-nightlight = {$page-nightlight}
+switch-nightlight = {page-nightlight}
 
 ## page: Choose Your Theme
 # page title
@@ -174,12 +174,12 @@ page-installing = Instalace Vašich aplikací
 page-finish = Váš systém je připraven
     .desc = Doufáme, že si svůj čerstvý systém užijete!
     # btn; closes the entire application
-    .done = {$page-categories.done}
+    .done = {page-categories.done}
 
 ## page: Error
 page-error = Chyba
     .desc = Omlouváme se, ale vyskytla se nečekaná chyba.
     # btn; closes the entire application
-    .done = {$page-categories.done}
+    .done = {page-categories.done}
     # btn
     .retry = Opakovat
