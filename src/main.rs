@@ -230,14 +230,36 @@ impl AppModel {
     }
 }
 
+fn make_lang_glibc_friendly(l: &i18n_embed::unic_langid::LanguageIdentifier) -> String {
+    let s = l.to_string();
+    if s.starts_with("zh-Hant") {
+        "zh_TW".to_owned()
+    } else if s.starts_with("zh-Hans") {
+        "zh_CN".to_owned()
+    } else {
+        s.replace('-', "_")
+    }
+}
+
 fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
     use i18n_embed::{
-        fluent::fluent_language_loader, unic_langid::subtags::Script, LanguageLoader,
+        fluent::fluent_language_loader,
+        unic_langid::{subtags::Script, LanguageIdentifier},
+        LanguageLoader,
     };
+    use std::str::FromStr;
     let loader = fluent_language_loader!();
     let available_langs = loader.available_languages(&Localizations).unwrap();
-    let mut langs = i18n_embed::DesktopLanguageRequester::requested_languages()
+    let mut langs = ["LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE", "LANGUAGES"]
         .into_iter()
+        .flat_map(|env| {
+            std::env::var(env).ok().into_iter().flat_map(|locales| {
+                locales
+                    .split(':')
+                    .filter_map(|locale| LanguageIdentifier::from_str(locale).ok())
+                    .collect_vec()
+            })
+        })
         .update(|li| {
             if li.language == "zh" {
                 if available_langs.iter().contains(li) {
@@ -257,6 +279,8 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
     if langs.is_empty() {
         langs = vec![loader.fallback_language().clone()];
     }
+    #[allow(clippy::indexing_slicing)]
+    std::env::set_var("LC_MESSAGES", make_lang_glibc_friendly(&langs[0]));
     loader.load_languages(&Localizations, &langs).unwrap();
     loader
 }
@@ -265,6 +289,7 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
 #[allow(clippy::missing_panics_doc)]
 fn main() {
     let _guard = setup_logs_and_install_panic_hook();
+    std::sync::LazyLock::<i18n_embed::fluent::FluentLanguageLoader>::force(&LL);
 
     gtk::gio::resources_register_include!("icons.gresource").unwrap();
 
