@@ -134,7 +134,8 @@ switch-nightlight = Night Light
 ## page: Choose Your Theme
 # page title
 page-theme = Choose Your Theme
-    .desc = Make this system your own with a splash of colour.\nYou can change this option later in settings.
+    .desc = Make this system your own with a splash of colour.
+            You can change this option later in settings.
     .note = Some apps may not respect this preference.
     # Light Theme
     .light = Light
