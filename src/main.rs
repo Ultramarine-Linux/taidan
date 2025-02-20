@@ -230,17 +230,6 @@ impl AppModel {
     }
 }
 
-fn make_lang_glibc_friendly(l: &i18n_embed::unic_langid::LanguageIdentifier) -> String {
-    let s = l.to_string();
-    if s.starts_with("zh-Hant") {
-        "zh_TW".to_owned()
-    } else if s.starts_with("zh-Hans") {
-        "zh_CN".to_owned()
-    } else {
-        s.replace('-', "_")
-    }
-}
-
 fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
     use i18n_embed::{
         fluent::fluent_language_loader,
@@ -279,8 +268,6 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
     if langs.is_empty() {
         langs = vec![loader.fallback_language().clone()];
     }
-    #[allow(clippy::indexing_slicing)]
-    std::env::set_var("LC_MESSAGES", make_lang_glibc_friendly(&langs[0]));
     loader.load_languages(&Localizations, &langs).unwrap();
     loader
 }

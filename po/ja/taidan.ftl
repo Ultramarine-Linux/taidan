@@ -27,7 +27,7 @@ imelangs =
 
 # page title
 page-welcome = {$distro} へようこそ
-    .ready = システムをちゃんとセットアップしましょう。
+    .ready = システムをセットアップしましょう。
     .go = 次
     .skipcfg = スキップ
 
@@ -58,27 +58,10 @@ page-password = パスワード作成
 ## page: Internet
 # page title
 page-internet = インターネット接続
-    .desc = インターネットに接続すると、最新ソフトをダウンロードできることになります。
+    .desc = インターネットに接続すると、最新ソフトをダウンロードできるようになります。
     .skip = スキップ
     .warn = コーデック・デバイスドライバ・ユーザーアプリをインストールするにはネット接続が必要です。
     .open = Wi-Fi接続アプリを起動
-
-# do NOT translate (for now)
-page-analytics =
-
-# do NOT translate (for now)
-page-crashreport =
-    .desc =
-    .lbl1 =
-    .lbl2 =
-# do NOT translate (for now)
-# btn-switch
-switch-crashreport =
-    .desc =
-
-# do NOT translate
-page-location =
-    .desc =
 
 ## page: Codecs and Drivers
 page-codecs = コーデックとデバイスドライバ
