@@ -90,7 +90,7 @@ generate_page!(WhoAreYou {
         libhelium::TextField {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
-            set_placeholder_text: Some(&t!("page-whoareyou", "fullname")),
+            set_placeholder_text: Some(&t!("page-whoareyou-fullname")),
             set_is_outline: true,
         },
 
@@ -98,7 +98,7 @@ generate_page!(WhoAreYou {
         libhelium::TextField {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
-            set_placeholder_text: Some(&t!("page-whoareyou", "username")),
+            set_placeholder_text: Some(&t!("page-whoareyou-username")),
             set_is_outline: true,
             set_needs_validation: true,
             set_regex: &libhelium::glib::Regex::new("^[a-z][-a-z0-9_]*$", gtk::glib::RegexCompileFlags::DEFAULT, gtk::glib::RegexMatchFlags::DEFAULT).unwrap().unwrap(),
@@ -108,7 +108,7 @@ generate_page!(WhoAreYou {
 
         #[local_ref]
         lbl_error -> gtk::Label {
-            set_label: &t!("page-whoareyou", "error"),
+            set_label: &t!("page-whoareyou-error"),
             set_use_markup: true,
             set_visible: false,
             add_css_class: "error",

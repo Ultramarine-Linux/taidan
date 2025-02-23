@@ -80,14 +80,14 @@ generate_page!(InputMethod {
             set_wrap: true,
             set_wrap_mode: gtk::pango::WrapMode::Word,
             set_label: &format!("{}\n\n{}\n\n{}",
-                t!("page-inputmethod", "desc1",
-                    ime = format!("<a href='{UMWIKI_INPUT_OTHER_LANG}'>{}</a>", t!("page-inputmethod", "ime"))
+                t!("page-inputmethod-desc1",
+                    ime = format!("<a href='{UMWIKI_INPUT_OTHER_LANG}'>{}</a>", t!("page-inputmethod-ime"))
                 ),
-                t!("page-inputmethod", "desc2",
-                    rime = format!("<a href='https://rime.im/'>{}</a>", t!("page-inputmethod", "rime"))
+                t!("page-inputmethod-desc2",
+                    rime = format!("<a href='https://rime.im/'>{}</a>", t!("page-inputmethod-rime"))
                 ),
-                t!("page-inputmethod", "desc3",
-                    wiki = format!("<a href='{UMWIKI_L10N}'>{}</a>", t!("page-inputmethod", "wiki"))
+                t!("page-inputmethod-desc3",
+                    wiki = format!("<a href='{UMWIKI_L10N}'>{}</a>", t!("page-inputmethod-wiki"))
                 ),
             ),
             set_justify: gtk::Justification::Center,
@@ -114,7 +114,7 @@ generate_page!(InputMethod {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
-                set_placeholder_text: Some(&t!("page-inputmethod", "search-lang")),
+                set_placeholder_text: Some(&t!("page-inputmethod-search-lang")),
             },
             gtk::ScrolledWindow {
                 set_hscrollbar_policy: gtk::PolicyType::Never,
@@ -142,7 +142,7 @@ generate_page!(InputMethod {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
-                set_placeholder_text: Some(&t!("page-inputmethod", "search-ims")),
+                set_placeholder_text: Some(&t!("page-inputmethod-search-ims")),
             },
             gtk::ScrolledWindow {
                 set_hscrollbar_policy: gtk::PolicyType::Never,

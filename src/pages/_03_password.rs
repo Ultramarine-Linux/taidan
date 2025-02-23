@@ -42,7 +42,7 @@ generate_page!(Password {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
             set_show_peek_icon: true,
-            set_placeholder_text: Some(&t!("page-password", "pw")),
+            set_placeholder_text: Some(&t!("page-password-pw")),
             connect_changed[sender, tf_repeat] => move |en| {
                 sender.input(Self::Input::SetBtnSensitive(en.text() == tf_repeat.text() && !en.text().is_empty()));
                 SETTINGS.write().passwd = en.text().to_string();
@@ -54,7 +54,7 @@ generate_page!(Password {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
             set_show_peek_icon: true,
-            set_placeholder_text: Some(&t!("page-password", "rp")),
+            set_placeholder_text: Some(&t!("page-password-rp")),
             connect_changed[sender] => move |en| {
                 let pass = en.text().to_string();
                 sender.input(Self::Input::SetBtnSensitive(SETTINGS.read().passwd == pass && !pass.is_empty()));

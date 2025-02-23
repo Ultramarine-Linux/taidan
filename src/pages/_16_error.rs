@@ -26,7 +26,7 @@ generate_page!(Error {
         },
 
         gtk::Label {
-            set_label: &t!("page-error", "desc"),
+            set_label: &t!("page-error-desc"),
             inline_css: "font-size: 1.25rem",
         },
     },
@@ -47,7 +47,7 @@ generate_page!(Error {
         libhelium::Button {
             set_is_textual: true,
             set_halign: gtk::Align::Start,
-            set_label: &t!("page-error", "retry"),
+            set_label: &t!("page-error-retry"),
             connect_clicked[sender] => move |_| {
                 sender.input(Self::Input::Nav(NavAction::GoTo(crate::Page::Categories)));
                 sender.input(Self::Input::Nav(NavAction::Next));
@@ -59,7 +59,7 @@ generate_page!(Error {
         libhelium::Button {
             set_is_pill: true,
             set_halign: gtk::Align::End,
-            set_label: &t!("page-error", "done"),
+            set_label: &t!("page-error-done"),
             inline_css: "padding-left: 48px; padding-right: 48px",
             connect_clicked => Self::Input::Nav(NavAction::Quit),
         },

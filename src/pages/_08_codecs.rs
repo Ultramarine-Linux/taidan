@@ -1,3 +1,5 @@
+const WIKI_POSTINSTALL: &str = "https://wiki.ultramarine-linux.org/en/setup/postinstall/";
+
 use crate::prelude::*;
 generate_page!(Codecs:
     update(self, message, sender) {} => {}
@@ -26,12 +28,12 @@ generate_page!(Codecs:
             set_use_markup: true,
             set_justify: gtk::Justification::Center,
             // FIXME: someone tell me how to do this properly
-            set_label: &format!("{}\n\n{}", t!("page-codecs", "desc1"), t!("page-codecs", "desc2", wiki = format!("<a href='https://wiki.ultramarine-linux.org/en/setup/postinstall/'>{}</a>", t!("page-codecs", "wiki")))),
+            set_label: &format!("{}\n\n{}", t!("page-codecs-desc1"), t!("page-codecs-desc2", wiki = format!("<a href='{WIKI_POSTINSTALL}'>{}</a>", t!("page-codecs-wiki")))),
         },
 
         #[template] crate::ui::SwitchBox {
             set_title: &t!("switch-codecs"),
-            set_subtitle: &t!("switch-codecs", "desc"),
+            set_subtitle: &t!("switch-codecs-desc"),
             #[template_child] switch {
                 set_active: true,
                 connect_state_set => move |_, state| {

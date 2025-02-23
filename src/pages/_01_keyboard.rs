@@ -99,7 +99,7 @@ generate_page!(Keyboard {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
-                set_placeholder_text: Some(&t!("page-keyboard", "search-layout")),
+                set_placeholder_text: Some(&t!("page-keyboard-search-layout")),
             },
             gtk::ScrolledWindow {
                 set_hscrollbar_policy: gtk::PolicyType::Never,
@@ -127,7 +127,7 @@ generate_page!(Keyboard {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
-                set_placeholder_text: Some(&t!("page-keyboard", "search-variant")),
+                set_placeholder_text: Some(&t!("page-keyboard-search-variant")),
             },
             gtk::ScrolledWindow {
                 set_hscrollbar_policy: gtk::PolicyType::Never,

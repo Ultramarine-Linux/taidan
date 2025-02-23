@@ -57,7 +57,7 @@ generate_page!(Installing {
         },
 
         gtk::Label {
-            set_label: &t!("page-installing", "desc"),
+            set_label: &t!("page-installing-desc"),
             inline_css: "font-size: 1.25rem",
         },
     },
@@ -65,7 +65,7 @@ generate_page!(Installing {
     // FIXME: libhelium::ProgressBar
     #[local_ref] main_progress_bar ->
     gtk::ProgressBar {
-        set_text: Some(&t!("page-installing", "loading")),
+        set_text: Some(&t!("page-installing-loading")),
     },
 
     #[local_ref] dnf_progress_bar ->

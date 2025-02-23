@@ -103,12 +103,12 @@ impl IMELanguages {
     #[must_use]
     pub fn name(self) -> String {
         match self {
-            Self::Chinese => t!("imelangs", "ch"),
-            Self::Japanese => t!("imelangs", "ja"),
-            Self::Korean => t!("imelangs", "ko"),
-            Self::Vietnamese => t!("imelangs", "vi"),
-            Self::Indic => t!("imelangs", "in"),
-            Self::Thai => t!("imelangs", "th"),
+            Self::Chinese => t!("imelangs-ch"),
+            Self::Japanese => t!("imelangs-ja"),
+            Self::Korean => t!("imelangs-ko"),
+            Self::Vietnamese => t!("imelangs-vi"),
+            Self::Indic => t!("imelangs-in"),
+            Self::Thai => t!("imelangs-th"),
         }
     }
     #[must_use]
@@ -123,8 +123,7 @@ impl std::fmt::Display for IMELanguages {
             self.name()
         } else {
             t!(
-                "imelangs",
-                "display",
+                "imelangs-display",
                 lang_name = self.name(),
                 native_lang_name = native
             )

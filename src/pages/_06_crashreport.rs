@@ -30,19 +30,19 @@ generate_page!(CrashReport {
 
         gtk::Label {
             // TRANSLATORS: this is unused, do NOT translate
-            set_label: &t!("page-crashreport", "desc", org = "Fyra Labs"),
+            set_label: &t!("page-crashreport-desc", org = "Fyra Labs"),
         },
 
         gtk::Label {
             // TRANSLATORS: this is unused, do NOT translate
-            set_label: &format!("{}\n{}", t!("page-crashreport", "lbl1"), t!("page-crashreport", "lbl2")),
+            set_label: &format!("{}\n{}", t!("page-crashreport-lbl1"), t!("page-crashreport-lbl2")),
         },
 
         libhelium::MiniContentBlock {
             // TRANSLATORS: this is unused, do NOT translate
             set_title: &t!("switch-crashreport"),
             // TRANSLATORS: this is unused, do NOT translate
-            set_subtitle: &t!("switch-crashreport", "desc"),
+            set_subtitle: &t!("switch-crashreport-desc"),
 
             #[wrap(Some)]
             set_widget = &libhelium::Switch {

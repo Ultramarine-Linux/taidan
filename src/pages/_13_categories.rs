@@ -76,7 +76,7 @@ generate_page!(Categories {
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
-            set_label: &t!("page-categories", "confirm"),
+            set_label: &t!("page-categories-confirm"),
             remove_css_class: "suggested-action",
             add_css_class: "destructive-action",
             connect_clicked => Self::Input::Nav(NavAction::Next),
@@ -257,7 +257,7 @@ kurage::generate_component!(CategoryWindow {
             libhelium::Button {
                 set_is_pill: true,
                 set_halign: gtk::Align::End,
-                set_label: &t!("page-categories", "done"),
+                set_label: &t!("page-categories-done"),
                 inline_css: "padding-left: 48px; padding-right: 48px",
                 add_css_class: "suggested-action",
                 connect_clicked[root] => move |_| root.set_visible(false),

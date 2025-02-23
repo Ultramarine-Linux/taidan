@@ -91,13 +91,13 @@ generate_page!(Theme:
 
         gtk::Label {
             set_use_markup: true,
-            set_label: &t!("page-theme", "desc"),
+            set_label: &t!("page-theme-desc"),
             set_justify: gtk::Justification::Center,
         },
 
         gtk::Label {
             set_use_markup: true,
-            set_label: &t!("page-theme", "note"),
+            set_label: &t!("page-theme-note"),
             add_css_class: "caption",
         },
 
@@ -118,7 +118,7 @@ generate_page!(Theme:
                     set_requested_width: 150*1920/1080,
                 },
                 gtk::Label {
-                    set_label: &t!("page-theme", "light"),
+                    set_label: &t!("page-theme-light"),
                 },
             },
             #[name(darkbox)]
@@ -133,7 +133,7 @@ generate_page!(Theme:
                     set_requested_width: 150*1920/1080,
                 },
                 gtk::Label {
-                    set_label: &t!("page-theme", "dark"),
+                    set_label: &t!("page-theme-dark"),
                 },
             },
         },

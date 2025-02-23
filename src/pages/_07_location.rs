@@ -33,7 +33,7 @@ generate_page!(Location {
         gtk::Label {
             set_use_markup: true,
             // TRANSLATORS: this is unused, do NOT translate
-            set_label: &t!("page-location", "desc"),
+            set_label: &t!("page-location-desc"),
         },
 
         #[template] crate::ui::SwitchBox {

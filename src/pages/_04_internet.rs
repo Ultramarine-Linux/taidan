@@ -37,14 +37,14 @@ generate_page!(Internet {
 
         gtk::Label {
             set_justify: gtk::Justification::Center,
-            set_label: &t!("page-internet", "desc"),
+            set_label: &t!("page-internet-desc"),
         },
 
         libhelium::Button {
             set_is_textual: true,
             set_halign: gtk::Align::Center,
             set_hexpand: false,
-            set_label: &t!("page-internet", "skip"),
+            set_label: &t!("page-internet-skip"),
             inline_css: "padding-left: 48px; padding-right: 48px",
             connect_clicked[sender] => move |_| {
                 SETTINGS.write().nointernet = true;
@@ -54,7 +54,7 @@ generate_page!(Internet {
 
         #[local_ref] lbl_warn ->
         gtk::Label {
-            set_label: &t!("page-internet", "warn"),
+            set_label: &t!("page-internet-warn"),
             add_css_class: "warning",
         },
 
@@ -62,7 +62,7 @@ generate_page!(Internet {
             set_is_pill: true,
             set_halign: gtk::Align::Center,
             // set_icon: Some("network-wireless-symbolic"),
-            set_label: &t!("page-internet", "open"),
+            set_label: &t!("page-internet-open"),
             connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("nm-connection-editor", &[]).await.unwrap() }),
         }
     },

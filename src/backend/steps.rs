@@ -103,13 +103,13 @@ impl From<Stage> for u8 {
 impl From<Stage> for String {
     fn from(value: Stage) -> Self {
         match value {
-            Stage::DnfDownloadUpdate(_) => t!("steps", "dnfdownloadupdate"),
-            Stage::DnfInstallUpdate(_) => t!("steps", "dnfinstallupdate"),
-            Stage::Script(_) => t!("steps", "script"),
-            Stage::DnfDownloadApps(_) => t!("steps", "dnfdownloadapps"),
-            Stage::DnfInstallApps(_) => t!("steps", "dnfinstallapps"),
-            Stage::DriversCodecs(_) => t!("steps", "driverscodecs"),
-            _ => t!("page-installing", "loading"),
+            Stage::DnfDownloadUpdate(_) => t!("steps-dnfdownloadupdate"),
+            Stage::DnfInstallUpdate(_) => t!("steps-dnfinstallupdate"),
+            Stage::Script(_) => t!("steps-script"),
+            Stage::DnfDownloadApps(_) => t!("steps-dnfdownloadapps"),
+            Stage::DnfInstallApps(_) => t!("steps-dnfinstallapps"),
+            Stage::DriversCodecs(_) => t!("steps-driverscodecs"),
+            _ => t!("page-installing-loading"),
         }
     }
 }
