@@ -2,109 +2,95 @@ default = Výchozí
 prev = Předchozí
 next = Další
 
-steps =
-    .dnfdownloadupdate = Stahování systémových aktualizací…
-    .dnfinstallupdate = Instalace systémových aktualizací…
-    .script =
-    .dnfdownloadapps = Downloading User Programs…
-    .dnfinstallapps = Installing User Programs…
-    .driverscodecs = Installing additional drivers…
+steps-dnfdownloadupdate = Stahování systémových aktualizací…
+steps-dnfinstallupdate = Instalace systémových aktualizací…
+steps-dnfdownloadapps = Downloading User Programs…
+steps-dnfinstallapps = Installing User Programs…
+steps-driverscodecs = Installing additional drivers…
 
-imelangs =
-    .ch = Čínština
-    .ja = Japonština
-    .ko = Korejština
-    .vi = Vietnamština
-    .in = Indické
-    .th = Thajština
+imelangs-ch = Čínština
+imelangs-ja = Japonština
+imelangs-ko = Korejština
+imelangs-vi = Vietnamština
+imelangs-in = Indické
+imelangs-th = Thajština
 
-    .display = {$lang_name} ({$native_lang_name})
+imelangs-display = {$lang_name} ({$native_lang_name})
 
 page-welcome = Vítejte v {$distro}
-    .ready = Připravme Váš systém.
-    .go = Pojďme
-    .skipcfg = Přeskočit konfiguraci
+page-welcome-ready = Připravme Váš systém.
+page-welcome-go = Pojďme
+page-welcome-skipcfg = Přeskočit konfiguraci
 
 page-keyboard = Rozložení klávesnice
-    .search-layout = Hledat rozložení klávesnice…
-    .search-variant = Hledat varianty rozložení klávesnice…
+page-keyboard-search-layout = Hledat rozložení klávesnice…
+page-keyboard-search-variant = Hledat varianty rozložení klávesnice…
 
 page-whoareyou = Kdo jste?
-    .fullname = Celé jméno
-    .username = Uživatelské jméno
-    .error = Uživatelské jméno
+page-whoareyou-fullname = Celé jméno
+page-whoareyou-username = Uživatelské jméno
+page-whoareyou-error = Uživatelské jméno
         - musí začínat malým písmenem
         - musí obsahovat pouze písmena a čísla, podtržítko (<tt>_</tt>) nebo pomlčku (<tt>-</tt>)
 
 page-password = Vytvořte heslo
-    .pw = Heslo
-    .rp = Potvrďte heslo
+page-password-pw = Heslo
+page-password-rp = Potvrďte heslo
 
 page-internet = Pojďme Vás připojit
-    .desc = Připojte se k Internetu k získání toho nejnovějšího a nejlepšího.
-    .skip = Nemám připojení k Internetu
-    .warn = Kodeky, ovladače a další uživatelské programy nebudou nainstalovány.
-    .open = Otevřít applet Wi-Fi připojení
+page-internet-desc = Připojte se k Internetu k získání toho nejnovějšího a nejlepšího.
+page-internet-skip = Nemám připojení k Internetu
+page-internet-warn = Kodeky, ovladače a další uživatelské programy nebudou nainstalovány.
+page-internet-open = Otevřít applet Wi-Fi připojení
 
 page-analytics = Analýza a Hlášení nehod
 
 page-crashreport = Hlášení nehod
-    .desc = Povolte {$org} sbírání dat o pádech k odhalení chyb a Vaší pomoci.
-    .lbl1 = All data collected is anonymous and end-to-end encrypted.
-    .lbl2 = You will be given a crash ID to help support find what went wrong.
+page-crashreport-desc = Povolte {$org} sbírání dat o pádech k odhalení chyb a Vaší pomoci.
+page-crashreport-lbl1 = All data collected is anonymous and end-to-end encrypted.
+page-crashreport-lbl2 = You will be given a crash ID to help support find what went wrong.
+
 switch-crashreport = Poslat data havárie
-    .desc =
 
 page-location = Služby určování polohy
-    .desc = Povolit aplikacím žádato o Vaši přibližnou polohu s Mozilla Location Services
+page-location-desc = Povolit aplikacím žádato o Vaši přibližnou polohu s Mozilla Location Services
 
 page-codecs = Kodeky a ovladače
-    .desc1 = 
-    .desc2 = 
-    .wiki = 
 switch-codecs = Nainstalovat kodeky a ovladače
-    .desc = Stiskněte další pro přeskočení instalace
+switch-codecs-desc = Stiskněte další pro přeskočení instalace
 
 page-inputmethod = Metody vstupu
-    .desc1 =
-    .desc2 =
-    .desc3 =
-    .ime =
-    .rime =
-    .wiki =
-    .search-lang = Hledat jazyk…
-    .search-ims = Hledat IMs/IMEs…
+page-inputmethod-search-lang = Hledat jazyk…
+page-inputmethod-search-ims = Hledat IMs/IMEs…
 
 page-nightlight = Noční osvětlení
-    .lbl1 = V noci zbarví obrazovku teplým tónem, pro snížení únavy očí.
-    .lbl2 = Není prokázáno, že by noční světlo pomáhalo při potížích s usínáním.
+page-nightlight-lbl1 = V noci zbarví obrazovku teplým tónem, pro snížení únavy očí.
+page-nightlight-lbl2 = Není prokázáno, že by noční světlo pomáhalo při potížích s usínáním.
 
 switch-nightlight = {page-nightlight}
 
 page-theme = Vyberte si motiv
-    .desc = Přizpůsobte si system barevným nádechem.
+page-theme-desc = Přizpůsobte si system barevným nádechem.
             Tuto možnost si můžete později změnit v nastavení.
-    .note = Některé aplikace nemusí toto nastavení respektovat.
-    .light = Světlý
-    .dark = Tmavý
+page-theme-note = Některé aplikace nemusí toto nastavení respektovat.
+page-theme-light = Světlý
+page-theme-dark = Tmavý
 
 page-browser = Výběr prohlížeče
 
 page-categories = K čemu toto zařízení využíváte?
-    .confirm = Potvrdit a nastavit systém
-    .done = Hotovo
-
-categories =
+page-categories-confirm = Potvrdit a nastavit systém
+page-categories-done = Hotovo
 
 page-installing = Instalace Vašich aplikací
-    .desc = Nepotrvá to dlouho!
-    .loading = Načítání…
+page-installing-desc = Nepotrvá to dlouho!
+page-installing-loading = Načítání…
 
 page-finish = Váš systém je připraven
-    .desc = Doufáme, že si svůj čerstvý systém užijete!
-    .done = {page-categories.done}
+page-finish-desc = Doufáme, že si svůj čerstvý systém užijete!
+page-finish-done = {page-categories.done}
 
 page-error = Chyba
-    .desc = Omlouváme se, ale vyskytla se nečekaná chyba.
-    .done = {page-categories.done}
-    .retry = Opakovat
+page-error-desc = Omlouváme se, ale vyskytla se nečekaná chyba.
+page-error-done = {page-categories.done}
+page-error-retry = Opakovat
