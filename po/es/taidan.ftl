@@ -1,84 +1,67 @@
 default = Por Defecto
 prev = Previo
 next = Siguiente
-
 steps-dnfdownloadupdate = Descargando Actualización del Sistema…
 steps-dnfinstallupdate = Instalando Actualización del Sistema…
 steps-dnfdownloadapps = Descargando Programas del Usuario…
 steps-dnfinstallapps = Instalando Programas del Usuario…
 steps-driverscodecs = Instalando controladores adicionales…
-
 imelangs-ch = Chino
 imelangs-ja = Japonés
 imelangs-ko = Coreano
 imelangs-vi = Vietnamita
 imelangs-th = Tailandés
-imelangs-display = {$lang_name} ({$native_lang_name})
-
-page-welcome = Bienvenid@ a {$distro}
+imelangs-display = { $lang_name } ({ $native_lang_name })
+page-welcome = Bienvenid@ a { $distro }
 page-welcome-ready = Vamos a alistar tu sistema.
 page-welcome-go = Vamos
 page-welcome-skipcfg = Saltar Configuración
-
 page-keyboard = Layout de teclado
 page-keyboard-search-layout = Busca tu layout de teclado…
 page-keyboard-search-variant = Buscar tu variante de teclado…
-
 page-whoareyou = Quién eres?
 page-whoareyou-fullname = Nombre Completo
 page-whoareyou-username = Nombre de Usuario
-page-whoareyou-error = Nombre de Usuario
-        - Iniciar con letras minúsculas
-        - Solo contener caracteres alfanuméricos, guión bajo (<tt>_<tt>) o guión (<tt>-<tt>)
-
+page-whoareyou-error =
+    Nombre de Usuario
+    - Iniciar con letras minúsculas
+    - Solo contener caracteres alfanuméricos, guión bajo (<tt>_<tt>) o guión (<tt>-<tt>)
 page-password = Crear una contraseña
 page-password-pw = Contraseña
 page-password-rp = Repetir Contraseña
-
 page-internet = Vamos a ponerte en linea
 page-internet-desc = Conéctate al internet para obtener lo último y mejor.
 page-internet-skip = No tengo Internet
-
 page-codecs = Códecs y Controladores
 page-codecs-desc1 = Instalar controladores y códecs multimedia propietarios para tu dispositivo.
-page-codecs-desc2 = Consulta {$wiki} si no tienes una conexión a Internet.
+page-codecs-desc2 = Consulta { $wiki } si no tienes una conexión a Internet.
 page-codecs-wiki = wiki
 switch-codecs = Instalar Códecs y Controladores
 switch-codecs-desc = Presiona Siguiente para saltar instalación
-
 page-inputmethod = Método de Entrada
 page-inputmethod-search-lang = Buscar lenguaje…
 page-inputmethod-search-ims = Buscar IMs/IMEs…
-
 page-nightlight = Luz Nocturna
 page-nightlight-lbl1 = Entinta la pantalla con un tono cálido en la noche para reducir cansancio ocular.
 page-nightlight-lbl2 = Luz Nocturna no está confirmado con ayudar con la dificultad de dormir.
-
 switch-nightlight = Night Light
-
 page-theme = Elige tu tema
 page-theme-desc = Haz este sistema el tuyo con un toque de color. Puedes cambiar esta opción después en Configuración.
 page-theme-note = Algunas aplicaciones podrían no respetar esta preferencia.
 page-theme-light = Claro
 page-theme-dark = Oscuro
-
 page-browser = Selección de Navegador
-
 page-categories = Para que usarás este dispositivo?
 page-categories-confirm = Confirmar y Configurar Sistema
 page-categories-done = Hecho
-
-categories = {$cat}
-
+categories = { $cat }
 page-installing = Instalando tus Aplicaciones
 page-installing-desc = Esto no tomará mucho!
 page-installing-loading = Cargando…
-
 page-finish = Tu Sistema está listo
 page-finish-desc = Esperamos que disfrutes tu nuevo sistema!
-page-finish-done = {page-categories-done}
-
+page-finish-done = { page-categories-done }
 page-error = Error
 page-error-desc = Lo sentimos, pero hay un problema inesperado.
-page-error-done = {page-categories-done}
+page-error-done = { page-categories-done }
 page-error-retry = Reintentar
