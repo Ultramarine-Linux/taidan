@@ -13,10 +13,54 @@
         <file preprocess="xml-stripblanks" alias="network-wireless-symbolic.svg">icons/network-wireless-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="display-brightness-symbolic.svg">icons/display-brightness-symbolic.svg</file>
 
-        <file preprocess="xml-stripblanks" alias="ctlg-browser-firefox.svg">catalogue/browser/firefox.svg</file>
-        <file preprocess="xml-stripblanks" alias="ctlg-browser-edge.svg">catalogue/browser/edge.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-browser-chrome.svg">catalogue/browser/chrome.svg</file>
         <file preprocess="xml-stripblanks" alias="ctlg-browser-chromium.svg">catalogue/browser/chromium.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-browser-edge.svg">catalogue/browser/edge.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-browser-firefox.svg">catalogue/browser/firefox.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-browser-vivaldi.svg">catalogue/browser/vivaldi.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-browser-zen.svg">catalogue/browser/zen.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-dev-toolbox">catalogue/development/dev-toolbox.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-docker">catalogue/development/docker.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-helium-toolchain">catalogue/development/helium-toolchain.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-kate">catalogue/development/kate.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-kde-toolchain">catalogue/development/kde-toolchain.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-nim-language">catalogue/development/nim-language.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-nodejs-toolchain">catalogue/development/nodejs-toolchain.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-packaging-toolchain">catalogue/development/packaging-toolchain.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-rust-toolchain">catalogue/development/rust-toolchain.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-tailscale">catalogue/development/tailscale.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-vala-toolchain">catalogue/development/vala-toolchain.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-virt-manager">catalogue/development/virt-manager.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-visual-studio-code">catalogue/development/visual-studio-code.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-development-zed">catalogue/development/zed.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-gaming-bottles">catalogue/gaming/bottles.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-gaming-heroic-games-launcher">catalogue/gaming/heroic-games-launcher.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-gaming-itch">catalogue/gaming/itch.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-gaming-lutris">catalogue/gaming/lutris.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-gaming-minecraft-(prism-launcher)">catalogue/gaming/minecraft-(prism-launcher).svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-gaming-steam">catalogue/gaming/steam.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-making-freecad">catalogue/making/freecad.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-making-kicad">catalogue/making/kicad.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-making-raspberry-pi-imager">catalogue/making/raspberry-pi-imager.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-making-raspberry-pi-tools">catalogue/making/raspberry-pi-tools.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-making-thonny">catalogue/making/thonny.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-making-ultimaker-cura">catalogue/making/ultimaker-cura.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-mediaprod-audacity">catalogue/mediaprod/audacity.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-mediaprod-blender">catalogue/mediaprod/blender.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-mediaprod-gimp">catalogue/mediaprod/gimp.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-mediaprod-handbrake">catalogue/mediaprod/handbrake.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-mediaprod-kdenlive">catalogue/mediaprod/kdenlive.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-mediaprod-lmms">catalogue/mediaprod/lmms.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-mediaprod-muse">catalogue/mediaprod/muse.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-photography-art-Darktable">catalogue/photography-art/Darktable.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-photography-art-inkscape">catalogue/photography-art/inkscape.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-photography-art-kolourpaint">catalogue/photography-art/kolourpaint.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-photography-art-krita">catalogue/photography-art/krita.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-photography-art-photoflare">catalogue/photography-art/photoflare.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-photography-art-rawtherapee">catalogue/photography-art/rawtherapee.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-productivity-libreoffice">catalogue/productivity/libreoffice.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-productivity-onlyoffice">catalogue/productivity/onlyoffice.svg</file>
+        <file preprocess="xml-stripblanks" alias="ctlg-productivity-thunderbird">catalogue/productivity/thunderbird.svg</file>
 
         <file preprocess="xml-stripblanks" alias="applications-office-symbolic.svg">icons/applications-office-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="applications-games-symbolic.svg">icons/applications-games-symbolic.svg</file>
