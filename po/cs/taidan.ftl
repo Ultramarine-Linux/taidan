@@ -1,96 +1,76 @@
 default = Výchozí
 prev = Předchozí
 next = Další
-
 steps-dnfdownloadupdate = Stahování systémových aktualizací…
 steps-dnfinstallupdate = Instalace systémových aktualizací…
 steps-dnfdownloadapps = Downloading User Programs…
 steps-dnfinstallapps = Installing User Programs…
 steps-driverscodecs = Installing additional drivers…
-
 imelangs-ch = Čínština
 imelangs-ja = Japonština
 imelangs-ko = Korejština
 imelangs-vi = Vietnamština
 imelangs-in = Indické
 imelangs-th = Thajština
-
-imelangs-display = {$lang_name} ({$native_lang_name})
-
-page-welcome = Vítejte v {$distro}
+imelangs-display = { $lang_name } ({ $native_lang_name })
+page-welcome = Vítejte v { $distro }
 page-welcome-ready = Připravme Váš systém.
 page-welcome-go = Pojďme
 page-welcome-skipcfg = Přeskočit konfiguraci
-
 page-keyboard = Rozložení klávesnice
 page-keyboard-search-layout = Hledat rozložení klávesnice…
 page-keyboard-search-variant = Hledat varianty rozložení klávesnice…
-
 page-whoareyou = Kdo jste?
 page-whoareyou-fullname = Celé jméno
 page-whoareyou-username = Uživatelské jméno
-page-whoareyou-error = Uživatelské jméno
-        - musí začínat malým písmenem
-        - musí obsahovat pouze písmena a čísla, podtržítko (<tt>_</tt>) nebo pomlčku (<tt>-</tt>)
-
+page-whoareyou-error =
+    Uživatelské jméno
+    - musí začínat malým písmenem
+    - musí obsahovat pouze písmena a čísla, podtržítko (<tt>_</tt>) nebo pomlčku (<tt>-</tt>)
 page-password = Vytvořte heslo
 page-password-pw = Heslo
 page-password-rp = Potvrďte heslo
-
 page-internet = Pojďme Vás připojit
 page-internet-desc = Připojte se k Internetu k získání toho nejnovějšího a nejlepšího.
 page-internet-skip = Nemám připojení k Internetu
 page-internet-warn = Kodeky, ovladače a další uživatelské programy nebudou nainstalovány.
 page-internet-open = Otevřít applet Wi-Fi připojení
-
 page-analytics = Analýza a Hlášení nehod
-
 page-crashreport = Hlášení nehod
-page-crashreport-desc = Povolte {$org} sbírání dat o pádech k odhalení chyb a Vaší pomoci.
+page-crashreport-desc = Povolte { $org } sbírání dat o pádech k odhalení chyb a Vaší pomoci.
 page-crashreport-lbl1 = All data collected is anonymous and end-to-end encrypted.
 page-crashreport-lbl2 = You will be given a crash ID to help support find what went wrong.
-
 switch-crashreport = Poslat data havárie
-
 page-location = Služby určování polohy
 page-location-desc = Povolit aplikacím žádato o Vaši přibližnou polohu s Mozilla Location Services
-
 page-codecs = Kodeky a ovladače
 switch-codecs = Nainstalovat kodeky a ovladače
 switch-codecs-desc = Stiskněte další pro přeskočení instalace
-
 page-inputmethod = Metody vstupu
 page-inputmethod-search-lang = Hledat jazyk…
 page-inputmethod-search-ims = Hledat IMs/IMEs…
-
 page-nightlight = Noční osvětlení
 page-nightlight-lbl1 = V noci zbarví obrazovku teplým tónem, pro snížení únavy očí.
 page-nightlight-lbl2 = Není prokázáno, že by noční světlo pomáhalo při potížích s usínáním.
-
-switch-nightlight = {page-nightlight}
-
+switch-nightlight = { page-nightlight }
 page-theme = Vyberte si motiv
-page-theme-desc = Přizpůsobte si system barevným nádechem.
-            Tuto možnost si můžete později změnit v nastavení.
+page-theme-desc =
+    Přizpůsobte si system barevným nádechem.
+    Tuto možnost si můžete později změnit v nastavení.
 page-theme-note = Některé aplikace nemusí toto nastavení respektovat.
 page-theme-light = Světlý
 page-theme-dark = Tmavý
-
 page-browser = Výběr prohlížeče
-
 page-categories = K čemu toto zařízení využíváte?
 page-categories-confirm = Potvrdit a nastavit systém
 page-categories-done = Hotovo
-
 page-installing = Instalace Vašich aplikací
 page-installing-desc = Nepotrvá to dlouho!
 page-installing-loading = Načítání…
-
 page-finish = Váš systém je připraven
 page-finish-desc = Doufáme, že si svůj čerstvý systém užijete!
-page-finish-done = {page-categories.done}
-
+page-finish-done = { page-categories.done }
 page-error = Chyba
 page-error-desc = Omlouváme se, ale vyskytla se nečekaná chyba.
-page-error-done = {page-categories.done}
+page-error-done = { page-categories.done }
 page-error-retry = Opakovat

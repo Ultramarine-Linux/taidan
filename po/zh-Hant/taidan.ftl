@@ -1,95 +1,78 @@
 default = 預設值
 prev = 上一頁
 next = 下一頁
-
 steps-dnfdownloadupdate = 下載系統更新中…
 steps-dnfinstallupdate = 安裝系統更新中…
 steps-script = 執行發行版定義手稿中…
 steps-dnfdownloadapps = 下載使用者程式中…
 steps-dnfinstallapps = 安裝使用者程式中…
 steps-driverscodecs = 安裝驅動程式中…
-
 imelangs-ch = 中文
 imelangs-ja = 日文
 imelangs-ko = 韓文
 imelangs-vi = 越南語
 imelangs-in = 印雅語支
 imelangs-th = 泰文
-imelangs-display = {$lang_name}（{$native_lang_name}）
-
-
-page-welcome = 歡迎使用{$distro}
+imelangs-display = { $lang_name }（{ $native_lang_name }）
+page-welcome = 歡迎使用{ $distro }
 page-welcome-ready = 一起準備好新的系統吧。
 page-welcome-go = 開始
 page-welcome-skipcfg = 略過系統配置
-
 page-keyboard = 鍵盤配置
 page-keyboard-search-layout = 搜尋鍵盤配置…
 page-keyboard-search-variant = 搜尋鍵盤變體…
-
 page-whoareyou = 創建新用戶帳號
 page-whoareyou-fullname = 名字
 page-whoareyou-username = 用戶名稱
-page-whoareyou-error = 用戶名稱
-        - 首個字母須為小楷
-        - 必須只以數字、英文字母、底線(<tt>_</tt>)或連接號(<tt>-</tt>)組成
-
+page-whoareyou-error =
+    用戶名稱
+    - 首個字母須為小楷
+    - 必須只以數字、英文字母、底線(<tt>_</tt>)或連接號(<tt>-</tt>)組成
 page-password = 創建密碼
 page-password-pw = 密碼
 page-password-rp = 重覆密碼
-
 page-internet = 網絡連線
 page-internet-desc = 連接互聯網，取得最新、最好的。
 page-internet-skip = 我不能連上網
 page-internet-warn = 編解碼器、驅動程式及使用者程式將不被安裝。
 page-internet-open = 開啓Wi-Fi連線小程式
-
 page-codecs = 編解碼器及驅動程式
 page-codecs-desc1 = 安裝專利多媒體編解碼器與驅動程式。
-page-codecs-desc2 = 若未能連上網絡，請參考{$wiki}。
+page-codecs-desc2 = 若未能連上網絡，請參考{ $wiki }。
 page-codecs-wiki = 我們的wiki
 switch-codecs = 安裝專利媒體編解碼器與驅動程式
 switch-codecs-desc = 按「下一頁」跳過
-
 page-inputmethod = 輸入法
-page-inputmethod-desc1 = 您可以<b>選擇</b>添加{$ime}，以輸入不同語言的文字。您的選擇將於登入後生效。
-page-inputmethod-desc2 = 選擇{$rime}會有更多的中文輸入法，但這需要自行進階設定，故並不建議新手使用。
-page-inputmethod-desc3 = 您可以到{$wiki}瞭解更多。
+page-inputmethod-desc1 = 您可以<b>選擇</b>添加{ $ime }，以輸入不同語言的文字。您的選擇將於登入後生效。
+page-inputmethod-desc2 = 選擇{ $rime }會有更多的中文輸入法，但這需要自行進階設定，故並不建議新手使用。
+page-inputmethod-desc3 = 您可以到{ $wiki }瞭解更多。
 page-inputmethod-ime = 輸入法
 page-inputmethod-rime = Rime（中州韻輸入法引擎）
 page-inputmethod-wiki = wiki
 page-inputmethod-search-lang = 搜尋語言…
 page-inputmethod-search-ims = 搜尋輸入法…
-
 page-nightlight = 護眼模式
 page-nightlight-lbl1 = 夜間時調教至較暖和的色溫有助減少對雙眼的傷害。
 page-nightlight-lbl2 = 護眼模式並未證實能改善睡眠。
-
-switch-nightlight = {page-nightlight}
-
+switch-nightlight = { page-nightlight }
 page-theme = 選擇主題
-page-theme-desc = 選擇主題色彩。
-            您可以隨時在設定更改此選項。
+page-theme-desc =
+    選擇主題色彩。
+    您可以隨時在設定更改此選項。
 page-theme-note = 部分程式並不會對此設定有所反應。
 page-theme-light = 淺色
 page-theme-dark = 深色
-
 page-browser = 選擇瀏覽器
-
 page-categories = 您會如何使用此設備？
 page-categories-confirm = 確定並裝配系統
 page-categories-done = 完成
-
-categories = {$cat}
-
+categories = { $cat }
 page-installing = 正在安裝您的應用程式
 page-installing-desc = 很快就會完成，請稍等吧！
 page-installing-loading = 加載中…
-
 page-finish = 完成
 page-finish-desc = 希望您享受您的新系統吧！
 page-finish-done = 完成
-
 page-error = 錯誤
 page-error-desc = 不好意思，但我們遇到了問題。
 page-error-done = 關閉
