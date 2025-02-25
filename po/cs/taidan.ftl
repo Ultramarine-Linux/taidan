@@ -23,10 +23,7 @@ page-keyboard-search-variant = Hledat varianty rozložení klávesnice…
 page-whoareyou = Kdo jste?
 page-whoareyou-fullname = Celé jméno
 page-whoareyou-username = Uživatelské jméno
-page-whoareyou-error =
-    Uživatelské jméno
-    - musí začínat malým písmenem
-    - musí obsahovat pouze písmena a čísla, podtržítko (<tt>_</tt>) nebo pomlčku (<tt>-</tt>)
+page-whoareyou-error = Uživatelské jméno musí začínat malým písmenem a musí obsahovat pouze písmena, čísla, podtržítka (<tt>_</tt>) nebo pomlčky (<tt>-</tt>)
 page-password = Vytvořte heslo
 page-password-pw = Heslo
 page-password-rp = Potvrďte heslo
