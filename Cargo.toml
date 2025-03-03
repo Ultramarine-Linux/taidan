@@ -4,7 +4,7 @@ members = ["taidan_proc_macros", "taidan_catalogue_parser"]
 
 [package]
 name = "taidan"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 description = "Out-Of-Box-Experience (OOBE) and Welcome App"
 license = "GPL-2.0-or-later"
@@ -17,7 +17,10 @@ color-eyre = "0.6.3"
 const_format = "0.2.34"
 enum_dispatch = "0.3.13"
 futures = "0.3.31"
-i18n-embed = { version = "0.15.3", features = ["desktop-requester", "fluent-system"] }
+i18n-embed = { version = "0.15.3", features = [
+    "desktop-requester",
+    "fluent-system",
+] }
 i18n-embed-fl = "0.9.3"
 itertools = "0.14.0"
 kurage = { version = "0.1.0" }
