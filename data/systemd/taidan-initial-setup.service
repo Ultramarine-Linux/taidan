@@ -15,9 +15,12 @@ ConditionKernelCommandLine=!rd.live.image
 
 # see https://github.com/cage-kiosk/cage/wiki/Starting-Cage-on-boot-with-systemd
 [Service]
-Type=simple
+Type=oneshot
+TimeoutSec=0
+RemainAfterExit=no
+ExecStartPre=-/bin/plymouth quit
+ExecStartPre=+sh -c "exec chvt 7"
 ExecStart=/usr/bin/cage -s /usr/bin/taidan
-ExecStartPost=+sh -c "exec chvt 7"
 ExecStopPost=+sh -c "exec chvt 1"
 User=taidan
 UtmpIdentifier=tty7
