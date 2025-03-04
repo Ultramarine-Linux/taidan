@@ -2,8 +2,9 @@ use crate::prelude::*;
 generate_page!(Internet {
     btn_next: libhelium::Button,
     lbl_warn: gtk::Label,
+    lbl_ok: gtk::Label,
 }:
-    init[lbl_warn](root, sender, model, widgets) {
+    init[lbl_warn lbl_ok](root, sender, model, widgets) {
         let sender1 = sender.clone();
         sender.oneshot_command(async move { check_online(sender1).await });
         model.btn_next = widgets.prev_next_btns.next.clone();
@@ -12,6 +13,7 @@ generate_page!(Internet {
         IsOnline => {
             self.btn_next.set_sensitive(true);
             self.lbl_warn.set_visible(false);
+            self.lbl_ok.set_visible(true);
         }
     } => {}
 
@@ -50,6 +52,13 @@ generate_page!(Internet {
                 SETTINGS.write().nointernet = true;
                 sender.input(Self::Input::Nav(NavAction::Next));
             },
+        },
+
+        #[local_ref] lbl_ok ->
+        gtk::Label {
+            set_label: &t!("page-internet-ok"),
+            set_visible: false,
+            add_css_class: "success",
         },
 
         #[local_ref] lbl_warn ->
