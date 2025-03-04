@@ -62,7 +62,7 @@ pub(super) async fn handle_dnf(
 #[derive(Debug)]
 pub(super) struct EnableRepo {
     /// denotes the path to the file, the toml object and whether it is modified.
-    files: std::collections::HashMap<std::path::PathBuf, (toml_edit::DocumentMut, bool)>,
+    files: std::collections::HashMap<std::path::PathBuf, (Vec<u8>, bool)>,
 }
 
 impl EnableRepo {
@@ -75,12 +75,27 @@ impl EnableRepo {
     #[tracing::instrument]
     pub(super) async fn enable_repo(&mut self, repo: &str) -> color_eyre::Result<()> {
         tracing::debug!("Enabling repo");
-        if let Some((inner_toml, b)) = self
-            .files
-            .iter_mut()
-            .find_map(|(_, (doc, b))| doc.get_mut(repo).map(|toml| (toml, b)))
-        {
-            inner_toml["enabled"] = toml_edit::value(1);
+        if let Some((doc, b)) = self.files.iter_mut().find_map(|(_, (doc, b))| {
+            doc.starts_with(&format_bytes::format_bytes!(b"[{}]\n", repo.as_bytes()))
+                .then_some((doc, b))
+        }) {
+            const TARGET: &[u8] = b"\nenabled=";
+            if memchr::memmem::find(doc, b"\nenabled=1").is_some() {
+                return Ok(());
+            }
+            if let Some(i) = memchr::memmem::find(doc, TARGET) {
+                doc[i + TARGET.len()] = b'1';
+                let mut j = 1;
+                while doc[i + TARGET.len() + j] != b'\n' {
+                    doc[i + TARGET.len() + j] = b' ';
+                    j += 1;
+                }
+            } else {
+                let mut newdoc = doc[..repo.len() + 3].to_vec();
+                newdoc.extend(b"enabled=1\n");
+                newdoc.extend(&doc[repo.len() + 3..]);
+                std::mem::swap(&mut newdoc, doc);
+            }
             *b = true;
             return Ok(());
         }
@@ -110,16 +125,7 @@ impl EnableRepo {
         let mut readdir = tokio::fs::read_dir("/etc/yum.repos.d/").await?;
         let mut files = std::collections::HashMap::new();
         while let Some(f) = readdir.next_entry().await? {
-            files.insert(
-                f.path(),
-                (
-                    std::fs::read_to_string(f.path())?
-                        .parse()
-                        .wrap_err("invalid toml file")
-                        .with_note(|| format!("path: {}", f.path().display()))?,
-                    false,
-                ),
-            );
+            files.insert(f.path(), (std::fs::read(f.path())?, false));
         }
         Ok(Self { files })
     }
@@ -130,7 +136,7 @@ impl EnableRepo {
             self.files
                 .iter()
                 .filter(|(_, (_, b))| *b)
-                .map(|(p, (doc, _))| tokio::fs::write(p, doc.to_string())),
+                .map(|(p, (doc, _))| tokio::fs::write(p, doc)),
         )
         .await?;
         Ok(())
