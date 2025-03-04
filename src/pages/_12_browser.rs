@@ -8,9 +8,9 @@ generate_page!(Browser {
     browser_rows: Vec<relm4::Controller<BrowserRow>>,
     optlist: gtk::ListBox,
     btn_next: libhelium::Button,
-    img: libhelium::ContentBlockImage,
+    // img: libhelium::ContentBlockImage,
 }:
-    init[optlist img](root, sender, model, widgets) {
+    init[optlist /* img */](root, sender, model, widgets) {
         let browser_category = CFG.catalogue.iter()
             .find(|category| category.name == "Browsers")
             .expect("No browser category");
@@ -32,8 +32,8 @@ generate_page!(Browser {
             let mut sett = SETTINGS.write();
             let ctlg = &mut sett.catalogue;
             let selection = row.model().choice.name.to_ascii_lowercase().replace(' ', "-");
-            self.img.set_file(&format!("resource:///com/fyralabs/Taidan/screenshots/ss-browser-{selection}.png"));
-            self.img.set_visible(true);
+            // self.img.set_file(&format!("resource:///com/fyralabs/Taidan/screenshots/ss-browser-{selection}.png"));
+            // self.img.set_visible(true);
             if let Some(browsers) = ctlg.get_mut("browser") {
                 // NOTE: since we only allow 1 browser choice, remove the old one
                 browsers.clear();
@@ -83,13 +83,13 @@ generate_page!(Browser {
                 set_orientation: gtk::Orientation::Vertical,
 
                 // BUG: gtk refuses to update the image automatically???
-                #[local_ref] img ->
-                libhelium::ContentBlockImage {
-                    set_requested_height: 150,
-                    set_requested_width: 150*1920/1080,
-                    set_valign: gtk::Align::Center,
-                    set_halign: gtk::Align::Center,
-                },
+                // #[local_ref] img ->
+                // libhelium::ContentBlockImage {
+                //     set_requested_height: 150,
+                //     set_requested_width: 150*1920/1080,
+                //     set_valign: gtk::Align::Center,
+                //     set_halign: gtk::Align::Center,
+                // },
 
                 #[local_ref] optlist ->
                 gtk::ListBox {
