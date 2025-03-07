@@ -23,10 +23,7 @@ page-keyboard-search-variant = Tìm kiếm biến thể bàn phím…
 page-whoareyou = Giới thiệu bạn là ai?
 page-whoareyou-fullname = Tên đầy đủ
 page-whoareyou-username = Tên người dùng
-page-whoareyou-error =
-    Tên người dùng
-    - phải bắt đầu bằng chữ thường
-    - chỉ được chứa chữ cái và số, dấu gạch dưới (<tt>_</tt>) hoặc dấu gạch ngang (<tt>-</tt>)
+page-whoareyou-error = Tên người dùng phải bắt đầu bằng chữ thường và chỉ được chứa chữ cái và số, dấu gạch dưới (<tt>_</tt>) hoặc dấu gạch ngang (<tt>-</tt>)
 page-password = Hãy đặt mật khẩu
 page-password-pw = Mật khẩu
 page-password-rp = Nhập lại mật khẩu
@@ -51,7 +48,7 @@ page-inputmethod-search-ims = Tìm kiếm IMs/IMEs…
 page-nightlight = Ánh sáng đêm
 page-nightlight-lbl1 = Phủ màn hình bằng tông màu ấm vào ban đêm để giảm mỏi mắt.
 page-nightlight-lbl2 = Ánh sáng đêm không được chứng minh là hỗ trợ việc mất ngủ.
-switch-nightlight = { page-nightlight }
+switch-nightlight = Ánh sáng đêm
 page-theme = Chọn chủ đề bạn muốn
 page-theme-desc =
     Biến hệ thống này thành của riêng bạn với một chút màu sắc.
@@ -72,5 +69,5 @@ page-finish-desc = Tận hưởng hệ thống mới của bạn!
 page-finish-done = { page-categories.done }
 page-error = Lỗi
 page-error-desc = Rất tiếc, đã có lỗi xảy ra.
-page-error-done = { page-categories.done }
+page-error-done = Xong
 page-error-retry = Thử lại
