@@ -34,7 +34,10 @@ impl WidgetTemplate for SwitchBox {
         libhelium::MiniContentBlock {
             #[wrap(Some)]
             #[name(switch)]
-            set_widget = &gtk::Switch {}
+            set_widget = &gtk::Switch {
+                set_halign: gtk::Align::End,
+                set_hexpand: true
+            }
         }
     }
 }
