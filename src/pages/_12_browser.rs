@@ -31,7 +31,7 @@ generate_page!(Browser {
             let row = self.browser_rows.get(index).expect("browser row not exist called browser page");
             let mut sett = SETTINGS.write();
             let ctlg = &mut sett.catalogue;
-            let selection = row.model().choice.name.to_ascii_lowercase().replace(' ', "-");
+            // let selection = row.model().choice.name.to_ascii_lowercase().replace(' ', "-");
             // self.img.set_file(&format!("resource:///com/fyralabs/Taidan/screenshots/ss-browser-{selection}.png"));
             // self.img.set_visible(true);
             if let Some(browsers) = ctlg.get_mut("browser") {

@@ -319,7 +319,12 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
 
     tracing_subscriber::registry()
         .with(fmt::layer().pretty())
-        .with(EnvFilter::from_env("TAIDAN_LOG"))
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(tracing::level_filters::LevelFilter::DEBUG.into())
+                .with_env_var("TAIDAN_LOG")
+                .from_env_lossy(),
+        )
         .with(
             tracing_journald::layer()
                 .unwrap()
