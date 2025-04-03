@@ -178,10 +178,15 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Nav(NavAction::GoTo(page)) => self.page = *page,
             AppMsg::Nav(NavAction::Quit) => {
-                if let Err(e) = std::fs::remove_file("/.unconfigured") {
-                    tracing::error!(?e, "cannot remove /.unconfigured; exiting anyway");
-                }
-                std::process::exit(0);
+                sender.oneshot_command(async {
+                    if let Err(e) = backend::pkexec("root", "rm", &["-rf", "/.unconfigured"]).await
+                    {
+                        tracing::error!(?e, "cannot remove /.unconfigured; exiting anyway");
+                    } else {
+                        tracing::debug!("removed /.unconfigured");
+                    }
+                });
+                relm4::main_application().quit();
             }
             AppMsg::Nav(NavAction::Next) => {
                 self.page = usize::from(self.page)

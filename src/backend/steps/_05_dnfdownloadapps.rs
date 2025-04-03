@@ -90,18 +90,10 @@ impl super::Step for DnfDownloadApps {
         }
         enable_repo.save().await?;
         for copr in &settings.actions[4] {
-            let dnf = tokio::process::Command::new("dnf")
-                .args(["copr", "enable", copr])
-                .status()
-                .await
-                .wrap_err("fail to run `dnf`")?;
-            if !dnf.success() {
-                return Err(eyre!("`dnf copr enable {copr}` failed")
-                    .note(format!("Exit code: {:?}", dnf.code())));
-            }
+            crate::backend::pkexec("root", "dnf5", &["copr", "enable", copr]).await?;
         }
         // as per jade's request, we need to remove firefox first for the browser category
-        super::acmd("dnf5", &["rm", "-yq", "firefox"]).await?;
+        crate::backend::pkexec("root", "dnf5", &["rm", "-yq", "firefox"]).await?;
 
         // run flatpak and dnf in parallel
         // this should be safe, supposedly they don't affect each other
