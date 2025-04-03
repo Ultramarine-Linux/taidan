@@ -237,12 +237,11 @@ impl AppModel {
 
 fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
     use i18n_embed::{
-        fluent::fluent_language_loader,
-        unic_langid::{subtags::Script, LanguageIdentifier},
-        LanguageLoader,
+        fluent::fluent_language_loader, unic_langid::LanguageIdentifier, LanguageLoader,
     };
     use std::str::FromStr;
     let loader = fluent_language_loader!();
+    let locale_solver = poly_l10n::LocaleFallbackSolver::<poly_l10n::Rulebook>::default();
     let available_langs = loader.available_languages(&Localizations).unwrap();
     let mut langs = ["LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE", "LANGUAGES"]
         .into_iter()
@@ -254,21 +253,8 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
                     .collect_vec()
             })
         })
-        .update(|li| {
-            if li.language == "zh" {
-                if available_langs.iter().contains(li) {
-                } else if li.script.is_some() {
-                    li.clear_variants();
-                } else if li
-                    .region
-                    .is_some_and(|region| ["HK", "TW", "MO"].contains(&region.as_str()))
-                {
-                    li.script = Some(Script::from_bytes(b"Hant").unwrap());
-                } else {
-                    li.script = Some(Script::from_bytes(b"Hans").unwrap());
-                }
-            }
-        })
+        .flat_map(|li| locale_solver.solve_locale(li))
+        .filter(|li| available_langs.contains(li))
         .collect_vec();
     if langs.is_empty() {
         langs = vec![loader.fallback_language().clone()];
