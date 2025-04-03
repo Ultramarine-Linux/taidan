@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{backend::root, prelude::*};
 static NVIDIA_PREFIXES: std::sync::LazyLock<std::collections::HashMap<&str, &str>> =
     std::sync::LazyLock::new(|| {
         [
@@ -29,7 +29,6 @@ static NVIDIA_PREFIXES: std::sync::LazyLock<std::collections::HashMap<&str, &str
 
 use tokio::process::Command;
 
-use super::acmd;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DriversCodecs;
 #[derive(Clone, Copy, Debug, Default)]
@@ -145,10 +144,10 @@ impl Drivers {
         let pkgs = Self::list_nvidia_packages().await?;
         let mut args = vec!["install", "-y"];
         args.extend(pkgs.iter().map(String::as_str));
-        acmd("rpm-ostree", &args)
+        root("rpm-ostree", &args)
             .await
             .with_note(|| format!("pkgs={pkgs:?}"))?;
-        acmd(
+        root(
             "rpm-ostree",
             &[
                 "kargs",
@@ -177,12 +176,12 @@ impl Drivers {
         let pkgs = Self::list_nvidia_packages().await?;
         let mut args = vec!["in", "-y", "--allowerasing", "--best"];
         args.extend(pkgs.iter().map(String::as_str));
-        acmd("dnf", &args)
+        root("dnf", &args)
             .await
             .with_note(|| format!("pkgs={pkgs:?}"))?;
 
         if primary_gpu {
-            acmd(
+            root(
                 "sh",
                 &[r#"
                     cp -p /usr/share/X11/xorg.conf.d/nvidia.conf /etc/X11/xorg.conf.d/nvidia.conf
@@ -216,13 +215,13 @@ impl Drivers {
     async fn setup_broadcom() -> color_eyre::Result<()> {
         if Self::check_boardcom_wifi().await {
             tracing::info!("Setting up broadcom wifi drivers");
-            acmd("dnf", &["in", "-y", "broadcom-wl", "akmod-wl"])
+            root("dnf", &["in", "-y", "broadcom-wl", "akmod-wl"])
                 .await
                 .wrap_err("fail to install broadcom wifi drivers")?;
         }
         if Self::check_boardcom_bluetooth().await {
             tracing::info!("Setting up broadcom bluetooth drivers");
-            acmd("dnf", &["in", "-y", "broadcom-bt-firmware"])
+            root("dnf", &["in", "-y", "broadcom-bt-firmware"])
                 .await
                 .wrap_err("fail to install broadcom bluetooth drivers")?;
         }

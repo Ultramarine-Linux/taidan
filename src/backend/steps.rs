@@ -142,3 +142,5 @@ pub async fn acmd(name: &str, args: &[&str]) -> color_eyre::Result<()> {
     }
     Ok(())
 }
+
+pub(crate) use super::root;
