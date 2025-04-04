@@ -290,22 +290,3 @@ pub async fn set_keymap(
         set_gsettings_keymap(user, layout, variant).await
     }
 }
-
-pub async fn get_lang() -> Option<String> {
-    let langs = taidan_proc_macros::list_langs_by_langpacks!();
-    let f = tokio::fs::read_to_string("/etc/locale.conf").await.ok()?;
-    f.lines()
-        .find_map(|l| {
-            l.strip_prefix("LANGUAGE=")
-                .or_else(|| l.strip_prefix("LANG="))
-        })
-        .iter()
-        .find_map(|&s| {
-            langs.contains(&s).then_some(s).or_else(|| {
-                s.split_once('_')
-                    .map(|(s, _)| s)
-                    .filter(|s| langs.contains(s))
-            })
-        })
-        .map(ToOwned::to_owned)
-}

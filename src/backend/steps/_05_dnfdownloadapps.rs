@@ -70,10 +70,6 @@ impl super::Step for DnfDownloadApps {
             settings.actions[1].push("fcitx5-chinese-addons".to_owned());
         }
 
-        if let Some(lang) = crate::backend::i18n::get_lang().await {
-            settings.actions[1].push(format!("ultramarine-langpacks-{lang}"));
-        }
-
         Ok(())
     }
     #[tracing::instrument]
