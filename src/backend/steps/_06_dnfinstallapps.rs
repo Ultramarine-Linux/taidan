@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use tokio::process::Command;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DnfInstallApps;
 impl super::Step for DnfInstallApps {
@@ -12,28 +11,47 @@ impl super::Step for DnfInstallApps {
         if settings.nointernet {
             return Ok(());
         }
-        // run flatpak and dnf in parallel
-        // this should be safe, supposedly they don't affect each other
-        futures::future::try_join(
-            super::super::flatpak::handle_flatpak(sender.clone(), |flatpak| {
-                flatpak
-                    .args(["install", "-y", "--noninteractive", "--no-pull"])
-                    .args(&settings.actions[2])
-            }),
-            super::super::dnf::handle_dnf(sender, |dnf| {
-                dnf.args(["in", "-y"]).args(&settings.actions[1])
-            }),
-        )
-        .await?;
+        match (
+            settings.actions[1].is_empty(),
+            settings.actions[2].is_empty(),
+        ) {
+            (true, true) => {}
+            (true, false) => {
+                super::super::flatpak::handle_flatpak(sender.clone(), |flatpak| {
+                    flatpak
+                        .args(["install", "-y", "--noninteractive", "--no-pull"])
+                        .args(&settings.actions[2])
+                })
+                .await?;
+            }
+            (false, true) => {
+                super::super::dnf::handle_dnf(sender, |dnf| {
+                    dnf.args(["in", "-y"]).args(&settings.actions[1])
+                })
+                .await?;
+            }
+            (false, false) => {
+                // run flatpak and dnf in parallel
+                // this should be safe, supposedly they don't affect each other
+                futures::future::try_join(
+                    super::super::flatpak::handle_flatpak(sender.clone(), |flatpak| {
+                        flatpak
+                            .args(["install", "-y", "--noninteractive", "--no-pull"])
+                            .args(&settings.actions[2])
+                    }),
+                    super::super::dnf::handle_dnf(sender, |dnf| {
+                        dnf.args(["in", "-y"]).args(&settings.actions[1])
+                    }),
+                )
+                .await?;
+            }
+        }
 
         for script in &settings.actions[3] {
-            let status = (Command::new("sh").args(["-c", script]).status().await)
-                .wrap_err("fail to run `sh`")?;
-            if !status.success() {
-                return Err(eyre!("script failed")
-                    .note(format!("status: {status:?}"))
-                    .note(format!("script: {script:?}")));
-            }
+            super::root("sh", &["-c", script])
+                .await
+                .wrap_err("script failed")
+                .note(format!("script: {script:?}"))?;
         }
 
         Ok(())

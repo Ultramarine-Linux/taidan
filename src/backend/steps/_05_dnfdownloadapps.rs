@@ -91,20 +91,43 @@ impl super::Step for DnfDownloadApps {
         // as per jade's request, we need to remove firefox first for the browser category
         crate::backend::pkexec("root", "dnf5", &["rm", "-yq", "firefox"]).await?;
 
-        // run flatpak and dnf in parallel
-        // this should be safe, supposedly they don't affect each other
-        futures::future::try_join(
-            super::super::flatpak::handle_flatpak(sender.clone(), |flatpak| {
-                flatpak
-                    .args(["install", "-y", "--noninteractive", "--no-deploy"])
-                    .args(&settings.actions[2])
-            }),
-            super::super::dnf::handle_dnf(sender, |dnf| {
-                dnf.args(["in", "-y", "--downloadonly"])
-                    .args(&settings.actions[1])
-            }),
-        )
-        .await?;
+        match (
+            settings.actions[1].is_empty(),
+            settings.actions[2].is_empty(),
+        ) {
+            (true, true) => {}
+            (true, false) => {
+                super::super::flatpak::handle_flatpak(sender.clone(), |flatpak| {
+                    flatpak
+                        .args(["install", "-y", "--noninteractive", "--no-deploy"])
+                        .args(&settings.actions[2])
+                })
+                .await?;
+            }
+            (false, true) => {
+                super::super::dnf::handle_dnf(sender, |dnf| {
+                    dnf.args(["in", "-y", "--downloadonly"])
+                        .args(&settings.actions[1])
+                })
+                .await?;
+            }
+            (false, false) => {
+                // run flatpak and dnf in parallel
+                // this should be safe, supposedly they don't affect each other
+                futures::future::try_join(
+                    super::super::flatpak::handle_flatpak(sender.clone(), |flatpak| {
+                        flatpak
+                            .args(["install", "-y", "--noninteractive", "--no-deploy"])
+                            .args(&settings.actions[2])
+                    }),
+                    super::super::dnf::handle_dnf(sender, |dnf| {
+                        dnf.args(["in", "-y", "--downloadonly"])
+                            .args(&settings.actions[1])
+                    }),
+                )
+                .await?;
+            }
+        }
         Ok(())
     }
 }
