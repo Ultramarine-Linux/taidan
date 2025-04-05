@@ -103,7 +103,6 @@ page-codecs = Codecs and Drivers
 page-codecs-desc1 = Install proprietary media codecs and drivers for your device.
 page-codecs-desc2 =
     Consult the { $wiki } if you don't have an Internet connection.
-    # we need to make this another attribute because we need to tag this as a link
 page-codecs-wiki = wiki
 switch-codecs = Install Codecs and Drivers
 switch-codecs-desc = Press next to skip installation
