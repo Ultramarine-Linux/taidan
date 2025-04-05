@@ -176,7 +176,12 @@ impl SimpleComponent for AppModel {
                 tracing::trace!("Skipping to page Internet");
                 self.page = Page::Internet;
             }
-            AppMsg::Nav(NavAction::GoTo(page)) => self.page = *page,
+            AppMsg::Nav(NavAction::GoTo(page)) => {
+                self.page = *page;
+                if *page == Page::Installing {
+                    self.run_install(sender, backend::start_install);
+                }
+            }
             AppMsg::Nav(NavAction::Quit) => {
                 sender.oneshot_command(async {
                     if let Err(e) = backend::pkexec("root", "rm", &["-rf", "/.unconfigured"]).await
