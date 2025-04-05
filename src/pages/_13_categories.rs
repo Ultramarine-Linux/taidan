@@ -11,7 +11,7 @@ generate_page!(Categories {
         let mut catfactory: FactoryVecDeque<CategoryBtn>
             = FactoryVecDeque::builder().launch(widgets.flowbox.clone()).forward(sender.input_sender(), CategoriesPageMsg::BtnClick);
         let mut catf = catfactory.guard();
-        CFG.catalogue.iter().filter(|cat| cat.name != "browser")
+        CFG.catalogue.iter().filter(|cat| cat.name != super::_12_browser::BROWSER_CATEGORY)
             .for_each(|cat| _ = catf.push_back(CategoryBtn {
                 category: cat.name.clone(),
             }));

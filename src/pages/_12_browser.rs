@@ -2,7 +2,7 @@
 use crate::prelude::*;
 use relm4::RelmRemoveAllExt;
 
-const BROWSER_CATEGORY: &str = "Browsers";
+pub(crate) const BROWSER_CATEGORY: &str = "Browsers";
 
 generate_page!(Browser {
     browser_rows: Vec<relm4::Controller<BrowserRow>>,
@@ -12,7 +12,7 @@ generate_page!(Browser {
 }:
     init[optlist /* img */](root, sender, model, widgets) {
         let browser_category = CFG.catalogue.iter()
-            .find(|category| category.name == "Browsers")
+            .find(|category| category.name ==BROWSER_CATEGORY)
             .expect("No browser category");
         model.browser_rows = browser_category.choices.iter().cloned().enumerate()
             .map(|(index, choice)| {
@@ -34,7 +34,7 @@ generate_page!(Browser {
             // let selection = row.model().choice.name.to_ascii_lowercase().replace(' ', "-");
             // self.img.set_file(&format!("resource:///com/fyralabs/Taidan/screenshots/ss-browser-{selection}.png"));
             // self.img.set_visible(true);
-            if let Some(browsers) = ctlg.get_mut("browser") {
+            if let Some(browsers) = ctlg.get_mut(BROWSER_CATEGORY) {
                 // NOTE: since we only allow 1 browser choice, remove the old one
                 browsers.clear();
                 if let Some(opts) = browsers.get(&index) {
@@ -46,7 +46,7 @@ generate_page!(Browser {
             } else {
                 let mut map = std::collections::HashMap::new();
                 map.insert(index, vec![0;CFG.catalogue.iter().find(|c| c.name == BROWSER_CATEGORY).expect("can't find category").choices[index].options.len()]);
-                ctlg.insert("browser".into(), map);
+                ctlg.insert(BROWSER_CATEGORY.into(), map);
                 row.model().populate_optlist(&self.optlist, index, &std::iter::empty());
             }
         },
@@ -210,7 +210,7 @@ fn on_choice_toggled(browser_index: usize, i: usize, k: usize) -> impl Fn(&gtk::
             SETTINGS
                 .write()
                 .catalogue
-                .get_mut("browser")
+                .get_mut(BROWSER_CATEGORY)
                 .unwrap()
                 .get_mut(&browser_index)
                 .unwrap()[i] = k;
@@ -218,7 +218,7 @@ fn on_choice_toggled(browser_index: usize, i: usize, k: usize) -> impl Fn(&gtk::
             SETTINGS
                 .write()
                 .catalogue
-                .get_mut("browser")
+                .get_mut(BROWSER_CATEGORY)
                 .unwrap()
                 .get_mut(&browser_index)
                 .unwrap()[i] = 0;
