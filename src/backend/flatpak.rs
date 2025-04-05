@@ -17,13 +17,14 @@ pub(super) async fn handle_flatpak(
     let mut cmd = tokio::process::Command::new("pkexec");
     cmd.args(["--user", "root", "flatpak"]);
     f(&mut cmd);
-    let mut output = cmd
-        .stdout(std::process::Stdio::piped())
+    let output = cmd
+        // .stdout(std::process::Stdio::piped())
         .spawn()
         .wrap_err("fail to run `flatpak`")?;
-    let mut stdout_lines = tokio::io::BufReader::new(output.stdout.take().unwrap()).split(b'\n');
+    // let mut stdout_lines = tokio::io::BufReader::new(output.stdout.take().unwrap()).split(b'\n');
     futures::try_join!(
         async move {
+            /*
             while let Some(line) =
                 (stdout_lines.next_segment().await).wrap_err("cannot read stdout")?
             {
@@ -54,9 +55,11 @@ pub(super) async fn handle_flatpak(
 
                 pu::send_frac(&sender, &line[afterspace..slash], &line[slash + 1..end]);
             }
+            */
             Ok(())
         },
         pu::wait_for("flatpak", output)
     )?;
+    pu::send_frac(&sender, 100, 100);
     Ok(())
 }

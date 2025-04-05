@@ -96,19 +96,13 @@ mod parseutil {
     /// # Panics
     /// - cannot convert bytes to `&str`
     /// - cannot parse to `u32`
-    pub fn send_frac(
-        sender: &relm4::Sender<crate::pages::InstallingPageMsg>,
-        num: &[u8],
-        den: &[u8],
-    ) {
-        let denominator: u32 = core::str::from_utf8(den).unwrap().parse().unwrap();
-        if denominator == 0 {
+    pub fn send_frac(sender: &relm4::Sender<crate::pages::InstallingPageMsg>, num: u32, den: u32) {
+        if den == 0 {
             return;
         }
-        let numerator: u32 = core::str::from_utf8(num).unwrap().parse().unwrap();
         sender
             .send(crate::pages::InstallingPageMsg::UpdFlatpakProg(
-                f64::from(numerator) / f64::from(denominator),
+                f64::from(num) / f64::from(den),
             ))
             .expect("ui sender fails");
     }

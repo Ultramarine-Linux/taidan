@@ -1,7 +1,12 @@
+use std::sync::LazyLock;
+
 use super::parseutil as pu;
 use tokio::io::AsyncBufReadExt;
 
 use crate::prelude::*;
+
+static PROGRESS_REGEX: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"^\[(\d+)/(\d+)\]").unwrap());
 
 /// # Errors
 /// - if `dnf5` doesn't work correctly then maybe
@@ -21,37 +26,22 @@ pub(super) async fn handle_dnf(
         .stdout(std::process::Stdio::piped())
         .spawn()
         .wrap_err("fail to run `dnf5`")?;
-    let mut stdout_lines = tokio::io::BufReader::new(output.stdout.take().unwrap()).split(b'\n');
+    let mut stdout_lines = tokio::io::BufReader::new(output.stdout.take().unwrap()).lines();
     futures::try_join!(
         async move {
             while let Some(line) =
-                (stdout_lines.next_segment().await).wrap_err("cannot read stdout")?
+                (stdout_lines.next_line().await).wrap_err("cannot read stdout")?
             {
-                let mut it = line.iter().copied();
-                if it.next().is_none_or(|c| c != b'[') {
-                    continue;
-                }
-
-                let slash = if let Some(slash) = pu::search(&mut it, |c| {
-                    (c == b' ' || c.is_ascii_digit()).then_some(c == b'/')
-                }) {
-                    slash + 1
-                } else {
+                let Some(matches) = PROGRESS_REGEX.captures(&line) else {
                     continue;
                 };
-
-                let end = if let Some(end) =
-                    pu::search(&mut it, |c| c.is_ascii_digit().then_some(c == b']'))
-                {
-                    end + slash + 1
-                } else {
+                let Ok(numerator) = matches[1].parse() else {
                     continue;
                 };
-
-                if end == slash + 1 || slash == 1 {
+                let Ok(denominator) = matches[2].parse() else {
                     continue;
-                }
-                pu::send_frac(&sender, &line[1..slash], &line[slash + 1..end]);
+                };
+                pu::send_frac(&sender, numerator, denominator);
             }
             Ok(())
         },

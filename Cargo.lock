@@ -2468,6 +2468,7 @@ dependencies = [
  "paste",
  "phf",
  "poly_l10n",
+ "regex",
  "relm4",
  "reqwest",
  "rust-embed",
