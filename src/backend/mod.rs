@@ -118,6 +118,7 @@ mod parseutil {
 /// - command failed to run
 /// - command exited with non-zero status code
 pub async fn pkexec(user: &str, name: &str, args: &[&str]) -> color_eyre::Result<()> {
+    tracing::debug!(?name, ?args, "running pkexec");
     let p = tokio::process::Command::new("pkexec")
         .args(["--user", user, name])
         .args(args)
@@ -134,6 +135,7 @@ pub async fn pkexec(user: &str, name: &str, args: &[&str]) -> color_eyre::Result
 /// - command failed to run
 /// - command exited with non-zero status code
 pub async fn root(name: &str, args: &[&str]) -> color_eyre::Result<()> {
+    tracing::debug!(?name, ?args, "running pkexec");
     let p = tokio::process::Command::new("pkexec")
         .args(["--user", "root", name])
         .args(args)

@@ -86,7 +86,7 @@ impl super::Step for DnfDownloadApps {
         }
         enable_repo.save().await?;
         for copr in &settings.actions[4] {
-            crate::backend::pkexec("root", "dnf5", &["copr", "enable", copr]).await?;
+            crate::backend::pkexec("root", "dnf5", &["copr", "enable", "-y", copr]).await?;
         }
         // as per jade's request, we need to remove firefox first for the browser category
         crate::backend::pkexec("root", "dnf5", &["rm", "-yq", "firefox"]).await?;

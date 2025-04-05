@@ -16,7 +16,6 @@ keywords = ["oobe", "ultramarine", "linux"]
 color-eyre = "0.6.3"
 const_format = "0.2.34"
 enum_dispatch = "0.3.13"
-format-bytes = "0.3.0"
 futures = "0.3.31"
 i18n-embed = { version = "0.15.3", features = [
     "desktop-requester",
@@ -41,14 +40,13 @@ serde = "1.0.217"
 serde_json = "1.0.138"
 taidan_catalogue_parser = { path = "taidan_catalogue_parser" }
 taidan_proc_macros = { path = "taidan_proc_macros" }
-tempfile = "3.14.0"
+tempfile = { version = "3.14.0", default-features = false }
 tokio = { version = "1.42.0", features = [
     "fs",
     "io-util",
     "macros",
     "process",
 ] }
-toml_edit = "0.22.22"
 tracing = "0.1.41"
 tracing-appender = "0.2.3"
 tracing-error = "0.2.1"

@@ -77,7 +77,7 @@ impl EnableRepo {
     pub(super) async fn enable_repo(&mut self, repo: &str) -> color_eyre::Result<()> {
         tracing::debug!("Enabling repo");
         if let Some((doc, b)) = self.files.iter_mut().find_map(|(_, (doc, b))| {
-            doc.starts_with(&format_bytes::format_bytes!(b"[{}]\n", repo.as_bytes()))
+            doc.starts_with(format!("[{repo}]\n").as_bytes())
                 .then_some((doc, b))
         }) {
             const TARGET: &[u8] = b"\nenabled=";
