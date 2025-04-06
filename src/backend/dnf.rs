@@ -6,7 +6,7 @@ use tokio::io::AsyncBufReadExt;
 use crate::prelude::*;
 
 static PROGRESS_REGEX: LazyLock<regex::Regex> =
-    LazyLock::new(|| regex::Regex::new(r"^\[(\d+)/(\d+)\]").unwrap());
+    LazyLock::new(|| regex::Regex::new(r"^\[\s*(\d+)/(\d+)\]").unwrap());
 
 /// # Errors
 /// - if `dnf5` doesn't work correctly then maybe
@@ -131,5 +131,19 @@ impl EnableRepo {
         )
         .await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn dnf_progress_regex() {
+        let line = "[ 1/50] idk";
+        let matches = PROGRESS_REGEX.captures(line).unwrap();
+        let numerator: u32 = matches[1].parse().unwrap();
+        let denominator: u32 = matches[2].parse().unwrap();
+        assert_eq!(numerator, 1);
+        assert_eq!(denominator, 50);
     }
 }
