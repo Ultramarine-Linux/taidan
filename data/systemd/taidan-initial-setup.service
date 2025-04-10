@@ -13,7 +13,6 @@ Before=display-manager.service
 Conflicts=plymouth-quit-wait.service initial-setup-text.service initial-setup-graphical.service initial-setup.service
 ConditionKernelCommandLine=!rd.live.image
 
-# see https://github.com/cage-kiosk/cage/wiki/Starting-Cage-on-boot-with-systemd
 [Service]
 Type=oneshot
 TimeoutSec=0

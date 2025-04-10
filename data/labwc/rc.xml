@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+
+<!--
+  This is a very simple config file with many options missing. For a complete
+  set of options with comments, see docs/rc.xml.all
+-->
+
+<labwc_config>
+
+  <theme>
+    <name></name>
+    <cornerRadius>8</cornerRadius>
+    <font name="Inter" size="11" />
+  </theme>
+
+  <keyboard>
+    <default />
+  </keyboard>
+
+  <mouse>
+    <default />
+    <!-- unbind all mouse buttons for desktop -->
+    <context name="Root">
+      <mousebind button="Right" action="Press">
+      </mousebind>
+    </context>
+        <context name="Root">
+      <mousebind button="Left" action="Press">
+
+      </mousebind>
+    </context>
+  </mouse>
+
+</labwc_config>

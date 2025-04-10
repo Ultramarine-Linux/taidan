@@ -10,3 +10,4 @@ install -Dpm644 data/systemd/*.service                  -t $DESTDIR/usr/lib/syst
 install -Dpm644 data/systemd/*.preset                   -t $DESTDIR/usr/lib/systemd/system-preset/
 install -Dpm644 data/polkit-1/rules.d/100-taidan.rules  -t $DESTDIR/usr/share/polkit-1/rules.d/
 install -Dpm644 data/pam.d/taidan -t $DESTDIR/etc/pam.d/
+install -Dpm644 data/labwc/*                               -t $DESTDIR/usr/lib/taidan/labwc/
