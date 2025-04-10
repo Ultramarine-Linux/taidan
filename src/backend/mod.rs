@@ -64,17 +64,6 @@ pub async fn start_simple_install(
 mod parseutil {
     use crate::prelude::*;
 
-    pub fn search<F: FnMut(u8) -> Option<bool>, I: Iterator<Item = u8>>(
-        it: &mut I,
-        mut f: F,
-    ) -> Option<usize> {
-        let mut idx = 0;
-        while !f(it.next()?)? {
-            idx += 1;
-        }
-        Some(idx)
-    }
-
     /// # Errors
     /// - wait for `output` failed…?
     /// - process exited with non-zero error code

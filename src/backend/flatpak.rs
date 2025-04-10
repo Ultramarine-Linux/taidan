@@ -1,6 +1,4 @@
 use super::parseutil as pu;
-use tokio::io::AsyncBufReadExt;
-
 use crate::prelude::*;
 
 /// # Errors
