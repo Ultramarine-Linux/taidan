@@ -1,4 +1,4 @@
 # Example autostart file
 
 # Set background color.
-swaybg -c '#113344' >/dev/null 2>&1 &
+swaybg -i /usr/share/backgrounds/default.png -m fill -c '#113344' >/dev/null 2>&1 &
