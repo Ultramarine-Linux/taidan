@@ -170,6 +170,7 @@ categories = { $cat }
 page-installing = Installing Your Apps
 page-installing-desc = This won't take long!
 page-installing-loading = Loading…
+page-installing-flatpak = Installing {$n} flatpaks…
 
 ## page: Finish
 

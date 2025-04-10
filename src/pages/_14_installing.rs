@@ -65,14 +65,20 @@ generate_page!(Installing {
     // FIXME: libhelium::ProgressBar
     #[local_ref] main_progress_bar ->
     gtk::ProgressBar {
+        set_show_text: true,
         set_text: Some(&t!("page-installing-loading")),
     },
 
     #[local_ref] dnf_progress_bar ->
-    gtk::ProgressBar { },
+    gtk::ProgressBar {
+        set_show_text: true,
+    },
 
     #[local_ref] flatpak_progress_bar ->
-    gtk::ProgressBar { },
+    gtk::ProgressBar {
+        set_show_text: true,
+        set_text: Some(&t!("page-installing-flatpak", n = SETTINGS.actions[2].len()))
+    },
 );
 
 impl crate::ui::PageTrig for InstallingPage {}
