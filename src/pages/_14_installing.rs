@@ -77,7 +77,7 @@ generate_page!(Installing {
     #[local_ref] flatpak_progress_bar ->
     gtk::ProgressBar {
         set_show_text: true,
-        set_text: Some(&t!("page-installing-flatpak", n = SETTINGS.actions[2].len()))
+        set_text: Some(&t!("page-installing-flatpak", n = SETTINGS.read().actions[2].len()))
     },
 );
 
