@@ -131,4 +131,4 @@ async fn check_online(sender: ComponentSender<InternetPage>) {
     sender.input(InternetPageMsg::IsOnline);
 }
 
-crate::skipconfig_skip_page!(Internet);
+crate::always_skip_page!(Internet);
