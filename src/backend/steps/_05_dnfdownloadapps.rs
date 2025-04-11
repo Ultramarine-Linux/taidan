@@ -35,11 +35,11 @@ impl super::Step for DnfDownloadApps {
                     settings.actions[action.as_int()].push(action.consume_inner_str());
                 })
             })?;
-        settings.actions[1].extend(
-            super::_07_drivers_codecs::Codecs::codecs()
-                .iter()
-                .map(ToString::to_string),
-        );
+        // settings.actions[1].extend(
+        //     super::_07_drivers_codecs::Codecs::codecs()
+        //         .iter()
+        //         .map(ToString::to_string),
+        // );
 
         if !settings.ims.is_empty() {
             let pkgs: &[&str] = match &*CFG.edition {
