@@ -2452,7 +2452,7 @@ dependencies = [
 
 [[package]]
 name = "taidan"
-version = "0.1.16"
+version = "0.1.17"
 dependencies = [
  "color-eyre",
  "const_format",
