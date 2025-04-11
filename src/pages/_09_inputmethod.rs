@@ -167,4 +167,4 @@ generate_page!(InputMethod {
     }
 );
 
-crate::skipconfig_skip_page!(InputMethod);
+crate::always_skip_page!(InputMethod);
