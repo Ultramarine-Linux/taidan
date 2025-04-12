@@ -42,7 +42,7 @@ impl super::Step for DriversCodecs {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
-        if !settings.install_codecs_drivers {
+        if !settings.install_codecs_drivers || settings.nointernet {
             return Ok(());
         }
         if let Err(e) = Drivers::setup_nvidia().await {

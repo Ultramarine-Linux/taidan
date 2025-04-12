@@ -78,6 +78,9 @@ impl super::Step for DnfDownloadApps {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
+        if settings.nointernet {
+            return Ok(());
+        }
         let mut enable_repo = super::super::dnf::EnableRepo::new().await?;
         // NOTE: we unfortunately cannot execute this in parallel because `enable_repo()` borrows
         // `enable_repo` mutably, and it's impossible to mutate the object in parallel safely.

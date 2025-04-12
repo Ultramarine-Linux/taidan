@@ -13,7 +13,7 @@ impl super::Step for SetupImf {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
-        if settings.ims.is_empty() {
+        if settings.ims.is_empty() || settings.nointernet {
             return Ok(());
         }
         if let Err(e) = match &*CFG.edition {
