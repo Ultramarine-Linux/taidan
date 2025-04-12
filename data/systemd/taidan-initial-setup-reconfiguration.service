@@ -17,6 +17,9 @@ Requires=taidan-initial-setup.service
 Type=oneshot
 TimeoutSec=0
 RemainAfterExit=yes
+# This unit wil run taidan-initial-setup,
+# so we can just stub it out
+ExecStart=true
 SuccessAction=systemctl disable taidan-initial-setup-reconfiguration
 TimeoutSec=0
 RemainAfterExit=no
