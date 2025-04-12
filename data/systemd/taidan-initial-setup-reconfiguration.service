@@ -17,7 +17,7 @@ Requires=taidan-initial-setup.service
 Type=oneshot
 TimeoutSec=0
 RemainAfterExit=yes
-ExecStart=/usr/libexec/taidan/reconfiguration-mode-enabled
+SuccessAction=systemctl disable taidan-initial-setup-reconfiguration
 TimeoutSec=0
 RemainAfterExit=no
 
