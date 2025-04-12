@@ -273,6 +273,8 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
 fn main() {
     let _guard = setup_logs_and_install_panic_hook();
     std::sync::LazyLock::<i18n_embed::fluent::FluentLanguageLoader>::force(&LL);
+    // FIXME: temp hack to set nointernet to true here (should be default value), please refactor
+    SETTINGS.read().nointernet = true;
 
     gtk::gio::resources_register_include!("icons.gresource").unwrap();
 
