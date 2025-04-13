@@ -226,7 +226,6 @@ impl SimpleComponent for AppModel {
                     .sender()
                     // .send(pages::_16_error::ErrorPageMsg::Receive(msg.clone()))
                     .send(pages::_07_error::ErrorPageMsg::Receive(msg.clone()))
-
                     .expect("sender dropped?");
             }
         }
