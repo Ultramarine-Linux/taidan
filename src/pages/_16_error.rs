@@ -49,7 +49,7 @@ generate_page!(Error {
             set_halign: gtk::Align::Start,
             set_label: &t!("page-error-retry"),
             connect_clicked[sender] => move |_| {
-                sender.input(Self::Input::Nav(NavAction::GoTo(crate::Page::Categories)));
+                sender.input(Self::Input::Nav(NavAction::GoTo(crate::Page::Theme)));
                 sender.input(Self::Input::Nav(NavAction::Next));
             },
         },
