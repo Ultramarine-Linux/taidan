@@ -153,4 +153,4 @@ generate_page!(Keyboard {
     }
 );
 
-impl crate::ui::PageTrig for KeyboardPage {}
+crate::always_skip_page!(Keyboard);
