@@ -31,24 +31,25 @@ pub static LL: std::sync::LazyLock<i18n_embed::fluent::FluentLanguageLoader> =
 #[folder = "po/"]
 struct Localizations;
 
+// todo: rearrange this and re-enable this
 kurage::generate_pages!(Page AppModel AppMsg:
     00: Welcome,
     // 01: Keyboard,
-    02: WhoAreYou,
-    03: Password,
+    01: WhoAreYou,
+    02: Password,
     // 04: Internet,
     // 05: Analytics,
     // 06: CrashReport,
     // 07: Location,
     // 08: Codecs,
     // 09: InputMethod,
-    10: NightLight,
-    11: Theme,
+    03: NightLight,
+    04: Theme,
     // 12: Browser,
     // 13: Categories,
-    14: Installing,
-    15: Finish,
-    16: Error,
+    05: Installing,
+    06: Finish,
+    07: Error,
 );
 
 #[derive(Debug, Clone)]
@@ -223,7 +224,9 @@ impl SimpleComponent for AppModel {
                 self.page = Page::Error;
                 self.error_page
                     .sender()
-                    .send(pages::_16_error::ErrorPageMsg::Receive(msg.clone()))
+                    // .send(pages::_16_error::ErrorPageMsg::Receive(msg.clone()))
+                    .send(pages::_07_error::ErrorPageMsg::Receive(msg.clone()))
+
                     .expect("sender dropped?");
             }
         }

@@ -114,6 +114,7 @@ generate_page!(Keyboard {
         },
 
         gtk::Box {
+            set_visible: false,
             set_orientation: gtk::Orientation::Vertical,
             set_spacing: 10,
             set_vexpand: true,
