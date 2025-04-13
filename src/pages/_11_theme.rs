@@ -66,8 +66,11 @@ generate_page!(Theme:
         });
         widgets.lightbox.add_controller(ctl_light);
         widgets.darkbox.add_controller(ctl_dark);
+        SETTINGS.subscribe(sender.input_sender(), |_| Self::Input::Update);
     }
-    update(self, message, sender) {} => {}
+    update(self, message, sender) {
+        Update => {},
+    } => {}
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
@@ -117,10 +120,13 @@ generate_page!(Theme:
                     set_requested_height: 150,
                     set_requested_width: 150*1920/1080,
                 },
-                gtk::Label {
-                    set_label: &t!("page-theme-light"),
+                gtk::CheckButton {
+                    set_label: Some(&t!("page-theme-light")),
+                    #[watch]
+                    set_active: !SETTINGS.read().theme_is_dark
                 },
             },
+
             #[name(darkbox)]
             gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
@@ -132,12 +138,14 @@ generate_page!(Theme:
                     set_requested_height: 150,
                     set_requested_width: 150*1920/1080,
                 },
-                gtk::Label {
-                    set_label: &t!("page-theme-dark"),
+
+                gtk::CheckButton {
+                    set_label: Some(&t!("page-theme-dark")),
+                    #[watch]
+                    set_active: SETTINGS.read().theme_is_dark,
                 },
             },
         },
-
         #[name(accentbox)]
         gtk::Box {
             set_visible: ["gnome", "plasma", "kde"].contains(&&*CFG.edition),
