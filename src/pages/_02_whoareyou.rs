@@ -46,17 +46,19 @@ generate_page!(WhoAreYou {
     }
     update(self, message, sender) {
         NotifyFullName(name: String) => {
-            if name.is_empty() {
-                SETTINGS.write().fullname.clone_from(&SETTINGS.read().username);
+            let mut settings = SETTINGS.write();
+            settings.fullname = if name.is_empty() {
+                settings.username.clone()
             } else {
-                SETTINGS.write().fullname = name;
+                name
             }
         },
         NotifyUsername(user: String) => {
-            if SETTINGS.read().fullname.is_empty() {
-                SETTINGS.write().fullname.clone_from(&user);
+            let mut settings = SETTINGS.write();
+            settings.username = user.clone();
+            if settings.fullname.is_empty() {
+                settings.fullname = user.clone();
             }
-            SETTINGS.write().username = user;
             self.lbl_error.set_visible(false);
             self.btn_next.set_sensitive(true);
         },
