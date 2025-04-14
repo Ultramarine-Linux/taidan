@@ -209,7 +209,7 @@ impl SimpleComponent for AppModel {
                 self.page = usize::from(self.page)
                     .wrapping_add(1)
                     .try_into()
-                    .expect("No next page!");
+                    .unwrap_or_else(|_| self.page);
                 if self.page == Page::Installing {
                     self.run_install(sender, backend::start_install);
                 }
@@ -218,7 +218,7 @@ impl SimpleComponent for AppModel {
                 self.page = usize::from(self.page)
                     .wrapping_sub(1)
                     .try_into()
-                    .expect("No prev page!");
+                    .unwrap_or_else(|_| self.page);
             }
             AppMsg::InstallError(msg) => {
                 self.page = Page::Error;
