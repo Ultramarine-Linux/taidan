@@ -1,17 +1,24 @@
 use crate::prelude::*;
-/// Check if the entry (assume inside [`libhelium::TextField`]) is valid.
-///
-/// # Panics
-/// Panic if it is not an `internal_entry` inside [`libhelium::TextField`].
-fn valid_entry(en: &gtk::Text) -> bool {
-    en.parent()
-        .and_then(|x| x.parent())
-        .and_then(|x| x.parent())
-        .and_then(|x| x.parent())
-        .unwrap()
-        .dynamic_cast::<libhelium::TextField>()
-        .unwrap()
-        .is_valid()
+use regex::Regex;
+
+// /// Check if the entry (assume inside [`libhelium::TextField`]) is valid.
+// ///
+// /// # Panics
+// /// Panic if it is not an `internal_entry` inside [`libhelium::TextField`].
+// fn valid_entry(en: &gtk::Text) -> bool {
+//     en.parent()
+//         .and_then(|x| x.parent())
+//         .and_then(|x| x.parent())
+//         .and_then(|x| x.parent())
+//         .unwrap()
+//         .dynamic_cast::<libhelium::TextField>()
+//         .unwrap()
+//         .is_valid()
+// }
+
+fn valid_entry(s: &str) -> bool {
+    let re = Regex::new("^[a-z][-a-z0-9_]*$").unwrap();
+    re.is_match(s)
 }
 
 generate_page!(WhoAreYou {
@@ -21,27 +28,7 @@ generate_page!(WhoAreYou {
     init[lbl_error](root, sender, model, widgets) {
         let s0 = sender.clone();
         let s1 = sender.clone();
-        widgets.tf_fullname.internal_entry().connect_changed(move |en| {
-            s1.input(Self::Input::NotifyFullName(en.text().to_string()));
-        });
-        widgets.tf_username.internal_entry().connect_changed(move |en| sender.input(
-            if valid_entry(en) {
-                Self::Input::NotifyUsername(en.text().to_string())
-            } else {
-                Self::Input::InvalidUsername
-            }
-        ));
-        let tfu0 = widgets.tf_username.clone();
-        let tfu1 = widgets.tf_username.clone();
-        widgets.tf_fullname.internal_entry().connect_activate(move |_| _ = tfu0.internal_entry().grab_focus());
-        widgets.tf_fullname.internal_entry().connect_move_focus(move |_, direction| {
-            // FIXME: doesn't work ;;
-            // FIXME: btw this is a libhelium bug
-            if direction == gtk::DirectionType::TabForward {
-                tfu1.internal_entry().grab_focus();
-            }
-        });
-        widgets.tf_username.internal_entry().connect_activate(move |en| if valid_entry(en) { s0.output(Self::Output::Nav(NavAction::Next)).unwrap(); });
+
         model.btn_next = widgets.prev_next_btns.next.clone();
     }
     update(self, message, sender) {
@@ -89,24 +76,48 @@ generate_page!(WhoAreYou {
         },
 
         #[name = "tf_fullname"]
-        libhelium::TextField {
+        gtk::Entry {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
             set_placeholder_text: Some(&t!("page-whoareyou-fullname")),
-            set_is_outline: true,
+            connect_changed[sender] => move |e| sender.input(Self::Input::NotifyFullName(e.text().to_string())),
+            connect_activate[sender] => move |e| if valid_entry(e.text().as_str()) { sender.output(Self::Output::Nav(NavAction::Next)).unwrap() },
         },
 
         #[name = "tf_username"]
-        libhelium::TextField {
+        gtk::Entry {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
             set_placeholder_text: Some(&t!("page-whoareyou-username")),
-            set_is_outline: true,
-            set_needs_validation: true,
-            set_regex: &libhelium::glib::Regex::new("^[a-z][-a-z0-9_]*$", gtk::glib::RegexCompileFlags::DEFAULT, gtk::glib::RegexMatchFlags::DEFAULT).unwrap().unwrap(),
-
-            connect_activate[sender] => move |en| if en.is_valid() { sender.output(Self::Output::Nav(NavAction::Next)).unwrap(); },
+            connect_changed[sender] => move |e| if valid_entry(e.text().as_str()) {
+                sender.input(Self::Input::NotifyUsername(e.text().to_string()))
+            } else {
+                sender.input(Self::Input::InvalidUsername)
+            }
         },
+
+        // TODO(lleyton): libhelium::TextField currently has broken tabbing behavior, so we'll use a gtk::Entry for now
+
+        // #[name = "tf_fullname"]
+        // libhelium::TextField {
+        //     set_hexpand: true,
+        //     set_halign: gtk::Align::Fill,
+        //     set_placeholder_text: Some(&t!("page-whoareyou-fullname")),
+        //     set_is_outline: true,
+        // },
+
+
+        // #[name = "tf_username"]
+        // libhelium::TextField {
+        //     set_hexpand: true,
+        //     set_halign: gtk::Align::Fill,
+        //     set_placeholder_text: Some(&t!("page-whoareyou-username")),
+        //     set_is_outline: true,
+        //     set_needs_validation: true,
+        //     set_regex: &libhelium::glib::Regex::new("^[a-z][-a-z0-9_]*$", gtk::glib::RegexCompileFlags::DEFAULT, gtk::glib::RegexMatchFlags::DEFAULT).unwrap().unwrap(),
+
+        //     connect_activate[sender] => move |en| if en.is_valid() { sender.output(Self::Output::Nav(NavAction::Next)).unwrap(); },
+        // },
 
         #[local_ref]
         lbl_error -> gtk::Label {
