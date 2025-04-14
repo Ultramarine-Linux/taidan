@@ -81,7 +81,6 @@ generate_page!(WhoAreYou {
             set_halign: gtk::Align::Fill,
             set_placeholder_text: Some(&t!("page-whoareyou-fullname")),
             connect_changed[sender] => move |e| sender.input(Self::Input::NotifyFullName(e.text().to_string())),
-            connect_activate[sender] => move |e| if valid_entry(e.text().as_str()) { sender.output(Self::Output::Nav(NavAction::Next)).unwrap() },
         },
 
         #[name = "tf_username"]
@@ -93,7 +92,8 @@ generate_page!(WhoAreYou {
                 sender.input(Self::Input::NotifyUsername(e.text().to_string()))
             } else {
                 sender.input(Self::Input::InvalidUsername)
-            }
+            },
+            connect_activate[sender] => move |e| if valid_entry(e.text().as_str()) { sender.output(Self::Output::Nav(NavAction::Next)).unwrap() },
         },
 
         // TODO(lleyton): libhelium::TextField currently has broken tabbing behavior, so we'll use a gtk::Entry for now
