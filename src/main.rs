@@ -18,7 +18,7 @@ const APPID: &str = "com.fyralabs.Taidan";
 // configuration of the distro OOBE.
 pub static CFG: std::sync::LazyLock<cfg::Config> = std::sync::LazyLock::new(|| {
     tracing::debug!("Initializing cfg::Config");
-    let mut cfg = cfg::Config::default();
+    let mut cfg = cfg::Config::new().expect("cannot init config");
     cfg.populate();
     tracing::debug!("Populated cfg::Config (turn on `trace` to see body)");
     cfg
@@ -31,8 +31,7 @@ pub static LL: std::sync::LazyLock<i18n_embed::fluent::FluentLanguageLoader> =
 #[folder = "po/"]
 struct Localizations;
 
-// todo: rearrange this and re-enable this
-kurage::generate_pages!(Page AppModel AppMsg:
+generate_pages!(Page AppModel AppMsg:
     00: Welcome,
     01: Keyboard,
     02: WhoAreYou,
@@ -180,14 +179,6 @@ impl SimpleComponent for AppModel {
                 self.page = Page::Installing;
                 self.run_install(sender, backend::start_install);
             }
-            // AppMsg::Nav(NavAction::Next) if self.page == Page::Internet => {
-            //     tracing::trace!("Skipping to page Codecs after Page::Internet");
-            //     self.page = Page::Codecs;
-            // }
-            // AppMsg::Nav(NavAction::Back) if self.page == Page::Codecs => {
-            //     tracing::trace!("Skipping to page Internet");
-            //     self.page = Page::Internet;
-            // }
             AppMsg::Nav(NavAction::GoTo(page)) => {
                 self.page = *page;
                 if *page == Page::Installing {
@@ -206,19 +197,25 @@ impl SimpleComponent for AppModel {
                 relm4::main_application().quit();
             }
             AppMsg::Nav(NavAction::Next) => {
-                self.page = usize::from(self.page)
-                    .wrapping_add(1)
-                    .try_into()
-                    .unwrap_or_else(|_| self.page);
+                while {
+                    self.page = usize::from(self.page)
+                        .wrapping_add(1)
+                        .try_into()
+                        .unwrap_or(self.page);
+                    !self.get_page_widget().is_visible()
+                } {}
                 if self.page == Page::Installing {
                     self.run_install(sender, backend::start_install);
                 }
             }
             AppMsg::Nav(NavAction::Back) => {
-                self.page = usize::from(self.page)
-                    .wrapping_sub(1)
-                    .try_into()
-                    .unwrap_or_else(|_| self.page);
+                while {
+                    self.page = usize::from(self.page)
+                        .wrapping_sub(1)
+                        .try_into()
+                        .unwrap_or(self.page);
+                    !self.get_page_widget().is_visible()
+                } {}
             }
             AppMsg::InstallError(msg) => {
                 self.page = Page::Error;

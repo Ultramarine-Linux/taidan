@@ -1815,9 +1815,9 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "poly_l10n"
-version = "0.0.3"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d468b7a069f71373c259098219e6d58c9bbe650af55afae408b91479ee0aea65"
+checksum = "8bb2239d83a46831976cc8c6fc7dd43413c03f4033386261ddff7b5688445667"
 dependencies = [
  "isolang",
  "itertools 0.14.0",
@@ -2454,6 +2454,7 @@ dependencies = [
 name = "taidan"
 version = "0.1.22"
 dependencies = [
+ "basic-toml",
  "color-eyre",
  "const_format",
  "enum_dispatch",

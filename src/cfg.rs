@@ -2,14 +2,41 @@ use color_eyre::{eyre::eyre, Section};
 use itertools::Itertools;
 pub use taidan_catalogue_parser::{Category, Choice, ChoiceActions, ChoiceOption, ACTION_TYPES};
 
-#[derive(Default, Clone, Debug)]
+#[allow(clippy::unsafe_derive_deserialize)]
+#[derive(Clone, Debug, Default, serde::Deserialize)]
 pub struct Config {
+    #[serde(skip)]
     pub distro: String,
+    #[serde(skip)]
     pub catalogue: Vec<Category>,
+    #[serde(skip)]
     pub edition: String,
+
+    pub skip_pages: Vec<crate::Page>,
+    #[serde(default = "_default_org")]
+    pub org: String,
+}
+
+fn _default_org() -> String {
+    "Fyra Labs".into()
 }
 
 impl Config {
+    /// Create a new [`Config`] by reading from `/etc/taidan.toml`, else [`Self::default()`].
+    ///
+    /// Remember to [`Self::populate`] afterwards.
+    ///
+    /// # Errors
+    /// Failure to parse `/etc/taidan.toml`.
+    pub fn new() -> Result<Self, basic_toml::Error> {
+        let Ok(s) = std::fs::read_to_string("/etc/taidan.toml")
+            .inspect_err(|err| tracing::warn!(?err, "cannot read /etc/taidan.toml"))
+        else {
+            return Ok(Self::default());
+        };
+        basic_toml::from_str(&s)
+    }
+
     /// Populate the [`Config`] struct.
     ///
     /// # Panics

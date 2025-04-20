@@ -30,7 +30,7 @@ generate_page!(CrashReport {
 
         gtk::Label {
             // TRANSLATORS: this is unused, do NOT translate
-            set_label: &t!("page-crashreport-desc", org = "Fyra Labs"),
+            set_label: &t!("page-crashreport-desc", org = CFG.org.clone()),
         },
 
         gtk::Label {

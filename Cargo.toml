@@ -13,6 +13,7 @@ readme = "README.md"
 keywords = ["oobe", "ultramarine", "linux"]
 
 [dependencies]
+basic-toml = "0.1.10"
 color-eyre = "0.6.3"
 const_format = "0.2.34"
 enum_dispatch = "0.3.13"
