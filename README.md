@@ -56,3 +56,15 @@ cargo run -p taidan_catalogue_parser -- catalogue/browser.yml
     You should have received a copy of the GNU General Public License along
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+## 🕶️ Hacking
+
+Taidan reads an optional configuration file at `/etc/taidan.toml`:
+
+```toml
+edition = "plasma"
+skip_pages = ["theme", "browser"] # maybe you don't want taidan to setup themes / install a browser
+org = "Fyra Labs"
+```
+
+[Helium]: https://developer.fyralabs.com/helium/hig
