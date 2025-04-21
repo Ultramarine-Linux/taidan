@@ -1,5 +1,9 @@
 use crate::prelude::*;
-skipconfig!();
+
+fn page_skipconfig() -> bool {
+    SETTINGS.read().skipconfig || CFG.edition == "xfce"
+}
+
 generate_page!(NightLight:
     update(self, message, sender) {} => {}
 
@@ -53,9 +57,3 @@ generate_page!(NightLight:
         },
     }
 );
-
-impl crate::ui::PageTrig for NightLightPage {
-    fn arrive(&self) -> bool {
-        SETTINGS.read().skipconfig || CFG.edition == "xfce"
-    }
-}

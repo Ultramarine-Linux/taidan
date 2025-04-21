@@ -1,11 +1,6 @@
 #[macro_export]
 macro_rules! skipconfig_skip_page {
     ($page:ident) => {
-        ::paste::paste! {
-            impl $crate::ui::PageTrig for [<$page Page>] {
-                fn arrive(&self) -> bool { $crate::SETTINGS.read().skipconfig }
-            }
-        }
         fn page_skipconfig() -> bool {
             SETTINGS.read().skipconfig
         }
@@ -15,11 +10,6 @@ macro_rules! skipconfig_skip_page {
 #[macro_export]
 macro_rules! always_skip_page {
     ($page:ident) => {
-        ::paste::paste! {
-            impl $crate::ui::PageTrig for [<$page Page>] {
-                fn arrive(&self) -> bool { true }
-            }
-        }
         fn page_skipconfig() -> bool {
             true
         }

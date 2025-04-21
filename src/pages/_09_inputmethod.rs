@@ -167,5 +167,3 @@ generate_page!(InputMethod {
         },
     }
 );
-
-impl crate::ui::PageTrig for InputMethodPage {}

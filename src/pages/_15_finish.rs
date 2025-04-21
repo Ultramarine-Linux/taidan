@@ -35,5 +35,3 @@ generate_page!(Finish:
         connect_clicked => Self::Input::Nav(NavAction::Quit),
     },
 );
-
-impl crate::ui::PageTrig for FinishPage {}

@@ -131,5 +131,3 @@ async fn check_online(sender: ComponentSender<InternetPage>) {
     }
     sender.input(InternetPageMsg::IsOnline);
 }
-
-impl crate::ui::PageTrig for InternetPage {}

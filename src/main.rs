@@ -65,34 +65,6 @@ pub enum AppMsg {
     InstallError(String),
 }
 
-impl AppModel {
-    fn page_trig_arrive(&self) -> bool {
-        use crate::ui::PageTrig;
-        macro_rules! meow {
-            ($Page:ident $($page:ident),+$(,)?) => { kurage::paste::paste! {
-                match self.page {
-                    $($Page::[<$page:camel>] => self.[<$page:snake _page>].model().arrive(),)+
-                }
-            }}
-        }
-        meow!(Page
-            Welcome,
-            Keyboard,
-            WhoAreYou,
-            Password,
-            Internet, Analytics,
-            CrashReport,
-            Location,
-            Codecs,
-            InputMethod,
-            NightLight, Theme,
-            Browser,
-            Categories,
-            Installing, Finish, Error,
-        )
-    }
-}
-
 #[allow(clippy::str_to_string)]
 #[relm4::component(pub)]
 impl SimpleComponent for AppModel {
@@ -163,9 +135,7 @@ impl SimpleComponent for AppModel {
     }
 
     fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>) {
-        let s0 = sender.clone();
         tracing::trace!(?message, "AppModel: Received message");
-        let origpage = self.page;
         match &message {
             AppMsg::Nav(NavAction::Next)
                 if self.page == Page::Password && SETTINGS.read().skipconfig =>
@@ -224,9 +194,6 @@ impl SimpleComponent for AppModel {
                     .send(pages::_16_error::ErrorPageMsg::Receive(msg.clone()))
                     .expect("sender dropped?");
             }
-        }
-        if origpage != self.page && self.page_trig_arrive() {
-            s0.input(message);
         }
     }
 }

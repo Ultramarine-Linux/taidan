@@ -80,5 +80,3 @@ generate_page!(Installing {
         set_text: Some(&t!("page-installing-flatpak", n = SETTINGS.read().actions[2].len()))
     },
 );
-
-impl crate::ui::PageTrig for InstallingPage {}

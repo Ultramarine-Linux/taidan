@@ -139,5 +139,3 @@ generate_page!(WhoAreYou {
         },
     }
 );
-
-impl crate::ui::PageTrig for WhoAreYouPage {}
