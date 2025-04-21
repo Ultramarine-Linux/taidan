@@ -9,7 +9,7 @@ pub struct Config {
     pub distro: String,
     #[serde(skip)]
     pub catalogue: Vec<Category>,
-    #[serde(skip)]
+    #[serde(default)]
     pub edition: String,
 
     pub skip_pages: Vec<crate::Page>,
@@ -54,15 +54,17 @@ impl Config {
             .unwrap_or(name)
             .clone_into(&mut self.distro);
 
-        let edition = file
-            .split('\n')
-            .find_map(|line| line.strip_prefix("VARIANT_ID="))
-            .expect("Cannot find VARIANT_ID=… in /etc/os-release");
-        edition
-            .strip_prefix('"')
-            .and_then(|name| name.strip_suffix('"'))
-            .unwrap_or(edition)
-            .clone_into(&mut self.edition);
+        if self.edition.is_empty() {
+            let edition = file
+                .split('\n')
+                .find_map(|line| line.strip_prefix("VARIANT_ID="))
+                .expect("Cannot find VARIANT_ID=… in /etc/os-release");
+            edition
+                .strip_prefix('"')
+                .and_then(|name| name.strip_suffix('"'))
+                .unwrap_or(edition)
+                .clone_into(&mut self.edition);
+        }
 
         // catalogue
         self.populate_catalogue()
