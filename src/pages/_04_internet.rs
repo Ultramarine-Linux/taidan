@@ -1,4 +1,5 @@
 use crate::prelude::*;
+skipconfig!();
 generate_page!(Internet {
     btn_next: libhelium::Button,
     lbl_warn: gtk::Label,
@@ -131,4 +132,4 @@ async fn check_online(sender: ComponentSender<InternetPage>) {
     sender.input(InternetPageMsg::IsOnline);
 }
 
-crate::always_skip_page!(Internet);
+impl crate::ui::PageTrig for InternetPage {}

@@ -54,4 +54,4 @@ generate_page!(Codecs:
     }
 );
 
-crate::always_skip_page!(Codecs);
+crate::skipconfig_skip_page!(Codecs);

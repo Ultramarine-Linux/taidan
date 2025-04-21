@@ -6,6 +6,9 @@ macro_rules! skipconfig_skip_page {
                 fn arrive(&self) -> bool { $crate::SETTINGS.read().skipconfig }
             }
         }
+        fn page_skipconfig() -> bool {
+            SETTINGS.read().skipconfig
+        }
     };
 }
 
@@ -17,10 +20,26 @@ macro_rules! always_skip_page {
                 fn arrive(&self) -> bool { true }
             }
         }
+        fn page_skipconfig() -> bool {
+            true
+        }
     };
 }
 
 kurage::kurage_gen_macros!();
+
+macro_rules! skipconfig {
+    () => {
+        fn page_skipconfig() -> bool {
+            SETTINGS.read().skipconfig
+        }
+    };
+}
+pub(crate) use skipconfig;
+
+pub(crate) const fn page_skipconfig() -> bool {
+    false
+}
 
 kurage::generate_generator! { generate_page => [<$name Page>]:
     update: {
@@ -28,7 +47,7 @@ kurage::generate_generator! { generate_page => [<$name Page>]:
     } => { Nav(NavAction) }
 
     libhelium::ViewMono {
-        set_visible: !CFG.skip_pages.contains(&$crate::Page::$name),
+        set_visible: !CFG.skip_pages.contains(&$crate::Page::$name) && page_skipconfig(),
         set_show_right_title_buttons: false,
         append = &gtk::Box {
             set_orientation: gtk::Orientation::Vertical,

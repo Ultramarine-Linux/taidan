@@ -14,6 +14,7 @@ const UMWIKI_INPUT_OTHER_LANG: &str =
     "https://wiki.ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language";
 const UMWIKI_L10N: &str = "https://wiki.ultramarine-linux.org/en/usage/l10n/";
 
+skipconfig!();
 generate_page!(InputMethod {
     langbox: gtk::ListBox,
     imbox: gtk::ListBox,
@@ -167,4 +168,4 @@ generate_page!(InputMethod {
     }
 );
 
-crate::always_skip_page!(InputMethod);
+impl crate::ui::PageTrig for InputMethodPage {}

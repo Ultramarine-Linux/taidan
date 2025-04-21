@@ -1,4 +1,5 @@
 use crate::prelude::*;
+skipconfig!();
 generate_page!(NightLight:
     update(self, message, sender) {} => {}
 
