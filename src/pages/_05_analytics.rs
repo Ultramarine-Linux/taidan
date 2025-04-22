@@ -30,5 +30,6 @@ generate_page!(Analytics:
         // TODO: buttons for confirming / rejecting analytics
     },
 );
-
-crate::always_skip_page!(Analytics);
+fn page_skipconfig() -> bool {
+    true
+}

@@ -1,21 +1,3 @@
-#[macro_export]
-macro_rules! skipconfig_skip_page {
-    ($page:ident) => {
-        fn page_skipconfig() -> bool {
-            SETTINGS.read().skipconfig
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! always_skip_page {
-    ($page:ident) => {
-        fn page_skipconfig() -> bool {
-            true
-        }
-    };
-}
-
 kurage::kurage_gen_macros!();
 
 macro_rules! skipconfig {

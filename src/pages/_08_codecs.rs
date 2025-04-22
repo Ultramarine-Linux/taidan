@@ -1,6 +1,7 @@
 const WIKI_POSTINSTALL: &str = "https://wiki.ultramarine-linux.org/en/setup/postinstall/";
 
 use crate::prelude::*;
+skipconfig!();
 generate_page!(Codecs:
     update(self, message, sender) {} => {}
 
@@ -53,5 +54,3 @@ generate_page!(Codecs:
         },
     }
 );
-
-crate::skipconfig_skip_page!(Codecs);

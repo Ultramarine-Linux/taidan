@@ -153,5 +153,3 @@ generate_page!(Keyboard {
         },
     }
 );
-
-crate::always_skip_page!(Keyboard);

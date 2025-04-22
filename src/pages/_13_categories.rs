@@ -366,5 +366,3 @@ fn on_choice_toggled(
         }
     }
 }
-
-crate::always_skip_page!(Categories);

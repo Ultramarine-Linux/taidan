@@ -57,5 +57,6 @@ generate_page!(Location {
         },
     }
 );
-
-crate::always_skip_page!(Location);
+fn page_skipconfig() -> bool {
+    true
+}

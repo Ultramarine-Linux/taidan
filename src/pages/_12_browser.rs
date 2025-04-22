@@ -225,5 +225,3 @@ fn on_choice_toggled(browser_index: usize, i: usize, k: usize) -> impl Fn(&gtk::
         }
     }
 }
-
-crate::always_skip_page!(Browser);

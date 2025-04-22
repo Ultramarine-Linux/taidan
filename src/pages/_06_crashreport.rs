@@ -61,5 +61,6 @@ generate_page!(CrashReport {
         },
     }
 );
-
-crate::always_skip_page!(CrashReport);
+fn page_skipconfig() -> bool {
+    true
+}

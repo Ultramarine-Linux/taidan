@@ -11,6 +11,7 @@ background: alpha(@color, 0.18);
 color: transparent;
 box-shadow: inset 0 0 0 3px alpha(@color, 0.32);";
 
+skipconfig!();
 generate_page!(Theme:
     init(root, sender, model, widgets) {
         let (light0, dark0) = (widgets.lightbox.clone(), widgets.darkbox.clone());
@@ -209,5 +210,3 @@ fn on_accent_toggled(
         }
     }
 }
-
-crate::skipconfig_skip_page!(Theme);
