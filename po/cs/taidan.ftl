@@ -84,3 +84,4 @@ categories = { $cat }
 page-inputmethod-desc1 = Můžete si <b>volitelně</b> přidat { $ime }. To Vám umožní psát v specifických jazycích. Tato změna se projeví po přihlášení do Vašeho uživatelského účtu.
 page-inputmethod-desc2 = V { $rime } modelu může být k dispozici více možností čínského způsobu vstupu, ale to vyžaduje pokročilé nastavení a tudíž není doporučené pro začátečníky.
 page-internet-ok = Nyní jste připojeni k Internetu!
+page-installing-flatpak = Instaluji { $n } flatpaků…
