@@ -22,10 +22,7 @@ page-keyboard-search-variant = Buscar tu variante de teclado…
 page-whoareyou = Quién eres?
 page-whoareyou-fullname = Nombre Completo
 page-whoareyou-username = Nombre de Usuario
-page-whoareyou-error =
-    Nombre de Usuario
-    - Iniciar con letras minúsculas
-    - Solo contener caracteres alfanuméricos, guión bajo (<tt>_<tt>) o guión (<tt>-<tt>)
+page-whoareyou-error = El nombre de Usuario debe de iniciar con letras minúsculas y solo debe contener caracteres alfanuméricos, guión bajo (<tt>_</tt>) o guión (<tt>-</tt>)
 page-password = Crear una contraseña
 page-password-pw = Contraseña
 page-password-rp = Repetir Contraseña
@@ -44,9 +41,11 @@ page-inputmethod-search-ims = Buscar IMs/IMEs…
 page-nightlight = Luz Nocturna
 page-nightlight-lbl1 = Entinta la pantalla con un tono cálido en la noche para reducir cansancio ocular.
 page-nightlight-lbl2 = Luz Nocturna no está confirmado con ayudar con la dificultad de dormir.
-switch-nightlight = Night Light
+switch-nightlight = Luz Nocturna
 page-theme = Elige tu tema
-page-theme-desc = Haz este sistema el tuyo con un toque de color. Puedes cambiar esta opción después en Configuración.
+page-theme-desc =
+    Haz este sistema el tuyo con un toque de color.
+    Puedes cambiar esta opción después en Configuración.
 page-theme-note = Algunas aplicaciones podrían no respetar esta preferencia.
 page-theme-light = Claro
 page-theme-dark = Oscuro
@@ -65,3 +64,17 @@ page-error = Error
 page-error-desc = Lo sentimos, pero hay un problema inesperado.
 page-error-done = { page-categories-done }
 page-error-retry = Reintentar
+steps-script = Ejecutando scripts de Distribución…
+page-internet-ok = Ahora estas conectado al Internet!
+page-crashreport-lbl1 = Toda información recolectada es anónima y con encriptado punto-a-punto.
+page-installing-flatpak = Instalando { $n } Flatpaks…
+page-crashreport = Reporte de Vuelcos
+page-crashreport-desc = Permitir a { $org } a coleccionar datos de vuelco para encontrar errores y ayudar a usted.
+page-analytics = Analíticos y Reporte de Vuelcos
+page-crashreport-lbl2 = Usted tendrá un ID de vuelco para ayudar al soporte encontrar lo que pasó incorrectamente.
+switch-crashreport = Enviar Datos de Vuelco
+page-location-desc = Permitir a las aplicaciones pedir su ubicación aproximada con el Servicio de Localización de Mozilla.
+imelangs-in = Indio
+page-internet-warn = Códecs, controladores y otros programas de usuario no serán instalados.
+page-internet-open = Abrir applet de conexión Wi-Fi
+page-location = Servicios de Localización
