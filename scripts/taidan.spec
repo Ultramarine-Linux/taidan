@@ -16,7 +16,8 @@ Requires:       libwebp
 Requires:       webp-pixbuf-loader
 Requires:       xhost
 # Requires:       labwc
-Requires:       cage
+# Requires:       cage
+Requires:       kwin-wayland swaybg
 BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl
 BuildRequires:  pkgconfig(libhelium-1)
 BuildRequires:  pkgconfig(openssl)
@@ -44,6 +45,7 @@ DESTDIR=%buildroot ./scripts/install.sh
 %doc README.md
 %license LICENSE.md LICENSE.dependencies
 %_bindir/taidan
+%_libexecdir/start-taidan
 %_datadir/polkit-1/rules.d/100-taidan.rules
 %_presetdir/95-taidan.preset
 %_sysconfdir/com.fyralabs.Taidan/
