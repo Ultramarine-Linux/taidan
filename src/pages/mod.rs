@@ -4,22 +4,25 @@
 //! designed such that they are sorted correctly inside most code editors.
 
 #![allow(clippy::semicolon_outside_block)] // bug from relm4 component macro
-pub mod _00_welcome;
-pub mod _01_keyboard;
-pub mod _02_whoareyou;
-pub mod _03_password;
-pub mod _04_internet;
-pub mod _05_analytics;
-pub mod _06_crashreport;
-pub mod _07_location;
-pub mod _08_codecs;
-pub mod _09_inputmethod;
-pub mod _10_nightlight;
-pub mod _11_theme;
-pub mod _12_browser;
-pub mod _13_categories;
-pub mod _14_installing;
-pub mod _15_finish;
-pub mod _16_error;
+pub mod _00_language;
+pub mod _01_welcome;
+pub mod _02_keyboard;
+pub mod _03_whoareyou;
+pub mod _04_password;
+pub mod _05_internet;
+pub mod _06_analytics;
+pub mod _07_crashreport;
+pub mod _08_location;
+pub mod _09_codecs;
+pub mod _10_inputmethod;
+pub mod _11_nightlight;
+pub mod _12_theme;
+pub mod _13_browser;
+pub mod _14_categories;
+pub mod _15_installing;
+pub mod _16_finish;
+pub mod _17_error;
 
-pub use _14_installing::InstallingPageMsg;
+pub(crate) use _13_browser::BROWSER_CATEGORY;
+pub use _15_installing::InstallingPageMsg;
+pub use _17_error::ErrorPageMsg;
