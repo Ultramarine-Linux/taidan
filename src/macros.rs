@@ -19,7 +19,7 @@ kurage::generate_generator! { generate_page => [<$name Page>]:
     } => { Nav(NavAction) }
 
     libhelium::ViewMono {
-        set_visible: !CFG.skip_pages.contains(&$crate::Page::$name) && page_skipconfig(),
+        set_visible: !CFG.skip_pages.contains(&$crate::Page::$name) && !page_skipconfig(),
         set_show_right_title_buttons: false,
         append = &gtk::Box {
             set_orientation: gtk::Orientation::Vertical,
@@ -41,7 +41,7 @@ macro_rules! awrite {
 #[macro_export]
 macro_rules! t {
     ($msgid:literal $($tt:tt)*) => {
-        i18n_embed_fl::fl!($crate::LL, $msgid $($tt)*)
+        i18n_embed_fl::fl!($crate::LL.read(), $msgid $($tt)*)
     };
 }
 
