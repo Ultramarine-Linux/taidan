@@ -3,6 +3,8 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, Default, serde::Serialize)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
+    pub langlocale: String,
+
     pub skipconfig: bool,
     pub nointernet: bool,
 

@@ -23,23 +23,28 @@ i18n-embed = { version = "0.15.4", features = [
     "fluent-system",
 ] }
 i18n-embed-fl = "0.9.4"
+iso3166 = "1.2.1"
+isolang = { version = "2.4.0", features = ["local_names"] }
 itertools = "0.14.0"
 kurage = { version = "0.1.4" }
+libc = "0.2.172"
 # libappstream = "0.3.0"
 libhelium = "0.10.0"
 memchr = "2.7.4"
+parking_lot = "0.12.3"
 paste = "1.0.15"
 phf = { version = "0.11.3", features = ["macros"] }
-poly_l10n = "0.0.4"
+poly_l10n = "0.0.6"
 regex = "1.11.1"
 relm4 = { version = "0.9.1", default-features = false, features = ["macros"] }
 reqwest = { version = "0.12.15", features = [
     "http2",
     "native-tls",
 ], default-features = false }
-rust-embed = "8.7.0"
+rust-embed = { version = "8.7.0", features = ["include-exclude"] }
 serde = "1.0.219"
 serde_json = "1.0.140"
+strip-ansi-escapes = "0.2.1"
 taidan_catalogue_parser = { path = "taidan_catalogue_parser" }
 taidan_proc_macros = { path = "taidan_proc_macros" }
 tempfile = { version = "3.19.1", default-features = false }

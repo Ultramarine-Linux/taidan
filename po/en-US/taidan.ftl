@@ -187,3 +187,6 @@ page-error = Error
 page-error-desc = We are sorry, but there is an unexpected problem.
 page-error-done = Done
 page-error-retry = Retry
+
+page-language = Language
+page-language-search-lang = Search Language/Locale…

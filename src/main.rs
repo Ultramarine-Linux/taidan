@@ -6,17 +6,28 @@ pub mod pages;
 pub mod prelude;
 pub mod ui;
 
+use std::sync::LazyLock;
+
 use crate::prelude::*;
 use gtk::glib::translate::FromGlibPtrNone;
+use i18n_embed::LanguageLoader;
+use parking_lot::RwLock;
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, RelmApp, SimpleComponent,
 };
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 const APPID: &str = "com.fyralabs.Taidan";
+static LOCALE_SOLVER: LazyLock<poly_l10n::LocaleFallbackSolver> = LazyLock::new(Default::default);
+static AVAILABLE_LANGS: LazyLock<Vec<i18n_embed::unic_langid::LanguageIdentifier>> =
+    LazyLock::new(|| {
+        i18n_embed::fluent::fluent_language_loader!()
+            .available_languages(&Localizations)
+            .unwrap()
+    });
 
 // configuration of the distro OOBE.
-pub static CFG: std::sync::LazyLock<cfg::Config> = std::sync::LazyLock::new(|| {
+pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     tracing::debug!("Initializing cfg::Config");
     let mut cfg = cfg::Config::new().expect("cannot init config");
     cfg.populate();
@@ -24,31 +35,33 @@ pub static CFG: std::sync::LazyLock<cfg::Config> = std::sync::LazyLock::new(|| {
     cfg
 });
 pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::SharedState::new();
-pub static LL: std::sync::LazyLock<i18n_embed::fluent::FluentLanguageLoader> =
-    std::sync::LazyLock::new(handle_l10n);
+pub static LL: std::sync::LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
+    std::sync::LazyLock::new(|| RwLock::new(handle_l10n()));
 
 #[derive(rust_embed::RustEmbed)]
 #[folder = "po/"]
+#[exclude = "en-owo/*.ftl"]
 struct Localizations;
 
 generate_pages!(Page AppModel AppMsg:
-    00: Welcome,
-    01: Keyboard,
-    02: WhoAreYou,
-    03: Password,
-    04: Internet,
-    05: Analytics,
-    06: CrashReport,
-    07: Location,
-    08: Codecs,
-    09: InputMethod,
-    10: NightLight,
-    11: Theme,
-    12: Browser,
-    13: Categories,
-    14: Installing,
-    15: Finish,
-    16: Error,
+    00: Language,
+    01: Welcome,
+    02: Keyboard,
+    03: WhoAreYou,
+    04: Password,
+    05: Internet,
+    06: Analytics,
+    07: CrashReport,
+    08: Location,
+    09: Codecs,
+    10: InputMethod,
+    11: NightLight,
+    12: Theme,
+    13: Browser,
+    14: Categories,
+    15: Installing,
+    16: Finish,
+    17: Error,
 );
 
 #[derive(Debug, Clone)]
@@ -90,6 +103,7 @@ impl SimpleComponent for AppModel {
                 #[transition = "SlideLeftRight"]
                 #[name = "stack"]
                 match model.page {
+                    Page::Language => *model.language_page.widget(),
                     Page::Welcome => *model.welcome_page.widget(),
                     Page::Keyboard => *model.keyboard_page.widget(),
                     Page::WhoAreYou => *model.who_are_you_page.widget(),
@@ -136,7 +150,7 @@ impl SimpleComponent for AppModel {
 
     fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>) {
         tracing::trace!(?message, "AppModel: Received message");
-        match &message {
+        match message {
             AppMsg::Nav(NavAction::Next)
                 if self.page == Page::Password && SETTINGS.read().skipconfig =>
             {
@@ -150,8 +164,8 @@ impl SimpleComponent for AppModel {
                 self.run_install(sender, backend::start_install);
             }
             AppMsg::Nav(NavAction::GoTo(page)) => {
-                self.page = *page;
-                if *page == Page::Installing {
+                self.page = page;
+                if page == Page::Installing {
                     self.run_install(sender, backend::start_install);
                 }
             }
@@ -191,7 +205,7 @@ impl SimpleComponent for AppModel {
                 self.page = Page::Error;
                 self.error_page
                     .sender()
-                    .send(pages::_16_error::ErrorPageMsg::Receive(msg.clone()))
+                    .send(pages::ErrorPageMsg::Receive(msg))
                     .expect("sender dropped?");
             }
         }
@@ -210,30 +224,20 @@ impl AppModel {
         let (ss, sett) = (sender.clone(), SETTINGS.read().clone());
         sender.oneshot_command(async move {
             if let Err(e) = f(sett, inst_sender).await {
-                ss.input(AppMsg::InstallError(format!("{e:?}")));
+                ss.input(AppMsg::InstallError(strip_ansi_escapes::strip_str(
+                    format!("{e:?}"),
+                )));
             }
         });
     }
 }
 
 fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
-    use i18n_embed::{
-        fluent::fluent_language_loader, unic_langid::LanguageIdentifier, LanguageLoader,
-    };
-    use std::str::FromStr;
+    use i18n_embed::{fluent::fluent_language_loader, LanguageLoader};
     let loader = fluent_language_loader!();
     let locale_solver = poly_l10n::LocaleFallbackSolver::<poly_l10n::Rulebook>::default();
     let available_langs = loader.available_languages(&Localizations).unwrap();
-    let mut langs = ["LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE", "LANGUAGES"]
-        .into_iter()
-        .flat_map(|env| {
-            std::env::var(env).ok().into_iter().flat_map(|locales| {
-                locales
-                    .split(':')
-                    .filter_map(|locale| LanguageIdentifier::from_str(locale).ok())
-                    .collect_vec()
-            })
-        })
+    let mut langs = poly_l10n::system_want_langids()
         .flat_map(|li| locale_solver.solve_locale(li))
         .filter(|li| available_langs.contains(li))
         .collect_vec();
@@ -248,7 +252,7 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
 #[allow(clippy::missing_panics_doc)]
 fn main() {
     let _guard = setup_logs_and_install_panic_hook();
-    std::sync::LazyLock::<i18n_embed::fluent::FluentLanguageLoader>::force(&LL);
+    std::sync::LazyLock::force(&LL);
     // FIXME: temp hack to set nointernet to true here (should be default value), please refactor
     SETTINGS.write().nointernet = true;
 
