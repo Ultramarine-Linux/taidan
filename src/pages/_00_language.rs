@@ -41,6 +41,26 @@ generate_page!(Language {
         }
     } => {}
 
+
+    gtk::Box {
+        set_orientation: gtk::Orientation::Vertical,
+        set_spacing: 16,
+        set_margin_bottom: 16,
+        set_valign: gtk::Align::Fill,
+        set_halign: gtk::Align::Fill,
+
+        gtk::Image {
+            set_icon_name: Some("globe-symbolic"),
+            inline_css: "-gtk-icon-size: 64px",
+        },
+
+        gtk::Label {
+            set_label: &t!("page-language"),
+            add_css_class: "view-subtitle",
+            inline_css: "font-weight: bold",
+        },
+    },
+
     #[local_ref]
     search -> libhelium::TextField {
         set_is_search: true,
@@ -63,28 +83,22 @@ generate_page!(Language {
             connect_selected_rows_changed => LanguagePageMsg::Selected,
         }
     },
-    gtk::Box {
-        set_orientation: gtk::Orientation::Horizontal,
-        set_spacing: 4,
 
-        gtk::Box {
-            set_hexpand: true,
-        },
-
-        libhelium::Button {
-            set_is_pill: true,
-            #[watch]
-            set_label: &t!("next"),
-            add_css_class: "large-button",
-            connect_clicked => Self::Input::Nav(NavAction::Next),
-        }
+    libhelium::Button {
+        set_valign: gtk::Align::End,
+        set_halign: gtk::Align::Fill,
+        set_is_pill: true,
+        set_halign: gtk::Align::End,
+        set_label: &t!("next"),
+        inline_css: "padding-left: 48px; padding-right: 48px",
+        add_css_class: "suggested-action",
+        connect_clicked => Self::Input::Nav(NavAction::Next),
     },
 );
 use i18n_embed::LanguageLoader;
 use relm4::RelmIterChildrenExt;
 use relm4::SharedState;
 use std::rc::Rc;
-use std::str::FromStr;
 
 static SEARCH_STATE: SharedState<gtk::glib::GString> = SharedState::new();
 // This is a list of languages sorted by total speakers:
@@ -105,42 +119,21 @@ struct LanguageRow {
 }
 
 impl LanguageRow {
-    fn get_locales_via_libc() -> Vec<String> {
-        let mut locales = Vec::new();
-        let mut current = std::ptr::null_mut();
-
-        loop {
-            // SAFETY: meow
-            current = unsafe { libc::newlocale(libc::LC_ALL_MASK, std::ptr::null(), current) };
-            if current.is_null() {
-                break;
-            }
-
-            // SAFETY: meow
-            let name_ptr = unsafe { libc::nl_langinfo_l(libc::CODESET, current) };
-            if !name_ptr.is_null() {
-                // SAFETY: meow
-                let name_cstr = unsafe { std::ffi::CStr::from_ptr(name_ptr) };
-                if let Ok(name) = name_cstr.to_str() {
-                    locales.push(name.to_owned());
-                }
-            }
-        }
-
-        locales.sort_unstable();
-        locales.dedup();
-        locales
-    }
-    fn list() -> impl Iterator<Item = Self> {
-        Self::get_locales_via_libc()
-            .into_iter()
-            .filter(|locale| locale.as_bytes().contains(&b'.'))
+    fn list(f: impl FnMut(Self)) {
+        // FIXME: maybe use some C API instead?
+        let mut cmd = std::process::Command::new("localedef");
+        cmd.arg("--list-archive")
+            .stdout(std::process::Stdio::piped());
+        let stdout = cmd.output().expect("cannot run localedef").stdout;
+        (stdout.split(|&b| b == b'\n'))
+            .filter(|v| !v.contains(&b'.') && !v.contains(&b'@'))
             .filter_map(|locale| {
-                poly_l10n::LanguageIdentifier::from_str(&locale)
+                poly_l10n::LanguageIdentifier::from_bytes(locale)
                     .ok()
                     .map(|l| (l, locale))
             })
             .filter_map(|(langid, locale)| {
+                let locale = core::str::from_utf8(locale).ok()?.to_owned();
                 let lang = isolang::Language::from_locale(&locale)?;
                 let name = langid
                     .region
@@ -157,6 +150,7 @@ impl LanguageRow {
                     native_name: lang.to_autonym().unwrap_or_default(),
                 })
             })
+            .for_each(f);
     }
 }
 
@@ -197,7 +191,7 @@ impl Default for BtnFactory {
             .detach();
 
         let mut btns = btnfactory.guard();
-        LanguageRow::list().for_each(|x| _ = btns.push_back(x));
+        LanguageRow::list(|x| _ = btns.push_back(x));
         btns.push_back(LanguageRow {
             locale: "en-owo".to_owned(),
             name: "English (OWO)".to_owned(),
