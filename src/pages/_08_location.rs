@@ -57,6 +57,6 @@ generate_page!(Location {
         },
     }
 );
-fn page_skipconfig() -> bool {
+const fn page_skipconfig() -> bool {
     true
 }

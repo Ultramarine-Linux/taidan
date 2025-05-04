@@ -61,6 +61,6 @@ generate_page!(CrashReport {
         },
     }
 );
-fn page_skipconfig() -> bool {
+const fn page_skipconfig() -> bool {
     true
 }
