@@ -22,6 +22,7 @@ BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl
 BuildRequires:  pkgconfig(libhelium-1)
 BuildRequires:  pkgconfig(openssl)
 BuildRequires:  clang-libs
+BuildRequires:  clang-devel
 BuildRequires:  pkgconfig(libacl)
 BuildRequires:  pkgconfig(libattr)
 
