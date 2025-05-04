@@ -30,6 +30,6 @@ generate_page!(Analytics:
         // TODO: buttons for confirming / rejecting analytics
     },
 );
-fn page_skipconfig() -> bool {
+const fn page_skipconfig() -> bool {
     true
 }
