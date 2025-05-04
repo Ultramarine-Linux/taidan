@@ -22,33 +22,17 @@ impl LanguageRow {
             .stdout(std::process::Stdio::piped());
         let stdout = cmd.output().expect("cannot run localedef").stdout;
         (stdout.split(|&b| b == b'\n'))
-            .filter(|v| !v.contains(&b'.') && !v.contains(&b'@'))
+            .filter(|v| !v.contains(&b'.') && !v.contains(&b'@') && !v.is_empty())
             .filter_map(|locale| {
-                unic_langid_impl::LanguageIdentifier::from_bytes(locale)
-                    .ok()
-                    .map(|l| (l, locale))
-            })
-            .filter_map(|(langid, locale)| {
                 let locale = core::str::from_utf8(locale).ok()?.to_owned();
-
-                let uloc = rust_icu_uloc::ULoc::try_from(locale)
-                    .expect(&format!("cannot make ULoc for {locale}"));
+                let uloc = rust_icu_uloc::ULoc::try_from(&*locale)
+                    .unwrap_or_else(|_| panic!("cannot make ULoc for {locale}"));
                 Some(Self {
                     locale,
-                    name: c_uloc.display_name(&uloc).ok()?.try_into().ok()?,
-                    native_name: uloc.display_name(&uloc).ok()?.try_into().ok()?,
+                    name: (&uloc.display_name(&c_uloc).ok()?).try_into().ok()?,
+                    native_name: (&uloc.display_name(&uloc).ok()?).try_into().ok()?,
                 })
             })
             .collect()
     }
-}
-
-/// Gets the native display name for a locale using ICU
-fn locale_to_native_name(locale: &str) -> String {
-    let uloc =
-        rust_icu_uloc::ULoc::try_from(locale).expect(&format!("cannot make ULoc for {locale}"));
-    uloc.display_name(&uloc)
-        .expect(&format!("no display name for {locale}"))
-        .try_into()
-        .expect(&format!("can't turn UChar to String for {locale}"))
 }

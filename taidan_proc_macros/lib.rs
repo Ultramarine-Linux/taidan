@@ -78,15 +78,10 @@ pub fn comptime_localedef_langrows(const_name: TokenStream) -> TokenStream {
 
     // sort the popular languages, put to top
     for lang in lang::POPULAR_LANGS.iter().rev() {
-        let Some(index) = langs
-            .iter()
-            .position(|l: &lang::LanguageRow| l.locale.starts_with(lang))
-        else {
+        let Some(index) = langs.iter().position(|l| l.locale.starts_with(lang)) else {
             continue;
         };
-        let Some(x) = langs.remove(index) else {
-            unreachable!()
-        };
+        let x = langs.remove(index);
         langs.insert(0, x);
     }
 
@@ -114,7 +109,7 @@ pub fn comptime_localedef_langrows(const_name: TokenStream) -> TokenStream {
     let len = langs.len();
 
     quote! {
-        const #const_name: [LanguageRow; #len] = [#(#langs)];
+        const #const_name: [LanguageRow; #len] = [#(#langs)*];
     }
     .into()
 }
