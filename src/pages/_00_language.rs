@@ -41,7 +41,6 @@ generate_page!(Language {
         }
     } => {}
 
-
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
         set_spacing: 16,
