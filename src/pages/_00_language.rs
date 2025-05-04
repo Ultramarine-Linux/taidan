@@ -142,6 +142,7 @@ impl relm4::factory::FactoryComponent for &'static LanguageRow {
 struct BtnFactory(Rc<relm4::factory::FactoryVecDeque<&'static LanguageRow>>);
 
 impl Default for BtnFactory {
+    #[allow(clippy::needless_for_each)]
     fn default() -> Self {
         let mut btnfactory = relm4::factory::FactoryVecDeque::builder()
             .launch(gtk::ListBox::default())

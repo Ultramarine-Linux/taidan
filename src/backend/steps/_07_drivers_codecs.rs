@@ -47,10 +47,10 @@ impl super::Step for DriversCodecs {
         }
         if let Err(e) = Drivers::setup_nvidia().await {
             tracing::warn!(?e, "cannot setup nvidia drivers");
-        };
+        }
         if let Err(e) = Drivers::setup_broadcom().await {
             tracing::warn!(?e, "cannot setup broadcom drivers");
-        };
+        }
         // FIXME: refactor this to somewhere else not in this file
         // also this is done inside `_05_dnfdownloadapps.rs`
         // Codecs::install_codecs().await?;
