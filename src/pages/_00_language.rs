@@ -175,11 +175,7 @@ impl AsRef<gtk::Widget> for BtnFactory {
 
 fn set_lang(lang: &LanguageRow) {
     tracing::info!(lang.locale, "Using selected locale");
-    if let Ok(locale) = lang
-        .locale
-        .split_once('.')
-        .map_or(lang.locale, |(left, _)| left)
-        .to_owned()
+    if let Ok(locale) = (lang.locale)
         .parse::<i18n_embed::unic_langid::LanguageIdentifier>()
         .inspect_err(|e| tracing::error!(?e, "Cannot apply language"))
     {
@@ -195,7 +191,6 @@ fn set_lang(lang: &LanguageRow) {
         loader
             .load_languages(&crate::Localizations, &locales)
             .expect("fail to load languages");
-        tracing::debug!(lang=?loader.current_languages(), welcome=loader.get_args_concrete("page-welcome", std::iter::once(("distro", "Ultramarine Linux".into())).collect()), "new loader");
         *crate::LL.write() = loader;
         SETTINGS.write().langlocale = lang.locale;
     }
