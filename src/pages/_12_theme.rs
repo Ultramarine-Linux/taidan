@@ -67,11 +67,8 @@ generate_page!(Theme:
         });
         widgets.lightbox.add_controller(ctl_light);
         widgets.darkbox.add_controller(ctl_dark);
-        SETTINGS.subscribe(sender.input_sender(), |_| Self::Input::Update);
     }
-    update(self, message, sender) {
-        Update => {},
-    } => {}
+    update(self, message, sender) {} => {}
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,

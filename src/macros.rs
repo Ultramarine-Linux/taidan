@@ -14,8 +14,13 @@ pub(crate) const fn page_skipconfig() -> bool {
 }
 
 kurage::generate_generator! { generate_page => [<$name Page>]:
+    init: {
+        SETTINGS.subscribe($sender.input_sender(), |_| Self::Input::Update);
+        tracing::debug!("page initialised");
+    }
     update: {
         Nav(action: NavAction) => $sender.output(Self::Output::Nav(action)).unwrap(),
+        Update => {},
     } => { Nav(NavAction) }
 
     libhelium::ViewMono {
