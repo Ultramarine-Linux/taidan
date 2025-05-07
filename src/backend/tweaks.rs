@@ -3,6 +3,27 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// A distro-specified setting read by Taidan during runtime.
+///
+/// The tweaks must be stored in [`TWEAKS_DIR`] as folders, as so:
+///
+/// ```no_run
+/// /usr/share/taidan/tweaks/ (TWEAKS_DIR)
+/// ┣╸my_tweak/
+/// ┃ ├╴tweak.toml (optional)
+/// ┃ └╴up (required, must be executable)
+/// ┗╸other_tweak/
+///   ├╴tweak.toml
+///   └╴up
+/// ```
+///
+/// The ID of a tweak is determined by the directory name (`my_tweak`, `other_tweak`).
+///
+/// The `tweak.toml` file, if present, MUST specify the following two fields:
+/// - `ftl_name` (alias `name`): the fluent ID for the name of the tweak
+/// - `ftl_desc` (alias `desc`): the fluent ID for the description of the tweak
+///
+/// If the file is unpresent, the above two fields default to `<id>-name` and `<id>-desc`.
 #[derive(Clone, Debug, Default, serde::Deserialize)]
 pub struct Tweak {
     #[serde(skip)]
