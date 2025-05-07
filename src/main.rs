@@ -52,7 +52,7 @@ generate_pages!(Page AppModel AppMsg:
     05: Internet,
     06: Analytics,
     07: CrashReport,
-    08: Location,
+    08: Tweaks,
     09: Codecs,
     10: InputMethod,
     11: NightLight,
