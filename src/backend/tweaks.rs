@@ -5,12 +5,48 @@ use std::{
 
 #[derive(Clone, Debug, Default, serde::Deserialize)]
 pub struct Tweak {
+    #[serde(skip)]
     pub path: PathBuf,
+    #[serde(alias = "name")]
+    pub ftl_name: String,
+    #[serde(alias = "desc")]
+    pub ftl_desc: String,
 }
 
 pub const TWEAKS_DIR: &str = "/usr/share/taidan/tweaks/";
 
 impl Tweak {
+    pub fn try_from_cfg_path(dir: &Path) -> std::io::Result<Result<Self, basic_toml::Error>> {
+        let f = std::fs::read(dir.join("tweak.toml"))?;
+        Ok(basic_toml::from_slice(&f))
+    }
+    #[tracing::instrument]
+    pub fn from_cfg_path(dir: &Path) -> Self {
+        Self::try_from_cfg_path(dir)
+            .inspect_err(|err| {
+                if err.kind() == std::io::ErrorKind::NotFound {
+                    tracing::debug!(?err, "no tweak.toml, using default");
+                } else {
+                    tracing::warn!(?err, "cannot read tweak.toml, using default");
+                }
+            })
+            .ok()
+            .and_then(|inner_toml| {
+                inner_toml
+                    .inspect_err(|err| {
+                        tracing::error!(?err, "cannot parse tweak.toml, using default")
+                    })
+                    .ok()
+            })
+            .unwrap_or_else(|| {
+                let tweak_name = dir.file_name().unwrap().to_string_lossy();
+                Self {
+                    ftl_name: format!("{tweak_name}-name"),
+                    ftl_desc: format!("{tweak_name}-desc"),
+                    ..Self::default()
+                }
+            })
+    }
     #[tracing::instrument]
     pub fn from_dir(path: PathBuf) -> std::io::Result<Self> {
         debug_assert!(path.is_dir());
@@ -29,7 +65,8 @@ impl Tweak {
                 format!("{up:?} is not executable"),
             ));
         }
-        Ok(Self { path })
+        let cfg_self = Self::from_cfg_path(&path);
+        Ok(Self { path, ..cfg_self })
     }
 
     #[tracing::instrument]
@@ -45,8 +82,15 @@ impl Tweak {
             .collect()
     }
 
-    pub fn name(&self) -> &std::ffi::OsStr {
+    pub fn id(&self) -> &std::ffi::OsStr {
         self.path.file_name().unwrap()
+    }
+
+    pub fn name(&self) -> String {
+        crate::t!(&self.ftl_name)
+    }
+    pub fn desc(&self) -> String {
+        crate::t!(&self.ftl_desc)
     }
 }
 

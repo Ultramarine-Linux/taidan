@@ -1,9 +1,10 @@
-use const_format::formatcp;
+//! Runtime l10n module.
+//!
+//! The compile-time loader is available as [`crate::LL`].
 use i18n_embed::fluent::{fluent_language_loader, FluentLanguageLoader};
 use i18n_embed::{unic_langid::LanguageIdentifier, FileSystemAssets, LanguageLoader as _};
 use itertools::Itertools;
 use parking_lot::RwLock;
-use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
 
 #[cfg(not(debug_assertions))]
@@ -42,24 +43,40 @@ pub static PO_LOADER: LazyLock<RwLock<FluentLanguageLoader>> = LazyLock::new(|| 
         langs = vec![loader.fallback_language().clone()];
     }
     loader.load_languages(&***PO_ASSETS, &langs).unwrap();
-    loader
+    RwLock::new(loader)
 });
 
 #[macro_export]
 macro_rules! t {
     (@$msgid:literal) => {
-        if $crate::backend::l10n::PO_LOADER.has($msgid) {
+        if $crate::backend::l10n::PO_LOADER.read().has($msgid) {
             $crate::backend::l10n::PO_LOADER.read().get($msgid)
         } else {
             i18n_embed_fl::fl!($crate::LL.read(), $msgid)
         }
     };
     ($msgid:literal $(, $k:ident = $v:expr)*$(,)?) => {
-        if $crate::backend::l10n::PO_LOADER.has($msgid) {
+        if $crate::backend::l10n::PO_LOADER.read().has($msgid) {
             $crate::backend::l10n::PO_LOADER.read()
-                .get_args_concrete($msgid, [$((stringify!($k), $v.into())),*])
+                .get_args_concrete($msgid, [$((stringify!($k), $v.into())),*].into())
         } else {
             i18n_embed_fl::fl!($crate::LL.read(), $msgid $(, $k = $v)*)
+        }
+    };
+    (@$msgid:expr) => {
+        if $crate::backend::l10n::PO_LOADER.read().has($msgid) {
+            $crate::backend::l10n::PO_LOADER.read().get($msgid)
+        } else {
+            $crate::LL.read().get($msgid)
+        }
+    };
+    ($msgid:expr $(, $k:ident = $v:expr)*$(,)?) => {
+        if $crate::backend::l10n::PO_LOADER.read().has($msgid) {
+            $crate::backend::l10n::PO_LOADER.read()
+                .get_args_concrete($msgid, [$((stringify!($k), $v.into())),*].into())
+        } else {
+            $crate::LL.read()
+                .get_args_concrete($msgid, [$((stringify!($k), $v.into())),*].into())
         }
     };
 }

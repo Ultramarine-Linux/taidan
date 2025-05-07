@@ -20,13 +20,13 @@ generate_page!(Tweaks:
         },
 
         gtk::Label {
-            set_label: &t!("page-location"),
+            set_label: &t!("page-tweaks"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
 
         #[template] crate::ui::SwitchBox {
-            set_title: &t!("page-location"),
+            set_title: &t!("page-tweaks"),
             #[template_child] switch {
                 connect_state_set[sender] => move |_, state| {
                     sender.input(Self::Input::Switch(state));
@@ -45,3 +45,6 @@ generate_page!(Tweaks:
         },
     }
 );
+fn page_skipconfig() -> bool {
+    CFG.
+}
