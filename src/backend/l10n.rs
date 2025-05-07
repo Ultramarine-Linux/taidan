@@ -8,7 +8,7 @@ use parking_lot::RwLock;
 use std::sync::{Arc, LazyLock};
 
 #[cfg(not(debug_assertions))]
-const PO_PATH: &str = "/usr/share/readymade/po/";
+const PO_PATH: &str = "/usr/share/taidan/po/";
 
 #[cfg(debug_assertions)]
 const PO_PATH: &str = "po/";

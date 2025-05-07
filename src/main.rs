@@ -281,7 +281,7 @@ fn main() {
 ///
 /// # Panics
 /// - cannot install `color_eyre`
-/// - cannot create readymade tempdir
+/// - cannot create taidan tempdir
 #[allow(clippy::cognitive_complexity)]
 fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
     color_eyre::install().expect("install color_eyre");
