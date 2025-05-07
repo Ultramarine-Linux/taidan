@@ -1,12 +1,4 @@
-use crate::{backend::tweaks::Tweak, prelude::*};
-
-static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
-    let tweaks = Tweak::list()
-        .inspect_err(|err| tracing::error!(?err, "cannot list tweaks"))
-        .unwrap_or_default();
-    SETTINGS.write().tweaks = vec![false; tweaks.len()];
-    tweaks
-});
+use crate::{backend::tweaks::TWEAKS, prelude::*};
 
 fn page_skipconfig() -> bool {
     TWEAKS.is_empty()

@@ -1,7 +1,20 @@
 use std::{
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
+    sync::LazyLock,
 };
+
+use tokio::io::AsyncWriteExt;
+
+use crate::SETTINGS;
+
+pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
+    let tweaks = Tweak::list()
+        .inspect_err(|err| tracing::error!(?err, "cannot list tweaks"))
+        .unwrap_or_default();
+    SETTINGS.write().tweaks = vec![false; tweaks.len()];
+    tweaks
+});
 
 /// A distro-specified setting read by Taidan during runtime.
 ///
@@ -112,6 +125,24 @@ impl Tweak {
     }
     pub fn desc(&self) -> String {
         crate::t!(&self.ftl_desc)
+    }
+
+    /// Run `up` with the serialized `settings`
+    #[tracing::instrument]
+    pub async fn run(&self, settings: &[u8], on: bool) {
+        let mut cmd = tokio::process::Command::new(self.path.join("up"))
+            .arg(if on { "1" } else { "0" })
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .expect("cannot run `up`"); // checked in `from_dir`
+        let stdin = cmd.stdin.as_mut().unwrap();
+        stdin.write_all(settings).await.unwrap();
+        stdin.flush().await.unwrap();
+        match cmd.wait().await {
+            Ok(x) if x.success() => {}
+            Ok(x) => tracing::error!(rc=?x.code(), "process failed with non-zero exit code"),
+            Err(err) => tracing::error!(?err, "waiting for the `up` process failed"),
+        }
     }
 }
 
