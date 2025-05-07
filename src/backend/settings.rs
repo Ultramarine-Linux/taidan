@@ -28,4 +28,6 @@ pub struct Settings {
     pub catalogue: HashMap<String, HashMap<usize, Vec<usize>>>,
 
     pub actions: [Vec<String>; crate::cfg::ACTION_TYPES],
+
+    pub tweaks: Vec<bool>,
 }

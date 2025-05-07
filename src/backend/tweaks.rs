@@ -91,7 +91,7 @@ impl Tweak {
     }
 
     #[tracing::instrument]
-    pub fn list() -> std::io::Result<Vec<Self>> {
+    pub fn list() -> std::io::Result<Box<[Self]>> {
         std::fs::read_dir("/usr/share/taidan/tweaks/")?
             .filter_map(|dir_entry| {
                 dir_entry

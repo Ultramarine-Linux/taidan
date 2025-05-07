@@ -93,6 +93,7 @@ page-crashreport-lbl2 = You will be given a crash ID to help support find what w
 # btn-switch
 switch-crashreport = Send Crash Data
 switch-crashreport-desc = Press next to keep off
+
 page-tweaks = System Tweaks
 
 ## page: Codecs and Drivers

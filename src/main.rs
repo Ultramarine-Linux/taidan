@@ -111,7 +111,7 @@ impl SimpleComponent for AppModel {
                     Page::Internet => *model.internet_page.widget(),
                     Page::Analytics => *model.analytics_page.widget(),
                     Page::CrashReport => *model.crash_report_page.widget(),
-                    Page::Location => *model.location_page.widget(),
+                    Page::Tweaks => *model.tweaks_page.widget(),
                     Page::Codecs => *model.codecs_page.widget(),
                     Page::InputMethod => *model.input_method_page.widget(),
                     Page::NightLight => *model.night_light_page.widget(),
