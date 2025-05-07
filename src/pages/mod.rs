@@ -12,7 +12,7 @@ pub mod _04_password;
 pub mod _05_internet;
 pub mod _06_analytics;
 pub mod _07_crashreport;
-pub mod _08_location;
+pub mod _08_tweaks;
 pub mod _09_codecs;
 pub mod _10_inputmethod;
 pub mod _11_nightlight;

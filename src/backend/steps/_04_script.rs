@@ -31,9 +31,13 @@ impl super::Step for Script {
     }
     async fn run(
         &self,
-        _: &crate::backend::settings::Settings,
+        settings: &crate::backend::settings::Settings,
         _: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
+        let sett = serde_json::to_vec(settings)?;
+        for (&on, tweak) in settings.tweaks.iter().zip(&*crate::backend::tweaks::TWEAKS) {
+            tweak.run(&sett, on).await;
+        }
         Ok(())
     }
 }

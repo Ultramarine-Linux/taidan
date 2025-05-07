@@ -6,7 +6,7 @@
         <file preprocess="xml-stripblanks" alias="system-users-symbolic.svg">icons/system-users-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="dialog-question-symbolic.svg">icons/dialog-question-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="eye-open-negative-filled-symbolic.svg">icons/eye-open-negative-filled-symbolic.svg</file>
-        <file preprocess="xml-stripblanks" alias="location-active-symbolic.svg">icons/location-active-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="systemsettings-symbolic.svg">icons/systemsettings-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="web-browser-symbolic.svg">icons/web-browser-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="dialog-error-symbolic.svg">icons/dialog-error-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="input-keyboard-symbolic.svg">icons/input-keyboard-symbolic.svg</file>
