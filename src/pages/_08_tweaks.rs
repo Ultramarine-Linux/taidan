@@ -99,8 +99,8 @@ impl relm4::factory::FactoryComponent for TweakBox {
             set_widget = &gtk::Switch {
                 set_halign: gtk::Align::End,
                 set_hexpand: true,
-                connect_state_set => move |_, state| {
-                    crate::SETTINGS.write().tweaks[self.0] = state;
+                connect_state_set[idx = self.0] => move |_, state| {
+                    crate::SETTINGS.write().tweaks[idx] = state;
                     glib::Propagation::Proceed
                 },
             }
