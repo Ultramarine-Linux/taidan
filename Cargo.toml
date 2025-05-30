@@ -18,10 +18,7 @@ color-eyre = "0.6.3"
 const_format = "0.2.34"
 enum_dispatch = "0.3.13"
 futures = "0.3.31"
-i18n-embed = { version = "0.15.4", features = [
-    "desktop-requester",
-    "fluent-system",
-] }
+i18n-embed = { version = "0.15.4", features = ["desktop-requester", "filesystem-assets", "fluent-system"] }
 i18n-embed-fl = "0.9.4"
 iso3166 = "1.2.1"
 isolang = { version = "2.4.0", features = ["local_names"] }

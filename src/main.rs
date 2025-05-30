@@ -52,7 +52,7 @@ generate_pages!(Page AppModel AppMsg:
     05: Internet,
     06: Analytics,
     07: CrashReport,
-    08: Location,
+    08: Tweaks,
     09: Codecs,
     10: InputMethod,
     11: NightLight,
@@ -111,7 +111,7 @@ impl SimpleComponent for AppModel {
                     Page::Internet => *model.internet_page.widget(),
                     Page::Analytics => *model.analytics_page.widget(),
                     Page::CrashReport => *model.crash_report_page.widget(),
-                    Page::Location => *model.location_page.widget(),
+                    Page::Tweaks => *model.tweaks_page.widget(),
                     Page::Codecs => *model.codecs_page.widget(),
                     Page::InputMethod => *model.input_method_page.widget(),
                     Page::NightLight => *model.night_light_page.widget(),
@@ -281,7 +281,7 @@ fn main() {
 ///
 /// # Panics
 /// - cannot install `color_eyre`
-/// - cannot create readymade tempdir
+/// - cannot create taidan tempdir
 #[allow(clippy::cognitive_complexity)]
 fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
     color_eyre::install().expect("install color_eyre");

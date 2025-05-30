@@ -44,13 +44,6 @@ macro_rules! awrite {
 }
 
 #[macro_export]
-macro_rules! t {
-    ($msgid:literal $($tt:tt)*) => {
-        i18n_embed_fl::fl!($crate::LL.read(), $msgid $($tt)*)
-    };
-}
-
-#[macro_export]
 macro_rules! generate_pages {
     ($Page:ident $AppModel:ident $AppMsg:ident: $($num:tt: $page:ident $($forward:expr)?),+$(,)?) => { ::paste::paste! {
         use pages::{$([<_$num _$page:lower>]::[<$page:camel Page>]),+};

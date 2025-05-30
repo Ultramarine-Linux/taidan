@@ -6,9 +6,11 @@ use crate::pages::InstallingPageMsg;
 pub mod dnf;
 pub mod flatpak;
 pub mod i18n;
+pub mod l10n;
 pub mod settings;
 pub mod steps;
 pub mod theme;
+pub mod tweaks;
 
 use crate::prelude::*;
 
