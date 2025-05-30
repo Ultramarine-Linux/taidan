@@ -50,6 +50,11 @@ pub struct Tweak {
 pub const TWEAKS_DIR: &str = "/usr/share/taidan/tweaks/";
 
 impl Tweak {
+    /// Attempt to read and parse the `tweak.toml` file from the given directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`std::io::Error`] if the file cannot be read, or a [`basic_toml::Error`] if the file cannot be parsed.
     pub fn try_from_cfg_path(dir: &Path) -> std::io::Result<Result<Self, basic_toml::Error>> {
         let f = std::fs::read(dir.join("tweak.toml"))?;
         Ok(basic_toml::from_slice(&f))
@@ -68,7 +73,7 @@ impl Tweak {
             .and_then(|inner_toml| {
                 inner_toml
                     .inspect_err(|err| {
-                        tracing::error!(?err, "cannot parse tweak.toml, using default")
+                        tracing::error!(?err, "cannot parse tweak.toml, using default");
                     })
                     .ok()
             })
@@ -112,10 +117,16 @@ impl Tweak {
                     .ok()
                     .filter(|entry| entry.path().is_dir())
             })
-            .map(|dir_entry| Ok(Self::from_dir(dir_entry.path())?))
+            .map(|dir_entry| Self::from_dir(dir_entry.path()))
             .collect()
     }
 
+    /// Return the tweak's ID, which is the directory name.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the tweak's path does not have a file name.
+    #[must_use]
     pub fn id(&self) -> &std::ffi::OsStr {
         self.path.file_name().unwrap()
     }
