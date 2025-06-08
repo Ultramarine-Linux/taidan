@@ -189,3 +189,6 @@ page-error-retry = Retry
 
 page-language = Language
 page-language-search-lang = Search Language/Locale…
+
+flatpakening-name = Use Flatpaks instead of RPMs
+flatpakening-desc = This enhances system security by sandboxing designated applications.
