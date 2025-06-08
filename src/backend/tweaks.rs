@@ -13,6 +13,7 @@ pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
         .inspect_err(|err| tracing::error!(?err, "cannot list tweaks"))
         .unwrap_or_default();
     SETTINGS.write().tweaks = vec![false; tweaks.len()];
+    tracing::info!("found {} tweaks", tweaks.len());
     tweaks
 });
 
@@ -47,6 +48,9 @@ pub struct Tweak {
     pub ftl_desc: String,
 }
 
+#[cfg(debug_assertions)]
+pub const TWEAKS_DIR: &str = "data/tweaks/";
+#[cfg(not(debug_assertions))]
 pub const TWEAKS_DIR: &str = "/usr/share/taidan/tweaks/";
 
 impl Tweak {
@@ -110,7 +114,7 @@ impl Tweak {
 
     #[tracing::instrument]
     pub fn list() -> std::io::Result<Box<[Self]>> {
-        std::fs::read_dir("/usr/share/taidan/tweaks/")?
+        std::fs::read_dir(TWEAKS_DIR)?
             .filter_map(|dir_entry| {
                 dir_entry
                     .inspect_err(|err| tracing::error!(?err, "cannot read file in {TWEAKS_DIR}"))
@@ -141,11 +145,13 @@ impl Tweak {
     /// Run `up` with the serialized `settings`
     #[tracing::instrument]
     pub async fn run(&self, settings: &[u8], on: bool) {
-        let mut cmd = tokio::process::Command::new(self.path.join("up"))
+        let mut cmd = tokio::process::Command::new("pkexec")
+            .args(["--user", "root"])
+            .arg(self.path.join("up"))
             .arg(if on { "1" } else { "0" })
             .stdin(std::process::Stdio::piped())
             .spawn()
-            .expect("cannot run `up`"); // checked in `from_dir`
+            .expect("fail to run pkexec");
         let stdin = cmd.stdin.as_mut().unwrap();
         stdin.write_all(settings).await.unwrap();
         stdin.flush().await.unwrap();
