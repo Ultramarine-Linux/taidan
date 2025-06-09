@@ -93,9 +93,8 @@ page-crashreport-lbl2 = You will be given a crash ID to help support find what w
 # btn-switch
 switch-crashreport = Send Crash Data
 switch-crashreport-desc = Press next to keep off
-# do NOT translate
-page-location = Location Services
-page-location-desc = Allow apps to request your approximate location with Mozilla Location Services.
+
+page-tweaks = System Tweaks
 
 ## page: Codecs and Drivers
 
@@ -190,3 +189,6 @@ page-error-retry = Retry
 
 page-language = Language
 page-language-search-lang = Search Language/Locale…
+
+flatpakening-name = Use Flatpaks instead of RPMs
+flatpakening-desc = This enhances system security by sandboxing designated applications.

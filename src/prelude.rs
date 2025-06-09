@@ -17,3 +17,5 @@ pub use crate::{t, NavAction, CFG, SETTINGS};
 
 pub(crate) static REQWEST_CLIENT: std::sync::LazyLock<reqwest::Client> =
     std::sync::LazyLock::new(reqwest::Client::new);
+
+pub use std::sync::LazyLock;

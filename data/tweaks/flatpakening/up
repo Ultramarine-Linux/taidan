@@ -1,0 +1,13 @@
+#!/bin/sh
+# vi: ft=sh noet ci pi sts=0 sw=2 ts=2
+
+if [[ $1 -eq 0 ]]; then exit 0; fi
+
+latest=`curl https://raw.githubusercontent.com/Ultramarine-Linux/weekly-polycrystal/refs/heads/main/latest`
+edition=`sed -nE 's@^VARIANT_ID=@@p' /etc/os-release`
+filename="flatpak-um$(rpm -E '%fedora')-$edition-$(rpm -E '%_arch').tar.zst"
+url="https://github.com/Ultramarine-Linux/weekly-polycrystal/releases/download/$latest/$filename"
+
+curl -sL "$url" | tar xv -C /var/lib/ --use-compress-program="zstd --threads=0"
+
+# TODO: uninstall the RPMs?
