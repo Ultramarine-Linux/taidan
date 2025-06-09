@@ -73,7 +73,6 @@ page-error-done = Xong
 page-error-retry = Thử lại
 page-internet-warn = Codec, trình điều khiển và các phần mềm khác sẽ không được cài đặt.
 page-internet-ok = Bạn đã được kết nối với Internet!!!
-page-location-desc = Cho phép các ứng dụng yêu cầu vị trí tương đối của bạn với Dịch vụ vị trí Mozilla.
 page-installing-flatpak = Đang cài đặt { $n } flatpaks…
 page-internet-open = Mở tiện ích Wi-Fi
 page-language = Ngôn ngữ
