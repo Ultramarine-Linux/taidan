@@ -77,3 +77,7 @@ page-installing-flatpak = Đang cài đặt { $n } flatpaks…
 page-internet-open = Mở tiện ích Wi-Fi
 page-language = Ngôn ngữ
 page-language-search-lang = Tìm ngôn ngữ/địa phương…
+flatpakening-name = Dùng Flatpak thay vì RPM
+flatpakening-desc = Giúp hệ thống của bạn thêm bảo mật khi các ứng dụng lựa chọn được cách ly.
+switch-crashreport-desc = Nhấn Tiếp để bỏ qua bước này
+page-tweaks = Tinh chỉnh hệ thống
