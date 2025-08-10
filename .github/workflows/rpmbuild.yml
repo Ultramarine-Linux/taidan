@@ -11,6 +11,8 @@ jobs:
       image: ghcr.io/terrapkg/builder:f41
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Install dependencies
         run: dnf builddep -y scripts/taidan.spec && dnf in -y rpmdevtools
