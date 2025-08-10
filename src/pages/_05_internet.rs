@@ -73,7 +73,7 @@ generate_page!(Internet {
             set_halign: gtk::Align::Center,
             // set_icon: Some("network-wireless-symbolic"),
             set_label: &t!("page-internet-open"),
-            connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("nm-connection-editor", &[]).await.unwrap() }),
+            connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("netto", &[]).await.unwrap() }),
         }
     },
 
