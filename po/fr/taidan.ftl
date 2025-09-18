@@ -1,46 +1,3 @@
-## page: Welcome
-
-
-## page: Keyboard Layout
-
-
-## page: Who are You?
-
-
-## page: Create a Password
-
-
-## page: Internet
-
-
-## page: Codecs and Drivers
-
-
-## page: Input Method
-
-
-## page: Nightlight
-
-
-## page: Choose Your Theme
-
-
-## page: Browser Selection
-
-
-## page: Categories
-## this page shows different categories in the app catalogue (e.g. Productivity, Gaming, Media Prod., etc.)
-
-
-## page: Installing
-
-
-## page: Finish
-
-
-## page: Error
-
-<<<<<<< HEAD
 prev = Précédent
 next = Suivant
 steps-dnfdownloadupdate = Téléchargement de la mise à jour du Système…
@@ -90,5 +47,3 @@ flatpakening-name = Utiliser des Flatpaks à la place de paquets RPMs
 flatpakening-desc = Cela améliore la sécurité du système en isolant les applications sélectionnées.
 default = Par défaut
 steps-driverscodecs = Installation des pilotes additionnels…
-=======
->>>>>>> d42f54e (Added translation using Weblate (French))
