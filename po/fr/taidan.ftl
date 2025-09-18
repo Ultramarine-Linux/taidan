@@ -40,6 +40,7 @@
 
 ## page: Error
 
+<<<<<<< HEAD
 prev = Précédent
 next = Suivant
 steps-dnfdownloadupdate = Téléchargement de la mise à jour du Système…
@@ -89,3 +90,5 @@ flatpakening-name = Utiliser des Flatpaks à la place de paquets RPMs
 flatpakening-desc = Cela améliore la sécurité du système en isolant les applications sélectionnées.
 default = Par défaut
 steps-driverscodecs = Installation des pilotes additionnels…
+=======
+>>>>>>> d42f54e (Added translation using Weblate (French))
