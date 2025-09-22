@@ -289,7 +289,7 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
         .prefix("taidan-logs")
         .tempdir()
         .expect("create logs tempdir")
-        .into_path();
+        .keep();
     // create dir
     std::fs::create_dir_all(&temp_dir).expect("create logs tempdir");
     let file_appender = tracing_appender::rolling::never(&temp_dir, "taidan.log");
@@ -322,9 +322,6 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
     }
     tracing::info!("Taidan {version}", version = env!("CARGO_PKG_VERSION"));
     tracing::info!("Logging to journald");
-    tracing::info!(
-        "Logging to {tmp}/taidan.log",
-        tmp = temp_dir.to_string_lossy()
-    );
+    tracing::info!("Logging to {}/taidan.log", temp_dir.display());
     guard
 }
