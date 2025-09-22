@@ -10,4 +10,4 @@ url="https://github.com/Ultramarine-Linux/weekly-polycrystal/releases/download/$
 
 curl -sL "$url" | tar xv -C /var/lib/ --use-compress-program="zstd --threads=0"
 
-# TODO: uninstall the RPMs?
+dnf group remove ultramarine-$edition-no-flatpak-apps -y
