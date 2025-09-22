@@ -22,7 +22,7 @@ pub struct Category {
 impl Category {
     pub fn parse_path(path: &std::path::Path) -> Res<Self> {
         let mut obj: Self =
-            serde_yml::from_reader(std::fs::File::open(path).map_err(|err| E::Io {
+            serde_yaml_ng::from_reader(std::fs::File::open(path).map_err(|err| E::Io {
                 err,
                 path: path.to_path_buf(),
             })?)
@@ -50,11 +50,11 @@ pub struct Choice {
     pub note: Option<String>,
     #[serde(default)]
     #[serde(rename = "options")]
-    _options: Box<[serde_yml::Value]>,
+    _options: Box<[serde_yaml_ng::Value]>,
     #[serde(skip)]
     pub options: Box<[ChoiceOption]>,
     #[serde(rename = "actions")]
-    _actions: serde_yml::Value,
+    _actions: serde_yaml_ng::Value,
     #[serde(skip)]
     pub actions: ChoiceActions,
     pub editions: Option<Vec<String>>,
@@ -195,7 +195,7 @@ impl Choice {
     /// - you did not input your yaml properly smh
     #[tracing::instrument]
     fn populate_options(&mut self, cat: &str) -> Res {
-        use serde_yml::Value;
+        use serde_yaml_ng::Value;
         self.options = self
             ._options
             .iter_mut()
@@ -244,7 +244,7 @@ impl Choice {
     #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
     #[tracing::instrument]
     fn recurse_yml_seq(
-        mut val: serde_yml::Value,
+        mut val: serde_yaml_ng::Value,
         mut counter: Vec<usize>,
         dimension: &[usize],
         depth: usize,
@@ -254,7 +254,7 @@ impl Choice {
     ) -> Res<ChoiceActions> {
         if depth == counter.len() {
             // expect leaf or list
-            let serde_yml::Value::String(s) = val else {
+            let serde_yaml_ng::Value::String(s) = val else {
                 return E::syntax(
                     choice,
                     cat,
@@ -269,7 +269,7 @@ impl Choice {
         }
         // get inner seq
         let Some(seq) = val.as_sequence_mut() else {
-            if matches!(&val, serde_yml::Value::String(s) if s == "todo") {
+            if matches!(&val, serde_yaml_ng::Value::String(s) if s == "todo") {
                 // assume inner arrays with all todos
                 return (0..dimension[depth])
                     .map(|i| {
@@ -370,7 +370,7 @@ mod test {
     #[test]
     fn test_parse_catalogue_browser() {
         let mut obj: Category =
-            serde_yml::from_str(include_str!("../catalogue/browser.yml")).unwrap();
+            serde_yaml_ng::from_str(include_str!("../catalogue/browser.yml")).unwrap();
         obj.choices
             .iter_mut()
             .try_for_each(|choice| choice.parse_after_yaml("browser"))

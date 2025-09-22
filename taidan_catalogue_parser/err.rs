@@ -5,7 +5,7 @@ pub(crate) type E = CatalogueError;
 pub enum CatalogueError {
     #[error("YAML syntax error at {}: {err:?}", path.display())]
     Yml {
-        err: serde_yml::Error,
+        err: serde_yaml_ng::Error,
         path: std::path::PathBuf,
     },
     #[error("Input/output error at {}: {err:?}", path.display())]
