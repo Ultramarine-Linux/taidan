@@ -93,7 +93,7 @@ impl Config {
             .map_err(|e| {
                 eyre!("Cannot read catalogue dir")
                     .wrap_err(e)
-                    .note(format!("Catalogue dir: {dir:?}"))
+                    .note(format!("Catalogue dir: {}", dir.display()))
             })?
             .map(|f| -> color_eyre::Result<_> { Ok(Category::parse_path(&f?.path())?) })
             .try_collect()

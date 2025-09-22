@@ -14,6 +14,15 @@ pub mod tweaks;
 
 use crate::prelude::*;
 
+/// Start the installation process.
+///
+/// # Panics
+///
+/// Panics if the given sender is dropped.
+///
+/// # Errors
+///
+/// Stage failures are propagated.
 #[tracing::instrument]
 pub async fn start_install(
     mut settings: settings::Settings,
@@ -37,6 +46,20 @@ pub async fn start_install(
     Ok(())
 }
 
+/// Start the "simple" installation process.
+///
+/// This executes the following stages only:
+/// - [`steps::Stage::UserAdd`]
+/// - [`steps::Stage::Script`]
+/// - [`steps::Stage::DriversCodecs`]
+///
+/// # Panics
+///
+/// Panics if the given sender is dropped.
+///
+/// # Errors
+///
+/// Stage failures are propagated.
 #[allow(clippy::default_trait_access)]
 #[tracing::instrument]
 pub async fn start_simple_install(

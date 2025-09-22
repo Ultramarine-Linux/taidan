@@ -63,8 +63,13 @@ impl Tweak {
         let f = std::fs::read(dir.join("tweak.toml"))?;
         Ok(basic_toml::from_slice(&f))
     }
+    /// Obtain [`Tweak`] from the path to the tweak directory, assuming the entry is valid.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `dir` ends in `..`, see [`Path::file_name()`].
     #[tracing::instrument]
-    pub fn from_cfg_path(dir: &Path) -> Self {
+    fn from_cfg_path(dir: &Path) -> Self {
         Self::try_from_cfg_path(dir)
             .inspect_err(|err| {
                 if err.kind() == std::io::ErrorKind::NotFound {
@@ -90,6 +95,14 @@ impl Tweak {
                 }
             })
     }
+    /// Obtain [`Tweak`] from the path to the tweak directory.
+    /// This is the "safe" version of [`Self::from_cfg_path()`].
+    ///
+    /// # Errors
+    ///
+    /// The constructor expects the directory to contain an executable file named `up`.
+    /// For more information, see the struct docs.
+    /// [`std::io::ErrorKind::NotFound`], [`std::io::ErrorKind::PermissionDenied`] may be returned.
     #[tracing::instrument]
     pub fn from_dir(path: PathBuf) -> std::io::Result<Self> {
         debug_assert!(path.is_dir());
@@ -99,7 +112,7 @@ impl Tweak {
         }) else {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                format!("expected file `up` in `{path:?}`"),
+                format!("expected file `up` in `{}`", path.display()),
             ));
         };
         if !is_executable(&up.path()) {
@@ -112,6 +125,12 @@ impl Tweak {
         Ok(Self { path, ..cfg_self })
     }
 
+    /// Obtain a list of tweaks from the directory containing different tweaks.
+    /// See the struct docs for more information.
+    ///
+    /// # Errors
+    ///
+    /// See [`Self::from_dir()`].
     #[tracing::instrument]
     pub fn list() -> std::io::Result<Box<[Self]>> {
         std::fs::read_dir(TWEAKS_DIR)?
@@ -143,6 +162,10 @@ impl Tweak {
     }
 
     /// Run `up` with the serialized `settings`
+    ///
+    /// # Panics
+    ///
+    /// Expects `pkexec` to be available.
     #[tracing::instrument]
     pub async fn run(&self, settings: &[u8], on: bool) {
         let mut cmd = tokio::process::Command::new("pkexec")
