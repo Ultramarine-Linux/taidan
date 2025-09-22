@@ -1,6 +1,8 @@
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 
 name: Build RPM snapshot package
 
