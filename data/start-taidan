@@ -1,5 +1,9 @@
 #!/usr/bin/sh
 
+source /etc/X11/xinit/xinitrc
+xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/http'
+xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/https'
+
 swaybg -i /usr/share/backgrounds/default.png -m fill -c '#113344' >/dev/null 2>&1 &
 TAIDAN_LOG=trace /usr/bin/taidan
 
