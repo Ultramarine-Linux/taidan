@@ -1,7 +1,8 @@
 use std::sync::LazyLock;
 
 use super::parseutil as pu;
-use tokio::io::AsyncBufReadExt;
+use futures::{SinkExt, StreamExt};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 use crate::prelude::*;
 
@@ -22,11 +23,18 @@ pub(super) async fn handle_dnf(
     let mut cmd = tokio::process::Command::new("pkexec");
     cmd.args(["--user", "root", "dnf5"]);
     f(&mut cmd);
-    let mut output = cmd
-        .stdout(std::process::Stdio::piped())
+    let (writer, reader) = tokio::net::unix::pipe::pipe().expect("cannot create pipe");
+    let writer = (writer.into_blocking_fd()).expect("cannot set blocking mode to pipe writer");
+    let output = cmd
+        .stdout(writer.try_clone().expect("cannot clone writer"))
+        .stderr(writer)
         .spawn()
         .wrap_err("fail to run `dnf5`")?;
-    let mut stdout_lines = tokio::io::BufReader::new(output.stdout.take().unwrap()).lines();
+    let (mut tx, mut rx) = futures::channel::mpsc::unbounded::<String>();
+    let mut dnf_log = tokio::fs::File::create(&*crate::TEMP_DIR.join("dnf5.stdout.log"))
+        .await
+        .expect("cannot create log file");
+    let mut stdout_lines = tokio::io::BufReader::new(reader).lines();
     futures::try_join!(
         async move {
             while let Some(line) =
@@ -42,6 +50,14 @@ pub(super) async fn handle_dnf(
                     continue;
                 };
                 pu::send_frac(&sender, numerator, denominator);
+                tx.send(line.clone()).await.expect("tx closed");
+            }
+            tx.close().await.expect("cannot close channel");
+            Ok(())
+        },
+        async move {
+            while let Some(line) = rx.next().await {
+                crate::awrite!(dnf_log <- "{line}").expect("cannot write to log");
             }
             Ok(())
         },

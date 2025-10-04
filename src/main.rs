@@ -277,6 +277,16 @@ fn main() {
     RelmApp::from_app(app).run::<AppModel>(());
 }
 
+pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
+    let dir = tempfile::Builder::new()
+        .prefix("taidan-logs")
+        .tempdir()
+        .expect("create logs tempdir")
+        .keep();
+    std::fs::create_dir_all(&dir).expect("create logs tempdir");
+    dir
+});
+
 /// Returns a logging guard.
 ///
 /// # Panics
@@ -285,14 +295,7 @@ fn main() {
 #[allow(clippy::cognitive_complexity)]
 fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
     color_eyre::install().expect("install color_eyre");
-    let temp_dir = tempfile::Builder::new()
-        .prefix("taidan-logs")
-        .tempdir()
-        .expect("create logs tempdir")
-        .keep();
-    // create dir
-    std::fs::create_dir_all(&temp_dir).expect("create logs tempdir");
-    let file_appender = tracing_appender::rolling::never(&temp_dir, "taidan.log");
+    let file_appender = tracing_appender::rolling::never(&*TEMP_DIR, "taidan.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::registry()
@@ -322,6 +325,6 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
     }
     tracing::info!("Taidan {version}", version = env!("CARGO_PKG_VERSION"));
     tracing::info!("Logging to journald");
-    tracing::info!("Logging to {}/taidan.log", temp_dir.display());
+    tracing::info!("Logging to {}/taidan.log", TEMP_DIR.display());
     guard
 }
