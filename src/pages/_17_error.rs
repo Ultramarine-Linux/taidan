@@ -48,10 +48,7 @@ generate_page!(Error {
             set_is_textual: true,
             set_halign: gtk::Align::Start,
             set_label: &t!("page-error-retry"),
-            connect_clicked[sender] => move |_| {
-                sender.input(Self::Input::Nav(NavAction::GoTo(crate::Page::Theme)));
-                sender.input(Self::Input::Nav(NavAction::Next));
-            },
+            connect_clicked => Self::Input::Nav(NavAction::GoTo(crate::Page::Installing)),
         },
 
         gtk::Box { set_halign: gtk::Align::Fill, set_hexpand: true },
