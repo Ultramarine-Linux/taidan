@@ -82,6 +82,7 @@ page-internet-skip = I don't have Internet
 page-internet-warn = Codecs, drivers and other user programs will not be installed.
 page-internet-open = Open Wi-Fi connection applet
 page-internet-ok = You are now connected to the Internet!
+page-internet-portal = Open browser for web login
 # do NOT translate (for now)
 page-analytics = Analytics and Crash Reporting
 # do NOT translate (for now)

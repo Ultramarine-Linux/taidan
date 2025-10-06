@@ -74,7 +74,14 @@ generate_page!(Internet {
             // set_icon: Some("network-wireless-symbolic"),
             set_label: &t!("page-internet-open"),
             connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("netto", &[]).await.unwrap() }),
-        }
+        },
+
+        libhelium::Button {
+            set_is_tint: true,
+            set_halign: gtk::Align::Center,
+            set_label: &t!("page-internet-portal"),
+            connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("xdg-open", &["http://detectportal.firefox.com/canonical.html"]).await.unwrap() }),
+        },
     },
 
     #[name(prev_next_btns)]
