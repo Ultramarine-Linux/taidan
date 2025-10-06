@@ -94,7 +94,7 @@ mod parseutil {
     /// - process exited with non-zero error code
     pub async fn wait_for(
         s: &'static str,
-        mut output: tokio::process::Child,
+        output: &mut tokio::process::Child,
     ) -> color_eyre::Result<()> {
         let status = output
             .wait()
@@ -110,14 +110,17 @@ mod parseutil {
     /// # Panics
     /// - cannot convert bytes to `&str`
     /// - cannot parse to `u32`
-    pub fn send_frac(sender: &relm4::Sender<crate::pages::InstallingPageMsg>, num: u32, den: u32) {
+    pub fn send_frac(
+        sender: &relm4::Sender<crate::pages::InstallingPageMsg>,
+        num: u32,
+        den: u32,
+        f: impl Fn(f64) -> crate::pages::InstallingPageMsg,
+    ) {
         if den == 0 {
             return;
         }
         sender
-            .send(crate::pages::InstallingPageMsg::UpdFlatpakProg(
-                f64::from(num) / f64::from(den),
-            ))
+            .send(f(f64::from(num) / f64::from(den)))
             .expect("ui sender fails");
     }
 }

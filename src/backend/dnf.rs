@@ -1,6 +1,7 @@
 use std::sync::LazyLock;
 
 use super::parseutil as pu;
+use futures::FutureExt;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 use crate::prelude::*;
@@ -24,7 +25,7 @@ pub(super) async fn handle_dnf(
     f(&mut cmd);
     let (writer, reader) = tokio::net::unix::pipe::pipe().expect("cannot create pipe");
     let writer = (writer.into_blocking_fd()).expect("cannot set blocking mode to pipe writer");
-    let output = cmd
+    let mut output = cmd
         .stdout(writer.try_clone().expect("cannot clone writer"))
         .stderr(writer)
         .spawn()
@@ -34,28 +35,35 @@ pub(super) async fn handle_dnf(
         .await
         .expect("cannot create log file");
     let mut stdout_lines = tokio::io::BufReader::new(reader).lines();
-    futures::try_join!(
-        async move {
-            while let Some(line) =
-                (stdout_lines.next_line().await).wrap_err("cannot read stdout")?
-            {
-                let Some(matches) = PROGRESS_REGEX.captures(&line) else {
-                    continue;
-                };
-                let Ok(numerator) = matches[1].parse() else {
-                    continue;
-                };
-                let Ok(denominator) = matches[2].parse() else {
-                    continue;
-                };
-                pu::send_frac(&sender, numerator, denominator);
-                crate::awrite!(log <- "{line}").expect("cannot write to log");
-            }
-            drop(log);
-            Ok(())
-        },
-        pu::wait_for("dnf5", output)
-    )
+    loop {
+        let line = futures::select! {
+            line = async { (stdout_lines.next_line().await).wrap_err("cannot read stdout") }.fuse() => line?,
+            res = pu::wait_for("dnf5", &mut output).fuse() => break res,
+        };
+
+        let Some(line) = line else {
+            tracing::debug!("stdout EOF, waiting for dnf5 complete");
+            break pu::wait_for("dnf5", &mut output).await;
+        };
+
+        crate::awrite!(log <- "{line}").expect("cannot write to log");
+        println!("dnf5: {line}");
+        let Some(matches) = PROGRESS_REGEX.captures(&line) else {
+            continue;
+        };
+        let Ok(numerator) = matches[1].parse() else {
+            continue;
+        };
+        let Ok(denominator) = matches[2].parse() else {
+            continue;
+        };
+        pu::send_frac(
+            &sender,
+            numerator,
+            denominator,
+            crate::pages::InstallingPageMsg::UpdDnfProg,
+        );
+    }
     .with_section(|| {
         std::fs::read_to_string(log_path)
             .unwrap_or_else(|e| format!("Cannot read dnf5.stdout.log: {e}"))

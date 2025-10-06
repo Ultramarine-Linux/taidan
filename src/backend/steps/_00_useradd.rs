@@ -15,7 +15,8 @@ impl super::Step for UserAdd {
         let pass =
             xcrypt::crypt(&settings.passwd, &crypt_setting).wrap_err("fail to encrypt password")?;
 
-        super::super::pkexec(
+        // ignore err in case recreate user
+        _ = super::super::pkexec(
             "root",
             "useradd",
             &[
@@ -27,7 +28,7 @@ impl super::Step for UserAdd {
                 &settings.username,
             ],
         )
-        .await?;
+        .await;
         super::super::pkexec("root", "usermod", &["-aG", "wheel", &settings.username]).await?;
 
         Ok(())
