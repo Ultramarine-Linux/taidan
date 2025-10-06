@@ -1,7 +1,6 @@
 use std::sync::LazyLock;
 
 use super::parseutil as pu;
-use futures::{SinkExt, StreamExt};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 use crate::prelude::*;
@@ -30,7 +29,6 @@ pub(super) async fn handle_dnf(
         .stderr(writer)
         .spawn()
         .wrap_err("fail to run `dnf5`")?;
-    let (mut tx, mut rx) = futures::channel::mpsc::unbounded::<String>();
     let log_path = &*crate::TEMP_DIR.join("dnf5.stdout.log");
     let mut log = tokio::fs::File::create(log_path)
         .await
@@ -51,15 +49,9 @@ pub(super) async fn handle_dnf(
                     continue;
                 };
                 pu::send_frac(&sender, numerator, denominator);
-                tx.send(line.clone()).await.expect("tx closed");
-            }
-            tx.close().await.expect("cannot close channel");
-            Ok(())
-        },
-        async move {
-            while let Some(line) = rx.next().await {
                 crate::awrite!(log <- "{line}").expect("cannot write to log");
             }
+            drop(log);
             Ok(())
         },
         pu::wait_for("dnf5", output)
