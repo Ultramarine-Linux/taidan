@@ -110,11 +110,11 @@ mod parseutil {
     /// # Panics
     /// - cannot convert bytes to `&str`
     /// - cannot parse to `u32`
-    pub fn send_frac(
+    pub fn send_frac<F: Fn(f64) -> crate::pages::InstallingPageMsg>(
         sender: &relm4::Sender<crate::pages::InstallingPageMsg>,
         num: u32,
         den: u32,
-        f: impl Fn(f64) -> crate::pages::InstallingPageMsg,
+        f: F,
     ) {
         if den == 0 {
             return;
