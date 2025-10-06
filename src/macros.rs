@@ -1,5 +1,10 @@
 kurage::kurage_gen_macros!();
 
+/// Set the page to be skipped when `skipconfig` is true.
+///
+/// The `skipconfig` field in `SETTINGS` indicates a "simple" installation.
+///
+/// See `generate_page` in `macros.rs` for details.
 macro_rules! skipconfig {
     () => {
         fn page_skipconfig() -> bool {
@@ -7,8 +12,13 @@ macro_rules! skipconfig {
         }
     };
 }
-pub(crate) use skipconfig;
+pub(crate) use skipconfig; // export
 
+/// Set the page to never be skipped.
+///
+/// Since this function is included in prelude, pages by default are not skipped.
+///
+/// See `generate_page` in `macros.rs` for details.
 pub(crate) const fn page_skipconfig() -> bool {
     false
 }
@@ -24,6 +34,8 @@ kurage::generate_generator! { generate_page => [<$name Page>]:
     } => { Nav(NavAction) }
 
     libhelium::ViewMono {
+        // HACK: we first check if the distro config skips this page, then check page_skipconfig().
+        // Redefinitions of `page_skipconfig` are ok due to star import.
         set_visible: !CFG.skip_pages.contains(&$crate::Page::$name) && !page_skipconfig(),
         set_show_right_title_buttons: false,
         append = &gtk::Box {
@@ -34,7 +46,7 @@ kurage::generate_generator! { generate_page => [<$name Page>]:
         },
     },
 }
-pub(crate) use generate_page;
+pub(crate) use generate_page; // export
 
 #[macro_export]
 macro_rules! awrite {

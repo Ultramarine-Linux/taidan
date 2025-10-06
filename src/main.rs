@@ -26,7 +26,7 @@ static AVAILABLE_LANGS: LazyLock<Vec<i18n_embed::unic_langid::LanguageIdentifier
             .unwrap()
     });
 
-// configuration of the distro OOBE.
+/// Configuration of the distro OOBE.
 pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     tracing::debug!("Initializing cfg::Config");
     let mut cfg = cfg::Config::new().expect("cannot init config");
@@ -35,6 +35,7 @@ pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     cfg
 });
 pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::SharedState::new();
+/// Language Loader
 pub static LL: std::sync::LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
     std::sync::LazyLock::new(|| RwLock::new(handle_l10n()));
 
@@ -186,7 +187,7 @@ impl SimpleComponent for AppModel {
                         .wrapping_add(1)
                         .try_into()
                         .unwrap_or(self.page);
-                    !self.get_page_widget().is_visible()
+                    !self.get_page_widget().is_visible() // hack in generate_pages
                 } {}
                 if self.page == Page::Installing {
                     self.run_install(sender, backend::start_install);
