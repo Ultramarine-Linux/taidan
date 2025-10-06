@@ -1,7 +1,7 @@
 #!/bin/sh
 # vi: ft=sh noet ci pi sts=0 sw=2 ts=2
 
-if [[ $1 -eq 0 ]]; then exit 0; fi
+if [[ $1 -eq 1 ]]; then exit 0; fi
 
 latest=`curl https://raw.githubusercontent.com/Ultramarine-Linux/weekly-polycrystal/refs/heads/main/latest`
 edition=`sed -nE 's@^VARIANT_ID=@@p' /etc/os-release`

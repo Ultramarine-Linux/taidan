@@ -5,6 +5,9 @@ for category in catalogue/*; do
   install -Dpm644 $category -t $DESTDIR/etc/$appid/catalogue/
 done
 
+mkdir -p $DESTDIR/usr/share/taidan
+cp -r data/tweaks/ $DESTDIR/usr/share/taidan/
+
 install -Dpm644 data/sysusers.d/taidan.conf             -t $DESTDIR/usr/lib/sysusers.d/
 install -Dpm644 data/systemd/*.service                  -t $DESTDIR/usr/lib/systemd/system/
 install -Dpm644 data/systemd/*.preset                   -t $DESTDIR/usr/lib/systemd/system-preset/

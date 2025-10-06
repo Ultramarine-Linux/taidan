@@ -50,6 +50,7 @@ pub struct Tweak {
 
 #[cfg(debug_assertions)]
 pub const TWEAKS_DIR: &str = "data/tweaks/";
+// WARN: this is also hardcoded in install.sh
 #[cfg(not(debug_assertions))]
 pub const TWEAKS_DIR: &str = "/usr/share/taidan/tweaks/";
 
