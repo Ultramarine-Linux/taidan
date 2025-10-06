@@ -31,7 +31,8 @@ pub(super) async fn handle_dnf(
         .spawn()
         .wrap_err("fail to run `dnf5`")?;
     let (mut tx, mut rx) = futures::channel::mpsc::unbounded::<String>();
-    let mut dnf_log = tokio::fs::File::create(&*crate::TEMP_DIR.join("dnf5.stdout.log"))
+    let log_path = &*crate::TEMP_DIR.join("dnf5.stdout.log");
+    let mut log = tokio::fs::File::create(log_path)
         .await
         .expect("cannot create log file");
     let mut stdout_lines = tokio::io::BufReader::new(reader).lines();
@@ -57,12 +58,17 @@ pub(super) async fn handle_dnf(
         },
         async move {
             while let Some(line) = rx.next().await {
-                crate::awrite!(dnf_log <- "{line}").expect("cannot write to log");
+                crate::awrite!(log <- "{line}").expect("cannot write to log");
             }
             Ok(())
         },
         pu::wait_for("dnf5", output)
-    )?;
+    )
+    .with_section(|| {
+        std::fs::read_to_string(log_path)
+            .unwrap_or_else(|e| format!("Cannot read dnf5.stdout.log: {e}"))
+            .header("Output:")
+    })?;
     Ok(())
 }
 

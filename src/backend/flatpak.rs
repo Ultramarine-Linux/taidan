@@ -1,5 +1,6 @@
 use super::parseutil as pu;
 use crate::prelude::*;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 /// # Errors
 /// - if `flatpak` doesn't work correctly then maybe
@@ -15,17 +16,25 @@ pub(super) async fn handle_flatpak(
     let mut cmd = tokio::process::Command::new("pkexec");
     cmd.args(["--user", "root", "flatpak"]);
     f(&mut cmd);
+    let (writer, reader) = tokio::net::unix::pipe::pipe().expect("cannot create pipe");
+    let writer = (writer.into_blocking_fd()).expect("cannot set blocking mode to pipe writer");
     let output = cmd
-        // .stdout(std::process::Stdio::piped())
+        .stdout(writer.try_clone().expect("cannot clone writer"))
+        .stderr(writer)
         .spawn()
         .wrap_err("fail to run `flatpak`")?;
-    // let mut stdout_lines = tokio::io::BufReader::new(output.stdout.take().unwrap()).split(b'\n');
+    let log_path = &*crate::TEMP_DIR.join("flatpak.stdout.log");
+    let mut log = tokio::fs::File::create(log_path)
+        .await
+        .expect("cannot create log file");
+    let mut stdout_lines = tokio::io::BufReader::new(reader).lines();
     futures::try_join!(
         async move {
-            /*
             while let Some(line) =
-                (stdout_lines.next_segment().await).wrap_err("cannot read stdout")?
+                (stdout_lines.next_line().await).wrap_err("cannot read stdout")?
             {
+                crate::awrite!(log <- "{line}").expect("cannot write to log");
+                /*
                 let mut it = line.iter().copied();
                 let Some(space) = pu::search(&mut it, |c| Some(c == b' ')) else {
                     continue;
@@ -52,12 +61,17 @@ pub(super) async fn handle_flatpak(
                 }
 
                 pu::send_frac(&sender, &line[afterspace..slash], &line[slash + 1..end]);
+                */
             }
-            */
             Ok(())
         },
         pu::wait_for("flatpak", output)
-    )?;
+    )
+    .with_section(|| {
+        std::fs::read_to_string(log_path)
+            .unwrap_or_else(|e| format!("Cannot read flatpak.stdout.log: {e}"))
+            .header("Output:")
+    })?;
     pu::send_frac(&sender, 100, 100);
     Ok(())
 }

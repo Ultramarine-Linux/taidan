@@ -1,6 +1,6 @@
 pub use color_eyre::{
     eyre::{eyre, Context},
-    Section,
+    Section, SectionExt,
 };
 pub use itertools::{Either, Itertools};
 pub use libhelium::{
