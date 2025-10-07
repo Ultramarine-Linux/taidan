@@ -11,7 +11,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 #[allow(clippy::arithmetic_side_effects)]
 #[allow(clippy::indexing_slicing)]
 pub(super) async fn handle_flatpak(
-    sender: relm4::Sender<crate::pages::InstallingPageMsg>,
+    _sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     f: impl Fn(&mut tokio::process::Command) -> &mut tokio::process::Command + Send,
 ) -> color_eyre::Result<()> {
     let mut cmd = tokio::process::Command::new("pkexec");
@@ -48,11 +48,5 @@ pub(super) async fn handle_flatpak(
             .unwrap_or_else(|e| format!("Cannot read flatpak.stdout.log: {e}"))
             .header("Output:")
     })?;
-    pu::send_frac(
-        &sender,
-        100,
-        100,
-        crate::pages::InstallingPageMsg::UpdFlatpakProg,
-    );
     Ok(())
 }

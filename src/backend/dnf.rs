@@ -61,7 +61,6 @@ pub(super) async fn handle_dnf(
             &sender,
             numerator,
             denominator,
-            crate::pages::InstallingPageMsg::UpdDnfProg,
         );
     }
     .with_section(|| {

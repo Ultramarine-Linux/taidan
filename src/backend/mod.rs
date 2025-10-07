@@ -110,17 +110,14 @@ mod parseutil {
     /// # Panics
     /// - cannot convert bytes to `&str`
     /// - cannot parse to `u32`
-    pub fn send_frac<F: Fn(f64) -> crate::pages::InstallingPageMsg>(
-        sender: &relm4::Sender<crate::pages::InstallingPageMsg>,
-        num: u32,
-        den: u32,
-        f: F,
-    ) {
+    pub fn send_frac(sender: &relm4::Sender<crate::pages::InstallingPageMsg>, num: u32, den: u32) {
         if den == 0 {
             return;
         }
         sender
-            .send(f(f64::from(num) / f64::from(den)))
+            .send(crate::pages::InstallingPageMsg::UpdDnfProg(
+                f64::from(num) / f64::from(den),
+            ))
             .expect("ui sender fails");
     }
 }

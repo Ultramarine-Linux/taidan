@@ -23,17 +23,16 @@ generate_page!(Installing {
             let text = format!("[{stage_num}/{}] {}", crate::backend::steps::NUM_STAGES, String::from(stage));
             self.stage = stage;
             self.main_progress_bar.set_text(Some(&text));
+            self.dnf_progress_bar.set_fraction(0.0);
+            self.dnf_progress_bar.set_visible(stage.is_dnf());
         },
         Finish => sender.output(Self::Output::Nav(NavAction::Next)).unwrap(),
         Throb => {
-            if self.stage.is_dnf() && self.dnf_progress_bar.fraction() != 0.0 {
-                self.throb_timeout.take().expect("throbbed by nonexistent glib::SourceId").remove();
-            } else {
+            if self.stage.is_dnf() && self.dnf_progress_bar.fraction() == 0.0 {
                 self.dnf_progress_bar.pulse();
             }
         },
         UpdDnfProg(frac: f64) => self.dnf_progress_bar.set_fraction(frac),
-        UpdFlatpakProg(frac: f64) => self.flatpak_progress_bar.set_fraction(frac),
     } => {}
 
     gtk::Box {
@@ -72,11 +71,5 @@ generate_page!(Installing {
     #[local_ref] dnf_progress_bar ->
     gtk::ProgressBar {
         set_show_text: true,
-    },
-
-    #[local_ref] flatpak_progress_bar ->
-    gtk::ProgressBar {
-        set_show_text: true,
-        set_text: Some(&t!("page-installing-flatpak", n = SETTINGS.read().actions[2].len()))
     },
 );
