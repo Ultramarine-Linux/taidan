@@ -179,7 +179,7 @@ impl Tweak {
         let stdin = cmd.stdin.as_mut().unwrap();
         stdin.write_all(settings).await.unwrap();
         stdin.flush().await.unwrap();
-        match cmd.wait().await {
+        match cmd.status().await {
             Ok(x) if x.success() => {}
             Ok(x) => tracing::error!(rc=?x.code(), "process failed with non-zero exit code"),
             Err(err) => tracing::error!(?err, "waiting for the `up` process failed"),

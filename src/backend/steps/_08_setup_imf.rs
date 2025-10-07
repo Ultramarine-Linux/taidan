@@ -102,7 +102,7 @@ async fn write_fcitx5_profile(
     p.stdin.as_mut().unwrap().write_all(&buf).await?;
     p.stdin.take().unwrap(); // drop the stream
 
-    let p = p.wait_with_output().await?;
+    let p = p.output().await?;
 
     if !p.status.success() {
         return Err(eyre!("failed to write to ~/.config/fcitx5/profile")
@@ -121,7 +121,7 @@ async fn write_fcitx5_profile(
     p.stdin.as_mut().unwrap().write_all(KWINRC_FCITX5).await?;
     p.stdin.take().unwrap(); // drop the stream
 
-    let p = p.wait_with_output().await?;
+    let p = p.output().await?;
 
     if !p.status.success() {
         return Err(eyre!("failed to write to ~/.config/kwinrc")
@@ -165,7 +165,7 @@ async fn write_ibus_profile(
     p.stdin.as_mut().unwrap().write_all(buf.as_bytes()).await?;
     p.stdin.take().unwrap(); // drop the stream
 
-    let p = p.wait_with_output().await?;
+    let p = p.output().await?;
 
     if !p.status.success() {
         return Err(eyre!("failed to write to ~/.config/kwinrc")
