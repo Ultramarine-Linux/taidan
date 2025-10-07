@@ -1,10 +1,12 @@
-use std::sync::LazyLock;
+use std::{
+    os::fd::{FromRawFd, IntoRawFd},
+    sync::LazyLock,
+};
 
 use super::parseutil as pu;
-use futures::FutureExt;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
-
 use crate::prelude::*;
+use futures::{FutureExt, StreamExt};
+use smol::io::{AsyncBufReadExt, AsyncWriteExt};
 
 static PROGRESS_REGEX: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"^\[\s*(\d+)/(\d+)\]").unwrap());
@@ -18,26 +20,29 @@ static PROGRESS_REGEX: LazyLock<regex::Regex> =
 #[allow(clippy::indexing_slicing)]
 pub(super) async fn handle_dnf(
     sender: relm4::Sender<crate::pages::InstallingPageMsg>,
-    f: impl Fn(&mut tokio::process::Command) -> &mut tokio::process::Command + Send,
+    f: impl Fn(&mut smol::process::Command) -> &mut smol::process::Command + Send,
 ) -> color_eyre::Result<()> {
-    let mut cmd = tokio::process::Command::new("pkexec");
+    let mut cmd = smol::process::Command::new("pkexec");
     cmd.args(["--user", "root", "dnf5"]);
     f(&mut cmd);
-    let (writer, reader) = tokio::net::unix::pipe::pipe().expect("cannot create pipe");
-    let writer = (writer.into_blocking_fd()).expect("cannot set blocking mode to pipe writer");
+    let (reader, writer) = std::io::pipe().expect("cannot create pipe");
+    // SAFETY: trivial conversion
+    let writer = unsafe { std::os::fd::OwnedFd::from_raw_fd(writer.into_raw_fd()) };
     let mut output = cmd
         .stdout(writer.try_clone().expect("cannot clone writer"))
         .stderr(writer)
         .spawn()
         .wrap_err("fail to run `dnf5`")?;
     let log_path = &*crate::TEMP_DIR.join("dnf5.stdout.log");
-    let mut log = tokio::fs::File::create(log_path)
+    let mut log = smol::fs::File::create(log_path)
         .await
         .expect("cannot create log file");
-    let mut stdout_lines = tokio::io::BufReader::new(reader).lines();
+    let reader =
+        smol::io::BufReader::new(smol::Async::new(reader).expect("cannot turn pipe async"));
+    let mut lines = reader.lines();
     loop {
         let line = futures::select! {
-            line = async { (stdout_lines.next_line().await).wrap_err("cannot read stdout") }.fuse() => line?,
+            line = async { lines.next().await.transpose().wrap_err("cannot read stdout") }.fuse() => line?,
             res = pu::wait_for("dnf5", &mut output).fuse() => break res,
         };
 
@@ -115,7 +120,7 @@ impl EnableRepo {
             let content = Self::get_repo_from_url(repo).await?;
             let path = std::path::Path::new("/etc/yum.repos.d/")
                 .join(repo.rsplit_once('/').expect("cannot split url with `/`").1);
-            tokio::fs::write(&path, content)
+            smol::fs::write(&path, content)
                 .await
                 .wrap_err("cannot write to file")
                 .with_note(|| path.display().to_string())?;
@@ -126,17 +131,20 @@ impl EnableRepo {
             .note("this repo is not installed in /etc/yum.repos.d/"))
     }
     #[tracing::instrument]
-    async fn get_repo_from_url(url: &str) -> color_eyre::Result<String> {
+    async fn get_repo_from_url(url: &str) -> color_eyre::Result<Vec<u8>> {
         tracing::debug!("Downloading repo file");
-        let r = (super::REQWEST_CLIENT.get(url).send().await).wrap_err("cannot send request")?;
-        let r = (r.error_for_status()).wrap_err("server fails to provide repo file")?;
-        Ok(r.text().await?)
+        let req = http_types::Request::get(url);
+        let mut r = (crate::a::https_req(req).await).wrap_err("can't send req")?;
+        if !r.status().is_success() {
+            color_eyre::eyre::bail!("server fails to provide repo file: {:?}", r.status());
+        }
+        (r.body_bytes().await).map_err(|err| eyre!("can't get body: {err}"))
     }
     #[tracing::instrument]
     pub(super) async fn new() -> color_eyre::Result<Self> {
-        let mut readdir = tokio::fs::read_dir("/etc/yum.repos.d/").await?;
+        let mut readdir = smol::fs::read_dir("/etc/yum.repos.d/").await?;
         let mut files = std::collections::HashMap::new();
-        while let Some(f) = readdir.next_entry().await? {
+        while let Some(f) = readdir.next().await.transpose()? {
             files.insert(f.path(), (std::fs::read(f.path())?, false));
         }
         Ok(Self { files })
@@ -148,7 +156,7 @@ impl EnableRepo {
             self.files
                 .iter()
                 .filter(|(_, (_, b))| *b)
-                .map(|(p, (doc, _))| tokio::fs::write(p, doc)),
+                .map(|(p, (doc, _))| smol::fs::write(p, doc)),
         )
         .await?;
         Ok(())

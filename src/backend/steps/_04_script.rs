@@ -16,7 +16,7 @@ impl super::Step for Script {
         ))?;
         serde_json::to_writer(f, settings)?;
         // `f` is moved into to_write() and is therefore dropped by now
-        let mut process = tokio::process::Command::new("bash");
+        let mut process = smol::process::Command::new("bash");
         process
             .arg("/usr/share/taidan/oobe.sh")
             .arg(SETTINGS_FILE)

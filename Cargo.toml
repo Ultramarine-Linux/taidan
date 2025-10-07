@@ -13,11 +13,14 @@ readme = "README.md"
 keywords = ["oobe", "ultramarine", "linux"]
 
 [dependencies]
+async-h1 = "2.3.4"
+async-native-tls = "0.5.0"
 basic-toml = "0.1.10"
 color-eyre = "0.6.5"
 const_format = "0.2.34"
 enum_dispatch = "0.3.13"
 futures = "0.3.31"
+http-types = { version = "2.12.0", default-features = false }
 i18n-embed = { version = "0.16.0", features = [
     "desktop-requester",
     "filesystem-assets",
@@ -28,33 +31,24 @@ iso3166 = "1.2.1"
 isolang = { version = "2.4.0", features = ["local_names"] }
 itertools = "0.14.0"
 kurage = { version = "0.1.4" }
-libc = "0.2.174"
 # libappstream = "0.3.0"
 libhelium = "0.12.0"
 memchr = "2.7.5"
+mio = { version = "1.0.4", default-features = false, features = ["os-ext"] }
 parking_lot = "0.12.4"
 paste = "1.0.15"
 phf = { version = "0.13.1", features = ["macros"] }
 poly_l10n = "0.0.6"
 regex = "1.11.1"
 relm4 = { version = "0.9.1", default-features = false, features = ["macros"] }
-reqwest = { version = "0.12.22", features = [
-    "http2",
-    "default-tls",
-], default-features = false }
 rust-embed = { version = "8.7.2", features = ["include-exclude"] }
 serde = "1.0.219"
 serde_json = "1.0.140"
+smol = "2.0.2"
 strip-ansi-escapes = "0.2.1"
 taidan_catalogue_parser = { path = "taidan_catalogue_parser" }
 taidan_proc_macros = { path = "taidan_proc_macros" }
 tempfile = { version = "3.20.0", default-features = false }
-tokio = { version = "1.46.1", features = [
-    "fs",
-    "io-util",
-    "macros",
-    "process",
-] }
 tracing = "0.1.41"
 tracing-appender = "0.2.3"
 tracing-error = "0.2.1"

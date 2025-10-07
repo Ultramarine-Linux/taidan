@@ -4,7 +4,7 @@ use std::{
     sync::LazyLock,
 };
 
-use tokio::io::AsyncWriteExt;
+use smol::io::AsyncWriteExt;
 
 use crate::SETTINGS;
 
@@ -169,7 +169,7 @@ impl Tweak {
     /// Expects `pkexec` to be available.
     #[tracing::instrument]
     pub async fn run(&self, settings: &[u8], on: bool) {
-        let mut cmd = tokio::process::Command::new("pkexec")
+        let mut cmd = smol::process::Command::new("pkexec")
             .args(["--user", "root"])
             .arg(self.path.join("up"))
             .arg(if on { "1" } else { "0" })
