@@ -1,6 +1,5 @@
 #!/usr/bin/sh
 
-source /etc/X11/xinit/xinitrc &
 xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/http' &
 xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/https' &
 
