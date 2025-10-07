@@ -2,19 +2,17 @@ use crate::prelude::*;
 skipconfig!();
 generate_page!(Internet {
     btn_next: libhelium::Button,
-    lbl_warn: gtk::Label,
-    lbl_ok: gtk::Label,
+    is_online: bool,
 }:
-    init[lbl_warn lbl_ok](root, sender, model, widgets) {
+    init(root, sender, model, widgets) {
         let sender1 = sender.clone();
         sender.oneshot_command(async move { check_online(sender1).await });
         model.btn_next = widgets.prev_next_btns.next.clone();
     }
     update(self, message, sender) {
         IsOnline => {
+            self.is_online = true;
             self.btn_next.set_sensitive(true);
-            self.lbl_warn.set_visible(false);
-            self.lbl_ok.set_visible(true);
         }
     } => {}
 
@@ -55,17 +53,18 @@ generate_page!(Internet {
             },
         },
 
-        #[local_ref] lbl_ok ->
         gtk::Label {
             set_label: &t!("page-internet-ok"),
-            set_visible: false,
+            #[watch]
+            set_visible: model.is_online,
             add_css_class: "success",
         },
 
-        #[local_ref] lbl_warn ->
         gtk::Label {
             set_label: &t!("page-internet-warn"),
             add_css_class: "warning",
+            #[watch]
+            set_visible: !model.is_online,
         },
 
         libhelium::Button {
@@ -81,6 +80,8 @@ generate_page!(Internet {
             set_halign: gtk::Align::Center,
             set_label: &t!("page-internet-portal"),
             connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("xdg-open", &["http://detectportal.firefox.com/canonical.html"]).await.unwrap() }),
+            #[watch]
+            set_visible: !model.is_online,
         },
     },
 
