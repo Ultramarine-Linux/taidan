@@ -1,5 +1,9 @@
 #!/usr/bin/sh
 
+# create "home dir"
+mkdir -p /usr/lib/
+cp -r /etc/skel /usr/lib/
+
 xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/http' &
 xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/https' &
 
