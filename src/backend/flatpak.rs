@@ -2,8 +2,6 @@ use std::os::fd::{FromRawFd, IntoRawFd};
 
 use super::parseutil as pu;
 use crate::prelude::*;
-use futures::{FutureExt, StreamExt};
-use smol::io::{AsyncBufReadExt, AsyncWriteExt};
 
 /// # Errors
 /// - if `flatpak` doesn't work correctly then maybe
@@ -14,9 +12,9 @@ use smol::io::{AsyncBufReadExt, AsyncWriteExt};
 #[allow(clippy::indexing_slicing)]
 pub(super) async fn handle_flatpak(
     _sender: relm4::Sender<crate::pages::InstallingPageMsg>,
-    f: impl Fn(&mut smol::process::Command) -> &mut smol::process::Command + Send,
+    f: impl Fn(&mut async_process::Command) -> &mut async_process::Command + Send,
 ) -> color_eyre::Result<()> {
-    let mut cmd = smol::process::Command::new("pkexec");
+    let mut cmd = async_process::Command::new("pkexec");
     cmd.args(["--user", "root", "flatpak"]);
     f(&mut cmd);
     let (reader, writer) = std::io::pipe().expect("cannot create pipe");
@@ -28,11 +26,11 @@ pub(super) async fn handle_flatpak(
         .spawn()
         .wrap_err("fail to run `flatpak`")?;
     let log_path = &*crate::TEMP_DIR.join("flatpak.stdout.log");
-    let mut log = smol::fs::File::create(log_path)
+    let mut log = async_fs::File::create(log_path)
         .await
         .expect("cannot create log file");
     let reader =
-        smol::io::BufReader::new(smol::Async::new(reader).expect("cannot turn pipe async"));
+        futures::io::BufReader::new(async_io::Async::new(reader).expect("cannot turn pipe async"));
     let mut lines = reader.lines();
     // SAFETY: trivial conversion
     loop {

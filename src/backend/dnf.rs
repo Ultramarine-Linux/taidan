@@ -5,8 +5,6 @@ use std::{
 
 use super::parseutil as pu;
 use crate::prelude::*;
-use futures::{FutureExt, StreamExt};
-use smol::io::{AsyncBufReadExt, AsyncWriteExt};
 
 static PROGRESS_REGEX: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"^\[\s*(\d+)/(\d+)\]").unwrap());
@@ -20,9 +18,9 @@ static PROGRESS_REGEX: LazyLock<regex::Regex> =
 #[allow(clippy::indexing_slicing)]
 pub(super) async fn handle_dnf(
     sender: relm4::Sender<crate::pages::InstallingPageMsg>,
-    f: impl Fn(&mut smol::process::Command) -> &mut smol::process::Command + Send,
+    f: impl Fn(&mut async_process::Command) -> &mut async_process::Command + Send,
 ) -> color_eyre::Result<()> {
-    let mut cmd = smol::process::Command::new("pkexec");
+    let mut cmd = async_process::Command::new("pkexec");
     cmd.args(["--user", "root", "dnf5"]);
     f(&mut cmd);
     let (reader, writer) = std::io::pipe().expect("cannot create pipe");
@@ -34,11 +32,11 @@ pub(super) async fn handle_dnf(
         .spawn()
         .wrap_err("fail to run `dnf5`")?;
     let log_path = &*crate::TEMP_DIR.join("dnf5.stdout.log");
-    let mut log = smol::fs::File::create(log_path)
+    let mut log = async_fs::File::create(log_path)
         .await
         .expect("cannot create log file");
     let reader =
-        smol::io::BufReader::new(smol::Async::new(reader).expect("cannot turn pipe async"));
+        futures::io::BufReader::new(async_io::Async::new(reader).expect("cannot turn pipe async"));
     let mut lines = reader.lines();
     loop {
         let line = futures::select! {
@@ -120,7 +118,7 @@ impl EnableRepo {
             let content = Self::get_repo_from_url(repo).await?;
             let path = std::path::Path::new("/etc/yum.repos.d/")
                 .join(repo.rsplit_once('/').expect("cannot split url with `/`").1);
-            smol::fs::write(&path, content)
+            async_fs::write(&path, content)
                 .await
                 .wrap_err("cannot write to file")
                 .with_note(|| path.display().to_string())?;
@@ -142,7 +140,7 @@ impl EnableRepo {
     }
     #[tracing::instrument]
     pub(super) async fn new() -> color_eyre::Result<Self> {
-        let mut readdir = smol::fs::read_dir("/etc/yum.repos.d/").await?;
+        let mut readdir = async_fs::read_dir("/etc/yum.repos.d/").await?;
         let mut files = std::collections::HashMap::new();
         while let Some(f) = readdir.next().await.transpose()? {
             files.insert(f.path(), (std::fs::read(f.path())?, false));
@@ -156,7 +154,7 @@ impl EnableRepo {
             self.files
                 .iter()
                 .filter(|(_, (_, b))| *b)
-                .map(|(p, (doc, _))| smol::fs::write(p, doc)),
+                .map(|(p, (doc, _))| async_fs::write(p, doc)),
         )
         .await?;
         Ok(())

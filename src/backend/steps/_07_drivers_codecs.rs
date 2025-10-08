@@ -27,7 +27,7 @@ static NVIDIA_PREFIXES: std::sync::LazyLock<std::collections::HashMap<&str, &str
         .collect()
     });
 
-use smol::process::Command;
+use async_process::Command;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DriversCodecs;

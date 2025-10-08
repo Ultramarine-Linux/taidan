@@ -16,3 +16,5 @@ pub(crate) use crate::macros::{generate_page, page_skipconfig, skipconfig};
 pub use crate::{t, NavAction, CFG, SETTINGS};
 
 pub use std::sync::LazyLock;
+
+pub use futures::prelude::*;

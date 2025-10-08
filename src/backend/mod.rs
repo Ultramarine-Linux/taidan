@@ -94,7 +94,7 @@ mod parseutil {
     /// - process exited with non-zero error code
     pub async fn wait_for(
         s: &'static str,
-        output: &mut smol::process::Child,
+        output: &mut async_process::Child,
     ) -> color_eyre::Result<()> {
         let status = output
             .status()
@@ -127,7 +127,7 @@ mod parseutil {
 /// - command exited with non-zero status code
 pub async fn pkexec(user: &str, name: &str, args: &[&str]) -> color_eyre::Result<()> {
     tracing::debug!(?name, ?args, "running pkexec");
-    let p = smol::process::Command::new("pkexec")
+    let p = async_process::Command::new("pkexec")
         .args(["--user", user, name])
         .args(args)
         .status()
@@ -144,7 +144,7 @@ pub async fn pkexec(user: &str, name: &str, args: &[&str]) -> color_eyre::Result
 /// - command exited with non-zero status code
 pub async fn root(name: &str, args: &[&str]) -> color_eyre::Result<()> {
     tracing::debug!(?name, ?args, "running pkexec");
-    let p = smol::process::Command::new("pkexec")
+    let p = async_process::Command::new("pkexec")
         .args(["--user", "root", name])
         .args(args)
         .status()

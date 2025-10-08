@@ -126,7 +126,7 @@ async fn check_online(sender: ComponentSender<InternetPage>) {
         {
             break;
         }
-        smol::Timer::after(std::time::Duration::from_secs(5)).await;
+        async_io::Timer::after(std::time::Duration::from_secs(5)).await;
     }
     sender.input(InternetPageMsg::IsOnline);
 }

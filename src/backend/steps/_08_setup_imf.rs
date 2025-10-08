@@ -1,5 +1,3 @@
-use smol::io::AsyncWriteExt;
-
 use super::super::i18n;
 use super::root;
 use crate::prelude::*;
@@ -45,7 +43,7 @@ async fn write_fcitx5_profile(
     // TODO: should we put these in /etc/skel/ instead? Problem: user has already been created
     // before this step…
     let default_group_name = t!("default");
-    smol::fs::create_dir_all(format!("/home/{username}/.config/fcitx5/"))
+    async_fs::create_dir_all(format!("/home/{username}/.config/fcitx5/"))
         .await
         .wrap_err("cannot create ~/.config/fcitx5/")?;
     root(
@@ -54,7 +52,7 @@ async fn write_fcitx5_profile(
     )
     .await?;
     let profile_path = format!("/home/{username}/.config/fcitx5/profile");
-    let mut p = smol::process::Command::new("pkexec")
+    let mut p = async_process::Command::new("pkexec")
         .args(["--user", "root", "tee"])
         .args(["-a", &profile_path])
         .stdin(std::process::Stdio::piped())
@@ -111,7 +109,7 @@ async fn write_fcitx5_profile(
 
     // https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg?ref_type=heads
     let kwinrc_path = format!("/home/{username}/.config/kwinrc");
-    let mut p = smol::process::Command::new("pkexec")
+    let mut p = async_process::Command::new("pkexec")
         .args(["--user", "root", "tee"])
         .args(["-a", &kwinrc_path])
         .stdin(std::process::Stdio::piped())
@@ -154,7 +152,7 @@ async fn write_ibus_profile(
         engines-order=[{engines}]\n\
         preload-engines[{engines}]\n");
 
-    let mut p = smol::process::Command::new("pkexec")
+    let mut p = async_process::Command::new("pkexec")
         .args(["--user", "root", "tee"])
         .args(["-a", "/etc/dconf/db/ibus.d/20-taidan-oobe"])
         .stdin(std::process::Stdio::piped())

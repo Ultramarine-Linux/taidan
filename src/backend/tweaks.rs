@@ -1,10 +1,9 @@
+use crate::prelude::*;
 use std::{
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     sync::LazyLock,
 };
-
-use smol::io::AsyncWriteExt;
 
 use crate::SETTINGS;
 
@@ -169,7 +168,7 @@ impl Tweak {
     /// Expects `pkexec` to be available.
     #[tracing::instrument]
     pub async fn run(&self, settings: &[u8], on: bool) {
-        let mut cmd = smol::process::Command::new("pkexec")
+        let mut cmd = async_process::Command::new("pkexec")
             .args(["--user", "root"])
             .arg(self.path.join("up"))
             .arg(if on { "1" } else { "0" })

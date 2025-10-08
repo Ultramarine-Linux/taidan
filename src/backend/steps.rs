@@ -132,7 +132,7 @@ pub fn cmd(name: &str, args: &[&str]) -> color_eyre::Result<()> {
 /// - command failed to run
 /// - command exited with non-zero status code
 pub async fn acmd(name: &str, args: &[&str]) -> color_eyre::Result<()> {
-    let p = smol::process::Command::new(name)
+    let p = async_process::Command::new(name)
         .args(args)
         .status()
         .await
