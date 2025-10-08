@@ -27,7 +27,7 @@ static NVIDIA_PREFIXES: std::sync::LazyLock<std::collections::HashMap<&str, &str
         .collect()
     });
 
-use tokio::process::Command;
+use async_process::Command;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DriversCodecs;
@@ -137,7 +137,7 @@ impl Drivers {
     }
 
     async fn is_ostree() -> bool {
-        tokio::fs::try_exists("/ostree").await.unwrap_or_default()
+        crate::a::exist("/ostree").await
     }
 
     async fn setup_nvidia_ostree() -> color_eyre::Result<()> {

@@ -15,7 +15,6 @@ pub use relm4::{
 pub(crate) use crate::macros::{generate_page, page_skipconfig, skipconfig};
 pub use crate::{t, NavAction, CFG, SETTINGS};
 
-pub(crate) static REQWEST_CLIENT: std::sync::LazyLock<reqwest::Client> =
-    std::sync::LazyLock::new(reqwest::Client::new);
-
 pub use std::sync::LazyLock;
+
+pub use futures::prelude::*;

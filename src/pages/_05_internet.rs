@@ -102,22 +102,13 @@ generate_page!(Internet {
 
 #[allow(clippy::equatable_if_let)]
 async fn check_online(sender: ComponentSender<InternetPage>) {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(20))
-        .user_agent(crate::APPID)
-        .build()
-        .unwrap();
     let arch = std::env::consts::ARCH;
     let edition = &CFG.edition;
     loop {
-        if let Ok(202) = client
-            .post("https://plausible.fyralabs.com/api/event")
-            .header(
-                "Content-Type",
-                reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .body(format!(
-                r#"
+        let mut req = http_types::Request::post("https://plausible.fyralabs.com/api/event");
+        req.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
+        req.set_body(format!(
+            r#"
                 {{
                     "name": "pageview",
                     "url": "app://internet/{arch}/{edition}",
@@ -127,15 +118,15 @@ async fn check_online(sender: ComponentSender<InternetPage>) {
                         "edition": "{edition}"
                     }}
                 }}
-                "#
-            ))
-            .send()
+            "#
+        ));
+        if crate::a::https_req(req)
             .await
-            .map(|r| r.status().as_u16())
+            .is_ok_and(|r| r.status().is_success())
         {
             break;
         }
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        async_io::Timer::after(std::time::Duration::from_secs(5)).await;
     }
     sender.input(InternetPageMsg::IsOnline);
 }
