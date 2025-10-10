@@ -8,6 +8,7 @@ xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/http' &
 xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/https' &
 
 swaybg -i /usr/share/backgrounds/default.png -m fill -c '#113344' >/dev/null 2>&1 &
+nm-applet &
 TAIDAN_LOG=trace /usr/bin/taidan
 
 pkill kwin_wayland
