@@ -4,7 +4,7 @@ members = ["taidan_proc_macros", "taidan_catalogue_parser"]
 
 [package]
 name = "taidan"
-version = "0.1.27"
+version = "0.1.28"
 edition = "2021"
 description = "Out-Of-Box-Experience (OOBE) and Welcome App"
 license = "GPL-2.0-or-later"
