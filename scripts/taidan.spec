@@ -18,7 +18,7 @@ Requires:       xhost
 # Requires:       labwc
 # Requires:       cage
 Requires:       kwin-wayland swaybg
-Requires:       netto nm-applet
+Requires:       netto network-manager-applet
 BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl
 BuildRequires:  pkgconfig(libhelium-1)
 BuildRequires:  pkgconfig(openssl)
