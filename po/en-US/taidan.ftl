@@ -192,4 +192,4 @@ page-language = Language
 page-language-search-lang = Search Language/Locale…
 
 flatpakening-name = Use RPMs instead of Flatpaks
-flatpakening-desc = Using RPMs may save space, but Flatpaks enhance system security by sandboxing designated applications.
+flatpakening-desc = Flatpaks provide better security by default, RPMs will save some space.
