@@ -112,14 +112,14 @@ pub async fn set_theme(
         tmp.to_str().unwrap()
     });
     tracing::debug!(?user);
-    if let Ok(true) = tokio::fs::try_exists("/usr/bin/plasma-apply-colorscheme").await {
+    if crate::a::exist("/usr/bin/plasma-apply-colorscheme").await {
         if let Some(accent) = accent {
             (accent.plasma(user, is_dark).await)
                 .wrap_err("cannot set accent and theme for plama")?;
         } else {
             (plasma_set_theme_only(user, is_dark).await).wrap_err("cannot set theme for plasma")?;
         }
-    } else if let Ok(true) = tokio::fs::try_exists("/usr/bin/gsettings").await {
+    } else if crate::a::exist("/usr/bin/gsettings").await {
         (accent.unwrap_or_default().gsettings(user, is_dark).await)
             .wrap_err("cannot set accent/theme using gsettings")?;
     } else {
@@ -141,7 +141,7 @@ pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::R
         tmp.to_str().unwrap()
     });
     tracing::debug!(?user);
-    if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
+    if crate::a::exist("/usr/bin/kwriteconfig6").await {
         let args = [
             ["--file", "~/.config/kwinrc", "--group"],
             ["NightColor", "--key", "Active"],

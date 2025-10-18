@@ -1,10 +1,9 @@
+use crate::prelude::*;
 use std::{
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     sync::LazyLock,
 };
-
-use tokio::io::AsyncWriteExt;
 
 use crate::SETTINGS;
 
@@ -169,7 +168,7 @@ impl Tweak {
     /// Expects `pkexec` to be available.
     #[tracing::instrument]
     pub async fn run(&self, settings: &[u8], on: bool) {
-        let mut cmd = tokio::process::Command::new("pkexec")
+        let mut cmd = async_process::Command::new("pkexec")
             .args(["--user", "root"])
             .arg(self.path.join("up"))
             .arg(if on { "1" } else { "0" })
@@ -179,7 +178,7 @@ impl Tweak {
         let stdin = cmd.stdin.as_mut().unwrap();
         stdin.write_all(settings).await.unwrap();
         stdin.flush().await.unwrap();
-        match cmd.wait().await {
+        match cmd.status().await {
             Ok(x) if x.success() => {}
             Ok(x) => tracing::error!(rc=?x.code(), "process failed with non-zero exit code"),
             Err(err) => tracing::error!(?err, "waiting for the `up` process failed"),

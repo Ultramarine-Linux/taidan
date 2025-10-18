@@ -284,7 +284,7 @@ pub async fn set_keymap(
         tmp = uzers::get_current_username().expect("can't get current username");
         tmp.to_str().unwrap()
     });
-    if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
+    if crate::a::exist("/usr/bin/kwriteconfig6").await {
         set_kde_keymap(user, layout, variant).await
     } else {
         set_gsettings_keymap(user, layout, variant).await
