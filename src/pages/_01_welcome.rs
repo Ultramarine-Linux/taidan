@@ -32,15 +32,16 @@ generate_page!(Welcome:
         set_hexpand: true,
         set_orientation: gtk::Orientation::Horizontal,
 
-        libhelium::Button {
-            set_is_textual: true,
-            set_halign: gtk::Align::Start,
-            set_label: &t!("page-welcome-skipcfg"),
-            connect_clicked[sender] => move |_| {
-                SETTINGS.write().skipconfig = true;
-                sender.input(Self::Input::Nav(NavAction::Next));
-            },
-        },
+        // https://github.com/Ultramarine-Linux/taidan/issues/79
+        // libhelium::Button {
+        //     set_is_textual: true,
+        //     set_halign: gtk::Align::Start,
+        //     set_label: &t!("page-welcome-skipcfg"),
+        //     connect_clicked[sender] => move |_| {
+        //         SETTINGS.write().skipconfig = true;
+        //         sender.input(Self::Input::Nav(NavAction::Next));
+        //     },
+        // },
 
         gtk::Box { set_halign: gtk::Align::Fill, set_hexpand: true },
 
