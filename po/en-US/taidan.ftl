@@ -100,21 +100,21 @@ page-tweaks = System Tweaks
 ## page: Codecs and Drivers
 
 page-codecs = Codecs and Drivers
-page-codecs-desc1 = Install proprietary media codecs and drivers for your device.
-page-codecs-desc2 =
+page-codecs-desc1 = Install common media codecs and drivers for your device.
+page-codecs-desc2 = 
     Consult the { $wiki } if you don't have an Internet connection.
 page-codecs-wiki = wiki
 switch-codecs = Install Codecs and Drivers
-switch-codecs-desc = Press next to skip installation
+switch-codecs-desc = Turning this on installs proprietary codecs and drivers
 
 ## page: Input Method
 
 # page title
 # .search*: search field placeholder
-page-inputmethod = Input Method
-page-inputmethod-desc1 = You may <b>optionally</b> choose to add an { $ime }. This allows you to type in languages that don't use the Latin alphabet.
-page-inputmethod-desc2 = More Chinese input method options may be available with the { $rime } engine, but this requires advanced configuration and is therefore not recommended to beginners.
-page-inputmethod-desc3 = You may fine out more information on { $wiki }.
+page-inputmethod = Additional Input Methods
+page-inputmethod-desc1 = Languages that don't use the Latin alphabet may require a special input method to be typed, you can select one here.
+page-inputmethod-desc2 = If you're using a Language that uses the Latin alphabet can safely skip this page.
+page-inputmethod-desc3 = More information is on the { $wiki }.
 page-inputmethod-ime = input method editor (IME)
 page-inputmethod-rime = Rime
 page-inputmethod-wiki = the wiki
