@@ -10,12 +10,11 @@ fn miniblk(row: &gtk::ListBoxRow) -> libhelium::MiniContentBlock {
 static SEARCH_LAYOUT: SharedState<libhelium::glib::GString> = SharedState::new();
 static SEARCH_VARIANT: SharedState<libhelium::glib::GString> = SharedState::new();
 static CHOSEN_LANG: SharedState<String> = SharedState::new();
-const UMWIKI_INPUT_OTHER_LANG: &str =
-    "https://wiki.ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language";
+// const UMWIKI_INPUT_OTHER_LANG: &str =
+//     "https://wiki.ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language";
 const UMWIKI_L10N: &str = "https://wiki.ultramarine-linux.org/en/usage/l10n/";
 
-skipconfig!();
-generate_page!(InputMethod {
+kurage::generate_component!(MoreBox {
     langbox: gtk::ListBox,
     imbox: gtk::ListBox,
 }:
@@ -44,7 +43,7 @@ generate_page!(InputMethod {
             miniblk(row).title().contains(&search) || miniblk(row).subtitle().contains(&search)
         });
     }
-    update(self, message, sender) {
+    update(self, message, _sender) {
         LangSelected => {
             self.imbox.remove_all();
             let row = self.langbox.selected_row().unwrap();
@@ -55,14 +54,80 @@ generate_page!(InputMethod {
                 .for_each(|row| self.imbox.append(&row));
             CHOSEN_LANG.write().clone_from(&lang);
         },
+    } => NavAction
+
+    gtk::Grid {
+        set_row_spacing: 4,
+        set_column_spacing: 10,
+        set_vexpand: true,
+        set_hexpand: true,
+        set_column_homogeneous: true,
+
+        #[name(searchlayout)]
+        attach[0, 0, 1, 1] = &libhelium::TextField {
+            set_is_search: true,
+            set_is_outline: true,
+            set_margin_top: 6,
+            set_margin_bottom: 6,
+            set_prefix_icon: Some("system-search-symbolic"),
+            set_placeholder_text: Some(&t!("page-inputmethod-search-lang")),
+        },
+        attach[0, 1, 1, 1] = &gtk::ScrolledWindow {
+            set_hscrollbar_policy: gtk::PolicyType::Never,
+            #[local_ref]
+            langbox -> gtk::ListBox {
+                add_css_class: "content-list",
+                set_selection_mode: gtk::SelectionMode::Single,
+                set_vexpand: true,
+                connect_selected_rows_changed => Self::Input::LangSelected,
+            }
+        },
+
+        #[name(searchvariant)]
+        attach[1, 0, 1, 1] = &libhelium::TextField {
+            set_is_search: true,
+            set_is_outline: true,
+            set_margin_top: 6,
+            set_margin_bottom: 6,
+            set_prefix_icon: Some("system-search-symbolic"),
+            set_placeholder_text: Some(&t!("page-inputmethod-search-ims")),
+        },
+        attach[1, 1, 1, 1] = &gtk::ScrolledWindow {
+            set_hscrollbar_policy: gtk::PolicyType::Never,
+            #[local_ref]
+            imbox -> gtk::ListBox {
+                add_css_class: "content-list",
+                set_selection_mode: gtk::SelectionMode::None,
+                set_vexpand: true,
+            }
+        },
+    }
+);
+
+skipconfig!();
+generate_page!(InputMethod {
+    more: bool,
+    morebox: gtk::Box,
+}:
+    init[morebox { model.morebox.clone() }](root, sender, model, widgets) {}
+    update(self, message, sender) {
+        More => {
+            self.more = true;
+            let mut morebox = MoreBox::builder().launch(()).forward(sender.input_sender(), Self::Input::Nav);
+            morebox.detach_runtime();
+            self.morebox.append(morebox.widget());
+        },
     } => {}
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
         set_spacing: 16,
         set_margin_bottom: 16,
-        set_valign: gtk::Align::Fill,
+        #[watch]
+        set_valign: if model.more { gtk::Align::Fill } else { gtk::Align::Center },
         set_halign: gtk::Align::Fill,
+        set_vexpand: true,
+        set_hexpand: true,
 
         gtk::Image {
             set_icon_name: Some("input-keyboard-symbolic"),
@@ -75,81 +140,46 @@ generate_page!(InputMethod {
             inline_css: "font-weight: bold",
         },
 
-        gtk::Label {
-            set_valign: gtk::Align::Center,
-            set_use_markup: true,
-            set_wrap: true,
-            set_wrap_mode: gtk::pango::WrapMode::Word,
-            set_label: &format!("{}\n\n{}\n\n{}",
-                t!("page-inputmethod-desc1"),
-                t!("page-inputmethod-desc2"),
-                t!("page-inputmethod-desc3",
-                    wiki = format!("<a href='{UMWIKI_L10N}'>{}</a>", t!("page-inputmethod-wiki"))
-                ),
-            ),
-            set_justify: gtk::Justification::Center,
-        },
-    },
+        #[transition = "SlideLeft"]
+        if model.more {
+            #[local]
+            morebox -> gtk::Box {}
+        } else {
+            gtk::Box {
+                set_spacing: 20,
+                set_orientation: gtk::Orientation::Vertical,
 
-    gtk::Box {
-        set_orientation: gtk::Orientation::Horizontal,
-        set_spacing: 4,
-        set_vexpand: true,
-        set_hexpand: true,
+                gtk::Label {
+                    set_valign: gtk::Align::Center,
+                    set_use_markup: true,
+                    set_wrap: true,
+                    set_wrap_mode: gtk::pango::WrapMode::Word,
+                    set_label: &format!("{}\n\n{}\n\n{}",
+                        t!("page-inputmethod-desc1"),
+                        t!("page-inputmethod-desc2"),
+                        t!("page-inputmethod-desc3",
+                            wiki = format!("<a href='{UMWIKI_L10N}'>{}</a>", t!("page-inputmethod-wiki"))
+                        ),
+                    ),
+                    set_justify: gtk::Justification::Center,
+                },
 
-        gtk::Box {
-            set_orientation: gtk::Orientation::Vertical,
-            set_spacing: 10,
-            set_vexpand: true,
-            set_hexpand: true,
-            set_halign: gtk::Align::Fill,
+                libhelium::Button {
+                    set_label: &t!("next"),
+                    set_is_pill: true,
+                    set_halign: gtk::Align::Center,
+                    connect_clicked => Self::Input::More,
+                    inline_css: "padding-left: 48px; padding-right: 48px",
+                },
 
-            #[name(searchlayout)]
-            libhelium::TextField {
-                set_is_search: true,
-                set_is_outline: true,
-                set_margin_top: 6,
-                set_margin_bottom: 6,
-                set_prefix_icon: Some("system-search-symbolic"),
-                set_placeholder_text: Some(&t!("page-inputmethod-search-lang")),
-            },
-            gtk::ScrolledWindow {
-                set_hscrollbar_policy: gtk::PolicyType::Never,
-                #[local_ref]
-                langbox -> gtk::ListBox {
-                    add_css_class: "content-list",
-                    set_selection_mode: gtk::SelectionMode::Single,
-                    set_vexpand: true,
-                    connect_selected_rows_changed => Self::Input::LangSelected,
-                }
-            },
-        },
-
-        gtk::Box {
-            set_orientation: gtk::Orientation::Vertical,
-            set_spacing: 10,
-            set_vexpand: true,
-            set_hexpand: true,
-            set_halign: gtk::Align::Fill,
-
-            #[name(searchvariant)]
-            libhelium::TextField {
-                set_is_search: true,
-                set_is_outline: true,
-                set_margin_top: 6,
-                set_margin_bottom: 6,
-                set_prefix_icon: Some("system-search-symbolic"),
-                set_placeholder_text: Some(&t!("page-inputmethod-search-ims")),
-            },
-            gtk::ScrolledWindow {
-                set_hscrollbar_policy: gtk::PolicyType::Never,
-                #[local_ref]
-                imbox -> gtk::ListBox {
-                    add_css_class: "content-list",
-                    set_selection_mode: gtk::SelectionMode::None,
-                    set_vexpand: true,
-                }
-            },
+                libhelium::Button {
+                    set_label: &t!("page-welcome-skipcfg"),
+                    set_is_pill: true,
+                    set_halign: gtk::Align::Center,
+                    connect_clicked => Self::Input::Nav(NavAction::Next),
+                    inline_css: "padding-left: 48px; padding-right: 48px",
+                },
+            }
         },
     },
 
@@ -159,6 +189,8 @@ generate_page!(InputMethod {
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
+            #[watch]
+            set_visible: model.more,
             connect_clicked => Self::Input::Nav(NavAction::Next),
         },
     }
