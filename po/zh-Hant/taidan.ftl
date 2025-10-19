@@ -52,8 +52,9 @@ page-inputmethod-wiki = wiki
 page-inputmethod-search-lang = 搜尋語言…
 page-inputmethod-search-ims = 搜尋輸入法…
 page-nightlight = 護眼模式
-page-nightlight-lbl1 = 夜間時調教至較暖和的色溫有助減少對雙眼的傷害。
-page-nightlight-lbl2 = 護眼模式並未證實能改善睡眠。
+page-nightlight-desc =
+    夜間時調教至較暖和的色溫有助減少對雙眼的傷害。
+    護眼模式並未證實能改善睡眠。
 switch-nightlight = { page-nightlight }
 page-theme = 選擇主題
 page-theme-desc =

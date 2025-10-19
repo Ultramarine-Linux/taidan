@@ -29,7 +29,7 @@ generate_page!(Codecs:
             set_use_markup: true,
             set_justify: gtk::Justification::Center,
             // FIXME: someone tell me how to do this properly
-            set_label: &format!("{}\n\n{}", t!("page-codecs-desc1"), t!("page-codecs-desc2", wiki = format!("<a href='{WIKI_POSTINSTALL}'>{}</a>", t!("page-codecs-wiki")))),
+            set_label: &format!("{}\n{}", t!("page-codecs-desc1"), t!("page-codecs-desc2", wiki = format!("<a href='{WIKI_POSTINSTALL}'>{}</a>", t!("page-codecs-wiki")))),
         },
 
         #[template] crate::ui::SwitchBox {

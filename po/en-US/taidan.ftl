@@ -101,7 +101,7 @@ page-tweaks = System Tweaks
 
 page-codecs = Codecs and Drivers
 page-codecs-desc1 = Install common media codecs and drivers for your device.
-page-codecs-desc2 = 
+page-codecs-desc2 =
     Consult the { $wiki } if you don't have an Internet connection.
 page-codecs-wiki = wiki
 switch-codecs = Install Codecs and Drivers
@@ -125,8 +125,9 @@ page-inputmethod-search-ims = Search IMs/IMEs…
 
 # page title
 page-nightlight = Night Light
-page-nightlight-lbl1 = Tint the display with a warm tone at night to reduce eyestrain.
-page-nightlight-lbl2 = Night Light is not proven to help with difficulty falling sleep.
+page-nightlight-desc =
+    Tint the display with a warm tone at night to reduce eyestrain.
+    Night Light is not proven to help with difficulty falling sleep.
 switch-nightlight = Night Light
 
 ## page: Choose Your Theme
@@ -160,7 +161,7 @@ page-categories-done = Done
 #   [Productivity] -> projdsalkaj;cjzkpqi
 #   [...]
 # }
-# the list of categories is available at 
+# the list of categories is available at
 # https://github.com/Ultramarine-Linux/taidan/tree/master/catalogue
 # open each yml file, check the first line for the name
 categories = { $cat }

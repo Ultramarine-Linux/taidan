@@ -39,8 +39,9 @@ page-inputmethod = Método de Entrada
 page-inputmethod-search-lang = Buscar lenguaje…
 page-inputmethod-search-ims = Buscar IMs/IMEs…
 page-nightlight = Luz Nocturna
-page-nightlight-lbl1 = Entinta la pantalla con un tono cálido en la noche para reducir cansancio ocular.
-page-nightlight-lbl2 = Luz Nocturna no está confirmado con ayudar con la dificultad de dormir.
+page-nightlight-desc =
+    Entinta la pantalla con un tono cálido en la noche para reducir cansancio ocular.
+    Luz Nocturna no está confirmado con ayudar con la dificultad de dormir.
 switch-nightlight = Luz Nocturna
 page-theme = Elige tu tema
 page-theme-desc =

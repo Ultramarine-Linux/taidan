@@ -28,12 +28,9 @@ generate_page!(NightLight:
         },
 
         gtk::Label {
-            set_label: &t!("page-nightlight-lbl1"),
-        },
-
-        gtk::Label {
             set_use_markup: true,
-            set_label: &t!("page-nightlight-lbl2"),
+            set_label: &t!("page-nightlight-desc"),
+            set_justify: gtk::Justification::Center,
         },
 
         #[template] crate::ui::SwitchBox {

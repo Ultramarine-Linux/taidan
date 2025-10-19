@@ -20,7 +20,6 @@ page-password = 创建密码
 page-password-pw = 密码
 page-password-rp = 重复密码
 page-nightlight = 护眼模式
-page-nightlight-lbl2 = 护眼模式並未证实能改善睡眠。
 switch-nightlight = { page-nightlight }
 page-theme = 选择主题
 page-theme-desc = 选择主题色彩。您可以随时在设定更改此选项。

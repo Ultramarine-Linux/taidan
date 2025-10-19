@@ -45,8 +45,9 @@ page-inputmethod = Metody vstupu
 page-inputmethod-search-lang = Hledat jazyk…
 page-inputmethod-search-ims = Hledat IMs/IMEs…
 page-nightlight = Noční osvětlení
-page-nightlight-lbl1 = V noci zbarví obrazovku teplým tónem, pro snížení únavy očí.
-page-nightlight-lbl2 = Není prokázáno, že by noční světlo pomáhalo při potížích s usínáním.
+page-nightlight-desc =
+    V noci zbarví obrazovku teplým tónem, pro snížení únavy očí.
+    Není prokázáno, že by noční světlo pomáhalo při potížích s usínáním.
 switch-nightlight = Noční osvětlení
 page-theme = Vyberte si motiv
 page-theme-desc =
