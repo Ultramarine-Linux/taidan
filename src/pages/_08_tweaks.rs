@@ -1,7 +1,9 @@
 use crate::{backend::tweaks::TWEAKS, prelude::*};
 
 fn page_skipconfig() -> bool {
-    TWEAKS.is_empty()
+    // https://github.com/Ultramarine-Linux/taidan/issues/81
+    true
+    // TWEAKS.is_empty()
 }
 
 struct TweaksFactory(FactoryVecDeque<TweakBox>);
