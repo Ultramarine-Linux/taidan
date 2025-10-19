@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crate::prelude::*;
 use relm4::{RelmIterChildrenExt, RelmRemoveAllExt, SharedState};
 
@@ -28,6 +30,7 @@ generate_page!(Keyboard {
 }:
     init[layoutbox variantbox](root, sender, model, widgets) {
         i18n::LAYOUTS.entries()
+            .sorted_by(|a, b| if *a.0 == "us" { Ordering::Less } else if *b.0 == "us" { Ordering::Greater } else { Ordering::Equal })
             .map(|(&layout, i18n::Layout { name, .. })| gtk::ListBoxRow::builder().child(&newmini(layout, *name)).build())
             .for_each(|row| model.layoutbox.append(&row));
         model.layoutbox.select_row(model.layoutbox.iter_children().find(|child| miniblk(child).title() == "us").as_ref());
