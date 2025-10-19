@@ -14,7 +14,11 @@ const UMWIKI_INPUT_OTHER_LANG: &str =
     "https://wiki.ultramarine-linux.org/en/usage/l10n/#inputting-in-another-language";
 const UMWIKI_L10N: &str = "https://wiki.ultramarine-linux.org/en/usage/l10n/";
 
-skipconfig!();
+/// https://github.com/Ultramarine-Linux/taidan/issues/96
+fn page_skipconfig() -> bool {
+    true
+}
+
 generate_page!(InputMethod {
     langbox: gtk::ListBox,
     imbox: gtk::ListBox,
