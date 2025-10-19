@@ -47,6 +47,8 @@ generate_page!(Internet {
             set_hexpand: false,
             set_label: &t!("page-internet-skip"),
             inline_css: "padding-left: 48px; padding-right: 48px",
+            #[watch]
+            set_visible: !model.is_online,
             connect_clicked[sender] => move |_| {
                 SETTINGS.write().nointernet = true;
                 sender.input(Self::Input::Nav(NavAction::Next));
@@ -72,6 +74,8 @@ generate_page!(Internet {
             set_halign: gtk::Align::Center,
             // set_icon: Some("network-wireless-symbolic"),
             set_label: &t!("page-internet-open"),
+            #[watch]
+            set_visible: !model.is_online,
             connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("netto", &[]).await.unwrap() }),
         },
 
