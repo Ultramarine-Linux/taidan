@@ -4,6 +4,8 @@ default = Default
 prev = Previous
 # btn (next page)
 next = Next
+# btn (skip anything)
+skip = Skip
 # shown on the progress bar
 steps-dnfdownloadupdate = Downloading System Update…
 steps-dnfinstallupdate = Installing System Update…
@@ -112,11 +114,11 @@ switch-codecs-desc = Turning this on installs proprietary codecs and drivers
 # page title
 # .search*: search field placeholder
 page-inputmethod = Additional Input Methods
-page-inputmethod-desc1 = Languages that don't use the Latin alphabet may require a special input method to be typed, you can select one here.
-page-inputmethod-desc2 = If you're using a Language that uses the Latin alphabet can safely skip this page.
-page-inputmethod-desc3 = More information is on the { $wiki }.
-page-inputmethod-ime = input method editor (IME)
-page-inputmethod-rime = Rime
+page-inputmethod-desc =
+    Languages with non-Latin characters may require an extra <b>input method editor (IME)</b>.
+    You can skip this page if you do not need to type in one of these languages.
+    More information is available on { $wiki }.
+page-inputmethod-add = Add Input Method
 page-inputmethod-wiki = the wiki
 page-inputmethod-search-lang = Search language…
 page-inputmethod-search-ims = Search IMs/IMEs…
