@@ -3,7 +3,7 @@
 
 langlist=`dnf search ultramarine-langpacks | sed -n '/-core-/!p' | sed -n '/-fonts-/!p' | sed -E 's/\.noarch:.+//;s/ ultramarine-langpacks-//'` &
 
-systemctl enable systemd-timesyncd.service --now &
+systemctl preset-all &
 
 lang=`. /etc/locale.conf; echo ${LANG%.*}`
 wait
