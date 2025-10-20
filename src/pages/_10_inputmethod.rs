@@ -154,43 +154,28 @@ generate_page!(InputMethod {
                     set_use_markup: true,
                     set_wrap: true,
                     set_wrap_mode: gtk::pango::WrapMode::Word,
-                    set_label: &format!("{}\n\n{}\n\n{}",
-                        t!("page-inputmethod-desc1"),
-                        t!("page-inputmethod-desc2"),
-                        t!("page-inputmethod-desc3",
-                            wiki = format!("<a href='{UMWIKI_L10N}'>{}</a>", t!("page-inputmethod-wiki"))
-                        ),
-                    ),
+                    set_label: &t!("page-inputmethod-desc", wiki = format!("<a href='{UMWIKI_L10N}'>{}</a>", t!("page-inputmethod-wiki"))),
                     set_justify: gtk::Justification::Center,
                 },
 
                 libhelium::Button {
-                    set_label: &t!("next"),
+                    set_color: libhelium::ButtonColor::Secondary,
+                    set_label: &t!("page-inputmethod-add"),
                     set_is_pill: true,
                     set_halign: gtk::Align::Center,
                     connect_clicked => Self::Input::More,
-                    inline_css: "padding-left: 48px; padding-right: 48px",
-                },
-
-                libhelium::Button {
-                    set_label: &t!("page-welcome-skipcfg"),
-                    set_is_pill: true,
-                    set_halign: gtk::Align::Center,
-                    connect_clicked => Self::Input::Nav(NavAction::Next),
                     inline_css: "padding-left: 48px; padding-right: 48px",
                 },
             }
         },
     },
 
-    #[name(prev_next_btns)]
     #[template] crate::ui::PrevNextBtns {
         #[template_child] prev {
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
-            #[watch]
-            set_visible: model.more,
+            set_label: &if model.more { t!("next") } else { t!("skip") },
             connect_clicked => Self::Input::Nav(NavAction::Next),
         },
     }

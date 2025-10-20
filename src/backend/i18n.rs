@@ -24,8 +24,8 @@ macro_rules! im {
 // lang → `InputMethod`
 // NOTE: some characters may not be displayed properly on your device, please make sure you have
 // the corresponding fonts installed.
-pub const IMS: phf::Map<&'static str, phf::Map<&'static str, InputMethod>> = phf::phf_map! {
-    "Chinese" => phf::phf_map! {
+pub const IMS: phf::OrderedMap<&'static str, phf::OrderedMap<&'static str, InputMethod>> = phf::phf_ordered_map! {
+    "Chinese" => phf::phf_ordered_map! {
         // IME                     Native       Ibus(=>pkg)                         Fcitx5(=>pkg)
         "Pinyin"            => im!(拼音         "pinyin",                           "pinyin"=>"chinese-addons"),
         // there's also libzhuyin but it's extremely unpopular, sorry
@@ -44,23 +44,23 @@ pub const IMS: phf::Map<&'static str, phf::Map<&'static str, InputMethod>> = phf
         // 叫下啲人用 rime 啦
         "Boshiamy"          => im!(嘸蝦米       (),                                 "boshiamy"=>"table-extra"),
     },
-    "Japanese" => phf::phf_map! {
+    "Japanese" => phf::phf_ordered_map! {
         "Mozc"              => im!(Mozc         "mozc",                             "mozc"),
         // "Anthy"             => im!(Anthy        "anthy",                            "anthy"),
     },
-    "Korean" => phf::phf_map! {
+    "Korean" => phf::phf_ordered_map! {
         "libhangul"         => im!(한글         "hangul",                           "hangul"),
     },
-    "Vietnamese" => phf::phf_map! {
+    "Vietnamese" => phf::phf_ordered_map! {
         "Unikey"            => im!(Unikey       "unikey",                           "unikey"),
         "ViQR"              => im!(ViQR         "viqr"=>"table-tv",                 "viqr"=>"m17n"),
     },
-    "Indic" => phf::phf_map! {
+    "Indic" => phf::phf_ordered_map! {
         "OpenBangla"        => im!(বাংলা        "openbangla",                       "openbangla"),
         "Sayura Sinhara"    => im!(සිංහල         "sayura",                           "sayura"),
         // "Others"            => im!(Others       "m17n",                             "m17n"),
     },
-    "Thai" => phf::phf_map! {
+    "Thai" => phf::phf_ordered_map! {
         "Thai"              => im!(ภาษาไทย      "thai"=>"table-tv",                 "libthai"=>"libthai")
     },
 };
@@ -278,12 +278,14 @@ pub async fn set_keymap(
     layout: &str,
     variant: Option<&str>,
 ) -> color_eyre::Result<()> {
+    let current_user = uzers::get_current_username().expect("can't get current username");
+    if current_user.as_encoded_bytes() != b"taidan" && cfg!(debug_assertions) {
+        // #74
+        tracing::warn!("Skipping set_keymap in debug mode without being `taidan` user");
+        return Ok(());
+    }
     super::theme::xhost_local().await?;
-    let mut tmp = std::ffi::OsString::default();
-    let user = user.unwrap_or_else(|| {
-        tmp = uzers::get_current_username().expect("can't get current username");
-        tmp.to_str().unwrap()
-    });
+    let user = user.unwrap_or_else(|| current_user.to_str().unwrap());
     if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
         set_kde_keymap(user, layout, variant).await
     } else {
