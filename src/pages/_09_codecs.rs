@@ -3,6 +3,14 @@ const WIKI_POSTINSTALL: &str = "https://wiki.ultramarine-linux.org/en/setup/post
 use crate::prelude::*;
 skipconfig!();
 generate_page!(Codecs:
+    init(root, sender, model, widgets) {
+        if CFG.edition == "xfce" {
+            let next = &widgets.prev_next_btns.next;
+            next.set_label(&t!("page-categories-confirm"));
+            next.remove_css_class("suggested-action");
+            next.add_css_class("destructive-action");
+        }
+    }
     update(self, message, sender) {} => {}
 
     gtk::Box {
@@ -45,12 +53,13 @@ generate_page!(Codecs:
         },
     },
 
+    #[name(prev_next_btns)]
     #[template] crate::ui::PrevNextBtns {
         #[template_child] prev {
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
-            connect_clicked => Self::Input::Nav(NavAction::Next),
+            connect_clicked => if CFG.edition == "xfce" { Self::Input::Nav(NavAction::GoTo(crate::Page::Installing)) } else { Self::Input::Nav(NavAction::Next) },
         },
     }
 );

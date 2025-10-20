@@ -50,7 +50,10 @@ generate_page!(NightLight:
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
-            connect_clicked => Self::Input::Nav(NavAction::Next),
+            set_label: &t!("page-categories-confirm"),
+            remove_css_class: "suggested-action",
+            add_css_class: "destructive-action",
+            connect_clicked => Self::Input::Nav(NavAction::GoTo(crate::Page::Installing)),
         },
     }
 );
