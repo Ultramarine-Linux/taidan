@@ -178,6 +178,12 @@ impl SimpleComponent for AppModel {
                     } else {
                         tracing::debug!("removed /.unconfigured");
                     }
+                    if let Err(e) = backend::pkexec("root", "systemctl", &["disable", "taidan-initial-setup-reconfiguration"]).await
+                    {
+                        tracing::error!(?e, "cannot disable taidan-initial-setup-reconfiguration.service; exiting anyway");
+                    } else {
+                        tracing::debug!("disabled taidan-initial-setup-reconfiguration.service");
+                    }
                 });
                 relm4::main_application().quit();
             }

@@ -20,7 +20,6 @@ RemainAfterExit=yes
 # This unit wil run taidan-initial-setup,
 # so we can just stub it out
 ExecStart=true
-ExecStartPost=systemctl disable taidan-initial-setup-reconfiguration
 TimeoutSec=0
 RemainAfterExit=no
 
