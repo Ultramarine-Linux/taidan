@@ -70,6 +70,7 @@ generate_page!(WhoAreYou {
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-whoareyou"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -79,6 +80,7 @@ generate_page!(WhoAreYou {
         gtk::Entry {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
+            #[watch]
             set_placeholder_text: Some(&t!("page-whoareyou-fullname")),
             connect_changed[sender] => move |e| sender.input(Self::Input::NotifyFullName(e.text().to_string())),
         },
@@ -87,6 +89,7 @@ generate_page!(WhoAreYou {
         gtk::Entry {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
+            #[watch]
             set_placeholder_text: Some(&t!("page-whoareyou-username")),
             connect_changed[sender] => move |e| if valid_entry(e.text().as_str()) {
                 sender.input(Self::Input::NotifyUsername(e.text().to_string()))
@@ -102,6 +105,7 @@ generate_page!(WhoAreYou {
         // libhelium::TextField {
         //     set_hexpand: true,
         //     set_halign: gtk::Align::Fill,
+        //     #[watch]
         //     set_placeholder_text: Some(&t!("page-whoareyou-fullname")),
         //     set_is_outline: true,
         // },
@@ -111,6 +115,7 @@ generate_page!(WhoAreYou {
         // libhelium::TextField {
         //     set_hexpand: true,
         //     set_halign: gtk::Align::Fill,
+        //     #[watch]
         //     set_placeholder_text: Some(&t!("page-whoareyou-username")),
         //     set_is_outline: true,
         //     set_needs_validation: true,
@@ -121,6 +126,7 @@ generate_page!(WhoAreYou {
 
         #[local_ref]
         lbl_error -> gtk::Label {
+            #[watch]
             set_label: &t!("page-whoareyou-error"),
             set_use_markup: true,
             set_visible: false,

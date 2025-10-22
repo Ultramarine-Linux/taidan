@@ -15,12 +15,14 @@ generate_page!(Welcome:
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-welcome", distro = CFG.distro.clone()),
             add_css_class: "view-title",
             inline_css: "font-weight: bold",
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-welcome-ready"),
             inline_css: "font-size: 1.25rem",
         },
@@ -36,6 +38,7 @@ generate_page!(Welcome:
         // libhelium::Button {
         //     set_is_textual: true,
         //     set_halign: gtk::Align::Start,
+        //     #[watch]
         //     set_label: &t!("page-welcome-skipcfg"),
         //     connect_clicked[sender] => move |_| {
         //         SETTINGS.write().skipconfig = true;
@@ -48,6 +51,7 @@ generate_page!(Welcome:
         libhelium::Button {
             set_is_pill: true,
             set_halign: gtk::Align::End,
+            #[watch]
             set_label: &t!("page-welcome-go"),
             inline_css: "padding-left: 48px; padding-right: 48px",
             add_css_class: "suggested-action",

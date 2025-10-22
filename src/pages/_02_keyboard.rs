@@ -87,6 +87,7 @@ generate_page!(Keyboard {
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-keyboard"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -113,6 +114,7 @@ generate_page!(Keyboard {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
+                #[watch]
                 set_placeholder_text: Some(&t!("page-keyboard-search-layout")),
             },
             gtk::ScrolledWindow {
@@ -146,6 +148,7 @@ generate_page!(Keyboard {
                 set_margin_top: 6,
                 set_margin_bottom: 6,
                 set_prefix_icon: Some("system-search-symbolic"),
+                #[watch]
                 set_placeholder_text: Some(&t!("page-keyboard-search-variant")),
             },
             gtk::ScrolledWindow {

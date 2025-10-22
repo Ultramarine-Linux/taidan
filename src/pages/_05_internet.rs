@@ -31,6 +31,7 @@ generate_page!(Internet {
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-internet"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -38,6 +39,7 @@ generate_page!(Internet {
 
         gtk::Label {
             set_justify: gtk::Justification::Center,
+            #[watch]
             set_label: &t!("page-internet-desc"),
         },
 
@@ -45,6 +47,7 @@ generate_page!(Internet {
             set_is_textual: true,
             set_halign: gtk::Align::Center,
             set_hexpand: false,
+            #[watch]
             set_label: &t!("page-internet-skip"),
             inline_css: "padding-left: 48px; padding-right: 48px",
             #[watch]
@@ -56,6 +59,7 @@ generate_page!(Internet {
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-internet-ok"),
             #[watch]
             set_visible: model.is_online,
@@ -63,6 +67,7 @@ generate_page!(Internet {
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-internet-warn"),
             add_css_class: "warning",
             #[watch]
@@ -73,6 +78,7 @@ generate_page!(Internet {
             set_is_pill: true,
             set_halign: gtk::Align::Center,
             // set_icon: Some("network-wireless-symbolic"),
+            #[watch]
             set_label: &t!("page-internet-open"),
             #[watch]
             set_visible: !model.is_online,
@@ -82,6 +88,7 @@ generate_page!(Internet {
         libhelium::Button {
             set_is_tint: true,
             set_halign: gtk::Align::Center,
+            #[watch]
             set_label: &t!("page-internet-portal"),
             connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("xdg-open", &["http://detectportal.firefox.com/canonical.html"]).await.unwrap() }),
             #[watch]

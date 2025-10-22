@@ -23,6 +23,7 @@ generate_page!(CrashReport {
 
         gtk::Label {
             // TRANSLATORS: this is unused, do NOT translate
+            #[watch]
             set_label: &t!("page-crashreport"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -30,18 +31,22 @@ generate_page!(CrashReport {
 
         gtk::Label {
             // TRANSLATORS: this is unused, do NOT translate
+            #[watch]
             set_label: &t!("page-crashreport-desc", org = CFG.org.clone()),
         },
 
         gtk::Label {
             // TRANSLATORS: this is unused, do NOT translate
+            #[watch]
             set_label: &format!("{}\n{}", t!("page-crashreport-lbl1"), t!("page-crashreport-lbl2")),
         },
 
         libhelium::MiniContentBlock {
             // TRANSLATORS: this is unused, do NOT translate
+            #[watch]
             set_title: &t!("switch-crashreport"),
             // TRANSLATORS: this is unused, do NOT translate
+            #[watch]
             set_subtitle: &t!("switch-crashreport-desc"),
 
             #[wrap(Some)]

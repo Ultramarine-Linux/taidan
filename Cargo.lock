@@ -1902,9 +1902,9 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "poly_l10n"
-version = "0.0.6"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "765d62e3b747732e18c994a09573f7ca05dbbbdb9f0d2716d4aec7a5a049b8b8"
+checksum = "9b9c71e86b237da73cecaa01a74530b9b73cfafc221bdc6045a3ea60364f438e"
 dependencies = [
  "isolang",
  "itertools 0.14.0",

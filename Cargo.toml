@@ -35,7 +35,7 @@ memchr = "2.7.5"
 parking_lot = "0.12.4"
 paste = "1.0.15"
 phf = { version = "0.13.1", features = ["macros"] }
-poly_l10n = "0.0.6"
+poly_l10n = "0.0.7"
 regex = "1.11.1"
 relm4 = { version = "0.9.1", default-features = false, features = ["macros"] }
 reqwest = { version = "0.12.22", features = [

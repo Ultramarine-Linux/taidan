@@ -46,6 +46,7 @@ generate_page!(Tweaks {
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-tweaks"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",

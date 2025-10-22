@@ -33,17 +33,27 @@ static PO_AVAILABLE_LANGS: LazyLock<Vec<LanguageIdentifier>> = LazyLock::new(|| 
         .unwrap()
 });
 
-pub static PO_LOADER: LazyLock<RwLock<FluentLanguageLoader>> = LazyLock::new(|| {
+/// Create a new loader according to the list of languages.
+///
+/// # Panics
+/// If languages that cannot be loaded are encounted, panics immediately.
+#[must_use]
+pub fn new_loader(mut langs: Vec<LanguageIdentifier>) -> FluentLanguageLoader {
     let loader = fluent_language_loader!();
-    let mut langs = poly_l10n::system_want_langids()
-        .flat_map(|li| crate::LOCALE_SOLVER.solve_locale(li))
-        .filter(|li| PO_AVAILABLE_LANGS.contains(li))
-        .collect_vec();
     if langs.is_empty() {
         langs = vec![loader.fallback_language().clone()];
     }
     loader.load_languages(&***PO_ASSETS, &langs).unwrap();
-    RwLock::new(loader)
+    loader
+}
+
+pub static PO_LOADER: LazyLock<RwLock<FluentLanguageLoader>> = LazyLock::new(|| {
+    RwLock::new(new_loader(
+        poly_l10n::system_want_langids()
+            .flat_map(|li| crate::LOCALE_SOLVER.solve_locale(li))
+            .filter(|li| PO_AVAILABLE_LANGS.contains(li))
+            .collect_vec(),
+    ))
 });
 
 #[macro_export]

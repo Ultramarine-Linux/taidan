@@ -77,6 +77,7 @@ pub enum NavAction {
 pub enum AppMsg {
     Nav(NavAction),
     InstallError(String),
+    Update,
 }
 
 #[allow(clippy::str_to_string)]
@@ -139,6 +140,7 @@ impl SimpleComponent for AppModel {
         settings.set_gtk_icon_theme_name(Some("Hydrogen"));
         let theme = gtk::IconTheme::for_display(&display);
         theme.add_resource_path("/com/fyralabs/Taidan/icons/symbolic/actions");
+        SETTINGS.subscribe(sender.input_sender(), |_| AppMsg::Update);
 
         let model = Self::_default(sender);
 
@@ -215,6 +217,7 @@ impl SimpleComponent for AppModel {
                     .send(pages::ErrorPageMsg::Receive(msg))
                     .expect("sender dropped?");
             }
+            AppMsg::Update => {}
         }
     }
 }

@@ -32,6 +32,7 @@ generate_page!(Password {
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-password"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -42,6 +43,7 @@ generate_page!(Password {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
             set_show_peek_icon: true,
+            #[watch]
             set_placeholder_text: Some(&t!("page-password-pw")),
             connect_changed[sender, tf_repeat] => move |en| {
                 sender.input(Self::Input::SetBtnSensitive(en.text() == tf_repeat.text() && !en.text().is_empty()));
@@ -54,6 +56,7 @@ generate_page!(Password {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
             set_show_peek_icon: true,
+            #[watch]
             set_placeholder_text: Some(&t!("page-password-rp")),
             connect_changed[sender] => move |en| {
                 let pass = en.text().to_string();

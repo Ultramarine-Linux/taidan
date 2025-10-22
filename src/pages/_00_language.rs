@@ -33,6 +33,7 @@ generate_page!(Language {
                         .load_languages(&crate::Localizations, &["en-Xowo".parse().unwrap()])
                         .expect("fail to load languages");
                     *crate::LL.write() = loader;
+                    *crate::backend::l10n::PO_LOADER.write() = crate::backend::l10n::new_loader(vec!["en-Xowo".parse().unwrap()]);
                     SETTINGS.write().langlocale = "en_US";
                 } else {
                     set_lang(lang);
@@ -54,6 +55,7 @@ generate_page!(Language {
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-language"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -88,6 +90,7 @@ generate_page!(Language {
         set_halign: gtk::Align::Fill,
         set_is_pill: true,
         set_halign: gtk::Align::End,
+        #[watch]
         set_label: &t!("next"),
         inline_css: "padding-left: 48px; padding-right: 48px",
         add_css_class: "suggested-action",
@@ -174,14 +177,14 @@ impl AsRef<gtk::Widget> for BtnFactory {
 }
 
 fn set_lang(lang: &LanguageRow) {
-    tracing::info!(lang.locale, "Using selected locale");
     if let Ok(locale) = (lang.locale)
         .split_once('.')
         .map_or(lang.locale, |(left, _)| left)
         .to_owned()
         .parse::<i18n_embed::unic_langid::LanguageIdentifier>()
-        .inspect_err(|e| tracing::error!(?e, "Cannot apply language"))
+        .inspect_err(|e| tracing::error!(?e, ?lang, "Cannot apply language"))
     {
+        tracing::info!(?locale, lang.locale, "Using selected locale");
         let mut locales = crate::LOCALE_SOLVER
             .solve_locale(locale)
             .into_iter()
@@ -195,6 +198,7 @@ fn set_lang(lang: &LanguageRow) {
             .load_languages(&crate::Localizations, &locales)
             .expect("fail to load languages");
         *crate::LL.write() = loader;
+        *crate::backend::l10n::PO_LOADER.write() = crate::backend::l10n::new_loader(locales);
         SETTINGS.write().langlocale = lang.locale;
     }
 }

@@ -10,6 +10,7 @@ impl WidgetTemplate for PrevNextBtns {
             libhelium::Button {
                 set_is_pill: true,
                 set_color: libhelium::ButtonColor::Surface,
+                #[watch]
                 set_label: &t!("prev"),
                 inline_css: "padding-left: 48px; padding-right: 48px",
             },
@@ -19,6 +20,7 @@ impl WidgetTemplate for PrevNextBtns {
             #[name = "next"]
             libhelium::Button {
                 set_is_pill: true,
+                #[watch]
                 set_label: &t!("next"),
                 inline_css: "padding-left: 48px; padding-right: 48px",
                 add_css_class: "suggested-action",
