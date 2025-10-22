@@ -79,6 +79,7 @@ page-internet-portal = 以瀏覽器登入
 page-tweaks = 系統調整
 page-inputmethod-desc =
     具有非拉丁文字的語言或需要<b>輸入法</b>。
+    按「追加輸入法」以繼續。
     請參考{ $wiki }瞭解更多。
 page-inputmethod-add = 追加輸入法
 page-installing-flatpak = 正在安裝 { $n } 個 Flatpak……
