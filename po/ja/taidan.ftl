@@ -77,14 +77,6 @@ switch-codecs-desc = 不必要である方は、「次」のボタンを押し�
 
 # page title
 page-inputmethod = 入力方法
-page-inputmethod-desc1 = { $ime }の追加次第で、英語以外の入力が可能になりますが、設定はログインした後だけ有効になります。
-page-inputmethod-desc2 =
-    <b>日本語はMozcを選択してください。</b>
-
-    特定の中国語入力方法は{ $rime }で利用可能かもしれませんが、セットアップが上級者向けのため、初心者におすすめしません。
-page-inputmethod-desc3 = 詳細は{ $wiki }にご覧ください。
-page-inputmethod-ime = IME
-page-inputmethod-rime = Rime（中州韻輸入法引擎）
 page-inputmethod-wiki = ウィキ
 page-inputmethod-search-lang = 言語検索…
 page-inputmethod-search-ims = 入力方法検索…
@@ -93,7 +85,6 @@ page-inputmethod-search-ims = 入力方法検索…
 
 # page title
 page-nightlight = 夜間モード
-page-nightlight-lbl1 = 画面の色合いを暖かくすることによって、目への負担を軽減することができます。
 switch-nightlight = { page-nightlight }
 
 ## page: Choose Your Theme
