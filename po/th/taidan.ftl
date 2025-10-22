@@ -22,7 +22,6 @@ page-password-pw = รหัสผ่าน
 page-password-rp = ใส่รหัสผ่านอีกครั้ง
 page-internet = มาต่ออินเตอร์เน็ตกันเถอะ
 page-internet-skip = ฉันไม่มีอินเตอร์เน็ต
-page-nightlight-lbl1 = ปรับสีจอภาพด้วยโทนสีอุ่นในเวลากลางคืนเพื่อลดอาการปวดตา
 switch-nightlight = Night Light
 page-theme = Choose Your Theme
 page-theme-desc =
