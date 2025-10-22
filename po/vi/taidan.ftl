@@ -82,6 +82,9 @@ flatpakening-name = Dùng Flatpak thay vì RPM
 flatpakening-desc = Giúp hệ thống của bạn thêm bảo mật khi các ứng dụng lựa chọn được cách ly.
 switch-crashreport-desc = Nhấn Tiếp để bỏ qua bước này
 page-tweaks = Tinh chỉnh hệ thống
+<<<<<<< HEAD
 page-crashreport-desc = Cho phép { $org } thu thập dữ liệu khi máy bạn nổ để tìm lỗi và hỗ trợ bạn.
 page-crashreport-lbl1 = Mọi dữ liệu thu thập đều ẩn danh và được mã hóa.
 page-crashreport-lbl2 = Bạn sẽ nhận được một mã sự cố để hỗ trợ tìm ra vấn đề.
+=======
+>>>>>>> 922a023 (Translated using Weblate (Vietnamese))
