@@ -83,3 +83,7 @@ page-whoareyou-error = 用戶名必須係細楷開頭，並由細楷、數宇、
 page-password = 密碼
 page-password-pw = 輸入密碼
 page-password-rp = 重覆密碼
+page-internet = 一齊連上網啦
+page-internet-desc = 連上網，攞到最新、最好嘅。
+page-internet-skip = 我上唔到網
+page-internet-warn = 編解碼器、驅動程式同應用程式
