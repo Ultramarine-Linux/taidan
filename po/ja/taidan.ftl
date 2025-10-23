@@ -5,12 +5,12 @@ prev = 前
 # btn (next page)
 next = 次
 # shown on the progress bar
-steps-dnfdownloadupdate = システムアップデートダウンロード中…
-steps-dnfinstallupdate = システムアップデートインストール中…
-steps-script = ディストリビューションスクリプト実行中…
-steps-dnfdownloadapps = ユーザーアプリダウンロード中…
-steps-dnfinstallapps = ユーザーアプリインストール中…
-steps-driverscodecs = システムアップデートインストール中…
+steps-dnfdownloadupdate = システムアップデートをダウンロード中…
+steps-dnfinstallupdate = システムアップデートをインストール中…
+steps-script = スクリプト実行中…
+steps-dnfdownloadapps = アプリをダウンロード中…
+steps-dnfinstallapps = アプリをインストール中…
+steps-driverscodecs = ドライバーとコーデックをインストール中…
 imelangs-ch = 中国語
 imelangs-ja = 日本語
 imelangs-ko = 韓国語
@@ -23,7 +23,7 @@ imelangs-display = { $lang_name }（{ $native_lang_name }）
 
 # page title
 page-welcome = { $distro } へようこそ
-page-welcome-ready = システムをセットアップしましょう。
+page-welcome-ready = デバイスをセットアップしましょう。
 page-welcome-go = 次
 page-welcome-skipcfg = スキップ
 
@@ -61,7 +61,7 @@ page-password-rp = 確認
 page-internet = インターネット接続
 page-internet-desc = インターネットに接続すると、最新ソフトをダウンロードできるようになります。
 page-internet-skip = スキップ
-page-internet-warn = コーデック・デバイスドライバ・ユーザーアプリをインストールするにはネット接続が必要です。
+page-internet-warn = コーデック・デバイスドライバ・アプリをインストールするにはネット接続が必要です。
 page-internet-open = Wi-Fi接続アプリを起動
 
 ## page: Codecs and Drivers
@@ -77,14 +77,6 @@ switch-codecs-desc = 不必要である方は、「次」のボタンを押し�
 
 # page title
 page-inputmethod = 入力方法
-page-inputmethod-desc1 = { $ime }の追加次第で、英語以外の入力が可能になりますが、設定はログインした後だけ有効になります。
-page-inputmethod-desc2 =
-    <b>日本語はMozcを選択してください。</b>
-
-    特定の中国語入力方法は{ $rime }で利用可能かもしれませんが、セットアップが上級者向けのため、初心者におすすめしません。
-page-inputmethod-desc3 = 詳細は{ $wiki }にご覧ください。
-page-inputmethod-ime = IME
-page-inputmethod-rime = Rime（中州韻輸入法引擎）
 page-inputmethod-wiki = ウィキ
 page-inputmethod-search-lang = 言語検索…
 page-inputmethod-search-ims = 入力方法検索…
@@ -93,7 +85,6 @@ page-inputmethod-search-ims = 入力方法検索…
 
 # page title
 page-nightlight = 夜間モード
-page-nightlight-lbl1 = 画面の色合いを暖かくすることによって、目への負担を軽減することができます。
 switch-nightlight = { page-nightlight }
 
 ## page: Choose Your Theme
@@ -146,3 +137,4 @@ page-error = エラー
 page-error-desc = 申し訳ございませんが、エラーが発生しました。
 page-error-done = 閉じる
 page-error-retry = リトライ
+skip = スキップ
