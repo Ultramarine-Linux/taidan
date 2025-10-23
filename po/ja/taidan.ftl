@@ -5,12 +5,12 @@ prev = 前
 # btn (next page)
 next = 次
 # shown on the progress bar
-steps-dnfdownloadupdate = システムアップデートダウンロード中…
-steps-dnfinstallupdate = システムアップデートインストール中…
-steps-script = ディストリビューションスクリプト実行中…
-steps-dnfdownloadapps = ユーザーアプリダウンロード中…
-steps-dnfinstallapps = ユーザーアプリインストール中…
-steps-driverscodecs = システムアップデートインストール中…
+steps-dnfdownloadupdate = システムアップデートをダウンロード中…
+steps-dnfinstallupdate = システムアップデートをインストール中…
+steps-script = スクリプト実行中…
+steps-dnfdownloadapps = アプリをダウンロード中…
+steps-dnfinstallapps = アプリをインストール中…
+steps-driverscodecs = ドライバーとコーデックをインストール中…
 imelangs-ch = 中国語
 imelangs-ja = 日本語
 imelangs-ko = 韓国語
@@ -23,7 +23,7 @@ imelangs-display = { $lang_name }（{ $native_lang_name }）
 
 # page title
 page-welcome = { $distro } へようこそ
-page-welcome-ready = システムをセットアップしましょう。
+page-welcome-ready = デバイスをセットアップしましょう。
 page-welcome-go = 次
 page-welcome-skipcfg = スキップ
 
@@ -61,7 +61,7 @@ page-password-rp = 確認
 page-internet = インターネット接続
 page-internet-desc = インターネットに接続すると、最新ソフトをダウンロードできるようになります。
 page-internet-skip = スキップ
-page-internet-warn = コーデック・デバイスドライバ・ユーザーアプリをインストールするにはネット接続が必要です。
+page-internet-warn = コーデック・デバイスドライバ・アプリをインストールするにはネット接続が必要です。
 page-internet-open = Wi-Fi接続アプリを起動
 
 ## page: Codecs and Drivers
@@ -137,3 +137,4 @@ page-error = エラー
 page-error-desc = 申し訳ございませんが、エラーが発生しました。
 page-error-done = 閉じる
 page-error-retry = リトライ
+skip = スキップ
