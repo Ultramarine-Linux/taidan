@@ -34,3 +34,4 @@ categories = { $cat }
 page-installing = 正在安装您的应用
 page-installing-desc = 请稍等一下
 page-installing-loading = 加载中…
+default = 预设
