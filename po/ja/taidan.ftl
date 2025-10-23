@@ -138,3 +138,5 @@ page-error-desc = 申し訳ございませんが、エラーが発生しまし�
 page-error-done = 閉じる
 page-error-retry = リトライ
 skip = スキップ
+page-language = 言語
+page-language-search-lang = 言語を検索…
