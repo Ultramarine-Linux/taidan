@@ -6,7 +6,6 @@ prev = Previous
 next = Next
 # btn (skip anything)
 skip = Skip
-# shown on the progress bar
 steps-dnfdownloadupdate = Downloading System Update…
 steps-dnfinstallupdate = Installing System Update…
 steps-script = Running Scriptlet…
@@ -34,9 +33,13 @@ imelangs-th = Thai
 # use different brackets, etc.
 imelangs-display = { $lang_name } ({ $native_lang_name })
 
-## page: Welcome
+## [Language]
 
-# .ready: ≈ "Next" btn; on click, goes to the next page
+page-language = Language
+page-language-search-lang = Search Language/Locale…
+
+## [Welcome]
+
 page-welcome = Welcome to { $distro }
 # page title
 page-welcome-ready = Let's get your device ready.
@@ -44,7 +47,7 @@ page-welcome-go = Let's Go
 # .skipcfg: also a "Next" btn, but skips some pages
 page-welcome-skipcfg = Skip Configuration
 
-## page: Keyboard Layout
+## [Keyboard Layout]
 
 # page title
 page-keyboard = Keyboard Layout
@@ -52,7 +55,7 @@ page-keyboard = Keyboard Layout
 page-keyboard-search-layout = Search keyboard layouts…
 page-keyboard-search-variant = Search keyboard variants…
 
-## page: Who are You?
+## [Username]
 
 # page title
 # remember, if you can't translate things literally, think of what makes sense here as a page heading
@@ -64,20 +67,19 @@ page-whoareyou-username = Username
 # .error: multiline, explanation pops out if invalid username
 page-whoareyou-error = Username can only contain letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
 
-## page: Create a Password
+## [Password]
 
 # page title
 page-password = Create a Password
-# the `.pw` attribute is a text field placeholder
+# text field placeholder for password
 page-password-pw = Password
-# the `.rp` attribute is yet another text field placeholder
+# yet another text field placeholder for repeating the password.
+# depending on the language you can just put the word equivalent to "repeat" here
 page-password-rp = Repeat Password
 
-## page: Internet
+## [Internet]
 
 # page title
-# .skip: btn
-# .open: btn
 page-internet = Let's Get Online
 page-internet-desc = Connect to the Internet to get the latest and greatest.
 page-internet-skip = I don't have Internet
@@ -85,21 +87,22 @@ page-internet-warn = Codecs, drivers and some apps won't be installed without in
 page-internet-open = Connect to a WiFi Network
 page-internet-ok = You're connected! Press next to continue.
 page-internet-portal = Login with Web Browser
-# do NOT translate (for now)
+
+## [Analytics and Crash Reporting]
+## this page is currently not in use, we recommend skipping
+
 page-analytics = Analytics and Crash Reporting
-# do NOT translate (for now)
 page-crashreport = Crash Reporting
 page-crashreport-desc = Allow { $org } to collect crash data to find bugs and assist you.
 page-crashreport-lbl1 = All data collected is anonymous and end-to-end-encrypted.
 page-crashreport-lbl2 = You will be given a crash ID to help support find what went wrong.
-# do NOT translate (for now)
-# btn-switch
 switch-crashreport = Send Crash Data
 switch-crashreport-desc = Press next to keep off
 
+## [Tweaks]
 page-tweaks = System Tweaks
 
-## page: Codecs and Drivers
+## [Codecs and Drivers]
 
 page-codecs = Codecs and Drivers
 page-codecs-desc1 = Install common media codecs and drivers for your device.
@@ -109,11 +112,12 @@ page-codecs-wiki = wiki
 switch-codecs = Install Codecs and Drivers
 switch-codecs-desc = Turning this on installs proprietary codecs and drivers
 
-## page: Input Method
+## [Input Method]
 
 # page title
-# .search*: search field placeholder
 page-inputmethod = Additional Input Methods
+# languages that do require IMEs should change the second line to:
+# Press "Add Input Method" to continue.
 page-inputmethod-desc =
     Languages with non-Latin characters may require an extra <b>input method editor (IME)</b>.
     You can skip this page if you do not need to type in one of these languages.
@@ -123,7 +127,7 @@ page-inputmethod-wiki = the wiki
 page-inputmethod-search-lang = Search language…
 page-inputmethod-search-ims = Search IMs/IMEs…
 
-## page: Nightlight
+## [Night Light]
 
 # page title
 page-nightlight = Night Light
@@ -132,11 +136,9 @@ page-nightlight-desc =
     Night Light is not proven to help with difficulty falling sleep.
 switch-nightlight = Night Light
 
-## page: Choose Your Theme
+## [Choose Your Theme]
 
 # page title
-# .light: Light Theme
-# .dark: Dark Theme
 page-theme = Choose Your Theme
 page-theme-desc =
     Make this system your own with a splash of colour.
@@ -145,15 +147,14 @@ page-theme-note = Some apps may not respect this preference.
 page-theme-light = Light
 page-theme-dark = Dark
 
-## page: Browser Selection
+## [Browser Selection]
 
 page-browser = Browser Selection
 
 ## page: Categories
 ## this page shows different categories in the app catalogue (e.g. Productivity, Gaming, Media Prod., etc.)
 
-# .confirm: btn
-# .done: btn; shown on new windows for closing
+# page title
 page-categories = What Do You Use This Device For?
 page-categories-confirm = Confirm and Setup System
 page-categories-done = Done
@@ -168,31 +169,25 @@ page-categories-done = Done
 # open each yml file, check the first line for the name
 categories = { $cat }
 
-## page: Installing
+## [Installing]
 
 page-installing = Installing Your Apps
 page-installing-desc = This won't take long!
 page-installing-loading = Loading…
 page-installing-flatpak = Installing {$n} Flatpaks…
 
-## page: Finish
+## [Finish]
 
-# .done: btn; closes the entire application
 page-finish = Ready to Do Your Thing?
 page-finish-desc = We hope you enjoy Ultramarine!
 page-finish-done = Done
 
-## page: Error
+## [Error]
 
-# .done: btn; closes the entire application
-# .retry: btn
 page-error = Error
 page-error-desc = We hit a snag.
 page-error-done = Exit
 page-error-retry = Retry
-
-page-language = Language
-page-language-search-lang = Search Language/Locale…
 
 flatpakening-name = Use RPMs instead of Flatpaks
 flatpakening-desc = Flatpaks provide better security by default, RPMs will save some space.
