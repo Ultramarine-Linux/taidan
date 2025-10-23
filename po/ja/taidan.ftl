@@ -41,10 +41,7 @@ page-keyboard-search-variant = キーバリエーションを検索…
 page-whoareyou = ユーザー登録
 page-whoareyou-fullname = 名前
 page-whoareyou-username = ユーザー名
-page-whoareyou-error =
-    ユーザー名のフォーマットについて
-    - 英小文字で始まる
-    - 英文字・数字・<tt>_</tt>・<tt>-</tt>だけで組む
+page-whoareyou-error = ユーザー名は、英小文字で始まり、英小文字・数字・<tt>_</tt>・<tt>-</tt>だけで組むことが必要です。
 
 ## page: Create a Password
 
@@ -68,7 +65,7 @@ page-internet-open = Wi-Fi接続
 
 page-codecs = コーデックとデバイスドライバ
 page-codecs-desc1 = コーデック・デバイスドライバをインストールします。
-page-codecs-desc2 = ネット接続が必要なので、接続のない場合は、{ $wiki }を読んでください。
+page-codecs-desc2 = ネット接続が必要なので、接続のない場合は、{ $wiki }をご覧ください。
 page-codecs-wiki = ウィキの記事
 switch-codecs = コーデック・デバイスドライバをインストール
 switch-codecs-desc = オンの場合はコーデック・デバイスドライバをインストールします
@@ -149,3 +146,5 @@ page-inputmethod-desc =
     詳細は{ $wiki }をご参考ください。
 page-inputmethod-add = 入力方法を追加
 page-nightlight-desc = 夜に映像をぬるく映し出すことで、目の疲れを改善することができます。
+flatpakening-name = Flatpakの代わりにRPMをインストール
+flatpakening-desc = Flatpakは安全性が高い一方、RPMはスペースを節約できます。
