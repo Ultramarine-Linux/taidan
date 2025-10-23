@@ -189,5 +189,7 @@ page-error-desc = We hit a snag.
 page-error-done = Exit
 page-error-retry = Retry
 
+## [Tweaks in Ultramarine]
+
 flatpakening-name = Use RPMs instead of Flatpaks
 flatpakening-desc = Flatpaks provide better security by default, RPMs will save some space.
