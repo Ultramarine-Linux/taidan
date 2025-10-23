@@ -65,7 +65,7 @@ page-whoareyou-fullname = Full Name
 # .username: text field placeholder
 page-whoareyou-username = Username
 # .error: multiline, explanation pops out if invalid username
-page-whoareyou-error = Username can only contain letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
+page-whoareyou-error = Username must start with lowercase letters can only contain lowercase letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
 
 ## [Password]
 
