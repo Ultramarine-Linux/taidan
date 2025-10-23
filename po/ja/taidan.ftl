@@ -62,16 +62,16 @@ page-internet = インターネット接続
 page-internet-desc = インターネットに接続すると、最新ソフトをダウンロードできるようになります。
 page-internet-skip = スキップ
 page-internet-warn = コーデック・デバイスドライバ・アプリをインストールするにはネット接続が必要です。
-page-internet-open = Wi-Fi接続アプリを起動
+page-internet-open = Wi-Fi接続
 
 ## page: Codecs and Drivers
 
 page-codecs = コーデックとデバイスドライバ
-page-codecs-desc1 = 専売特許のコーデック・デバイスドライバをインストールしますか？
+page-codecs-desc1 = コーデック・デバイスドライバをインストールします。
 page-codecs-desc2 = ネット接続が必要なので、接続のない場合は、{ $wiki }を読んでください。
 page-codecs-wiki = ウィキの記事
 switch-codecs = コーデック・デバイスドライバをインストール
-switch-codecs-desc = 不必要である方は、「次」のボタンを押してください
+switch-codecs-desc = オンの場合はコーデック・デバイスドライバをインストールします
 
 ## page: Input Method
 
@@ -127,8 +127,8 @@ page-installing-loading = ローディング…
 
 ## page: Finish
 
-page-finish = 完成
-page-finish-desc = 新しいシステムをお楽しみくださいませ。
+page-finish = 準備はよろしいでしょうか？
+page-finish-desc = 新しいシステムをお楽しみくださいませ！
 page-finish-done = 完了
 
 ## page: Error
@@ -139,4 +139,13 @@ page-error-done = 閉じる
 page-error-retry = リトライ
 skip = スキップ
 page-language = 言語
-page-language-search-lang = 言語を検索…
+page-language-search-lang = 言語検索…
+page-internet-ok = ネットに接続しました！「次」を押してください。
+page-internet-portal = ウェブブラウザでログイン
+page-tweaks = システム微調整
+page-inputmethod-desc =
+    非ラテン文字を用いる言語は<b>入力方法</b>が必要となる場合がございます。
+    「入力方法を追加」を押し、インストールすることが可能です。
+    詳細は{ $wiki }をご参考ください。
+page-inputmethod-add = 入力方法を追加
+page-nightlight-desc = 夜に映像をぬるく映し出すことで、目の疲れを改善することができます。
