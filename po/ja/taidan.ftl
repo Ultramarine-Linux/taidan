@@ -82,7 +82,7 @@ page-inputmethod-search-ims = 入力方法検索…
 
 # page title
 page-nightlight = 夜間モード
-switch-nightlight = { page-nightlight }
+switch-nightlight = 夜間モード
 
 ## page: Choose Your Theme
 
