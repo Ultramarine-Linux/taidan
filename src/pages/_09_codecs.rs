@@ -28,6 +28,7 @@ generate_page!(Codecs:
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-codecs"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -41,7 +42,9 @@ generate_page!(Codecs:
         },
 
         #[template] crate::ui::SwitchBox {
+            #[watch]
             set_title: &t!("switch-codecs"),
+            #[watch]
             set_subtitle: &t!("switch-codecs-desc"),
             #[template_child] switch {
                 set_active: true,
@@ -56,10 +59,14 @@ generate_page!(Codecs:
     #[name(prev_next_btns)]
     #[template] crate::ui::PrevNextBtns {
         #[template_child] prev {
+            #[watch]
+            set_label: &t!("prev"),
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
-            connect_clicked => if CFG.edition == "xfce" { Self::Input::Nav(NavAction::GoTo(crate::Page::Installing)) } else { Self::Input::Nav(NavAction::Next) },
+            #[watch]
+            set_label: &t!("next"),
+            connect_clicked => Self::Input::Nav(NavAction::Next),
         },
     }
 );

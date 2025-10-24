@@ -135,6 +135,7 @@ generate_page!(InputMethod {
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-inputmethod"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -154,12 +155,14 @@ generate_page!(InputMethod {
                     set_use_markup: true,
                     set_wrap: true,
                     set_wrap_mode: gtk::pango::WrapMode::Word,
+                    #[watch]
                     set_label: &t!("page-inputmethod-desc", wiki = format!("<a href='{UMWIKI_L10N}'>{}</a>", t!("page-inputmethod-wiki"))),
                     set_justify: gtk::Justification::Center,
                 },
 
                 libhelium::Button {
                     set_color: libhelium::ButtonColor::Secondary,
+                    #[watch]
                     set_label: &t!("page-inputmethod-add"),
                     set_is_pill: true,
                     set_halign: gtk::Align::Center,
@@ -172,9 +175,12 @@ generate_page!(InputMethod {
 
     #[template] crate::ui::PrevNextBtns {
         #[template_child] prev {
+            #[watch]
+            set_label: &t!("prev"),
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
+            #[watch]
             set_label: &if model.more { t!("next") } else { t!("skip") },
             connect_clicked => Self::Input::Nav(NavAction::Next),
         },

@@ -179,9 +179,12 @@ generate_page!(Theme:
 
     #[template] crate::ui::PrevNextBtns {
         #[template_child] prev {
+            #[watch]
+            set_label: &t!("prev"),
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
+            #[watch]
             set_label: &t!("page-categories-confirm"),
             remove_css_class: "suggested-action",
             add_css_class: "destructive-action",

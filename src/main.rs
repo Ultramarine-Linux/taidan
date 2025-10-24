@@ -219,6 +219,11 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Update => {}
         }
+        // BUG: labels don't update without this?
+        self.welcome_page
+            .sender()
+            .send(pages::_01_welcome::WelcomePageMsg::Update)
+            .unwrap();
     }
 }
 

@@ -137,9 +137,13 @@ generate_page!(WhoAreYou {
     #[name(prev_next_btns)]
     #[template] crate::ui::PrevNextBtns {
         #[template_child] prev {
+            #[watch]
+            set_label: &t!("prev"),
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
+            #[watch]
+            set_label: &t!("next"),
             set_sensitive: false,
             connect_clicked => Self::Input::Nav(NavAction::Next),
         },

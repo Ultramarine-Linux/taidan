@@ -1,5 +1,6 @@
 use crate::prelude::*;
 
+// FIXME: labels don't update when language changes
 #[relm4::widget_template(pub)]
 impl WidgetTemplate for PrevNextBtns {
     view! {

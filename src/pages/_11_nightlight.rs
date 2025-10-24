@@ -22,6 +22,7 @@ generate_page!(NightLight:
         },
 
         gtk::Label {
+            #[watch]
             set_label: &t!("page-nightlight"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
@@ -29,11 +30,13 @@ generate_page!(NightLight:
 
         gtk::Label {
             set_use_markup: true,
+            #[watch]
             set_label: &t!("page-nightlight-desc"),
             set_justify: gtk::Justification::Center,
         },
 
         #[template] crate::ui::SwitchBox {
+            #[watch]
             set_title: &t!("switch-nightlight"),
             #[template_child] switch {
                 connect_state_set[sender] => move |_, state| {
@@ -47,9 +50,12 @@ generate_page!(NightLight:
 
     #[template] crate::ui::PrevNextBtns {
         #[template_child] prev {
+            #[watch]
+            set_label: &t!("prev"),
             connect_clicked => Self::Input::Nav(NavAction::Back),
         },
         #[template_child] next {
+            #[watch]
             set_label: &t!("page-categories-confirm"),
             remove_css_class: "suggested-action",
             add_css_class: "destructive-action",
