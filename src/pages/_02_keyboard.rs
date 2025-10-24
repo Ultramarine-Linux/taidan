@@ -22,7 +22,7 @@ fn newmini(title: &str, subtitle: &str) -> libhelium::MiniContentBlock {
 }
 
 static SEARCH_LAYOUT: SharedState<libhelium::glib::GString> = SharedState::new();
-// static SEARCH_VARIANT: SharedState<libhelium::glib::GString> = SharedState::new();
+static SEARCH_VARIANT: SharedState<libhelium::glib::GString> = SharedState::new();
 
 generate_page!(Keyboard {
     layoutbox: gtk::ListBox,
@@ -35,7 +35,7 @@ generate_page!(Keyboard {
             .for_each(|row| model.layoutbox.append(&row));
         model.layoutbox.select_row(model.layoutbox.iter_children().find(|child| miniblk(child).title() == "us").as_ref());
         let layoutbox2 = layoutbox.clone();
-        // let variantbox2 = variantbox.clone();
+        let variantbox2 = variantbox.clone();
         widgets.searchlayout.internal_entry().connect_changed(move |en| {
             *SEARCH_LAYOUT.write() = en.text();
             layoutbox2.invalidate_filter();
@@ -44,14 +44,14 @@ generate_page!(Keyboard {
             let search = SEARCH_LAYOUT.read().to_ascii_lowercase();
             miniblk(row).title().contains(&search) || miniblk(row).subtitle().contains(&search)
         });
-        // widgets.searchvariant.internal_entry().connect_changed(move |en| {
-        //     *SEARCH_VARIANT.write() = en.text();
-        //     variantbox2.invalidate_filter();
-        // });
-        // variantbox.set_filter_func(move |row| {
-        //     let search = SEARCH_VARIANT.read().to_ascii_lowercase();
-        //     miniblk(row).title().contains(&search) || miniblk(row).subtitle().contains(&search)
-        // });
+        widgets.searchvariant.internal_entry().connect_changed(move |en| {
+            *SEARCH_VARIANT.write() = en.text();
+            variantbox2.invalidate_filter();
+        });
+        variantbox.set_filter_func(move |row| {
+            let search = SEARCH_VARIANT.read().to_ascii_lowercase();
+            miniblk(row).title().contains(&search) || miniblk(row).subtitle().contains(&search)
+        });
     }
     update(self, message, sender) {
         LayoutSelected => {
@@ -65,13 +65,13 @@ generate_page!(Keyboard {
             SETTINGS.write().kb_layout.clone_from(&layout);
             sender.oneshot_command(async move { i18n::set_keymap(None, &layout, None).await.expect("cannot set keymap") });
         },
-        // VariantSelected => {
-        //     let Some(row) = self.variantbox.selected_row() else { return };
-        //     let variant = (miniblk(&row).subtitle() != t!("default")).then(|| miniblk(&row).title().to_string());
-        //     SETTINGS.write().kb_variant.clone_from(&variant);
-        //     let layout = SETTINGS.read().kb_layout.clone();
-        //     sender.oneshot_command(async move { i18n::set_keymap(None, &layout, variant.as_deref()).await.expect("cannot set keymap") });
-        // },
+        VariantSelected => {
+            let Some(row) = self.variantbox.selected_row() else { return };
+            let variant = (miniblk(&row).subtitle() != t!("default")).then(|| miniblk(&row).title().to_string());
+            SETTINGS.write().kb_variant.clone_from(&variant);
+            let layout = SETTINGS.read().kb_layout.clone();
+            sender.oneshot_command(async move { i18n::set_keymap(None, &layout, variant.as_deref()).await.expect("cannot set keymap") });
+        },
     } => {}
 
     gtk::Box {
@@ -94,11 +94,11 @@ generate_page!(Keyboard {
         },
     },
 
-    /* gtk::Box {
+    gtk::Box {
         set_orientation: gtk::Orientation::Horizontal,
         set_spacing: 4,
         set_vexpand: true,
-        set_hexpand: true, */
+        set_hexpand: true,
 
         gtk::Box {
             set_orientation: gtk::Orientation::Vertical,
@@ -134,7 +134,7 @@ generate_page!(Keyboard {
 
         // NOTE: hide this for UI/UX reasons
 
-        /* gtk::Box {
+        gtk::Box {
             set_orientation: gtk::Orientation::Vertical,
             set_spacing: 10,
             set_vexpand: true,
@@ -162,7 +162,7 @@ generate_page!(Keyboard {
                 }
             },
         },
-    }, */
+    },
 
     #[name(prev_next_btns)]
     #[template] crate::ui::PrevNextBtns {
