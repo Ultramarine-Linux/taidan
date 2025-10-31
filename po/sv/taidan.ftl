@@ -68,5 +68,5 @@ imelangs-ja = Japanska
 imelangs-ko = Koreanska
 imelangs-vi = Vietnamisiska
 imelangs-th = Thailändska
-imelangs-display = Swedish (Svenska)
+imelangs-display = { $lang_name } ({ $native_lang_name })
 page-language = Språk
