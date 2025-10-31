@@ -53,3 +53,20 @@
 
 ## [Tweaks in Ultramarine]
 
+default = Standard
+prev = Föregående
+next = Nästa
+skip = Skippa
+steps-dnfdownloadupdate = Laddar ner system uppdatering…
+steps-dnfinstallupdate = Installerar system uppdatering…
+steps-script = Kör Scriptlet…
+steps-dnfdownloadapps = Laddar ner appar...
+steps-dnfinstallapps = Installerar appar...
+steps-driverscodecs = Installerar drivers och codecs...
+imelangs-ch = Kinesiska
+imelangs-ja = Japanska
+imelangs-ko = Koreanska
+imelangs-vi = Vietnamisiska
+imelangs-th = Thailändska
+imelangs-display = Swedish (Svenska)
+page-language = Språk
