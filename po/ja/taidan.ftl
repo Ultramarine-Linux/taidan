@@ -131,7 +131,7 @@ page-finish-done = 完了
 ## page: Error
 
 page-error = エラー
-page-error-desc = 申し訳ございませんが、エラーが発生しました。
+page-error-desc = 問題が発生しました。
 page-error-done = 閉じる
 page-error-retry = リトライ
 skip = スキップ
@@ -148,3 +148,11 @@ page-inputmethod-add = 入力方法を追加
 page-nightlight-desc = 夜に映像をぬるく映し出すことで、目の疲れを改善することができます。
 flatpakening-name = Flatpakの代わりにRPMをインストール
 flatpakening-desc = Flatpakは安全性が高い一方、RPMはスペースを節約できます。
+page-analytics = 分析とクラッシュレポート
+page-crashreport = クラッシュレポート
+page-crashreport-desc = { $org }が不具合の特定やサポートのためにクラッシュデータを収集することを許可します。
+page-crashreport-lbl1 = 収集されるすべてのデータは匿名化され、エンドツーエンドで暗号化されています。
+page-crashreport-lbl2 = サポートが問題の原因を特定できるように、クラッシュ ID が付与されます。
+switch-crashreport = クラッシュデータを送信
+switch-crashreport-desc = オフのままにするには次へを押してください
+page-installing-flatpak = { $n }つのFlatpakをインストールしています…
