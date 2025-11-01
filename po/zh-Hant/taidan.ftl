@@ -21,13 +21,10 @@ page-welcome-skipcfg = 略過系統配置
 page-keyboard = 鍵盤配置
 page-keyboard-search-layout = 搜尋鍵盤配置…
 page-keyboard-search-variant = 搜尋鍵盤變體…
-page-whoareyou = 創建新用戶帳號
+page-whoareyou = 您是誰？
 page-whoareyou-fullname = 名字
 page-whoareyou-username = 用戶名稱
-page-whoareyou-error =
-    用戶名稱
-    - 首個字母須為小楷
-    - 必須只以數字、英文字母、底線(<tt>_</tt>)或連接號(<tt>-</tt>)組成
+page-whoareyou-error = 用戶名稱須以小楷字母開始，並只以數字、小楷字母、底線(<tt>_</tt>)或連接號(<tt>-</tt>)組成。
 page-password = 創建密碼
 page-password-pw = 密碼
 page-password-rp = 重覆密碼
@@ -50,7 +47,7 @@ page-nightlight = 護眼模式
 page-nightlight-desc =
     夜間時調教至較暖和的色溫有助減少對雙眼的傷害。
     護眼模式並未證實能改善睡眠。
-switch-nightlight = { page-nightlight }
+switch-nightlight = 護眼模式
 page-theme = 選擇主題
 page-theme-desc =
     選擇主題色彩。
@@ -70,7 +67,7 @@ page-finish = 準備好嗎？
 page-finish-desc = 希望您享受您的新系統吧！
 page-finish-done = 完成
 page-error = 錯誤
-page-error-desc = 不好意思，但我們遇到了問題。
+page-error-desc = 我們遇到了問題。
 page-error-done = 關閉
 page-error-retry = 重試
 skip = 跳過
@@ -87,3 +84,10 @@ page-language = 語言
 page-language-search-lang = 搜尋語言……
 flatpakening-name = 以 RPM 取代 Flatpak
 flatpakening-desc = Flatpak 比較安全；RPM 利用較少儲存空間。
+page-analytics = 分析及錯誤彙報
+page-crashreport = 錯誤彙報
+page-crashreport-desc = 允許{ $org }收集錯誤訊息，以便尋找問題及提供協助。
+page-crashreport-lbl1 = 所有訊息均是匿名並具端至端加密。
+page-crashreport-lbl2 = 你會收到錯誤 ID 以便支援人員找出錯處。
+switch-crashreport = 傳送錯誤訊息
+switch-crashreport-desc = 按下一頁保持關閉
