@@ -71,7 +71,7 @@ imelangs-in = इंडिक
 imelangs-th = थाई
 imelangs-display = { $lang_name } ({ $native_lang_name })
 page-language = भाषा
-page-language-search-lang = भाषा/लोकैल खोजे…
+page-language-search-lang = भाषा खोजे/लोकैल …
 page-welcome = { $distro } में आपका स्वागत हैं
 page-welcome-ready = चलिए आपके उपकरण को तैयार करे।
 page-welcome-go = चलिए आगे बढ़ते हैं
@@ -95,3 +95,53 @@ page-internet-ok = आप कनेक्टेड है!अगला दबा
 page-internet-portal = वेब ब्राउजर से लॉगिन करें
 page-analytics = एनालिटिक्स और क्रैश रिपोर्टिंग
 page-crashreport = क्रैश रिपोर्टिंग
+page-crashreport-desc = { $org } को क्रैश डेटा इकट्ठा करने की अनुमति दें ताकि बग्स ढूंढे जा सकें और आपकी मदद की जा सके।
+page-crashreport-lbl1 = सारा इकट्ठा किया गया डेटा अनॉनिमस है और एंड-टू-एंड एन्क्रिप्टेड है।
+page-crashreport-lbl2 = आपको एक क्रैश ID दी जाएगी ताकि सपोर्ट यह पता लगा सके कि क्या गलती हुई
+switch-crashreport = क्रैश डेटा भेजें।
+switch-crashreport-desc = ऑफ रखने के लिए नेक्स्ट दबाएं।
+page-tweaks = सिस्टम ट्वीक्स
+page-codecs = कोडेक्स और ड्राइवर्स
+page-codecs-desc1 = अपने डिवाइस के लिए नॉर्मल मीडिया कोडेक्स और ड्राइवर्स इंस्टॉल करें।
+page-codecs-desc2 = अगर आपके पास इंटरनेट कनेक्शन नहीं है तो { $wiki } से कंसल्ट करें।
+page-codecs-wiki = विकि
+switch-codecs = कोडेक्स और ड्राइवर्स इंस्टॉल करें
+switch-codecs-desc = इसे ऑन करने से प्रोप्राइटरी कोडेक्स और ड्राइवर्स इंस्टॉल हो जाएंगे
+page-inputmethod = अतिरिक्त इनपुट मेथड्स
+page-inputmethod-desc =
+    जो भाषाएँ नॉन-लैटिन कैरेक्टर्स वाली हैं, उनके लिए एक अतिरिक्त <b>इनपुट मेथड एडिटर[input method editor(IME)]</b> की आवश्यकता हो सकती है।
+    यदि आपको इन भाषाओं में टाइप करने की जरूरत नहीं है, तो आप इस पेज को स्किप कर सकते हैं।
+    अधिक जानकारी { $wiki } पर उपलब्ध है।
+page-inputmethod-add = इनपुट मेथड जोड़ें
+page-inputmethod-wiki = विकि
+page-inputmethod-search-lang = भाषा ढूँढें…
+page-inputmethod-search-ims = IMs/IME ढूँढें…
+page-nightlight = नाइट लाइट
+page-nightlight-desc =
+    रात में आंखों पर दबाव कम करने के लिए डिस्प्ले को गर्म टोन में रंग दें। 
+     नाइट लाइट सोने में कठिनाई को कम करने में प्रभावी साबित नहीं हुई है।
+switch-nightlight = नाइट लाइट
+page-theme = अपना थीम चुनें
+page-theme-desc =
+    इस सिस्टम को अपने अनुसार रंगों के साथ कस्टमाइज़ करें।
+    आप बाद में इसे सेटिंग्स में बदल सकते हैं।
+page-theme-note = कुछ ऐप्स इस पसंद का पालन नहीं कर सकते हैं।
+page-theme-light = लाइट
+page-theme-dark = डार्क
+page-browser = ब्राउज़र सेलेक्शन
+page-categories = आप इस डिवाइस का इस्तेमाल किस लिए करते हैं?
+page-categories-confirm = कन्फ़र्म करे और सिस्टम सेटअप करे
+page-categories-done = पूरा हुआ
+categories = { $cat }
+page-installing = आपके ऐप्स इंस्टॉल हो रहे हैं
+page-installing-desc = इसमें ज्यादा समय नहीं लगेगा!
+page-installing-loading = लोड हो रहा है…
+page-installing-flatpak = { $n } फ्लैटपैक्स इंस्टॉल हो रहे हैं…
+page-finish = क्या आप अपना काम करने के लिए तैयार हैं?
+page-finish-desc = हमें उम्मीद है कि आप Ultramarine का आनंद लेंगे!
+page-finish-done = पूरा हुआ
+page-error = एरर
+page-error-done = एक्ज़िट
+page-error-retry = फिर कोशिश करें
+flatpakening-name = Flatpaks की बजाय RPMs का इस्तेमाल करें
+page-error-desc = हमें समस्या का सामना करना पड़ा
