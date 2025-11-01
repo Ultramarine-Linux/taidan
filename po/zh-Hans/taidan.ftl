@@ -1,10 +1,10 @@
-prev = Previous
-next = Next
+prev = 上一页
+next = 下一页
 steps-dnfdownloadupdate = 下载系统更新中…
-steps-dnfinstallupdate = 安装系统更新中…
-steps-dnfdownloadapps = 下载用户应用中…
-steps-dnfinstallapps = 安装用户应用中…
-steps-driverscodecs = 安装系统更新中…
+steps-dnfinstallupdate = 正在安装系统更新…
+steps-dnfdownloadapps = 正在下载应用…
+steps-dnfinstallapps = 正在安装应用…
+steps-driverscodecs = 正在安装驱动程式及编解码器…
 imelangs-display = { $lang_name } ({ $native_lang_name })
 page-welcome = 欢迎使用{ $distro }
 page-welcome-go = 开始
@@ -12,17 +12,16 @@ page-welcome-skipcfg = 跳过系统配置
 page-whoareyou = 创建新用户帐号
 page-whoareyou-fullname = 名字
 page-whoareyou-username = 用户名称
-page-whoareyou-error =
-    用戶名称
-    - 首个英文字母须为小楷
-    - 必须只包含数字、英文字母、底线(<tt>_</tt>)或连接号(<tt>-</tt>)
+page-whoareyou-error = 用戶名称须以小楷开始，并须只包含数字、小楷字母、底线(<tt>_</tt>)或连接号(<tt>-</tt>)。
 page-password = 创建密码
 page-password-pw = 密码
 page-password-rp = 重复密码
 page-nightlight = 护眼模式
-switch-nightlight = { page-nightlight }
+switch-nightlight = 护眼模式
 page-theme = 选择主题
-page-theme-desc = 选择主题色彩。您可以随时在设定更改此选项。
+page-theme-desc =
+    选择主题色彩。
+    您可以随时在设定更改此选项。
 page-theme-note = 部分应用并不会对此设定有所反应。
 page-theme-light = 浅色
 page-theme-dark = 深色
@@ -32,7 +31,7 @@ page-categories-confirm = 确定并装配系统
 page-categories-done = 完成
 categories = { $cat }
 page-installing = 正在安装您的应用
-page-installing-desc = 请稍等一下
+page-installing-desc = 敬请稍等一会！
 page-installing-loading = 加载中…
 default = 默认
 steps-script = 正在运行脚本…
@@ -61,3 +60,22 @@ page-codecs-desc1 = 为您的设备安装常用的媒体编解码器和驱动程
 page-codecs-desc2 = 若您没有互联网连接，请查阅 { $wiki }。
 page-codecs-wiki = 維基
 switch-codecs = 安装编解码器和驱动程序
+skip = 跳过
+switch-codecs-desc = 启动此会安装
+page-inputmethod = 更多输入法
+page-inputmethod-desc =
+    具有非拉丁文字的语言或<b>另需输入法</b>。
+    按「增加输入法」继续。
+    详情请浏览{ $wiki }。
+page-inputmethod-add = 增加输入法
+page-inputmethod-wiki = 维基
+page-inputmethod-search-lang = 搜寻语言…
+page-inputmethod-search-ims = 搜寻输入法…
+page-error-done = 离开
+page-error = 错误
+page-error-desc = 我们遇到了问题。
+page-finish-done = 完成
+page-finish-desc = 我们希望您享受新系统！
+page-finish = 准备好了吗？
+page-installing-flatpak = 正在安装 { $n } 个 Flatpak…
+page-error-retry = 重试
