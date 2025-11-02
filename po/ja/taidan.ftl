@@ -145,7 +145,9 @@ page-inputmethod-desc =
     「入力方法を追加」を押し、インストールすることが可能です。
     詳細は{ $wiki }をご参考ください。
 page-inputmethod-add = 入力方法を追加
-page-nightlight-desc = 夜に映像をぬるく映し出すことで、目の疲れを改善することができます。
+page-nightlight-desc =
+    夜間に画面を暖かい色調にして目の疲れを軽減します。
+    ナイトライトが寝付きの悪さを改善する効果は証明されていません。
 flatpakening-name = Flatpakの代わりにRPMをインストール
 flatpakening-desc = Flatpakは安全性が高い一方、RPMはスペースを節約できます。
 page-analytics = 分析とクラッシュレポート
