@@ -80,3 +80,6 @@ page-tweaks = Tinh chỉnh hệ thống
 page-crashreport-desc = Cho phép { $org } thu thập dữ liệu khi máy bạn nổ để tìm lỗi và hỗ trợ bạn.
 page-crashreport-lbl1 = Mọi dữ liệu thu thập đều ẩn danh và được mã hóa.
 page-crashreport-lbl2 = Bạn sẽ nhận được một mã sự cố để hỗ trợ tìm ra vấn đề.
+skip = Bỏ qua
+page-internet-portal = Đăng nhập bằng trình duyệt
+page-inputmethod-add = Thêm phương thức nhập
