@@ -10,6 +10,7 @@ impl super::Step for DnfDownloadUpdate {
         if settings.nointernet {
             return Ok(());
         }
-        super::super::dnf::handle_dnf(sender, |dnf| dnf.args(["up", "-y", "--downloadonly"])).await
+        // super::super::dnf::handle_dnf(sender, |dnf| dnf.args(["up", "-y", "--downloadonly"])).await
+        Ok(())
     }
 }

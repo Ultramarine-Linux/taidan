@@ -10,6 +10,7 @@ impl super::Step for DnfInstallUpdate {
         if settings.nointernet {
             return Ok(());
         }
-        super::super::dnf::handle_dnf(sender, |dnf| dnf.args(["up", "-y"])).await
+        // super::super::dnf::handle_dnf(sender, |dnf| dnf.args(["up", "-y"])).await
+        Ok(())
     }
 }
