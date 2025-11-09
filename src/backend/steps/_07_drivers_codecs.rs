@@ -61,35 +61,7 @@ impl super::Step for DriversCodecs {
 // NOTE: added during `_05_dnfdownloadapps.rs`
 impl Codecs {
     pub const fn codecs() -> &'static [&'static str] {
-        &[
-            "ffmpeg",
-            "gstreamer1",
-            "gstreamer1-plugins-bad-free-libs",
-            "gstreamer1-plugins-bad-free",
-            "gstreamer1-plugins-bad-free-extras",
-            // "gstreamer1-plugins-bad-free-freeworld",
-            "gstreamer1-plugins-base",
-            "gstreamer1-plugins-good",
-            "gstreamer1-plugins-good-gtk",
-            "gstreamer1-plugins-good-qt",
-            "gstreamer1-plugins-good-qt6",
-            "gstreamer1-plugins-ugly",
-            "gstreamer1-plugins-ugly-free",
-            "gstreamer1-plugin-libav",
-            "gstreamer1-plugin-openh264",
-            "lame",
-            "libaacs",
-            // "libavcodec",
-            // "libdvdcss",
-            "libvpx",
-            "nv-codec-headers",
-            "opus",
-            "openh264",
-            "pipewire-codec-aptx",
-            "pipewire-gstreamer",
-            "x264",
-            "x265",
-        ]
+        &["@multimedia"]
     }
 }
 
@@ -122,6 +94,7 @@ impl Drivers {
         let chipset = Self::get_nvidia_chipset().await?;
         match Self::get_nvidia_driver(&chipset) {
             "unsupported" => (),
+            // TODO: nvidia-driver
             "latest" => pkgs.extend_from_slice(&[
                 "akmod-nvidia".into(),
                 "xorg-x11-drv-nvidia".into(),
