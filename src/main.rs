@@ -186,8 +186,9 @@ impl SimpleComponent for AppModel {
                     } else {
                         tracing::debug!("disabled taidan-initial-setup-reconfiguration.service");
                     }
+
+                    relm4::main_application().quit();
                 });
-                relm4::main_application().quit();
             }
             AppMsg::Nav(NavAction::Next) => {
                 while {
