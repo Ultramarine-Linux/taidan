@@ -41,7 +41,7 @@ page-keyboard-search-variant = キーバリエーションを検索…
 page-whoareyou = ユーザー登録
 page-whoareyou-fullname = 名前
 page-whoareyou-username = ユーザー名
-page-whoareyou-error = ユーザー名は、英小文字で始まり、英小文字・数字・<tt>_</tt>・<tt>-</tt>だけで組むことが必要です。
+page-whoareyou-error = ユーザー名は、英小文字で始まり、英小文字・数字・アンダースコア(<tt>_</tt>)・ハイフン(<tt>-</tt>)のみを含むようにする必要があります。
 
 ## page: Create a Password
 
