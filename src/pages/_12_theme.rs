@@ -12,7 +12,7 @@ color: transparent;
 box-shadow: inset 0 0 0 3px alpha(@color, 0.32);";
 
 // https://github.com/Ultramarine-Linux/taidan/issues/89
-fn page_skipconfig() -> bool {
+const fn page_skipconfig() -> bool {
     true
 }
 

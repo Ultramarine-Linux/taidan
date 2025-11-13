@@ -15,7 +15,7 @@ use parking_lot::RwLock;
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, RelmApp, SimpleComponent,
 };
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 const APPID: &str = "com.fyralabs.Taidan";
 static LOCALE_SOLVER: LazyLock<poly_l10n::LocaleFallbackSolver> = LazyLock::new(Default::default);
@@ -248,7 +248,7 @@ impl AppModel {
 }
 
 fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
-    use i18n_embed::{fluent::fluent_language_loader, LanguageLoader};
+    use i18n_embed::{LanguageLoader, fluent::fluent_language_loader};
     let loader = fluent_language_loader!();
     let locale_solver = poly_l10n::LocaleFallbackSolver::<poly_l10n::Rulebook>::default();
     let available_langs = loader.available_languages(&Localizations).unwrap();
@@ -273,19 +273,18 @@ fn main() {
 
     gtk::gio::resources_register_include!("icons.gresource").unwrap();
 
+    // SAFETY: placeholder
+    let color = unsafe {
+        libhelium::RGBColor::from_glib_none(std::ptr::from_mut(&mut libhelium::ffi::HeRGBColor {
+            r: 0.0,
+            g: 7.0,
+            b: 143.0,
+        }))
+    };
     let app = libhelium::Application::builder()
         .application_id(APPID)
         .flags(gtk::gio::ApplicationFlags::default())
-        // SAFETY: placeholder
-        .default_accent_color(unsafe {
-            &libhelium::RGBColor::from_glib_none(std::ptr::from_mut(
-                &mut libhelium::ffi::HeRGBColor {
-                    r: 0.0,
-                    g: 7.0,
-                    b: 143.0,
-                },
-            ))
-        })
+        .default_accent_color(&color)
         .build();
 
     tracing::debug!("Starting Taidan");
