@@ -66,7 +66,7 @@ generate_page!(Codecs:
         #[template_child] next {
             #[watch]
             set_label: &t!("next"),
-            connect_clicked => Self::Input::Nav(NavAction::Next),
+            connect_clicked => if CFG.edition == "xfce" { Self::Input::Nav(NavAction::GoTo(crate::Page::Installing)) } else { Self::Input::Nav(NavAction::Next) },
         },
     }
 );

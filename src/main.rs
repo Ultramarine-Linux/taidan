@@ -78,6 +78,7 @@ pub enum AppMsg {
     Nav(NavAction),
     InstallError(String),
     Update,
+    Quit,
 }
 
 #[allow(clippy::str_to_string)]
@@ -173,7 +174,8 @@ impl SimpleComponent for AppModel {
                 }
             }
             AppMsg::Nav(NavAction::Quit) => {
-                sender.oneshot_command(async {
+                let ss = sender.clone();
+                sender.oneshot_command(async move {
                     if let Err(e) = backend::pkexec("root", "rm", &["-rf", "/.unconfigured"]).await
                     {
                         tracing::error!(?e, "cannot remove /.unconfigured; exiting anyway");
@@ -186,8 +188,9 @@ impl SimpleComponent for AppModel {
                     } else {
                         tracing::debug!("disabled taidan-initial-setup-reconfiguration.service");
                     }
+
+                    ss.input(AppMsg::Quit);
                 });
-                relm4::main_application().quit();
             }
             AppMsg::Nav(NavAction::Next) => {
                 while {
@@ -218,6 +221,9 @@ impl SimpleComponent for AppModel {
                     .expect("sender dropped?");
             }
             AppMsg::Update => {}
+            AppMsg::Quit => {
+                relm4::main_application().quit();
+            }
         }
         // BUG: labels don't update without this?
         self.welcome_page
