@@ -1,8 +1,8 @@
 //! Runtime l10n module.
 //!
 //! The compile-time loader is available as [`crate::LL`].
-use i18n_embed::fluent::{fluent_language_loader, FluentLanguageLoader};
-use i18n_embed::{unic_langid::LanguageIdentifier, FileSystemAssets, LanguageLoader as _};
+use i18n_embed::fluent::{FluentLanguageLoader, fluent_language_loader};
+use i18n_embed::{FileSystemAssets, LanguageLoader as _, unic_langid::LanguageIdentifier};
 use itertools::Itertools;
 use parking_lot::RwLock;
 use std::sync::{Arc, LazyLock};
