@@ -21,11 +21,39 @@ fn valid_entry(s: &str) -> bool {
     re.is_match(s)
 }
 
+#[allow(irrefutable_let_patterns)]
+fn autoset_username(en: &gtk::Entry, fullname: &str) {
+    if fullname.is_empty() {
+        return;
+    }
+    let user;
+    if let first = fullname
+        .split_once(|c: char| c.is_whitespace())
+        .map_or(fullname, |(a, _)| a)
+        && first.chars().all(|c: char| c.is_ascii_alphanumeric())
+        && first.chars().next().unwrap().is_ascii_alphabetic()
+    {
+        user = first.to_ascii_lowercase();
+    } else if let last = fullname
+        .rsplit_once(|c: char| c.is_whitespace())
+        .map_or(fullname, |(_, b)| b)
+        && last.chars().all(|c: char| c.is_ascii_alphanumeric())
+        && last.chars().next().unwrap().is_ascii_alphabetic()
+    {
+        user = last.to_ascii_lowercase();
+    } else {
+        return;
+    }
+    en.set_text(&user);
+}
+
 generate_page!(WhoAreYou {
+    username_field_modified: bool,
     lbl_error: gtk::Label,
     btn_next: libhelium::Button,
+    tf_username: gtk::Entry,
 }:
-    init[lbl_error](root, sender, model, widgets) {
+    init[lbl_error tf_username](root, sender, model, widgets) {
         let s0 = sender.clone();
         let s1 = sender.clone();
 
@@ -33,14 +61,18 @@ generate_page!(WhoAreYou {
     }
     update(self, message, sender) {
         NotifyFullName(name: String) => {
+            if !self.username_field_modified {
+                autoset_username(&self.tf_username, &name);
+            }
             let mut settings = SETTINGS.write();
             settings.fullname = if name.is_empty() {
                 settings.username.clone()
             } else {
                 name
-            }
+            };
         },
         NotifyUsername(user: String) => {
+            self.username_field_modified = true;
             let mut settings = SETTINGS.write();
             settings.username = user.clone();
             if settings.fullname.is_empty() {
@@ -85,7 +117,7 @@ generate_page!(WhoAreYou {
             connect_changed[sender] => move |e| sender.input(Self::Input::NotifyFullName(e.text().to_string())),
         },
 
-        #[name = "tf_username"]
+        #[local_ref] tf_username ->
         gtk::Entry {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
