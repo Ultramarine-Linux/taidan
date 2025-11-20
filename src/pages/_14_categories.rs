@@ -304,6 +304,7 @@ impl CatRow {
         cat_index: usize,
         optlist: &I,
     ) {
+        let cat = cat.to_owned();
         self.choice.options.iter().enumerate().for_each(|(i, opt)| {
             let inneroptlist = gtk::Box::new(gtk::Orientation::Vertical, 8);
             let mut iter = optlist.clone().skip(i);
@@ -313,7 +314,7 @@ impl CatRow {
                         .label(lbl)
                         .active(iter.next().is_some_and(|i| i == 1))
                         .build();
-                    btn.connect_toggled(on_choice_toggled(cat, cat_index, i, 1));
+                    btn.connect_toggled(on_choice_toggled(cat.clone(), cat_index, i, 1));
                     btn
                 }),
                 crate::cfg::ChoiceOption::Radio(list) => {
@@ -324,7 +325,7 @@ impl CatRow {
                                 .label(s)
                                 .active(k == active_index)
                                 .build();
-                            btn.connect_toggled(on_choice_toggled(cat, cat_index, i, k));
+                            btn.connect_toggled(on_choice_toggled(cat.clone(), cat_index, i, k));
                             btn
                         })
                         .collect_vec();
@@ -340,12 +341,11 @@ impl CatRow {
 
 #[allow(clippy::missing_panics_doc)]
 fn on_choice_toggled(
-    cat: &str,
+    cat: String,
     cat_index: usize,
     i: usize,
     k: usize,
 ) -> impl Fn(&gtk::CheckButton) {
-    let cat = cat.to_owned();
     move |b: &gtk::CheckButton| {
         if b.is_active() {
             SETTINGS

@@ -1,6 +1,6 @@
-use color_eyre::{eyre::eyre, Section};
+use color_eyre::{Section, eyre::eyre};
 use itertools::Itertools;
-pub use taidan_catalogue_parser::{Category, Choice, ChoiceActions, ChoiceOption, ACTION_TYPES};
+pub use taidan_catalogue_parser::{ACTION_TYPES, Category, Choice, ChoiceActions, ChoiceOption};
 
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, Debug, Default, serde::Deserialize)]
