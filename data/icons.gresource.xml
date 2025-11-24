@@ -2,7 +2,7 @@
 <gresources>
     <gresource prefix="com/fyralabs/Taidan/icons/symbolic/actions/">
         <file preprocess="xml-stripblanks" alias="globe-symbolic.svg">icons/globe-symbolic.svg</file>
-        <file preprocess="xml-stripblanks" alias="distro-icon-symbolic.svg">icons/distro-icon-symbolic.svg</file>
+        <file preprocess="xml-stripblanks" alias="distro-icon.svg">icons/distro-icon.svg</file>
         <file preprocess="xml-stripblanks" alias="system-users-symbolic.svg">icons/system-users-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="dialog-question-symbolic.svg">icons/dialog-question-symbolic.svg</file>
         <file preprocess="xml-stripblanks" alias="eye-open-negative-filled-symbolic.svg">icons/eye-open-negative-filled-symbolic.svg</file>

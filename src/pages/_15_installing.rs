@@ -45,7 +45,7 @@ generate_page!(Installing {
         set_halign: gtk::Align::Fill,
 
         gtk::Image {
-            set_icon_name: Some("distro-icon-symbolic"),
+            set_icon_name: Some("distro-icon"),
             inline_css: "-gtk-icon-size: 128px",
         },
 
