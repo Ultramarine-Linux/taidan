@@ -19,7 +19,12 @@ TimeoutSec=0
 RemainAfterExit=no
 ExecStartPre=-/bin/plymouth quit
 ExecStartPre=+sh -c "exec chvt 7"
-ExecStart=dbus-run-session kwin_wayland --no-lockscreen 'sh /usr/libexec/start-taidan'
+ExecStart=systemd-inhibit \
+ --who="Taidan Initial Setup" \
+ --what=handle-lid-switch:sleep:shutdown \
+ --why="Taidan Initial Setup is running" \
+ --mode=block \
+ dbus-run-session kwin_wayland --no-lockscreen 'sh /usr/libexec/start-taidan'
 ExecStopPost=+sh -c "exec chvt 1"
 StandardOutput=append:/var/log/taidan.stdout.log
 StandardError=append:/var/log/taidan.stderr.log
