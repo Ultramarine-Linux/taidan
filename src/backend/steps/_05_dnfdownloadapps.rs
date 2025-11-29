@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{backend::i18n::I18nImf, prelude::*};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DnfDownloadApps;
@@ -42,13 +42,13 @@ impl super::Step for DnfDownloadApps {
         );
 
         if !settings.ims.is_empty() {
-            let pkgs: &[&str] = match &*CFG.edition {
-                "plasma" | "kde" => &[
+            let pkgs: &[&str] = match CFG.i18n.imf {
+                I18nImf::Fcitx5 => &[
                     ["fcitx5-autostart", "fcitx5-qt5", "fcitx5-qt6"],
                     ["fcitx5-gtk", "kcm-fcitx5", "fcitx5-configtool"],
                 ]
                 .concat(),
-                _ => &["ibus-wayland", "ibus-qt", "ibus-gtk3", "ibus-gtk4"],
+                I18nImf::IBus => &["ibus-wayland", "ibus-qt", "ibus-gtk3", "ibus-gtk4"],
             };
             settings.actions[1].extend(pkgs.iter().map(|&s| s.to_owned()));
         }
