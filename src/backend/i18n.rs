@@ -156,31 +156,31 @@ pub struct InputMethod {
 impl InputMethod {
     #[must_use]
     pub fn available(self) -> bool {
-        match &*super::CFG.edition {
-            "plasma" | "kde" => self.fcitx5_ref.is_some(),
-            _ => self.ibus_ref.is_some(),
+        match super::CFG.i18n.imf {
+            I18nImf::Fcitx5 => self.fcitx5_ref.is_some(),
+            I18nImf::IBus => self.ibus_ref.is_some(),
         }
     }
-    /// Gets the package for the current edition
+    /// Gets the package for the current input method framework
     ///
     /// # Panics
-    /// Panics if and only if this IM is not available for the current edition.
+    /// Panics if and only if this IM is not available for the current framework.
     #[must_use]
     pub fn get_pkg(self) -> &'static str {
-        match &*super::CFG.edition {
-            "plasma" | "kde" => self.fcitx5_pkg.unwrap(),
-            _ => self.ibus_pkg.unwrap(),
+        match super::CFG.i18n.imf {
+            I18nImf::Fcitx5 => self.fcitx5_pkg.unwrap(),
+            I18nImf::IBus => self.ibus_pkg.unwrap(),
         }
     }
-    /// Gets the internal reference of the IM for the current edition
+    /// Gets the internal reference of the IM for the current input method framework
     ///
     /// # Panics
-    /// Panics if and only if this IM is not available for the current edition.
+    /// Panics if and only if this IM is not available for the current framework.
     #[must_use]
     pub fn get_ref(self) -> &'static str {
-        match &*super::CFG.edition {
-            "plasma" | "kde" => self.fcitx5_ref.unwrap(),
-            _ => self.ibus_ref.unwrap(),
+        match super::CFG.i18n.imf {
+            I18nImf::Fcitx5 => self.fcitx5_ref.unwrap(),
+            I18nImf::IBus => self.ibus_ref.unwrap(),
         }
     }
     pub fn handle_switch_state(
@@ -290,5 +290,36 @@ pub async fn set_keymap(
         set_kde_keymap(user, layout, variant).await
     } else {
         set_gsettings_keymap(user, layout, variant).await
+    }
+}
+
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+pub struct I18nCfg {
+    pub imf: I18nImf,
+}
+
+#[derive(Copy, Clone, Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum I18nImf {
+    Fcitx5,
+    #[default]
+    IBus,
+}
+
+impl I18nImf {
+    /// Returns `true` if the i18n imf is [`Fcitx5`].
+    ///
+    /// [`Fcitx5`]: I18nImf::Fcitx5
+    #[must_use]
+    pub const fn is_fcitx5(&self) -> bool {
+        matches!(self, Self::Fcitx5)
+    }
+
+    /// Returns `true` if the i18n imf is [`IBus`].
+    ///
+    /// [`IBus`]: I18nImf::IBus
+    #[must_use]
+    pub const fn is_ibus(&self) -> bool {
+        matches!(self, Self::IBus)
     }
 }

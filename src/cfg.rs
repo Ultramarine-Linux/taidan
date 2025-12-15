@@ -15,6 +15,8 @@ pub struct Config {
     pub skip_pages: Vec<crate::Page>,
     #[serde(default = "_default_org")]
     pub org: String,
+    
+    pub i18n: crate::backend::i18n::I18nCfg,
 }
 
 fn _default_org() -> String {

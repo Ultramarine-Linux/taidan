@@ -65,14 +65,19 @@ async fn write_fcitx5_profile(
     buf.extend_from_slice(
         format!(
             "\
-            [Groups/0]\n\
-            # Group Name\n\
-            Name={default_group_name}\n\
-            # Layout\n\
-            Default Layout={kb_layout}{var}\n\
-            # Default Input Method\n\
-            DefaultIM=keyboard-{kb_layout}{var}\n\n\
-        ",
+                [Groups/0]\n\
+                # Group Name\n\
+                Name={default_group_name}\n\
+                # Layout\n\
+                Default Layout={kb_layout}{var}\n\
+                # Default Input Method\n\
+                DefaultIM=keyboard-{kb_layout}{var}\n\n\
+                [Groups/0/Items/0]\n\
+                # Name\n\
+                Name=keyboard-{kb_layout}{var}\n\
+                # Layout\n\
+                Layout=\n\n\
+            ",
             var = &kb_variant
                 .as_ref()
                 .map(|variant| format!("-{variant}"))
@@ -85,12 +90,13 @@ async fn write_fcitx5_profile(
         buf.extend_from_slice(
             format!(
                 "\
-                [Groups/0/Items/{i}]\n\
-                # Name\n\
-                Name={}\n\
-                # Layout\n\
-                Layout=\n\n\
-            ",
+                    [Groups/0/Items/{}]\n\
+                    # Name\n\
+                    Name={}\n\
+                    # Layout\n\
+                    Layout=\n\n\
+                ",
+                i + 1,
                 i18n::str_to_im(im).fcitx5_ref.unwrap()
             )
             .as_bytes(),
