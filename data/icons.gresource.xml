@@ -79,6 +79,7 @@
         <file alias="ss-browser-chrome.png">screenshots/browsers/chrome.png</file>
         <file alias="ss-browser-chromium.png">screenshots/browsers/chrome.png</file>
         <file alias="ss-browser-firefox.png">screenshots/browsers/firefox.png</file>
+        <file alias="ss-browser-edge.png">screenshots/browsers/edge.png</file>
         <file alias="ss-browser-vivaldi.png">screenshots/browsers/vivaldi.png</file>
         <file alias="ss-browser-zen-browser.png">screenshots/browsers/zen.png</file>
         <file alias="ss-development-gnome-builder.png">screenshots/development/builder.png</file>
