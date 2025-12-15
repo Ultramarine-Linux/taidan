@@ -51,9 +51,7 @@ generate_page!(Tweaks {
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
-    },
 
-    gtk::ScrolledWindow {
         #[local_ref] factory_widget ->
         gtk::FlowBox {
             set_selection_mode: gtk::SelectionMode::None,
