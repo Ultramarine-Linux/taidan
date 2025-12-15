@@ -1,6 +1,6 @@
 pub use color_eyre::{
-    eyre::{eyre, Context},
     Section, SectionExt,
+    eyre::{Context, eyre},
 };
 pub use itertools::{Either, Itertools};
 pub use libhelium::{
@@ -13,7 +13,7 @@ pub use relm4::{
 };
 
 pub(crate) use crate::macros::{generate_page, page_skipconfig, skipconfig};
-pub use crate::{t, NavAction, CFG, SETTINGS};
+pub use crate::{CFG, NavAction, SETTINGS, t};
 
 pub(crate) static REQWEST_CLIENT: std::sync::LazyLock<reqwest::Client> =
     std::sync::LazyLock::new(reqwest::Client::new);
