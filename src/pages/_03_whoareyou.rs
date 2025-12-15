@@ -49,6 +49,7 @@ fn autoset_username(en: &gtk::Entry, fullname: &str) {
 
 generate_page!(WhoAreYou {
     username_field_modified: bool,
+    username_field_controlled: bool,
     lbl_error: gtk::Label,
     btn_next: libhelium::Button,
     tf_username: gtk::Entry,
@@ -62,6 +63,7 @@ generate_page!(WhoAreYou {
     update(self, message, sender) {
         NotifyFullName(name: String) => {
             if !self.username_field_modified {
+                self.username_field_controlled = true;
                 autoset_username(&self.tf_username, &name);
             }
             let mut settings = SETTINGS.write();
@@ -72,7 +74,11 @@ generate_page!(WhoAreYou {
             };
         },
         NotifyUsername(user: String) => {
-            self.username_field_modified = true;
+            if self.username_field_controlled {
+                self.username_field_controlled = false;
+            } else {
+                self.username_field_modified = true;
+            }
             let mut settings = SETTINGS.write();
             settings.username = user.clone();
             if settings.fullname.is_empty() {

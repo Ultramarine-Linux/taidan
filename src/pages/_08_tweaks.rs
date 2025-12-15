@@ -1,6 +1,6 @@
 use crate::{backend::tweaks::TWEAKS, prelude::*};
 
-const fn page_skipconfig() -> bool {
+fn page_skipconfig() -> bool {
     // https://github.com/Ultramarine-Linux/taidan/issues/81
     // NOTE: enabled again because it's needed by quite a lot of users --mado
     TWEAKS.is_empty()
