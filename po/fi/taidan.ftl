@@ -100,7 +100,7 @@ page-inputmethod-desc =
     Voit ohittaa tämän sivun, jos sinun ei tarvitse kirjoittaa millään näistä kielistä.
     Lisätietoja on saatavilla osoitteessa { $wiki }.
 page-inputmethod-add = Lisää syöttötapa
-page-inputmethod-wiki = the wiki
+page-inputmethod-wiki = wiki
 page-inputmethod-search-lang = Etsi kieliä…
 page-inputmethod-search-ims = Hae pikaviestejä/IME-sovelluksia…
 page-nightlight = Yövalo
