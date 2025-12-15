@@ -2,8 +2,8 @@ use crate::{backend::tweaks::TWEAKS, prelude::*};
 
 const fn page_skipconfig() -> bool {
     // https://github.com/Ultramarine-Linux/taidan/issues/81
-    true
-    // TWEAKS.is_empty()
+    // NOTE: enabled again because it's needed by quite a lot of users --mado
+    TWEAKS.is_empty()
 }
 
 struct TweaksFactory(FactoryVecDeque<TweakBox>);
@@ -51,9 +51,7 @@ generate_page!(Tweaks {
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
-    },
 
-    gtk::ScrolledWindow {
         #[local_ref] factory_widget ->
         gtk::FlowBox {
             set_selection_mode: gtk::SelectionMode::None,

@@ -4,7 +4,7 @@ members = ["taidan_proc_macros", "taidan_catalogue_parser"]
 
 [package]
 name = "taidan"
-version = "0.1.37"
+version = "0.1.39"
 edition = "2024"
 description = "Out-Of-Box-Experience (OOBE) and Welcome App"
 license = "GPL-2.0-or-later"
@@ -43,6 +43,7 @@ reqwest = { version = "0.12.22", features = [
     "default-tls",
 ], default-features = false }
 rust-embed = { version = "8.7.2", features = ["include-exclude"] }
+sentry = "0.45.0"
 serde = "1.0.219"
 serde_json = "1.0.140"
 strip-ansi-escapes = "0.2.1"

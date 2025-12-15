@@ -18,6 +18,8 @@ use relm4::{
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 const APPID: &str = "com.fyralabs.Taidan";
+const SENTRY_LINK: &str =
+    "https://26f566a221c052a686581b9170c2c9e6@o271654.ingest.us.sentry.io/4510401485799427";
 static LOCALE_SOLVER: LazyLock<poly_l10n::LocaleFallbackSolver> = LazyLock::new(Default::default);
 static AVAILABLE_LANGS: LazyLock<Vec<i18n_embed::unic_langid::LanguageIdentifier>> =
     LazyLock::new(|| {
@@ -314,9 +316,19 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 /// - cannot create taidan tempdir
 #[allow(clippy::cognitive_complexity)]
 fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
+    let sentry_guard = sentry::init((
+        SENTRY_LINK,
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            // Capture user IPs and potentially sensitive headers when using HTTP server integrations
+            // see https://docs.sentry.io/platforms/rust/data-management/data-collected for more info
+            send_default_pii: true,
+            ..Default::default()
+        },
+    ));
     color_eyre::install().expect("install color_eyre");
     let file_appender = tracing_appender::rolling::never(&*TEMP_DIR, "taidan.log");
-    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+    let (non_blocking, tracing_guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::registry()
         .with(fmt::layer().pretty())
@@ -346,5 +358,5 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
     tracing::info!("Taidan {version}", version = env!("CARGO_PKG_VERSION"));
     tracing::info!("Logging to journald");
     tracing::info!("Logging to {}/taidan.log", TEMP_DIR.display());
-    guard
+    (sentry_guard, tracing_guard)
 }

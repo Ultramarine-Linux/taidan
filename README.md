@@ -1,5 +1,7 @@
 # 🏮 Taidan
 
+> 🎵 _[**チョウチン少女** - Green wisteria](https://www.youtube.com/watch?v=1-wL7bb_l-o)_
+
 Taidan is a GUI Out-Of-Box-Experience (OOBE) and Welcome App for Ultramarine
 Linux, written in Rust and the [Helium] toolkit.
 
