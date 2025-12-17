@@ -52,6 +52,38 @@ generate_page!(Keyboard {
             let search = SEARCH_VARIANT.read().to_ascii_lowercase();
             miniblk(row).title().contains(&search) || miniblk(row).subtitle().contains(&search)
         });
+
+        // Add keyboard event handler for Enter key on layout box
+        let variantbox_clone = variantbox.clone();
+        let key_controller_layout = gtk::EventControllerKey::new();
+        key_controller_layout.connect_key_pressed(move |_, key, _, _| {
+            if key == gtk::gdk::Key::Return {
+                // Move focus to variant box and select first row when Enter is pressed on layout box
+                variantbox_clone.grab_focus();
+                if let Some(first_row) = variantbox_clone.first_child() {
+                    let row = first_row.dynamic_cast::<gtk::ListBoxRow>().unwrap();
+                    variantbox_clone.select_row(Some(&row));
+                }
+                gtk::glib::Propagation::Stop
+            } else {
+                gtk::glib::Propagation::Proceed
+            }
+        });
+        layoutbox.add_controller(key_controller_layout);
+
+        // Add keyboard event handler for Enter key on variant box
+        let sender_clone = sender.clone();
+        let key_controller_variant = gtk::EventControllerKey::new();
+        key_controller_variant.connect_key_pressed(move |_, key, _, _| {
+            if key == gtk::gdk::Key::Return {
+                // Navigate to next page when Enter is pressed
+                sender_clone.input(Self::Input::Nav(NavAction::Next));
+                gtk::glib::Propagation::Stop
+            } else {
+                gtk::glib::Propagation::Proceed
+            }
+        });
+        variantbox.add_controller(key_controller_variant);
     }
     update(self, message, sender) {
         LayoutSelected => {
