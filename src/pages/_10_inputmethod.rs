@@ -42,7 +42,7 @@ kurage::generate_component!(MoreBox {
             let search = SEARCH_VARIANT.read().to_ascii_lowercase();
             miniblk(row).title().contains(&search) || miniblk(row).subtitle().contains(&search)
         });
-        
+
         // Add keyboard event handler for Enter key on language box
         let sender_clone = sender.clone();
         let key_controller_lang = gtk::EventControllerKey::new();
@@ -56,7 +56,7 @@ kurage::generate_component!(MoreBox {
             }
         });
         langbox.add_controller(key_controller_lang);
-        
+
         // Add keyboard event handler for Enter key on IM box
         let sender_clone = sender.clone();
         let key_controller_im = gtk::EventControllerKey::new();

@@ -10,7 +10,7 @@ generate_page!(Codecs:
             next.remove_css_class("suggested-action");
             next.add_css_class("destructive-action");
         }
-        
+
         // Add keyboard event handler for Enter key
         let sender_clone = sender.clone();
         let key_controller = gtk::EventControllerKey::new();

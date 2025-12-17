@@ -8,7 +8,7 @@ generate_page!(Internet {
         let sender1 = sender.clone();
         sender.oneshot_command(async move { check_online(sender1).await });
         model.btn_next = widgets.prev_next_btns.next.clone();
-        
+
         // Add keyboard event handler for Enter key
         let sender_clone = sender.clone();
         let key_controller = gtk::EventControllerKey::new();

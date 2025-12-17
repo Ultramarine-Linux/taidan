@@ -52,7 +52,7 @@ generate_page!(Keyboard {
             let search = SEARCH_VARIANT.read().to_ascii_lowercase();
             miniblk(row).title().contains(&search) || miniblk(row).subtitle().contains(&search)
         });
-        
+
         // Add keyboard event handler for Enter key on layout box
         let variantbox_clone = variantbox.clone();
         let key_controller_layout = gtk::EventControllerKey::new();
@@ -70,7 +70,7 @@ generate_page!(Keyboard {
             }
         });
         layoutbox.add_controller(key_controller_layout);
-        
+
         // Add keyboard event handler for Enter key on variant box
         let sender_clone = sender.clone();
         let key_controller_variant = gtk::EventControllerKey::new();

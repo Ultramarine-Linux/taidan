@@ -20,7 +20,7 @@ generate_page!(Language {
                 || lang.name.to_ascii_lowercase().starts_with(&s)
         });
         btnfactory.select_row(btnfactory.iter_children().next().as_ref());
-        
+
         // Add keyboard event handler for Enter key
         let sender_clone = sender.clone();
         let key_controller = gtk::EventControllerKey::new();
