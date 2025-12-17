@@ -42,6 +42,34 @@ kurage::generate_component!(MoreBox {
             let search = SEARCH_VARIANT.read().to_ascii_lowercase();
             miniblk(row).title().contains(&search) || miniblk(row).subtitle().contains(&search)
         });
+        
+        // Add keyboard event handler for Enter key on language box
+        let sender_clone = sender.clone();
+        let key_controller_lang = gtk::EventControllerKey::new();
+        key_controller_lang.connect_key_pressed(move |_, key, _, _| {
+            if key == gtk::gdk::Key::Return {
+                // Navigate to next page when Enter is pressed
+                sender_clone.output(NavAction::Next);
+                gtk::glib::Propagation::Stop
+            } else {
+                gtk::glib::Propagation::Proceed
+            }
+        });
+        langbox.add_controller(key_controller_lang);
+        
+        // Add keyboard event handler for Enter key on IM box
+        let sender_clone = sender.clone();
+        let key_controller_im = gtk::EventControllerKey::new();
+        key_controller_im.connect_key_pressed(move |_, key, _, _| {
+            if key == gtk::gdk::Key::Return {
+                // Navigate to next page when Enter is pressed
+                sender_clone.output(NavAction::Next);
+                gtk::glib::Propagation::Stop
+            } else {
+                gtk::glib::Propagation::Proceed
+            }
+        });
+        imbox.add_controller(key_controller_im);
     }
     update(self, message, _sender) {
         LangSelected => {
@@ -109,7 +137,21 @@ generate_page!(InputMethod {
     more: bool,
     morebox: gtk::Box,
 }:
-    init[morebox { model.morebox.clone() }](root, sender, model, widgets) {}
+    init[morebox { model.morebox.clone() }](root, sender, model, widgets) {
+        // Add keyboard event handler for Enter key
+        let sender_clone = sender.clone();
+        let key_controller = gtk::EventControllerKey::new();
+        key_controller.connect_key_pressed(move |_, key, _, _| {
+            if key == gtk::gdk::Key::Return {
+                // Navigate to next page when Enter is pressed
+                sender_clone.input(Self::Input::Nav(NavAction::Next));
+                gtk::glib::Propagation::Stop
+            } else {
+                gtk::glib::Propagation::Proceed
+            }
+        });
+        root.add_controller(key_controller);
+    }
     update(self, message, sender) {
         More => {
             self.more = true;

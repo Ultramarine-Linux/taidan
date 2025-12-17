@@ -10,6 +10,24 @@ generate_page!(Codecs:
             next.remove_css_class("suggested-action");
             next.add_css_class("destructive-action");
         }
+        
+        // Add keyboard event handler for Enter key
+        let sender_clone = sender.clone();
+        let key_controller = gtk::EventControllerKey::new();
+        key_controller.connect_key_pressed(move |_, key, _, _| {
+            if key == gtk::gdk::Key::Return {
+                // Navigate to next page when Enter is pressed
+                if CFG.edition == "xfce" {
+                    sender_clone.input(Self::Input::Nav(NavAction::GoTo(crate::Page::Installing)));
+                } else {
+                    sender_clone.input(Self::Input::Nav(NavAction::Next));
+                }
+                gtk::glib::Propagation::Stop
+            } else {
+                gtk::glib::Propagation::Proceed
+            }
+        });
+        root.add_controller(key_controller);
     }
     update(self, message, sender) {} => {}
 
