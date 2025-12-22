@@ -36,7 +36,7 @@ impl super::Step for DnfDownloadApps {
                 })
             })?;
         settings.actions[1].extend(
-            super::_07_drivers_codecs::Codecs::codecs()
+            super::_08_drivers_codecs::Codecs::codecs()
                 .iter()
                 .map(ToString::to_string),
         );

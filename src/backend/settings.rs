@@ -11,6 +11,9 @@ pub struct Settings {
     pub kb_layout: String,
     pub kb_variant: Option<String>,
 
+    pub device_name: String,
+    pub hostname: String,
+
     pub fullname: String,
     pub username: String,
 
