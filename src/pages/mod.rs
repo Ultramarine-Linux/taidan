@@ -7,7 +7,7 @@
 pub mod _00_language;
 pub mod _01_welcome;
 pub mod _02_keyboard;
-pub mod _03_computername;
+pub mod _03_devicename;
 pub mod _04_whoareyou;
 pub mod _05_password;
 pub mod _06_internet;

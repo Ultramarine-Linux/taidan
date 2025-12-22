@@ -1,8 +1,8 @@
 use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Hostname;
-impl super::Step for Hostname {
+pub struct DeviceName;
+impl super::Step for DeviceName {
     #[tracing::instrument]
     async fn run(
         &self,
@@ -12,7 +12,7 @@ impl super::Step for Hostname {
         super::super::pkexec(
             "root",
             "hostnamectl",
-            &["set-hostname", &settings.computername, "--pretty"],
+            &["set-hostname", &settings.device_name, "--pretty"],
         )
         .await?;
         super::super::pkexec(

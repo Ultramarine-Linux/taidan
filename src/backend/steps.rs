@@ -1,4 +1,4 @@
-mod _00_hostname;
+mod _00_devicename;
 mod _01_useradd;
 mod _02_settheme;
 mod _03_dnfdownloadupdate;
@@ -12,7 +12,7 @@ mod _09_setup_imf;
 use crate::prelude::*;
 
 use crate::backend::steps::{
-    _00_hostname::Hostname, _01_useradd::UserAdd, _02_settheme::SetTheme,
+    _00_devicename::DeviceName, _01_useradd::UserAdd, _02_settheme::SetTheme,
     _03_dnfdownloadupdate::DnfDownloadUpdate, _04_dnfinstallupdate::DnfInstallUpdate,
     _05_script::Script, _06_dnfdownloadapps::DnfDownloadApps, _07_dnfinstallapps::DnfInstallApps,
     _08_drivers_codecs::DriversCodecs, _09_setup_imf::SetupImf,
@@ -41,7 +41,7 @@ pub const NUM_STAGES: usize = 10;
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone, Copy, Debug)]
 pub enum Stage {
-    Hostname,
+    DeviceName,
     UserAdd,
     SetTheme,
     DnfDownloadUpdate,
@@ -67,7 +67,7 @@ impl Stage {
     #[must_use]
     pub const fn all() -> &'static [Self] {
         &[
-            Self::Hostname(Hostname),
+            Self::DeviceName(DeviceName),
             Self::UserAdd(UserAdd),
             Self::SetTheme(SetTheme),
             Self::DnfDownloadUpdate(DnfDownloadUpdate),
@@ -83,14 +83,14 @@ impl Stage {
 
 impl Default for Stage {
     fn default() -> Self {
-        Self::Hostname(Hostname)
+        Self::DeviceName(DeviceName)
     }
 }
 
 impl From<Stage> for u8 {
     fn from(value: Stage) -> Self {
         match value {
-            Stage::Hostname(_) => 0,
+            Stage::DeviceName(_) => 0,
             Stage::UserAdd(_) => 1,
             Stage::SetTheme(_) => 2,
             Stage::DnfDownloadUpdate(_) => 3,
@@ -107,7 +107,7 @@ impl From<Stage> for u8 {
 impl From<Stage> for String {
     fn from(value: Stage) -> Self {
         match value {
-            Stage::Hostname(_) => t!("steps-hostname"),
+            Stage::DeviceName(_) => t!("steps-devicename"),
             Stage::DnfDownloadUpdate(_) => t!("steps-dnfdownloadupdate"),
             Stage::DnfInstallUpdate(_) => t!("steps-dnfinstallupdate"),
             Stage::Script(_) => t!("steps-script"),

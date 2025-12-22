@@ -33,10 +33,10 @@ fn autoset_hostname(en: &gtk::Entry, hostname: &str) {
     en.set_text(&user);
 }
 
-generate_page!(Computername {
+generate_page!(DeviceName {
     hostname_field_modified: bool,
     hostname_field_controlled: bool,
-    computername: gtk::Entry,
+    device_name: gtk::Entry,
     hostname: gtk::Entry,
     error: gtk::Label,
     next: libhelium::Button,
@@ -46,13 +46,13 @@ generate_page!(Computername {
     }
 
     update(self, message, sender) {
-        NotifyComputername(name: String) => {
+        NotifyDeviceName(name: String) => {
             if !self.hostname_field_modified {
                 self.hostname_field_controlled = true;
                 autoset_hostname(&self.hostname, &name);
             }
             let mut settings = SETTINGS.write();
-            settings.computername = if name.is_empty() {
+            settings.device_name = if name.is_empty() {
                 settings.hostname.clone()
             } else {
                 name
@@ -66,8 +66,8 @@ generate_page!(Computername {
             }
             let mut settings = SETTINGS.write();
             settings.hostname = name.clone();
-            if settings.computername.is_empty() {
-                settings.computername = name.clone();
+            if settings.device_name.is_empty() {
+                settings.device_name = name.clone();
             }
             self.error.set_visible(false);
             self.next.set_sensitive(true);
@@ -95,18 +95,18 @@ generate_page!(Computername {
 
         gtk::Label {
             #[watch]
-            set_label: &t!("page-computername"),
+            set_label: &t!("page-devicename"),
             add_css_class: "view-subtitle",
             inline_css: "font-weight: bold",
         },
 
-        #[name = "computername"]
+        #[name = "device_name"]
         gtk::Entry {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
             #[watch]
-            set_placeholder_text: Some(&t!("page-computername-computername")),
-            connect_changed[sender] => move |e| sender.input(Self::Input::NotifyComputername(e.text().to_string())),
+            set_placeholder_text: Some(&t!("page-devicename-devicename")),
+            connect_changed[sender] => move |e| sender.input(Self::Input::NotifyDeviceName(e.text().to_string())),
         },
 
         #[local_ref] hostname ->
@@ -114,7 +114,7 @@ generate_page!(Computername {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
             #[watch]
-            set_placeholder_text: Some(&t!("page-computername-hostname")),
+            set_placeholder_text: Some(&t!("page-devicename-hostname")),
             connect_changed[sender] => move |e| if valid_entry(e.text().as_str()) {
                 sender.input(Self::Input::NotifyHostname(e.text().to_string()))
             } else {
@@ -126,7 +126,7 @@ generate_page!(Computername {
         #[local_ref] error ->
         gtk::Label {
             #[watch]
-            set_label: &t!("page-computername-error"),
+            set_label: &t!("page-devicename-error"),
             set_use_markup: true,
             set_visible: false,
             add_css_class: "error",
