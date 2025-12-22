@@ -6,6 +6,7 @@ prev = Previous
 next = Next
 # btn (skip anything)
 skip = Skip
+steps-hostname = Setting Hostname…
 steps-dnfdownloadupdate = Downloading System Update…
 steps-dnfinstallupdate = Installing System Update…
 steps-script = Running Scriptlet…
@@ -54,6 +55,12 @@ page-keyboard = Keyboard Layout
 # .search*: search field placeholder
 page-keyboard-search-layout = Search keyboard layouts…
 page-keyboard-search-variant = Search keyboard variants…
+
+## [Computername]
+page-computername = Computer Name
+page-computername-computername = Name
+page-computername-hostname = Hostname
+page-computername-error = Hostname must start with lowercase letters and must only contain lowercase letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
 
 ## [Username]
 
