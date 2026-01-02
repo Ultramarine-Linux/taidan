@@ -1,7 +1,6 @@
 use tokio::io::AsyncWriteExt;
 
 use super::super::i18n;
-use super::root;
 use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -16,9 +15,9 @@ impl super::Step for SetupImf {
         if settings.ims.is_empty() || settings.nointernet {
             return Ok(());
         }
-        if let Err(e) = match &*CFG.edition {
-            "plasma" | "kde" => write_fcitx5_profile(settings).await,
-            _ => write_ibus_profile(settings).await,
+        if let Err(e) = match CFG.i18n.imf {
+            i18n::I18nImf::IBus => write_ibus_profile(settings).await,
+            i18n::I18nImf::Fcitx5 => write_fcitx5_profile(settings).await,
         } {
             tracing::warn!(?e, "cannot setup IMFs");
         }
@@ -42,20 +41,18 @@ async fn write_fcitx5_profile(
         ..
     }: &crate::backend::settings::Settings,
 ) -> color_eyre::Result<()> {
-    // TODO: should we put these in /etc/skel/ instead? Problem: user has already been created
-    // before this step…
     let default_group_name = t!("default");
-    tokio::fs::create_dir_all(format!("/home/{username}/.config/fcitx5/"))
-        .await
-        .wrap_err("cannot create ~/.config/fcitx5/")?;
-    root(
+    crate::backend::pkexec(
+        username,
         "mkdir",
         &["-p", &format!("/home/{username}/.config/fcitx5/")],
     )
-    .await?;
+    .await
+    .wrap_err("cannot create ~/.config/fcitx5/")?;
+
     let profile_path = format!("/home/{username}/.config/fcitx5/profile");
     let mut p = tokio::process::Command::new("pkexec")
-        .args(["--user", "root", "tee"])
+        .args(["--user", username, "tee"])
         .args(["-a", &profile_path])
         .stdin(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -118,7 +115,7 @@ async fn write_fcitx5_profile(
     // https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg?ref_type=heads
     let kwinrc_path = format!("/home/{username}/.config/kwinrc");
     let mut p = tokio::process::Command::new("pkexec")
-        .args(["--user", "root", "tee"])
+        .args(["--user", username, "tee"])
         .args(["-a", &kwinrc_path])
         .stdin(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -133,8 +130,6 @@ async fn write_fcitx5_profile(
         return Err(eyre!("failed to write to ~/.config/kwinrc")
             .note(String::from_utf8_lossy(&p.stderr).to_string()));
     }
-
-    root("chown", &[username, &profile_path, &kwinrc_path]).await?;
 
     Ok(())
 }

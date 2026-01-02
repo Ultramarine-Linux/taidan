@@ -12,6 +12,7 @@ pub struct Config {
     #[serde(default)]
     pub edition: String,
 
+    #[serde(default)]
     pub skip_pages: Vec<crate::Page>,
     #[serde(default = "_default_org")]
     pub org: String,
