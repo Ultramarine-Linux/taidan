@@ -249,6 +249,7 @@ impl AppModel {
         let (ss, sett) = (sender.clone(), SETTINGS.read().clone());
         sender.oneshot_command(async move {
             if let Err(e) = f(sett, inst_sender).await {
+                sentry_eyre::capture_report(&e);
                 ss.input(AppMsg::InstallError(strip_ansi_escapes::strip_str(
                     format!("{e:?}"),
                 )));

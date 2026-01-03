@@ -3035,6 +3035,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sentry-eyre"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82d0227188c4e1e7884a05ec83465cdd706d748c350c97a1c2820ba34b07b5e6"
+dependencies = [
+ "eyre",
+ "sentry-core",
+]
+
+[[package]]
 name = "sentry-panic"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3342,6 +3352,7 @@ dependencies = [
  "reqwest",
  "rust-embed",
  "sentry",
+ "sentry-eyre",
  "serde",
  "serde_json",
  "strip-ansi-escapes",
