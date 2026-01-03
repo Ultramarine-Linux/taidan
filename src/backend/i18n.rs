@@ -26,42 +26,42 @@ macro_rules! im {
 // the corresponding fonts installed.
 pub const IMS: phf::OrderedMap<&'static str, phf::OrderedMap<&'static str, InputMethod>> = phf::phf_ordered_map! {
     "Chinese" => phf::phf_ordered_map! {
-        // IME                     Native       Ibus(=>pkg)                         Fcitx5(=>pkg)
-        "Pinyin"            => im!(拼音         "pinyin",                           "pinyin"=>"chinese-addons"),
+        // IME                     Native       Ibus(=>pkg)                                 Fcitx5(=>pkg)
+        "Pinyin"            => im!(拼音         "pinyin",                                       "pinyin"=>"chinese-addons"),
         // there's also libzhuyin but it's extremely unpopular, sorry
-        "Zhuyin"            => im!(注音         "chewing",                          "chewing"),
-        "Cangjie 3"         => im!(倉頡版本三   "cangjie"=>"table-chinese-cangjie", "cangjie3"=>"table-extra"),
-        "Cangjie 5"         => im!(倉頡版本五   "cangjie"=>"table-chinese-cangjie", "cangjie5"=>"table-extra"),
-        "Quick 3"           => im!(速成版本三   "quick3"=>"table-chinese-quick",    "quick3"=>"table-extra"),
-        "Quick 5"           => im!(速成版本五   "quick5"=>"table-chinese-quick",    "quick5"=>"table-extra"),
-        "Quick Classic"     => im!(速成舊版     "quick5"=>"table-chinese-quick",    "quick-classic"=>"table-extra"),
-        "Rime"              => im!(Rime         "rime",                             "rime"),
-        "Shuangpin"         => im!(双拼         (),                                 "shuangpin"=>"chinese-addons"),
-        "Smart Cangjie 6"   => im!(快倉第六代   "cangjie"=>"table-chinese-scj",     "scj6"=>"table-extra"),
-        "Array 30"          => im!(行列三十     "array"=>"table-chinese-array",     "array30"=>"table-extra"),
+        "Zhuyin"            => im!(注音         "chewing",                                      "chewing"),
+        "Cangjie 3"         => im!(倉頡版本三   "table:cangjie3"=>"table-chinese-cangjie",      "cangjie3"=>"table-extra"),
+        "Cangjie 5"         => im!(倉頡版本五   "table:cangjie5"=>"table-chinese-cangjie",      "cangjie5"=>"table-extra"),
+        "Quick 3"           => im!(速成版本三   "table:quick3"=>"table-chinese-quick",          "quick3"=>"table-extra"),
+        "Quick 5"           => im!(速成版本五   "table:quick5"=>"table-chinese-quick",          "quick5"=>"table-extra"),
+        "Quick Classic"     => im!(速成舊版     "table:quick-classic"=>"table-chinese-quick",   "quick-classic"=>"table-extra"),
+        "Rime"              => im!(Rime         "rime",                                         "rime"),
+        "Shuangpin"         => im!(双拼         (),                                             "shuangpin"=>"chinese-addons"),
+        "Smart Cangjie 6"   => im!(快倉第六代   "table:scj6"=>"table-chinese-scj",              "scj6"=>"table-extra"),
+        "Array 30"          => im!(行列三十     "table:array"=>"table-chinese-array",           "array30"=>"table-extra"),
         // 對唔住，超超超垃圾，都唔知係咪俾人用
         //"Jyutping"          => im!(粵拼         "jyutping"=>"table-chinese-cantonese","jyutping-table"=>"table-extra")
         // 叫下啲人用 rime 啦
-        "Boshiamy"          => im!(嘸蝦米       (),                                 "boshiamy"=>"table-extra"),
+        "Boshiamy"          => im!(嘸蝦米       (),                                             "boshiamy"=>"table-extra"),
     },
     "Japanese" => phf::phf_ordered_map! {
-        "Mozc"              => im!(Mozc         "mozc",                             "mozc"),
+        "Mozc"              => im!(Mozc         "mozc-on"=>"mozc",                              "mozc"),
         // "Anthy"             => im!(Anthy        "anthy",                            "anthy"),
     },
     "Korean" => phf::phf_ordered_map! {
-        "libhangul"         => im!(한글         "hangul",                           "hangul"),
+        "libhangul"         => im!(한글         "hangul",                                       "hangul"),
     },
     "Vietnamese" => phf::phf_ordered_map! {
-        "Unikey"            => im!(Unikey       "unikey",                           "unikey"),
-        "ViQR"              => im!(ViQR         "viqr"=>"table-tv",                 "viqr"=>"m17n"),
+        "Unikey"            => im!(Unikey       "Unikey"=>"unikey",                             "unikey"),
+        "ViQR"              => im!(ViQR         "table:viqr"=>"table-tv",                       "viqr"=>"m17n"),
     },
     "Indic" => phf::phf_ordered_map! {
-        "OpenBangla"        => im!(বাংলা        "openbangla",                       "openbangla"),
-        "Sayura Sinhara"    => im!(සිංහල         "sayura",                           "sayura"),
+        "OpenBangla"        => im!(বাংলা           "openbangla",                                      "openbangla"),
+        "Sayura Sinhara"    => im!(සිංහල          "sayura",                                        "sayura"),
         // "Others"            => im!(Others       "m17n",                             "m17n"),
     },
     "Thai" => phf::phf_ordered_map! {
-        "Thai"              => im!(ภาษาไทย      "thai"=>"table-tv",                 "libthai"=>"libthai")
+        "Thai"              => im!(ภาษาไทย      "table:thai"=>"table-tv",                       "libthai"=>"libthai")
     },
 };
 
@@ -156,31 +156,31 @@ pub struct InputMethod {
 impl InputMethod {
     #[must_use]
     pub fn available(self) -> bool {
-        match &*super::CFG.edition {
-            "plasma" | "kde" => self.fcitx5_ref.is_some(),
-            _ => self.ibus_ref.is_some(),
+        match super::CFG.i18n.imf {
+            I18nImf::Fcitx5 => self.fcitx5_ref.is_some(),
+            I18nImf::IBus => self.ibus_ref.is_some(),
         }
     }
-    /// Gets the package for the current edition
+    /// Gets the package for the current input method framework
     ///
     /// # Panics
-    /// Panics if and only if this IM is not available for the current edition.
+    /// Panics if and only if this IM is not available for the current framework.
     #[must_use]
     pub fn get_pkg(self) -> &'static str {
-        match &*super::CFG.edition {
-            "plasma" | "kde" => self.fcitx5_pkg.unwrap(),
-            _ => self.ibus_pkg.unwrap(),
+        match super::CFG.i18n.imf {
+            I18nImf::Fcitx5 => self.fcitx5_pkg.unwrap(),
+            I18nImf::IBus => self.ibus_pkg.unwrap(),
         }
     }
-    /// Gets the internal reference of the IM for the current edition
+    /// Gets the internal reference of the IM for the current input method framework
     ///
     /// # Panics
-    /// Panics if and only if this IM is not available for the current edition.
+    /// Panics if and only if this IM is not available for the current framework.
     #[must_use]
     pub fn get_ref(self) -> &'static str {
-        match &*super::CFG.edition {
-            "plasma" | "kde" => self.fcitx5_ref.unwrap(),
-            _ => self.ibus_ref.unwrap(),
+        match super::CFG.i18n.imf {
+            I18nImf::Fcitx5 => self.fcitx5_ref.unwrap(),
+            I18nImf::IBus => self.ibus_ref.unwrap(),
         }
     }
     pub fn handle_switch_state(
@@ -290,5 +290,36 @@ pub async fn set_keymap(
         set_kde_keymap(user, layout, variant).await
     } else {
         set_gsettings_keymap(user, layout, variant).await
+    }
+}
+
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+pub struct I18nCfg {
+    pub imf: I18nImf,
+}
+
+#[derive(Copy, Clone, Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum I18nImf {
+    Fcitx5,
+    #[default]
+    IBus,
+}
+
+impl I18nImf {
+    /// Returns `true` if the i18n imf is [`Fcitx5`].
+    ///
+    /// [`Fcitx5`]: I18nImf::Fcitx5
+    #[must_use]
+    pub const fn is_fcitx5(&self) -> bool {
+        matches!(self, Self::Fcitx5)
+    }
+
+    /// Returns `true` if the i18n imf is [`IBus`].
+    ///
+    /// [`IBus`]: I18nImf::IBus
+    #[must_use]
+    pub const fn is_ibus(&self) -> bool {
+        matches!(self, Self::IBus)
     }
 }
