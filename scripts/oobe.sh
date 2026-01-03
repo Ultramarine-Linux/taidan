@@ -20,5 +20,3 @@ if grep -E '^video:' /etc/group; then
   # $1 is path to json file for `settings`
   usermod -aG video `jq -r '.username' $1`
 fi
-
-hostnamectl hostname ultramarine

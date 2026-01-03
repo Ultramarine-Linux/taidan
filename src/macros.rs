@@ -120,3 +120,4 @@ macro_rules! generate_pages {
     }};
     (@$page:ident $AppMsg:ident $forward:expr) => { $forward };
 }
+

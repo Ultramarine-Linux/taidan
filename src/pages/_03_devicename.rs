@@ -1,5 +1,7 @@
 use regex::Regex;
+use tokio::task;
 
+use crate::backend::steps;
 use crate::prelude::*;
 
 fn valid_entry(s: &str) -> bool {
@@ -36,7 +38,6 @@ fn autoset_hostname(en: &gtk::Entry, hostname: &str) {
 generate_page!(DeviceName {
     hostname_field_modified: bool,
     hostname_field_controlled: bool,
-    device_name: gtk::Entry,
     hostname: gtk::Entry,
     error: gtk::Label,
     next: libhelium::Button,
@@ -56,7 +57,7 @@ generate_page!(DeviceName {
                 settings.hostname.clone()
             } else {
                 name
-            };
+            }
         },
         NotifyHostname(name: String) => {
             if self.hostname_field_controlled {
@@ -75,6 +76,17 @@ generate_page!(DeviceName {
         InvalidHostname => {
             self.error.set_visible(true);
             self.next.set_sensitive(false);
+        },
+        SetHostname => {
+            let hostname = SETTINGS.read().hostname.clone();
+            let device_name = SETTINGS.read().device_name.clone();
+            let sender = sender.clone();
+            task::spawn(async move {
+                if let Err(e) = set_hostname(&hostname, &device_name).await {
+                    tracing::error!(?e, "failed to set hostname");
+                }
+                sender.input(DeviceNamePageMsg::Nav(NavAction::Next));
+            });
         }
     } => {
     }
@@ -100,7 +112,6 @@ generate_page!(DeviceName {
             inline_css: "font-weight: bold",
         },
 
-        #[name = "device_name"]
         gtk::Entry {
             set_hexpand: true,
             set_halign: gtk::Align::Fill,
@@ -120,7 +131,7 @@ generate_page!(DeviceName {
             } else {
                 sender.input(Self::Input::InvalidHostname)
             },
-            connect_activate[sender] => move |e| if valid_entry(e.text().as_str()) { sender.output(Self::Output::Nav(NavAction::Next)).unwrap() },
+            connect_activate[sender] => move |e| if valid_entry(e.text().as_str()) { sender.input(Self::Input::SetHostname) },
         },
 
         #[local_ref] error ->
@@ -144,7 +155,18 @@ generate_page!(DeviceName {
             #[watch]
             set_label: &t!("next"),
             set_sensitive: false,
-            connect_clicked => Self::Input::Nav(NavAction::Next),
-        },
+            connect_clicked => Self::Input::SetHostname,
+        }
     }
 );
+
+#[tracing::instrument]
+async fn set_hostname(hostname: &str, device_name: &str) -> color_eyre::Result<()> {
+    if cfg!(debug_assertions) {
+        tracing::debug!("skipping set_hostname since debug_assertions is on");
+        return Ok(());
+    }
+    steps::acmd("hostnamectl", &["set-hostname", device_name, "--pretty"]).await?;
+    steps::acmd("hostnamectl", &["set-hostname", hostname, "--static"]).await?;
+    Ok(())
+}

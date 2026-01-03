@@ -1,21 +1,20 @@
-mod _00_devicename;
-mod _01_useradd;
-mod _02_settheme;
-mod _03_dnfdownloadupdate;
-mod _04_dnfinstallupdate;
-mod _05_script;
-mod _06_dnfdownloadapps;
-mod _07_dnfinstallapps;
-mod _08_drivers_codecs;
-mod _09_setup_imf;
+mod _00_useradd;
+mod _01_settheme;
+mod _02_dnfdownloadupdate;
+mod _03_dnfinstallupdate;
+mod _04_script;
+mod _05_dnfdownloadapps;
+mod _06_dnfinstallapps;
+mod _07_drivers_codecs;
+mod _08_setup_imf;
 
 use crate::prelude::*;
 
 use crate::backend::steps::{
-    _00_devicename::DeviceName, _01_useradd::UserAdd, _02_settheme::SetTheme,
-    _03_dnfdownloadupdate::DnfDownloadUpdate, _04_dnfinstallupdate::DnfInstallUpdate,
-    _05_script::Script, _06_dnfdownloadapps::DnfDownloadApps, _07_dnfinstallapps::DnfInstallApps,
-    _08_drivers_codecs::DriversCodecs, _09_setup_imf::SetupImf,
+    _00_useradd::UserAdd, _01_settheme::SetTheme,
+    _02_dnfdownloadupdate::DnfDownloadUpdate, _03_dnfinstallupdate::DnfInstallUpdate,
+    _04_script::Script, _05_dnfdownloadapps::DnfDownloadApps, _06_dnfinstallapps::DnfInstallApps,
+    _07_drivers_codecs::DriversCodecs, _08_setup_imf::SetupImf,
 };
 
 #[allow(async_fn_in_trait, clippy::unused_async)]
@@ -36,12 +35,11 @@ pub trait Step {
     }
 }
 
-pub const NUM_STAGES: usize = 10;
+pub const NUM_STAGES: usize = 9;
 
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone, Copy, Debug)]
 pub enum Stage {
-    DeviceName,
     UserAdd,
     SetTheme,
     DnfDownloadUpdate,
@@ -67,7 +65,6 @@ impl Stage {
     #[must_use]
     pub const fn all() -> &'static [Self] {
         &[
-            Self::DeviceName(DeviceName),
             Self::UserAdd(UserAdd),
             Self::SetTheme(SetTheme),
             Self::DnfDownloadUpdate(DnfDownloadUpdate),
@@ -83,23 +80,22 @@ impl Stage {
 
 impl Default for Stage {
     fn default() -> Self {
-        Self::DeviceName(DeviceName)
+        Self::UserAdd(UserAdd)
     }
 }
 
 impl From<Stage> for u8 {
     fn from(value: Stage) -> Self {
         match value {
-            Stage::DeviceName(_) => 0,
-            Stage::UserAdd(_) => 1,
-            Stage::SetTheme(_) => 2,
-            Stage::DnfDownloadUpdate(_) => 3,
-            Stage::DnfInstallUpdate(_) => 4,
-            Stage::Script(_) => 5,
-            Stage::DnfDownloadApps(_) => 6,
-            Stage::DnfInstallApps(_) => 7,
-            Stage::DriversCodecs(_) => 8,
-            Stage::SetupImf(_) => 9,
+            Stage::UserAdd(_) => 0,
+            Stage::SetTheme(_) => 1,
+            Stage::DnfDownloadUpdate(_) => 2,
+            Stage::DnfInstallUpdate(_) => 3,
+            Stage::Script(_) => 4,
+            Stage::DnfDownloadApps(_) => 5,
+            Stage::DnfInstallApps(_) => 6,
+            Stage::DriversCodecs(_) => 7,
+            Stage::SetupImf(_) => 8,
         }
     }
 }
@@ -107,13 +103,13 @@ impl From<Stage> for u8 {
 impl From<Stage> for String {
     fn from(value: Stage) -> Self {
         match value {
-            Stage::DeviceName(_) => t!("steps-devicename"),
             Stage::DnfDownloadUpdate(_) => t!("steps-dnfdownloadupdate"),
             Stage::DnfInstallUpdate(_) => t!("steps-dnfinstallupdate"),
             Stage::Script(_) => t!("steps-script"),
             Stage::DnfDownloadApps(_) => t!("steps-dnfdownloadapps"),
             Stage::DnfInstallApps(_) => t!("steps-dnfinstallapps"),
             Stage::DriversCodecs(_) => t!("steps-driverscodecs"),
+            Stage::SetupImf(_) => t!("page-installing-loading"),
             _ => t!("page-installing-loading"),
         }
     }
