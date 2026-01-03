@@ -109,6 +109,7 @@ impl From<Stage> for String {
             Stage::DnfDownloadApps(_) => t!("steps-dnfdownloadapps"),
             Stage::DnfInstallApps(_) => t!("steps-dnfinstallapps"),
             Stage::DriversCodecs(_) => t!("steps-driverscodecs"),
+            Stage::SetupImf(_) => t!("page-installing-loading"),
             _ => t!("page-installing-loading"),
         }
     }

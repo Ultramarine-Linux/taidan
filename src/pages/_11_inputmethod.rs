@@ -49,7 +49,7 @@ kurage::generate_component!(MoreBox {
         key_controller_lang.connect_key_pressed(move |_, key, _, _| {
             if key == gtk::gdk::Key::Return {
                 // Navigate to next page when Enter is pressed
-                sender_clone.output(NavAction::Next);
+                sender_clone.output(NavAction::Next).expect("cannot output Next");
                 gtk::glib::Propagation::Stop
             } else {
                 gtk::glib::Propagation::Proceed
@@ -63,7 +63,7 @@ kurage::generate_component!(MoreBox {
         key_controller_im.connect_key_pressed(move |_, key, _, _| {
             if key == gtk::gdk::Key::Return {
                 // Navigate to next page when Enter is pressed
-                sender_clone.output(NavAction::Next);
+                sender_clone.output(NavAction::Next).expect("cannot output Next");
                 gtk::glib::Propagation::Stop
             } else {
                 gtk::glib::Propagation::Proceed

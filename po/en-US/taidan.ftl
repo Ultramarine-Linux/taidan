@@ -6,6 +6,7 @@ prev = Previous
 next = Next
 # btn (skip anything)
 skip = Skip
+steps-devicename = Setting Device Name…
 steps-dnfdownloadupdate = Downloading System Update…
 steps-dnfinstallupdate = Installing System Update…
 steps-script = Running Scriptlet…
@@ -54,6 +55,12 @@ page-keyboard = Keyboard Layout
 # .search*: search field placeholder
 page-keyboard-search-layout = Search keyboard layouts…
 page-keyboard-search-variant = Search keyboard variants…
+
+## [Device Name]
+page-devicename = Name This Device
+page-devicename-devicename = Name
+page-devicename-hostname = Hostname
+page-devicename-error = Hostname must start with a letter, and may only contain lowercase letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
 
 ## [Username]
 
