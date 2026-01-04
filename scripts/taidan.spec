@@ -49,6 +49,7 @@ DESTDIR=%buildroot ./scripts/install.sh
 %license LICENSE.md LICENSE.dependencies
 %_bindir/taidan
 %_libexecdir/start-taidan
+%attr(755, root, root) %_sysconfdir/com.fyralabs.Taidan/detect-internet
 %_datadir/polkit-1/rules.d/100-taidan.rules
 %_datadir/taidan
 %_presetdir/95-taidan.preset
