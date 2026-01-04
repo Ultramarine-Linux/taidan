@@ -1,6 +1,6 @@
-use color_eyre::{Section, eyre::eyre};
+use color_eyre::{eyre::eyre, Section};
 use itertools::Itertools;
-pub use taidan_catalogue_parser::{ACTION_TYPES, Category, Choice, ChoiceActions, ChoiceOption};
+pub use taidan_catalogue_parser::{Category, Choice, ChoiceActions, ChoiceOption, ACTION_TYPES};
 
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, Debug, Default, serde::Deserialize)]
@@ -19,10 +19,24 @@ pub struct Config {
 
     #[serde(default)]
     pub i18n: crate::backend::i18n::I18nCfg,
+
+    #[serde(default = "_default_internet_retry_interval")]
+    pub internet_retry_interval: u64,
+
+    #[serde(default = "_default_internet_timeout")]
+    pub internet_timeout: u64,
 }
 
 fn _default_org() -> String {
     "Fyra Labs".into()
+}
+
+fn _default_internet_retry_interval() -> u64 {
+    5
+}
+
+fn _default_internet_timeout() -> u64 {
+    20
 }
 
 impl Config {
