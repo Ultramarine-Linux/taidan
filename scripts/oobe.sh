@@ -1,10 +1,9 @@
 # This script is executed when the user confirm the setup
 
+systemctl preset-all
+systemctl enable --now systemd-timesyncd.service
 
 langlist=`dnf search ultramarine-langpacks | sed -n '/-core-/!p' | sed -n '/-fonts-/!p' | sed -E 's/\.noarch:.+//;s/ ultramarine-langpacks-//'` &
-
-systemctl preset-all &
-
 lang=`. /etc/locale.conf; echo ${LANG%.*}`
 wait
 if echo $langlist | grep $lang; then

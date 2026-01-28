@@ -159,6 +159,9 @@ generate_page!(InputMethod {
             morebox.detach_runtime();
             self.morebox.append(morebox.widget());
         },
+        Layouts => {
+            todo!()
+        }
     } => {}
 
     gtk::Box {
@@ -211,6 +214,16 @@ generate_page!(InputMethod {
                     connect_clicked => Self::Input::More,
                     inline_css: "padding-left: 48px; padding-right: 48px",
                 },
+
+                libhelium::Button {
+                    set_color: libhelium::ButtonColor::Secondary,
+                    #[watch]
+                    set_label: &t!("page-inputmethod-layouts"),
+                    set_is_pill: true,
+                    set_halign: gtk::Align::Center,
+                    connect_clicked => Self::Input::Layouts,
+                    inline_css: "padding-left: 48px; padding-right: 48px",
+                }
             }
         },
     },

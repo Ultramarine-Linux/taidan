@@ -1,6 +1,8 @@
-use crate::t;
+use crate::prelude::*;
 
 use super::pkexec;
+
+const IBUS_COMPONENT_SIMPLE_XML: &str = "/usr/share/ibus/component/simple.xml";
 
 taidan_proc_macros::keymap!(LAYOUTS);
 
@@ -219,6 +221,44 @@ impl InputMethod {
             ))
             .build()
     }
+    pub fn list_normal_kbs(&self) -> color_eyre::Result<std::collections::HashMap<String, String>> {
+        match super::CFG.i18n.imf {
+            I18nImf::Fcitx5 => todo!(),
+            I18nImf::IBus => {
+                if !std::path::Path::new(IBUS_COMPONENT_SIMPLE_XML).exists() {
+                    tracing::error!(
+                        path = IBUS_COMPONENT_SIMPLE_XML,
+                        "keyboard list doesn't exist"
+                    );
+                    return Ok(Default::default());
+                }
+                let f = std::fs::File::open(IBUS_COMPONENT_SIMPLE_XML)
+                    .wrap_err("cannot open IBUS_COMPONENT_SIMPLE_XML")?;
+                let xml: IBusComponentXml = quick_xml::de::from_reader(std::io::BufReader::new(f))
+                    .wrap_err("can't parse IBUS_COMPONENT_SIMPLE_XML")?;
+                Ok(xml
+                    .engines
+                    .into_iter()
+                    .map(|IBusEngineXml { name, longname, .. }| (name, longname))
+                    .collect())
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+struct IBusComponentXml {
+    #[serde(default)]
+    engines: Vec<IBusEngineXml>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+struct IBusEngineXml {
+    name: String,
+    language: String,
+    longname: String,
+    description: String,
+    rank: u8,
 }
 
 async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> color_eyre::Result<()> {

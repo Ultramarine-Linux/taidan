@@ -129,6 +129,7 @@ page-inputmethod-desc =
     You can skip this page if you do not need to type in one of these languages.
     More information is available on { $wiki }.
 page-inputmethod-add = Add Input Method
+page-inputmethod-layouts = Add More Layouts
 page-inputmethod-wiki = the wiki
 page-inputmethod-search-lang = Search language…
 page-inputmethod-search-ims = Search IMs/IMEs…
