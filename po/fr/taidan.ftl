@@ -91,3 +91,7 @@ page-browser = Sélection du navigateur
 page-categories = À quelles fins utilisez-vous cet appareil ?
 page-categories-confirm = Confirmer et configurer le système
 page-installing-flatpak = Installation de { $n } Flatpaks…
+page-devicename = Donner un nom à cet appareil
+page-devicename-devicename = Nom
+page-devicename-hostname = Nom d'hôte
+page-devicename-error = Le nom d'hôte doit commencer par une lettre, et peut contenir uniquement des lettres minuscules, des chiffres, des tirets bas (<tt>_</tt>) ou des traits d'union (<tt>-</tt>).
