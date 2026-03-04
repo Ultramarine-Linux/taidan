@@ -15,9 +15,8 @@ Requires:       flatpak
 Requires:       libwebp
 Requires:       webp-pixbuf-loader
 Requires:       xhost
-# Requires:       labwc
-# Requires:       cage
-Requires:       kwin-wayland swaybg
+Requires:       kwin
+Requires:       swaybg
 Requires:       netto network-manager-applet
 BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl
 BuildRequires:  pkgconfig(libhelium-1)
@@ -37,7 +36,6 @@ Linux, written in Rust and the Helium toolkit.
 %cargo_prep_online
 
 %build
-%cargo_license_summary_online
 %{cargo_license_online} > LICENSE.dependencies
 
 %install
