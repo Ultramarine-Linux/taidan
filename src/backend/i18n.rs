@@ -1,6 +1,6 @@
 use crate::t;
 
-use super::pkexec;
+use super::{pkexec, root};
 
 taidan_proc_macros::keymap!(LAYOUTS);
 
@@ -271,6 +271,13 @@ async fn set_gsettings_keymap(
     Ok(())
 }
 
+async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> color_eyre::Result<()> {
+    let variant = variant.unwrap_or("");
+    let args = ["set-x11-keymap", layout, "", variant, ""];
+    root("localectl", &args).await?;
+    Ok(())
+}
+
 #[allow(clippy::equatable_if_let)]
 #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 pub async fn set_keymap(
@@ -284,6 +291,10 @@ pub async fn set_keymap(
         tracing::warn!("Skipping set_keymap in debug mode without being `taidan` user");
         return Ok(());
     }
+    if let Ok(true) = tokio::fs::try_exists("/usr/bin/localectl").await {
+        return set_localectl_keymap(layout, variant).await;
+    }
+
     super::theme::xhost_local().await?;
     let user = user.unwrap_or_else(|| current_user.to_str().unwrap());
     if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
