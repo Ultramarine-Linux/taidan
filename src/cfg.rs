@@ -25,7 +25,7 @@ pub struct Config {
     #[serde(default)]
     pub taidan0: Taidan0Config,
 
-  #[serde(default = "_default_internet_retry_interval")]
+    #[serde(default = "_default_internet_retry_interval")]
     pub internet_retry_interval: u64,
 
     #[serde(default = "_default_internet_timeout")]
