@@ -2,6 +2,8 @@ use color_eyre::{Section, eyre::eyre};
 use itertools::Itertools;
 pub use taidan_catalogue_parser::{ACTION_TYPES, Category, Choice, ChoiceActions, ChoiceOption};
 
+use crate::backend::passwd::user_already_exists;
+
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, Debug, Default, serde::Deserialize)]
 pub struct Config {
@@ -19,6 +21,9 @@ pub struct Config {
 
     #[serde(default)]
     pub i18n: crate::backend::i18n::I18nCfg,
+
+    #[serde(default)]
+    pub taidan0: Taidan0Config,
 }
 
 fn _default_org() -> String {
@@ -47,6 +52,7 @@ impl Config {
     /// If there are any missing information, the function will immediately panic.
     #[tracing::instrument]
     pub fn populate(&mut self) {
+        self.taidan0.check();
         // distro
         let file = std::fs::read_to_string("/etc/os-release").expect("Cannot read /etc/os-release");
         let name = file
@@ -119,5 +125,22 @@ impl Config {
         );
         self.catalogue = Self::catalogue_from_path(dir)?;
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+pub struct Taidan0Config {
+    #[serde(default)]
+    pub continue_if_user_exists: bool,
+}
+
+impl Taidan0Config {
+    pub fn check(&self) {
+        if self.continue_if_user_exists {
+            tracing::info!("taidan0.continue_if_user_exists detected");
+        } else if user_already_exists() {
+            tracing::warn!("taidan0.continue_if_user_exists is false, exiting");
+            std::process::exit(0);
+        }
     }
 }
