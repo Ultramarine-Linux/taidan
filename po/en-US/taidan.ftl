@@ -107,6 +107,7 @@ switch-crashreport-desc = Press next to keep off
 
 ## [Tweaks]
 page-tweaks = System Tweaks
+page-tweaks-more = Show advanced configurations
 
 ## [Codecs and Drivers]
 
