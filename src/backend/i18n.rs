@@ -292,12 +292,12 @@ pub async fn set_keymap(
         return Ok(());
     }
     if let Ok(true) = tokio::fs::try_exists("/usr/bin/localectl").await {
-        return set_localectl_keymap(layout, variant).await;
+        set_localectl_keymap(layout, variant).await?;
     }
 
     super::theme::xhost_local().await?;
     let user = user.unwrap_or_else(|| current_user.to_str().unwrap());
-    if let Ok(true) = tokio::fs::try_exists("kwriteconfig6").await {
+    if let Ok(true) = tokio::fs::try_exists("/usr/bin/kwriteconfig6").await {
         set_kde_keymap(user, layout, variant).await
     } else {
         set_gsettings_keymap(user, layout, variant).await
