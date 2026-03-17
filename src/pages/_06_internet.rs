@@ -66,7 +66,7 @@ generate_page!(Internet {
             set_label: &t!("page-internet-skip"),
             inline_css: "padding-left: 48px; padding-right: 48px",
             #[watch]
-            set_visible: !model.is_online,
+            set_visible: CFG.taidan0.persist_no_internet_btn || !model.is_online,
             connect_clicked[sender] => move |_| {
                 SETTINGS.write().nointernet = true;
                 sender.input(Self::Input::Nav(NavAction::Next));

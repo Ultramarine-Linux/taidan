@@ -132,6 +132,10 @@ impl Config {
 pub struct Taidan0Config {
     #[serde(default)]
     pub continue_if_user_exists: bool,
+    #[serde(default)]
+    pub skip_dnf: bool,
+    #[serde(default)]
+    pub persist_no_internet_btn: bool,
 }
 
 impl Taidan0Config {
