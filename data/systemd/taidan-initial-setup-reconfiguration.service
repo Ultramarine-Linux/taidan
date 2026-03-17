@@ -10,7 +10,8 @@ Before=display-manager.service
 Before=taidan-initial-setup.service
 Conflicts=plymouth-quit-wait.service initial-setup-reconfiguration.service
 ConditionKernelCommandLine=!rd.live.image
-ConditionPathExists=/.unconfigured
+ConditionPathExists=|/var/.unconfigured
+ConditionPathExists=|/.unconfigured
 Requires=taidan-initial-setup.service
 
 [Service]

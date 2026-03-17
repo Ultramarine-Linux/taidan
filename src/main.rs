@@ -180,11 +180,11 @@ impl SimpleComponent for AppModel {
             AppMsg::Nav(NavAction::Quit) => {
                 let ss = sender.clone();
                 sender.oneshot_command(async move {
-                    if let Err(e) = backend::pkexec("root", "rm", &["-rf", "/.unconfigured"]).await
+                    if let Err(e) = backend::pkexec("root", "rm", &["-rf", "/var/.unconfigured", "/.unconfigured"]).await
                     {
-                        tracing::error!(?e, "cannot remove /.unconfigured; exiting anyway");
+                        tracing::error!(?e, "cannot remove /var/.unconfigured and/or /.unconfigured; exiting anyway");
                     } else {
-                        tracing::debug!("removed /.unconfigured");
+                        tracing::debug!("removed /var/.unconfigured and/or /.unconfigured");
                     }
                     if let Err(e) = backend::pkexec("root", "systemctl", &["disable", "taidan-initial-setup-reconfiguration"]).await
                     {

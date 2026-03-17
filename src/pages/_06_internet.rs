@@ -1,4 +1,9 @@
+use crate::backend::steps;
 use crate::prelude::*;
+
+const DETECT_INTERNET_SCRIPT: &str =
+    const_format::formatcp!("/etc/{}/detect-internet", crate::APPID);
+
 skipconfig!();
 generate_page!(Internet {
     btn_next: libhelium::Button,
@@ -130,42 +135,23 @@ generate_page!(Internet {
     }
 );
 
-#[allow(clippy::equatable_if_let)]
 async fn check_online(sender: ComponentSender<InternetPage>) {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(20))
-        .user_agent(crate::APPID)
-        .build()
-        .unwrap();
-    let arch = std::env::consts::ARCH;
-    let edition = &CFG.edition;
-    loop {
-        if let Ok(202) = client
-            .post("https://plausible.fyralabs.com/api/event")
-            .header(
-                "Content-Type",
-                reqwest::header::HeaderValue::from_static("application/json"),
-            )
-            .body(format!(
-                r#"
-                {{
-                    "name": "pageview",
-                    "url": "app://internet/{arch}/{edition}",
-                    "domain": "taidan",
-                    "props": {{
-                        "arch": "{arch}",
-                        "edition": "{edition}"
-                    }}
-                }}
-                "#
-            ))
-            .send()
-            .await
-            .map(|r| r.status().as_u16())
-        {
-            break;
+    let retry_interval = std::time::Duration::from_secs(CFG.internet_retry_interval);
+    if std::path::Path::new(DETECT_INTERNET_SCRIPT).exists() {
+        while let Err(e) = steps::acmd(DETECT_INTERNET_SCRIPT, &[]).await {
+            tracing::warn!(?e, "Internet detection script failed, continuing anyway");
+            tokio::time::sleep(retry_interval).await;
         }
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    } else {
+        let timeout = CFG.internet_timeout.to_string();
+        while !tokio::process::Command::new("ping")
+            .args(["-c", "1", "-W", &timeout, "1.1.1.1"])
+            .status()
+            .await
+            .is_ok_and(|r| r.success())
+        {
+            tokio::time::sleep(retry_interval).await;
+        }
     }
     sender.input(InternetPageMsg::IsOnline);
 }

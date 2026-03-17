@@ -27,9 +27,14 @@ impl std::fmt::Debug for TweaksFactory {
 
 generate_page!(Tweaks {
     factory: TweaksFactory,
+    show_advanced: bool,
 }:
     init[factory_widget { model.factory.0.widget() }](root, sender, model, widgets) {}
-    update(self, message, sender) {} => {}
+    update(self, message, sender) {
+        ShowAdvanced => {
+            self.show_advanced = true;
+        },
+    } => {}
 
     gtk::Box {
         set_orientation: gtk::Orientation::Vertical,
@@ -37,7 +42,8 @@ generate_page!(Tweaks {
         set_margin_horizontal: 80,
         set_vexpand: true,
         set_hexpand: true,
-        set_valign: gtk::Align::Center,
+        #[watch]
+        set_valign: if model.show_advanced { gtk::Align::Fill } else { gtk::Align::Center },
         set_halign: gtk::Align::Fill,
 
         gtk::Image {
@@ -52,18 +58,37 @@ generate_page!(Tweaks {
             inline_css: "font-weight: bold",
         },
 
-        #[local_ref] factory_widget ->
-        gtk::FlowBox {
-            set_selection_mode: gtk::SelectionMode::None,
-            set_orientation: gtk::Orientation::Horizontal,
-            set_vexpand: true,
-            set_homogeneous: true,
-            set_valign: gtk::Align::Center,
-            set_min_children_per_line: 1,
-            set_max_children_per_line: 2,
-            set_column_spacing: 6,
-            set_row_spacing: 6,
-            add_css_class: "content-flowbox",
+        #[transition = "SlideLeft"]
+        if model.show_advanced {
+            gtk::Box {
+                #[local_ref] factory_widget ->
+                gtk::FlowBox {
+                    set_selection_mode: gtk::SelectionMode::None,
+                    set_orientation: gtk::Orientation::Horizontal,
+                    set_vexpand: true,
+                    set_homogeneous: true,
+                    set_valign: gtk::Align::Center,
+                    set_min_children_per_line: 1,
+                    set_max_children_per_line: 2,
+                    set_column_spacing: 6,
+                    set_row_spacing: 6,
+                    add_css_class: "content-flowbox",
+                },
+            }
+        } else {
+            gtk::Box {
+                set_spacing: 20,
+                set_orientation: gtk::Orientation::Vertical,
+
+                libhelium::Button {
+                    set_color: libhelium::ButtonColor::Secondary,
+                    set_label: &t!("page-tweaks-more"),
+                    set_is_pill: true,
+                    set_halign: gtk::Align::Center,
+                    connect_clicked => Self::Input::ShowAdvanced,
+                    inline_css: "padding-left: 48px; padding-right: 48px",
+                },
+            }
         },
     },
 
