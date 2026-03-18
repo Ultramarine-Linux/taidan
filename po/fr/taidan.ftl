@@ -95,3 +95,4 @@ page-devicename = Donnez un nom à cet appareil
 page-devicename-devicename = Nom
 page-devicename-hostname = Nom d'hôte
 page-devicename-error = Le nom d'hôte doit commencer par une lettre, et peut contenir uniquement des lettres minuscules, des chiffres, des tirets bas (<tt>_</tt>) ou des traits d'union (<tt>-</tt>).
+page-tweaks-more = Afficher les configurations avancées
