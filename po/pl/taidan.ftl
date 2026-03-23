@@ -137,3 +137,4 @@ page-error-done = Wyjdź
 page-error-retry = Spróbuj ponownie
 flatpakening-name = Korzystaj z pakietów RPM zamiast flatpaków
 flatpakening-desc = Flatpaki posiadają domyślnie lepsze zabezpieczenia, za to pakiety RPM zużywają mniej miejsca.
+page-tweaks-more = Pokaż zaawansowaną konfigurację
