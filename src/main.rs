@@ -60,11 +60,9 @@ generate_pages!(Page AppModel AppMsg:
     10: Codecs,
     11: InputMethod,
     12: Theme,
-    13: Browser,
-    14: Categories,
-    15: Installing,
-    16: Finish,
-    17: Error,
+    13: Installing,
+    14: Finish,
+    15: Error,
 );
 
 #[derive(Debug, Clone)]
@@ -121,8 +119,6 @@ impl SimpleComponent for AppModel {
                     Page::Codecs => *model.codecs_page.widget(),
                     Page::InputMethod => *model.input_method_page.widget(),
                     Page::Theme => *model.theme_page.widget(),
-                    Page::Browser => *model.browser_page.widget(),
-                    Page::Categories => *model.categories_page.widget(),
                     Page::Installing => *model.installing_page.widget(),
                     Page::Finish => *model.finish_page.widget(),
                     Page::Error => *model.error_page.widget(),

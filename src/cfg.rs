@@ -1,5 +1,3 @@
-use color_eyre::{Section, eyre::eyre};
-use itertools::Itertools;
 pub use taidan_catalogue_parser::{ACTION_TYPES, Category, Choice, ChoiceActions, ChoiceOption};
 
 use crate::backend::passwd::user_already_exists;
@@ -9,8 +7,6 @@ use crate::backend::passwd::user_already_exists;
 pub struct Config {
     #[serde(skip)]
     pub distro: String,
-    #[serde(skip)]
-    pub catalogue: Vec<Category>,
     #[serde(default)]
     pub edition: String,
 
@@ -36,11 +32,11 @@ fn _default_org() -> String {
     "Fyra Labs".into()
 }
 
-fn _default_internet_retry_interval() -> u64 {
+const fn _default_internet_retry_interval() -> u64 {
     5
 }
 
-fn _default_internet_timeout() -> u64 {
+const fn _default_internet_timeout() -> u64 {
     20
 }
 
@@ -90,55 +86,7 @@ impl Config {
                 .clone_into(&mut self.edition);
         }
 
-        // catalogue
-        self.populate_catalogue()
-            .expect("cannot populate catalogue");
-
-        // remove choices by filter editions
-        self.catalogue.iter_mut().for_each(|cat| {
-            cat.choices.retain(|choice| {
-                choice
-                    .editions
-                    .as_ref()
-                    .is_none_or(|editions| editions.contains(&self.edition))
-            });
-        });
-
         tracing::trace!("Populated config: {self:#?}");
-    }
-
-    /// # Errors
-    /// - io errors on reading dir / file
-    /// - failure on parsing yml files
-    #[tracing::instrument]
-    fn catalogue_from_path(dir: &std::path::Path) -> color_eyre::Result<Vec<Category>> {
-        tracing::debug!(?dir, "Reading catalogue");
-        std::fs::read_dir(dir)
-            .map_err(|e| {
-                eyre!("Cannot read catalogue dir")
-                    .wrap_err(e)
-                    .note(format!("Catalogue dir: {}", dir.display()))
-            })?
-            .map(|f| -> color_eyre::Result<_> { Ok(Category::parse_path(&f?.path())?) })
-            .try_collect()
-    }
-
-    #[tracing::instrument]
-    fn populate_catalogue(&mut self) -> color_eyre::Result<()> {
-        if let Ok(p) = std::env::var("TAIDAN_CATALOGUE_DIR") {
-            let p = std::path::PathBuf::from(p);
-            if p.exists() && p.is_dir() {
-                self.catalogue = Self::catalogue_from_path(&p)?;
-                return Ok(());
-            }
-            tracing::error!(?p, "TAIDAN_CATALOGUE_DIR is set but no such directory");
-        }
-        let dir = std::path::Path::new(
-            option_env!("TAIDAN_CATALOGUE_DIR")
-                .unwrap_or(const_format::formatcp!("/etc/{}/catalogue/", crate::APPID)),
-        );
-        self.catalogue = Self::catalogue_from_path(dir)?;
-        Ok(())
     }
 }
 
