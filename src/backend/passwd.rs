@@ -9,10 +9,10 @@ use itertools::Itertools;
 
 #[must_use]
 pub fn user_already_exists() -> bool {
-    // if cfg!(debug_assertions) {
-    //     tracing::info!("skipping user_already_exists() check since debug_assertions is on");
-    //     return false;
-    // }
+    if cfg!(debug_assertions) {
+        tracing::info!("skipping user_already_exists() check since debug_assertions is on");
+        return false;
+    }
     let Ok(f) =
         File::open("/etc/passwd").inspect_err(|e| tracing::error!(?e, "cannot open /etc/passwd"))
     else {
