@@ -23,8 +23,6 @@ pub struct Settings {
 
     pub ims: Vec<&'static str>,
 
-    pub nightlight: bool,
-
     pub theme_is_dark: bool,
     pub accent: Option<super::theme::AccentColor>,
 
