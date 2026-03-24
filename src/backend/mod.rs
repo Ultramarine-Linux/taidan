@@ -7,6 +7,7 @@ pub mod dnf;
 pub mod flatpak;
 pub mod i18n;
 pub mod l10n;
+pub mod locale;
 pub mod passwd;
 pub mod settings;
 pub mod steps;
@@ -51,6 +52,7 @@ pub async fn start_install(
 ///
 /// This executes the following stages only:
 /// - [`steps::Stage::UserAdd`]
+/// - [`steps::Stage::SetLocale`]
 /// - [`steps::Stage::Script`]
 /// - [`steps::Stage::DriversCodecs`]
 ///
@@ -70,6 +72,10 @@ pub async fn start_simple_install(
     tracing::info!("Starting installation");
     tracing::info!("Running UserAdd");
     steps::Stage::UserAdd(Default::default())
+        .run(&settings, sender.clone())
+        .await?;
+    tracing::info!("Running SetLocale");
+    steps::Stage::SetLocale(Default::default())
         .run(&settings, sender.clone())
         .await?;
     tracing::info!("Running Script");

@@ -1,6 +1,7 @@
 mod _00_useradd;
 mod _01_settheme;
 mod _02_dnfdownloadupdate;
+mod _02_setlocale;
 mod _03_dnfinstallupdate;
 mod _04_script;
 mod _05_dnfdownloadapps;
@@ -12,7 +13,7 @@ use crate::prelude::*;
 
 use crate::backend::steps::{
     _00_useradd::UserAdd, _01_settheme::SetTheme, _02_dnfdownloadupdate::DnfDownloadUpdate,
-    _03_dnfinstallupdate::DnfInstallUpdate, _04_script::Script,
+    _02_setlocale::SetLocale, _03_dnfinstallupdate::DnfInstallUpdate, _04_script::Script,
     _05_dnfdownloadapps::DnfDownloadApps, _06_dnfinstallapps::DnfInstallApps,
     _07_drivers_codecs::DriversCodecs, _08_setup_imf::SetupImf,
 };
@@ -35,13 +36,14 @@ pub trait Step {
     }
 }
 
-pub const NUM_STAGES: usize = 9;
+pub const NUM_STAGES: usize = 10;
 
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone, Copy, Debug)]
 pub enum Stage {
     UserAdd,
     SetTheme,
+    SetLocale,
     DnfDownloadUpdate,
     DnfInstallUpdate,
     Script,
@@ -67,6 +69,7 @@ impl Stage {
         &[
             Self::UserAdd(UserAdd),
             Self::SetTheme(SetTheme),
+            Self::SetLocale(SetLocale),
             Self::DnfDownloadUpdate(DnfDownloadUpdate),
             Self::DnfInstallUpdate(DnfInstallUpdate),
             Self::Script(Script),
@@ -89,13 +92,14 @@ impl From<Stage> for u8 {
         match value {
             Stage::UserAdd(_) => 0,
             Stage::SetTheme(_) => 1,
-            Stage::DnfDownloadUpdate(_) => 2,
-            Stage::DnfInstallUpdate(_) => 3,
-            Stage::Script(_) => 4,
-            Stage::DnfDownloadApps(_) => 5,
-            Stage::DnfInstallApps(_) => 6,
-            Stage::DriversCodecs(_) => 7,
-            Stage::SetupImf(_) => 8,
+            Stage::SetLocale(_) => 2,
+            Stage::DnfDownloadUpdate(_) => 3,
+            Stage::DnfInstallUpdate(_) => 4,
+            Stage::Script(_) => 5,
+            Stage::DnfDownloadApps(_) => 6,
+            Stage::DnfInstallApps(_) => 7,
+            Stage::DriversCodecs(_) => 8,
+            Stage::SetupImf(_) => 9,
         }
     }
 }
