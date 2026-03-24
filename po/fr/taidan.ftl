@@ -78,11 +78,6 @@ page-inputmethod-desc =
 page-inputmethod-add = Ajouter une méthode de saisie
 page-inputmethod-wiki = le wiki
 page-inputmethod-search-ims = Rechercher des IM/IME…
-page-nightlight = Éclairage nocturne
-page-nightlight-desc =
-    Le soir, réchauffez les couleurs de votre écran pour réduire la fatigue visuelle.
-    L'efficacité de l'Éclairage nocturne sur les difficultés d'endormissement n'a pas été prouvée.
-switch-nightlight = Éclairage nocturne
 page-theme-desc =
     Appropriez-vous ce système en y mettant une touche de couleur.
     Vous pouvez modifier cette option plus tard dans les paramètres.

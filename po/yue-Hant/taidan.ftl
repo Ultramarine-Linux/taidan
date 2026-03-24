@@ -29,9 +29,6 @@
 ## [Input Method]
 
 
-## [Night Light]
-
-
 ## [Choose Your Theme]
 
 
@@ -106,11 +103,6 @@ page-inputmethod-wiki = 我哋嘅 wiki
 page-inputmethod-add = 加輸入法
 page-inputmethod-search-lang = 揾語言…
 page-inputmethod-search-ims = 揾輸入法…
-page-nightlight = 夜間模式
-page-nightlight-desc =
-    夜晚教個芒暖啲令到對眼冇咁辛苦。
-    夜間模式並唔會改善睡眠質素。
-switch-nightlight = 夜間模式
 page-theme = 主題
 page-theme-desc =
     主張你個人嘅色彩。

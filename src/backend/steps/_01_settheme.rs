@@ -16,12 +16,6 @@ impl super::Step for SetTheme {
         {
             tracing::warn!(?e, "cannot set theme");
         }
-        if let Err(e) =
-            super::super::theme::set_night_light(Some(&settings.username), settings.nightlight)
-                .await
-        {
-            tracing::warn!(?e, "cannot set nightlight");
-        }
         Ok(())
     }
 }

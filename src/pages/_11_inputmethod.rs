@@ -48,8 +48,9 @@ kurage::generate_component!(MoreBox {
         let key_controller_lang = gtk::EventControllerKey::new();
         key_controller_lang.connect_key_pressed(move |_, key, _, _| {
             if key == gtk::gdk::Key::Return {
-                // Navigate to next page when Enter is pressed
-                sender_clone.output(NavAction::Next).expect("cannot output Next");
+                sender_clone
+                    .output(NavAction::GoTo(crate::Page::Installing))
+                    .expect("cannot output GoTo Installing");
                 gtk::glib::Propagation::Stop
             } else {
                 gtk::glib::Propagation::Proceed
@@ -62,8 +63,9 @@ kurage::generate_component!(MoreBox {
         let key_controller_im = gtk::EventControllerKey::new();
         key_controller_im.connect_key_pressed(move |_, key, _, _| {
             if key == gtk::gdk::Key::Return {
-                // Navigate to next page when Enter is pressed
-                sender_clone.output(NavAction::Next).expect("cannot output Next");
+                sender_clone
+                    .output(NavAction::GoTo(crate::Page::Installing))
+                    .expect("cannot output GoTo Installing");
                 gtk::glib::Propagation::Stop
             } else {
                 gtk::glib::Propagation::Proceed
@@ -143,8 +145,8 @@ generate_page!(InputMethod {
         let key_controller = gtk::EventControllerKey::new();
         key_controller.connect_key_pressed(move |_, key, _, _| {
             if key == gtk::gdk::Key::Return {
-                // Navigate to next page when Enter is pressed
-                sender_clone.input(Self::Input::Nav(NavAction::Next));
+                // Input method selection is currently the last interactive step.
+                sender_clone.input(Self::Input::Nav(NavAction::GoTo(crate::Page::Installing)));
                 gtk::glib::Propagation::Stop
             } else {
                 gtk::glib::Propagation::Proceed
@@ -223,8 +225,10 @@ generate_page!(InputMethod {
         },
         #[template_child] next {
             #[watch]
-            set_label: &if model.more { t!("next") } else { t!("skip") },
-            connect_clicked => Self::Input::Nav(NavAction::Next),
+            set_label: &t!("page-categories-confirm"),
+            remove_css_class: "suggested-action",
+            add_css_class: "destructive-action",
+            connect_clicked => Self::Input::Nav(NavAction::GoTo(crate::Page::Installing)),
         },
     }
 );

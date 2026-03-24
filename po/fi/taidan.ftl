@@ -103,11 +103,6 @@ page-inputmethod-add = Lisää syöttötapa
 page-inputmethod-wiki = wiki
 page-inputmethod-search-lang = Etsi kieliä…
 page-inputmethod-search-ims = Hae pikaviestejä/IME-sovelluksia…
-page-nightlight = Yövalo
-page-nightlight-desc =
-    Sävytä näyttö lämpimällä sävyllä yöllä vähentääksesi silmien rasitusta.
-    Yövalon ei ole todistettu auttavan nukahtamisvaikeuksiin.
-switch-nightlight = Yövalo
 page-theme = Valitse teemasi
 page-theme-desc =
     Tee tästä järjestelmästä omasi väripilkulla.

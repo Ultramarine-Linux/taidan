@@ -40,11 +40,6 @@ page-inputmethod = Phương thức nhập
 page-inputmethod-wiki = wiki
 page-inputmethod-search-lang = Tìm kiếm ngôn ngữ…
 page-inputmethod-search-ims = Tìm kiếm IMs/IMEs…
-page-nightlight = Ánh sáng đêm
-page-nightlight-desc =
-    Phủ màn hình bằng tông màu ấm vào ban đêm để giảm mỏi mắt.
-    Ánh sáng đêm không được chứng minh là hỗ trợ việc mất ngủ.
-switch-nightlight = Ánh sáng đêm
 page-theme = Chọn chủ đề bạn muốn
 page-theme-desc =
     Biến hệ thống này thành của riêng bạn với một chút màu sắc.

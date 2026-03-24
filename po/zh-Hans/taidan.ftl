@@ -16,8 +16,6 @@ page-whoareyou-error = 用戶名称须以小楷开始，并须只包含数字、
 page-password = 创建密码
 page-password-pw = 密码
 page-password-rp = 重复密码
-page-nightlight = 护眼模式
-switch-nightlight = 护眼模式
 page-theme = 选择主题
 page-theme-desc =
     选择主题色彩。

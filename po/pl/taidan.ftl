@@ -29,9 +29,6 @@
 ## [Input Method]
 
 
-## [Night Light]
-
-
 ## [Choose Your Theme]
 
 
@@ -116,11 +113,6 @@ page-inputmethod-add = Dodaj metodę wprowadzania
 page-inputmethod-wiki = wiki
 page-inputmethod-search-lang = Wyszukaj język…
 page-inputmethod-search-ims = Wyszukaj IM/IME…
-page-nightlight = Światło nocne
-page-nightlight-desc =
-    Zabarwiaj wyświetlacz ciepłym odcieniem w nocy, aby ograniczyć przemęczanie wzroku.
-    Nie udowodniono, że światło nocne utrudnia proces zasypiania.
-switch-nightlight = Światło nocne
 page-theme = Wybierz motyw dla siebie
 page-theme-desc =
     Spraw, aby ten system był bardziej osobisty dzięki odrobinie koloru.
