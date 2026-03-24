@@ -9,30 +9,37 @@ fn valid_entry(s: &str) -> bool {
     re.is_match(s)
 }
 
-#[allow(irrefutable_let_patterns)]
-fn autoset_hostname(en: &gtk::Entry, hostname: &str) {
+fn derive_hostname(hostname: &str) -> Option<String> {
     if hostname.is_empty() {
-        return;
+        return Some(String::new());
     }
-    let user;
-    if let first = hostname
+
+    let first = hostname
         .split_once(|c: char| c.is_whitespace())
-        .map_or(hostname, |(a, _)| a)
-        && first.chars().all(|c: char| c.is_ascii_alphanumeric())
+        .map_or(hostname, |(a, _)| a);
+    if first.chars().all(|c: char| c.is_ascii_alphanumeric())
         && first.chars().next().unwrap().is_ascii_alphabetic()
     {
-        user = first.to_ascii_lowercase();
-    } else if let last = hostname
-        .rsplit_once(|c: char| c.is_whitespace())
-        .map_or(hostname, |(_, b)| b)
-        && last.chars().all(|c: char| c.is_ascii_alphanumeric())
-        && last.chars().next().unwrap().is_ascii_alphabetic()
-    {
-        user = last.to_ascii_lowercase();
+        Some(first.to_ascii_lowercase())
     } else {
-        return;
+        let last = hostname
+            .rsplit_once(|c: char| c.is_whitespace())
+            .map_or(hostname, |(_, b)| b);
+        if last.chars().all(|c: char| c.is_ascii_alphanumeric())
+            && last.chars().next().unwrap().is_ascii_alphabetic()
+        {
+            Some(last.to_ascii_lowercase())
+        } else {
+            None
+        }
     }
-    en.set_text(&user);
+}
+
+#[allow(irrefutable_let_patterns)]
+fn autoset_hostname(en: &gtk::Entry, hostname: &str) {
+    if let Some(hostname) = derive_hostname(hostname) {
+        en.set_text(&hostname);
+    }
 }
 
 generate_page!(DeviceName {
@@ -74,7 +81,12 @@ generate_page!(DeviceName {
             self.next.set_sensitive(true);
         },
         InvalidHostname => {
-            self.error.set_visible(true);
+            if self.hostname_field_controlled {
+                SETTINGS.write().hostname.clear();
+                self.error.set_visible(false);
+            } else {
+                self.error.set_visible(true);
+            }
             self.next.set_sensitive(false);
         },
         SetHostname => {
@@ -169,4 +181,24 @@ async fn set_hostname(hostname: &str, device_name: &str) -> color_eyre::Result<(
     steps::acmd("hostnamectl", &["set-hostname", device_name, "--pretty"]).await?;
     steps::acmd("hostnamectl", &["set-hostname", hostname, "--static"]).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::derive_hostname;
+
+    #[test]
+    fn empty_input_clears_hostname() {
+        assert_eq!(derive_hostname(""), Some(String::new()));
+    }
+
+    #[test]
+    fn valid_input_derives_lowercase_hostname() {
+        assert_eq!(derive_hostname("Laptop Pro"), Some(String::from("laptop")));
+    }
+
+    #[test]
+    fn non_convertible_input_does_not_overwrite_hostname() {
+        assert_eq!(derive_hostname("!!!"), None);
+    }
 }
