@@ -21,30 +21,37 @@ fn valid_entry(s: &str) -> bool {
     re.is_match(s)
 }
 
-#[allow(irrefutable_let_patterns)]
-fn autoset_username(en: &gtk::Entry, fullname: &str) {
+fn derive_username(fullname: &str) -> Option<String> {
     if fullname.is_empty() {
-        return;
+        return Some(String::new());
     }
-    let user;
-    if let first = fullname
+
+    let first = fullname
         .split_once(|c: char| c.is_whitespace())
-        .map_or(fullname, |(a, _)| a)
-        && first.chars().all(|c: char| c.is_ascii_alphanumeric())
+        .map_or(fullname, |(a, _)| a);
+    if first.chars().all(|c: char| c.is_ascii_alphanumeric())
         && first.chars().next().unwrap().is_ascii_alphabetic()
     {
-        user = first.to_ascii_lowercase();
-    } else if let last = fullname
-        .rsplit_once(|c: char| c.is_whitespace())
-        .map_or(fullname, |(_, b)| b)
-        && last.chars().all(|c: char| c.is_ascii_alphanumeric())
-        && last.chars().next().unwrap().is_ascii_alphabetic()
-    {
-        user = last.to_ascii_lowercase();
+        Some(first.to_ascii_lowercase())
     } else {
-        return;
+        let last = fullname
+            .rsplit_once(|c: char| c.is_whitespace())
+            .map_or(fullname, |(_, b)| b);
+        if last.chars().all(|c: char| c.is_ascii_alphanumeric())
+            && last.chars().next().unwrap().is_ascii_alphabetic()
+        {
+            Some(last.to_ascii_lowercase())
+        } else {
+            None
+        }
     }
-    en.set_text(&user);
+}
+
+#[allow(irrefutable_let_patterns)]
+fn autoset_username(en: &gtk::Entry, fullname: &str) {
+    if let Some(username) = derive_username(fullname) {
+        en.set_text(&username);
+    }
 }
 
 generate_page!(WhoAreYou {
@@ -88,7 +95,12 @@ generate_page!(WhoAreYou {
             self.btn_next.set_sensitive(true);
         },
         InvalidUsername => {
-            self.lbl_error.set_visible(true);
+            if self.username_field_controlled {
+                SETTINGS.write().username.clear();
+                self.lbl_error.set_visible(false);
+            } else {
+                self.lbl_error.set_visible(true);
+            }
             self.btn_next.set_sensitive(false);
         }
     } => {}
@@ -187,3 +199,23 @@ generate_page!(WhoAreYou {
         },
     }
 );
+
+#[cfg(test)]
+mod tests {
+    use super::derive_username;
+
+    #[test]
+    fn empty_input_clears_username() {
+        assert_eq!(derive_username(""), Some(String::new()));
+    }
+
+    #[test]
+    fn valid_input_derives_lowercase_username() {
+        assert_eq!(derive_username("Alice Smith"), Some(String::from("alice")));
+    }
+
+    #[test]
+    fn non_convertible_input_does_not_overwrite_username() {
+        assert_eq!(derive_username("!!!"), None);
+    }
+}
