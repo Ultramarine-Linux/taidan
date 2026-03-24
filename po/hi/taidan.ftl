@@ -29,9 +29,6 @@
 ## [Input Method]
 
 
-## [Night Light]
-
-
 ## [Choose Your Theme]
 
 
@@ -116,11 +113,6 @@ page-inputmethod-add = इनपुट मेथड जोड़ें
 page-inputmethod-wiki = विकि
 page-inputmethod-search-lang = भाषा ढूँढें…
 page-inputmethod-search-ims = IMs/IME ढूँढें…
-page-nightlight = नाइट लाइट
-page-nightlight-desc =
-    रात में आंखों पर दबाव कम करने के लिए डिस्प्ले को गर्म टोन में रंग दें। 
-     नाइट लाइट सोने में कठिनाई को कम करने में प्रभावी साबित नहीं हुई है।
-switch-nightlight = नाइट लाइट
 page-theme = अपना थीम चुनें
 page-theme-desc =
     इस सिस्टम को अपने अनुसार रंगों के साथ कस्टमाइज़ करें।

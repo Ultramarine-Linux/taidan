@@ -29,9 +29,6 @@
 ## [Input Method]
 
 
-## [Night Light]
-
-
 ## [Choose Your Theme]
 
 
@@ -105,11 +102,6 @@ page-inputmethod-add = Lägg till inmatningsmetod
 page-inputmethod-wiki = wikin
 page-inputmethod-search-lang = Sök språk…
 page-inputmethod-search-ims = Sök IMs/IMEs…
-page-nightlight = Nattljus
-page-nightlight-desc =
-    Tona skärmen med en varm ton på natten för att minska ansträngningen för ögonen. 
-    Nattljus har inte visat sig hjälpa mot svårigheter att somna.
-switch-nightlight = Nattlampa
 page-theme = Välj ditt tema
 page-theme-desc =
     Gör det här systemet till ditt eget med en färgklick. 

@@ -59,13 +59,12 @@ generate_pages!(Page AppModel AppMsg:
     09: Tweaks,
     10: Codecs,
     11: InputMethod,
-    12: NightLight,
-    13: Theme,
-    14: Browser,
-    15: Categories,
-    16: Installing,
-    17: Finish,
-    18: Error,
+    12: Theme,
+    13: Browser,
+    14: Categories,
+    15: Installing,
+    16: Finish,
+    17: Error,
 );
 
 #[derive(Debug, Clone)]
@@ -121,7 +120,6 @@ impl SimpleComponent for AppModel {
                     Page::Tweaks => *model.tweaks_page.widget(),
                     Page::Codecs => *model.codecs_page.widget(),
                     Page::InputMethod => *model.input_method_page.widget(),
-                    Page::NightLight => *model.night_light_page.widget(),
                     Page::Theme => *model.theme_page.widget(),
                     Page::Browser => *model.browser_page.widget(),
                     Page::Categories => *model.categories_page.widget(),

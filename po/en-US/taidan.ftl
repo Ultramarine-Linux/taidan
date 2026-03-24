@@ -134,15 +134,6 @@ page-inputmethod-wiki = the wiki
 page-inputmethod-search-lang = Search language…
 page-inputmethod-search-ims = Search IMs/IMEs…
 
-## [Night Light]
-
-# page title
-page-nightlight = Night Light
-page-nightlight-desc =
-    Tint the display with a warm tone at night to reduce eyestrain.
-    Night Light is not proven to help with difficulty falling sleep.
-switch-nightlight = Night Light
-
 ## [Choose Your Theme]
 
 # page title
