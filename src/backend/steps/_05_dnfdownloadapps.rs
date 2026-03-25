@@ -13,28 +13,6 @@ impl super::Step for DnfDownloadApps {
         if CFG.taidan0.skip_dnf || settings.nointernet {
             return Ok(());
         }
-        // settings
-        //     .catalogue
-        //     .iter()
-        //     .flat_map(|(cat_name, category)| {
-        //         let app_list = CFG.catalogue.iter().find(|cat| &cat.name == cat_name);
-        //         let app_list = &*app_list.expect("cannot find category").choices;
-        //         let it = category.iter().map(move |(&appidx, opts)| {
-        //             (app_list[appidx].actions.get_action(opts))
-        //                 .map(Iterator::cloned)
-        //                 .ok_or_else(|| {
-        //                     eyre!("cannot get action").note(format!(
-        //                         "appidx={appidx}, category={cat_name}, opts={opts:?}"
-        //                     ))
-        //                 })
-        //         });
-        //         it.flatten_ok()
-        //     })
-        //     .try_for_each(|action| {
-        //         action.map(|action| {
-        //             settings.actions[action.as_int()].push(action.consume_inner_str());
-        //         })
-        //     })?;
         settings.actions[1].extend(
             super::_07_drivers_codecs::Codecs::codecs()
                 .iter()
@@ -91,8 +69,6 @@ impl super::Step for DnfDownloadApps {
         for copr in &settings.actions[4] {
             crate::backend::pkexec("root", "dnf5", &["copr", "enable", "-y", copr]).await?;
         }
-        // // as per jade's request, we need to remove firefox first for the browser category
-        // crate::backend::pkexec("root", "dnf5", &["rm", "-yq", "firefox"]).await?;
 
         match (
             settings.actions[1].is_empty(),

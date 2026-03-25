@@ -22,6 +22,12 @@ fn valid_entry(s: &str) -> bool {
 }
 
 fn derive_username(fullname: &str) -> Option<String> {
+    fn derive_part(part: &str) -> Option<String> {
+        (part.chars().all(|c: char| c.is_ascii_alphanumeric())
+            && part.chars().next().is_some_and(|c| c.is_ascii_alphabetic()))
+        .then(|| part.to_ascii_lowercase())
+    }
+
     if fullname.is_empty() {
         return Some(String::new());
     }
@@ -29,22 +35,12 @@ fn derive_username(fullname: &str) -> Option<String> {
     let first = fullname
         .split_once(|c: char| c.is_whitespace())
         .map_or(fullname, |(a, _)| a);
-    if first.chars().all(|c: char| c.is_ascii_alphanumeric())
-        && first.chars().next().unwrap().is_ascii_alphabetic()
-    {
-        Some(first.to_ascii_lowercase())
-    } else {
+    derive_part(first).or_else(|| {
         let last = fullname
             .rsplit_once(|c: char| c.is_whitespace())
             .map_or(fullname, |(_, b)| b);
-        if last.chars().all(|c: char| c.is_ascii_alphanumeric())
-            && last.chars().next().unwrap().is_ascii_alphabetic()
-        {
-            Some(last.to_ascii_lowercase())
-        } else {
-            None
-        }
-    }
+        derive_part(last)
+    })
 }
 
 #[allow(irrefutable_let_patterns)]

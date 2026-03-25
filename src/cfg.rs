@@ -1,6 +1,6 @@
-pub use taidan_catalogue_parser::{ACTION_TYPES, Category, Choice, ChoiceActions, ChoiceOption};
-
 use crate::backend::passwd::user_already_exists;
+
+pub const ACTION_TYPES: usize = 5;
 
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, Debug, Default, serde::Deserialize)]

@@ -1,10 +1,6 @@
 DESTDIR=${DESTDIR:-/}
 appid="com.fyralabs.Taidan"
 
-for category in catalogue/*; do
-  install -Dpm644 $category -t $DESTDIR/etc/$appid/catalogue/
-done
-
 # Install internet detection script
 install -Dpm755 scripts/detect-internet -t $DESTDIR/etc/$appid/
 

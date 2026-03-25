@@ -150,7 +150,6 @@ page-theme-dark = Dark
 page-browser = Browser Selection
 
 ## page: Categories
-## this page shows different categories in the app catalogue (e.g. Productivity, Gaming, Media Prod., etc.)
 
 # page title
 page-categories = What Do You Use This Device For?
@@ -162,9 +161,6 @@ page-categories-done = Done
 #   [Productivity] -> projdsalkaj;cjzkpqi
 #   […]
 # }
-# the list of categories is available at
-# https://github.com/Ultramarine-Linux/taidan/tree/master/catalogue
-# open each yml file, check the first line for the name
 categories = { $cat }
 
 ## [Installing]
