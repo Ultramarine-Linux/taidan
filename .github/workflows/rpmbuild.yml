@@ -8,11 +8,11 @@ name: Build RPM snapshot package
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     container:
-      image: ghcr.io/terrapkg/builder:f41
+      image: ghcr.io/terrapkg/builder:f44
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
 
@@ -27,6 +27,6 @@ jobs:
           rpmbuild -ba scripts/taidan.spec --define "gitcommit $git_sha" --define "shortcommit $git_short" --define "_rpmdir $PWD/build" --define "_disable_source_fetch 0"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           path: build/**/*.rpm
