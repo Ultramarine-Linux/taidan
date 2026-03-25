@@ -17,12 +17,9 @@ pub mod _09_tweaks;
 pub mod _10_codecs;
 pub mod _11_inputmethod;
 pub mod _12_theme;
-pub mod _13_browser;
-pub mod _14_categories;
-pub mod _15_installing;
-pub mod _16_finish;
-pub mod _17_error;
+pub mod _13_installing;
+pub mod _14_finish;
+pub mod _15_error;
 
-pub(crate) use _13_browser::BROWSER_CATEGORY;
-pub use _15_installing::InstallingPageMsg;
-pub use _17_error::ErrorPageMsg;
+pub use _13_installing::InstallingPageMsg;
+pub use _15_error::ErrorPageMsg;
