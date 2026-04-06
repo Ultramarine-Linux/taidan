@@ -1,0 +1,6 @@
+#!/bin/sh
+# vi: ft=sh noet ci pi sts=0 sw=2 ts=2
+
+if [[ $1 -eq 1 ]]; then 
+	um tweaks enable cachyos-kernel
+fi
