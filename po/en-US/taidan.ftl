@@ -190,4 +190,4 @@ flatpakening-desc = Flatpaks provide better security by default, RPMs will save 
 mtu-probing-name = MTU Probing
 mtu-probing-desc = Enable MTU probing (fixes some applications like Ubisoft Connect). This can be reverted later.
 cachyos-kernel-name = CachyOS Kernel
-cachyos-kernel-desc = Install the CachyOS Kernel. This may provide a noticable preformance benefit, and can be reverted later.
+cachyos-kernel-desc = Install the CachyOS Kernel. This may provide a noticeable performance benefit, and can be reverted later.
