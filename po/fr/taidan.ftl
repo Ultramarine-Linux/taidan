@@ -91,3 +91,7 @@ page-devicename-devicename = Nom
 page-devicename-hostname = Nom d'hôte
 page-devicename-error = Le nom d'hôte doit commencer par une lettre, et peut contenir uniquement des lettres minuscules, des chiffres, des tirets bas (<tt>_</tt>) ou des traits d'union (<tt>-</tt>).
 page-tweaks-more = Afficher les configurations avancées
+mtu-probing-name = Sondes MTU
+mtu-probing-desc = Activez l'envoi de sondes MTU (corrige des bugs dans des applications comme Ubisoft Connect). Cette option pourra être désactivée plus tard.
+cachyos-kernel-name = Noyau CachyOS
+cachyos-kernel-desc = Installez le noyau CachyOS. Cette option peut sensiblement améliorer les performances, et pourra être désactivée plus tard.
