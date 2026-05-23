@@ -110,7 +110,7 @@ generate_page!(Internet {
             set_halign: gtk::Align::Center,
             #[watch]
             set_label: &t!("page-internet-portal"),
-            connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("xdg-open", &["http://detectportal.firefox.com/canonical.html"]).await.unwrap() }),
+            connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("io.elementary.capnet-assist", &[]).await.unwrap() }),
             #[watch]
             set_visible: !model.is_online,
         },
