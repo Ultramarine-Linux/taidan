@@ -102,7 +102,7 @@ generate_page!(Internet {
             set_label: &t!("page-internet-open"),
             #[watch]
             set_visible: !model.is_online,
-            connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("netto", &[]).await.unwrap() }),
+            connect_clicked[sender] => move |_| sender.oneshot_command(async { crate::backend::steps::acmd("nmgui", &[]).await.unwrap() }),
         },
 
         libhelium::Button {
