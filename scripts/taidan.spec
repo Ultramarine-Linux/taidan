@@ -17,7 +17,7 @@ Requires:       webp-pixbuf-loader
 Requires:       xhost
 Requires:       kwin
 Requires:       swaybg
-Requires:       netto network-manager-applet
+Requires:       nmgui network-manager-applet
 Requires:       capnet-assist
 BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl
 BuildRequires:  pkgconfig(libhelium-1)
