@@ -3349,7 +3349,7 @@ dependencies = [
 
 [[package]]
 name = "taidan"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "basic-toml",
  "color-eyre",
