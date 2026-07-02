@@ -100,8 +100,8 @@ generate_page!(Internet {
             // set_icon: Some("network-wireless-symbolic"),
             #[watch]
             set_label: &t!("page-internet-open"),
-            // #[watch]
-            // set_visible: !model.is_online,
+            #[watch]
+            set_visible: !model.is_online,
             connect_clicked[sender] => move |_| {
                 let args = std::env::vars().map(|(k, v)| format!("{k}={v}")).chain(["nmgui".into()]).collect_vec();
                 sender.oneshot_command(async move {
