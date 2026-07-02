@@ -143,7 +143,10 @@ pub async fn pkexec(user: &str, name: &str, args: &[&str]) -> color_eyre::Result
 /// # Errors
 /// - command failed to run
 /// - command exited with non-zero status code
-pub async fn root(name: &str, args: &[&str]) -> color_eyre::Result<()> {
+pub async fn root<I: IntoIterator + std::fmt::Debug>(name: &str, args: I) -> color_eyre::Result<()>
+where
+    <I as std::iter::IntoIterator>::Item: std::convert::AsRef<std::ffi::OsStr>,
+{
     tracing::debug!(?name, ?args, "running pkexec");
     let p = tokio::process::Command::new("pkexec")
         .args(["--user", "root", name])
