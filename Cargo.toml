@@ -44,7 +44,7 @@ reqwest = { version = "0.12.22", features = [
     "default-tls",
 ], default-features = false }
 rust-embed = { version = "8.7.2", features = ["include-exclude"] }
-sentry = "0.46.0"
+sentry = { version = "0.46.0", features = ["logs", "tracing"] }
 sentry-eyre = "0.3.0"
 serde = "1.0.219"
 serde_json = "1.0.140"

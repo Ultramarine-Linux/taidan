@@ -31,7 +31,13 @@ pub(super) async fn handle_flatpak(
     let mut stdout_lines = tokio::io::BufReader::new(reader).lines();
     loop {
         let line = futures::select! {
-            line = async { (stdout_lines.next_line().await).wrap_err("cannot read stdout") }.fuse() => line?,
+            line = async { stdout_lines.next_line().await }.fuse() => match line {
+                Ok(line) => line,
+                Err(e) => {
+                    tracing::warn!(?e, "cannot read stdout");
+                    continue;
+                }
+            },
             res = pu::wait_for("flatpak", &mut output).fuse() => break res,
         };
 

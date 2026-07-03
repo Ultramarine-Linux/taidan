@@ -37,7 +37,13 @@ pub(super) async fn handle_dnf(
     let mut stdout_lines = tokio::io::BufReader::new(reader).lines();
     loop {
         let line = futures::select! {
-            line = async { (stdout_lines.next_line().await).wrap_err("cannot read stdout") }.fuse() => line?,
+            line = async { stdout_lines.next_line().await }.fuse() => match line {
+                Ok(line) => line,
+                Err(e) => {
+                    tracing::warn!(?e, "cannot read stdout");
+                    continue;
+                }
+            },
             res = pu::wait_for("dnf5", &mut output).fuse() => break res,
         };
 
@@ -57,11 +63,7 @@ pub(super) async fn handle_dnf(
         let Ok(denominator) = matches[2].parse() else {
             continue;
         };
-        pu::send_frac(
-            &sender,
-            numerator,
-            denominator,
-        );
+        pu::send_frac(&sender, numerator, denominator);
     }
     .with_section(|| {
         std::fs::read_to_string(log_path)

@@ -243,6 +243,7 @@ impl AppModel {
         let (ss, sett) = (sender.clone(), SETTINGS.read().clone());
         sender.oneshot_command(async move {
             if let Err(e) = f(sett, inst_sender).await {
+                sentry::capture_message(&format!("{e:?}"), sentry::Level::Error);
                 sentry_eyre::capture_report(&e);
                 ss.input(AppMsg::InstallError(strip_ansi_escapes::strip_str(
                     format!("{e:?}"),
@@ -320,6 +321,7 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
             // Capture user IPs and potentially sensitive headers when using HTTP server integrations
             // see https://docs.sentry.io/platforms/rust/data-management/data-collected for more info
             send_default_pii: true,
+            enable_logs: true,
             ..Default::default()
         },
     ));
@@ -329,6 +331,7 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
 
     tracing_subscriber::registry()
         .with(fmt::layer().pretty())
+        .with(sentry::integrations::tracing::layer())
         .with(
             EnvFilter::builder()
                 .with_default_directive(tracing::level_filters::LevelFilter::DEBUG.into())
