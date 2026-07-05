@@ -174,8 +174,8 @@ async fn set_hostname(hostname: &str, device_name: &str) -> color_eyre::Result<(
         tracing::debug!("skipping set_hostname since debug_assertions is on");
         return Ok(());
     }
-    steps::acmd("hostnamectl", &["set-hostname", device_name, "--pretty"]).await?;
-    steps::acmd("hostnamectl", &["set-hostname", hostname, "--static"]).await?;
+    steps::root("hostnamectl", &["set-hostname", device_name, "--pretty"]).await?;
+    steps::root("hostnamectl", &["set-hostname", hostname, "--static"]).await?;
     Ok(())
 }
 
