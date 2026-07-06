@@ -1,3 +1,4 @@
+use color_eyre::eyre::OptionExt;
 use tokio::io::AsyncWriteExt;
 
 use crate::prelude::*;
@@ -53,13 +54,17 @@ async fn homed(settings: &crate::backend::settings::Settings) -> color_eyre::Res
             "homectl create {} -G wheel -c {} --enforce-password-policy=no",
             &settings.username, &settings.fullname
         ))
+        .stdin(std::process::Stdio::piped())
         .spawn()
-        .wrap_err(format!("fail to run `homectl`"))?;
+        .wrap_err("fail to run `homectl`")?;
     let pass = &settings.passwd;
-    _ = (p.stdin.as_mut().expect("stdin"))
+    let mut stdin = p.stdin.take().ok_or_eyre("stdin")?;
+    _ = stdin
         .write_all(format!("{pass}\n{pass}\n").as_bytes())
         .await
         .inspect_err(|e| tracing::error!(?e, "cannot write to stdin"));
+    _ = (stdin.flush().await).inspect_err(|e| tracing::error!(?e, "cannot flush stdin"));
+    std::mem::drop(stdin);
     let Ok(r) = (p.wait().await).inspect_err(|e| tracing::error!(?e, "cannot wait homectl")) else {
         _ = p.kill().await;
         return Ok(());

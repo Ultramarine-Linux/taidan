@@ -19,6 +19,8 @@ Requires:       kwin
 Requires:       swaybg
 Requires:       nmgui network-manager-applet
 Requires:       capnet-assist
+# required for running homectl
+Requires:       script
 BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl
 BuildRequires:  pkgconfig(libhelium-1)
 BuildRequires:  pkgconfig(openssl)

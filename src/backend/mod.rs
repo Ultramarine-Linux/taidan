@@ -129,7 +129,9 @@ mod parseutil {
 pub async fn pkexec(user: &str, name: &str, args: &[&str]) -> color_eyre::Result<()> {
     tracing::debug!(?name, ?args, "running pkexec");
     let p = tokio::process::Command::new("pkexec")
-        .args(["--user", user, name])
+        .args(["--user", user, "env"])
+        .args(std::env::vars().map(|(k, v)| format!("{k}={v}")))
+        .arg(name)
         .args(args)
         .status()
         .await

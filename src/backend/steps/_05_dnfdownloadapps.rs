@@ -56,7 +56,7 @@ impl super::Step for DnfDownloadApps {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
-        if settings.nointernet {
+        if CFG.taidan0.skip_dnf || settings.nointernet {
             return Ok(());
         }
         let mut enable_repo = super::super::dnf::EnableRepo::new().await?;
