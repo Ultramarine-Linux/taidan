@@ -98,6 +98,8 @@ pub struct Taidan0Config {
     pub skip_dnf: bool,
     #[serde(default)]
     pub persist_no_internet_btn: bool,
+    #[serde(default)]
+    pub systemd_homed: bool,
 }
 
 impl Taidan0Config {

@@ -65,7 +65,7 @@ generate_page!(Codecs:
             #[watch]
             set_subtitle: &t!("switch-codecs-desc"),
             #[template_child] switch {
-                set_active: true,
+                set_active: !CFG.skip_pages.contains(&crate::Page::Codecs),
                 connect_state_set => move |_, state| {
                     SETTINGS.write().install_codecs_drivers = state;
                     glib::Propagation::Proceed
