@@ -47,8 +47,9 @@ generate_page!(Language {
                         .load_languages(&crate::Localizations, &["en-Xowo".parse().unwrap()])
                         .expect("fail to load languages");
                     *crate::LL.write() = loader;
-                    *crate::backend::l10n::PO_LOADER.write() = crate::backend::l10n::new_loader(vec!["en-Xowo".parse().unwrap()]);
-                    SETTINGS.write().langlocale = "en_US";
+                    *crate::backend::l10n::PO_LOADER.write() =
+                        crate::backend::l10n::new_loader(vec!["en-Xowo".parse().unwrap()]);
+                    SETTINGS.write().langlocale = OWO_SYSTEM_LOCALE;
                 } else {
                     set_lang(lang);
                 }
@@ -117,6 +118,7 @@ use relm4::SharedState;
 use std::rc::Rc;
 
 static SEARCH_STATE: SharedState<gtk::glib::GString> = SharedState::new();
+const OWO_SYSTEM_LOCALE: &str = "en_US.UTF-8";
 
 #[derive(Clone, Debug)]
 struct LanguageRow {
@@ -191,14 +193,18 @@ impl AsRef<gtk::Widget> for BtnFactory {
 }
 
 fn set_lang(lang: &LanguageRow) {
-    if let Ok(locale) = (lang.locale)
-        .split_once('.')
-        .map_or(lang.locale, |(left, _)| left)
-        .to_owned()
-        .parse::<i18n_embed::unic_langid::LanguageIdentifier>()
+    crate::backend::locale::require_canonical_system_locale(lang.locale)
+        .expect("language rows should only contain canonical UTF-8 locales");
+
+    if let Ok(locale) = crate::backend::locale::locale_to_langid(lang.locale)
         .inspect_err(|e| tracing::error!(?e, ?lang, "Cannot apply language"))
     {
-        tracing::info!(?locale, lang.locale, "Using selected locale");
+        tracing::info!(
+            ?locale,
+            selected_locale = lang.locale,
+            system_locale = lang.locale,
+            "Using selected locale"
+        );
         let mut locales = crate::LOCALE_SOLVER
             .solve_locale(locale)
             .into_iter()

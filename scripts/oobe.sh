@@ -5,6 +5,8 @@ langlist=`dnf search ultramarine-langpacks | sed -n '/-core-/!p' | sed -n '/-fon
 
 systemctl preset-all &
 
+# Taidan now always sets LANG to a canonical UTF-8 locale, so strip the
+# encoding suffix before matching langpack names.
 lang=`. /etc/locale.conf; echo ${LANG%.*}`
 wait
 if echo $langlist | grep $lang; then
