@@ -70,7 +70,7 @@ impl super::Step for DnfDownloadApps {
         match (settings.actions[1].is_empty(), settings.actions[2].is_empty()) {
             (true, true) => {}
             (true, false) => {
-                super::super::flatpak::handle_flatpak(callback.clone(), |flatpak| {
+                super::super::flatpak::handle_flatpak(callback, |flatpak| {
                     flatpak
                         .args(["install", "-y", "--noninteractive", "--no-deploy"])
                         .args(&settings.actions[2])
@@ -87,7 +87,7 @@ impl super::Step for DnfDownloadApps {
                 // run flatpak and dnf in parallel
                 // this should be safe, supposedly they don't affect each other
                 futures::future::try_join(
-                    super::super::flatpak::handle_flatpak(callback.clone(), |flatpak| {
+                    super::super::flatpak::handle_flatpak(callback, |flatpak| {
                         flatpak
                             .args(["install", "-y", "--noninteractive", "--no-deploy"])
                             .args(&settings.actions[2])
