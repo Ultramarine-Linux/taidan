@@ -10,18 +10,14 @@ struct TweaksFactory(FactoryVecDeque<TweakBox>);
 
 impl Default for TweaksFactory {
     fn default() -> Self {
-        let mut factory = FactoryVecDeque::builder()
-            .launch(gtk::FlowBox::default())
-            .detach();
+        let mut factory = FactoryVecDeque::builder().launch(gtk::FlowBox::default()).detach();
         (0..TWEAKS.len()).for_each(|_| _ = factory.guard().push_back(()));
         Self(factory)
     }
 }
 impl std::fmt::Debug for TweaksFactory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TweaksFactory")
-            .field("len", &self.0.len())
-            .finish()
+        f.debug_struct("TweaksFactory").field("len", &self.0.len()).finish()
     }
 }
 

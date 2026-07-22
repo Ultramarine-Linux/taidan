@@ -75,10 +75,7 @@ async fn write_fcitx5_profile(
                 # Layout\n\
                 Layout=\n\n\
             ",
-            var = &kb_variant
-                .as_ref()
-                .map(|variant| format!("-{variant}"))
-                .unwrap_or_default(),
+            var = &kb_variant.as_ref().map(|variant| format!("-{variant}")).unwrap_or_default(),
         )
         .as_bytes(),
     );

@@ -25,9 +25,7 @@ pub(super) async fn handle_flatpak(
         .spawn()
         .wrap_err("fail to run `flatpak`")?;
     let log_path = &*crate::TEMP_DIR.join("flatpak.stdout.log");
-    let mut log = tokio::fs::File::create(log_path)
-        .await
-        .expect("cannot create log file");
+    let mut log = tokio::fs::File::create(log_path).await.expect("cannot create log file");
     let mut stdout_lines = tokio::io::BufReader::new(reader).lines();
     loop {
         let line = futures::select! {

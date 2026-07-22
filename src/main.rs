@@ -23,9 +23,7 @@ const SENTRY_LINK: &str =
 static LOCALE_SOLVER: LazyLock<poly_l10n::LocaleFallbackSolver> = LazyLock::new(Default::default);
 static AVAILABLE_LANGS: LazyLock<Vec<i18n_embed::unic_langid::LanguageIdentifier>> =
     LazyLock::new(|| {
-        i18n_embed::fluent::fluent_language_loader!()
-            .available_languages(&Localizations)
-            .unwrap()
+        i18n_embed::fluent::fluent_language_loader!().available_languages(&Localizations).unwrap()
     });
 
 /// Configuration of the distro OOBE.
@@ -192,10 +190,8 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Nav(NavAction::Next) => {
                 while {
-                    self.page = usize::from(self.page)
-                        .wrapping_add(1)
-                        .try_into()
-                        .unwrap_or(self.page);
+                    self.page =
+                        usize::from(self.page).wrapping_add(1).try_into().unwrap_or(self.page);
                     !self.get_page_widget().is_visible() // hack in generate_pages
                 } {}
                 if self.page == Page::Installing {
@@ -204,10 +200,8 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Nav(NavAction::Back) => {
                 while {
-                    self.page = usize::from(self.page)
-                        .wrapping_sub(1)
-                        .try_into()
-                        .unwrap_or(self.page);
+                    self.page =
+                        usize::from(self.page).wrapping_sub(1).try_into().unwrap_or(self.page);
                     !self.get_page_widget().is_visible()
                 } {}
             }
@@ -224,10 +218,7 @@ impl SimpleComponent for AppModel {
             }
         }
         // BUG: labels don't update without this?
-        self.welcome_page
-            .sender()
-            .send(pages::_01_welcome::WelcomePageMsg::Update)
-            .unwrap();
+        self.welcome_page.sender().send(pages::_01_welcome::WelcomePageMsg::Update).unwrap();
     }
 }
 
@@ -245,9 +236,7 @@ impl AppModel {
             if let Err(e) = f(sett, inst_sender).await {
                 sentry::capture_message(&format!("{e:?}"), sentry::Level::Error);
                 sentry_eyre::capture_report(&e);
-                ss.input(AppMsg::InstallError(strip_ansi_escapes::strip_str(
-                    format!("{e:?}"),
-                )));
+                ss.input(AppMsg::InstallError(strip_ansi_escapes::strip_str(format!("{e:?}"))));
             }
         });
     }
@@ -280,13 +269,12 @@ fn main() {
     gtk::gio::resources_register_include!("icons.gresource").unwrap();
 
     // SAFETY: placeholder
-    let color = unsafe {
-        libhelium::RGBColor::from_glib_none(std::ptr::from_mut(&mut libhelium::ffi::HeRGBColor {
-            r: 0.0,
-            g: 7.0,
-            b: 143.0,
-        }))
-    };
+    let color =
+        unsafe {
+            libhelium::RGBColor::from_glib_none(std::ptr::from_mut(
+                &mut libhelium::ffi::HeRGBColor { r: 0.0, g: 7.0, b: 143.0 },
+            ))
+        };
     let app = libhelium::Application::builder()
         .application_id(APPID)
         .flags(gtk::gio::ApplicationFlags::default())
@@ -338,17 +326,8 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
                 .with_env_var("TAIDAN_LOG")
                 .from_env_lossy(),
         )
-        .with(
-            tracing_journald::layer()
-                .unwrap()
-                .with_syslog_identifier("taidan".to_owned()),
-        )
-        .with(
-            fmt::layer()
-                .with_writer(non_blocking)
-                .with_ansi(false)
-                .compact(),
-        )
+        .with(tracing_journald::layer().unwrap().with_syslog_identifier("taidan".to_owned()))
+        .with(fmt::layer().with_writer(non_blocking).with_ansi(false).compact())
         .with(tracing_error::ErrorLayer::default())
         .init();
 

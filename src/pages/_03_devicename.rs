@@ -20,13 +20,9 @@ fn derive_hostname(hostname: &str) -> Option<String> {
         return Some(String::new());
     }
 
-    let first = hostname
-        .split_once(|c: char| c.is_whitespace())
-        .map_or(hostname, |(a, _)| a);
+    let first = hostname.split_once(|c: char| c.is_whitespace()).map_or(hostname, |(a, _)| a);
     derive_part(first).or_else(|| {
-        let last = hostname
-            .rsplit_once(|c: char| c.is_whitespace())
-            .map_or(hostname, |(_, b)| b);
+        let last = hostname.rsplit_once(|c: char| c.is_whitespace()).map_or(hostname, |(_, b)| b);
         derive_part(last)
     })
 }

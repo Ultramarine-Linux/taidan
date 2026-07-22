@@ -161,9 +161,8 @@ struct BtnFactory(Rc<relm4::factory::FactoryVecDeque<&'static LanguageRow>>);
 impl Default for BtnFactory {
     #[allow(clippy::needless_for_each)]
     fn default() -> Self {
-        let mut btnfactory = relm4::factory::FactoryVecDeque::builder()
-            .launch(gtk::ListBox::default())
-            .detach();
+        let mut btnfactory =
+            relm4::factory::FactoryVecDeque::builder().launch(gtk::ListBox::default()).detach();
 
         let mut btns = btnfactory.guard();
         LANGUAGE_ROWS.iter().for_each(|x| _ = btns.push_back(x));
@@ -208,9 +207,7 @@ fn set_lang(lang: &LanguageRow) {
         if locales.is_empty() {
             locales.push("en-US".parse().unwrap());
         }
-        loader
-            .load_languages(&crate::Localizations, &locales)
-            .expect("fail to load languages");
+        loader.load_languages(&crate::Localizations, &locales).expect("fail to load languages");
         *crate::LL.write() = loader;
         *crate::backend::l10n::PO_LOADER.write() = crate::backend::l10n::new_loader(locales);
         SETTINGS.write().langlocale = lang.locale;

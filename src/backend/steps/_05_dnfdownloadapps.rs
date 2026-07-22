@@ -13,11 +13,8 @@ impl super::Step for DnfDownloadApps {
         if CFG.taidan0.skip_dnf || settings.nointernet {
             return Ok(());
         }
-        settings.actions[1].extend(
-            super::_07_drivers_codecs::Codecs::codecs()
-                .iter()
-                .map(ToString::to_string),
-        );
+        settings.actions[1]
+            .extend(super::_07_drivers_codecs::Codecs::codecs().iter().map(ToString::to_string));
 
         if !settings.ims.is_empty() {
             let pkgs: &[&str] = match CFG.i18n.imf {
@@ -32,11 +29,7 @@ impl super::Step for DnfDownloadApps {
         }
         settings.actions[1].extend(
             (settings.ims.iter())
-                .filter_map(|im| {
-                    crate::backend::i18n::IMS
-                        .values()
-                        .find_map(|ims| ims.get(im))
-                })
+                .filter_map(|im| crate::backend::i18n::IMS.values().find_map(|ims| ims.get(im)))
                 .map(|im| im.get_pkg().to_owned())
                 .unique(),
         );
@@ -70,10 +63,7 @@ impl super::Step for DnfDownloadApps {
             crate::backend::pkexec("root", "dnf5", &["copr", "enable", "-y", copr]).await?;
         }
 
-        match (
-            settings.actions[1].is_empty(),
-            settings.actions[2].is_empty(),
-        ) {
+        match (settings.actions[1].is_empty(), settings.actions[2].is_empty()) {
             (true, true) => {}
             (true, false) => {
                 super::super::flatpak::handle_flatpak(sender.clone(), |flatpak| {
@@ -85,8 +75,7 @@ impl super::Step for DnfDownloadApps {
             }
             (false, true) => {
                 super::super::dnf::handle_dnf(sender, |dnf| {
-                    dnf.args(["in", "-y", "--downloadonly"])
-                        .args(&settings.actions[1])
+                    dnf.args(["in", "-y", "--downloadonly"]).args(&settings.actions[1])
                 })
                 .await?;
             }
@@ -100,8 +89,7 @@ impl super::Step for DnfDownloadApps {
                             .args(&settings.actions[2])
                     }),
                     super::super::dnf::handle_dnf(sender, |dnf| {
-                        dnf.args(["in", "-y", "--downloadonly"])
-                            .args(&settings.actions[1])
+                        dnf.args(["in", "-y", "--downloadonly"]).args(&settings.actions[1])
                     }),
                 )
                 .await?;

@@ -12,11 +12,7 @@ impl super::Step for UserAdd {
         settings: &crate::backend::settings::Settings,
         sender: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
-        if CFG.taidan0.systemd_homed {
-            homed(settings).await
-        } else {
-            useradd(settings).await
-        }
+        if CFG.taidan0.systemd_homed { homed(settings).await } else { useradd(settings).await }
     }
 }
 
@@ -31,14 +27,7 @@ async fn useradd(settings: &crate::backend::settings::Settings) -> color_eyre::R
     _ = super::super::pkexec(
         "root",
         "useradd",
-        &[
-            "-p",
-            &pass,
-            "-c",
-            &settings.fullname,
-            "-m",
-            &settings.username,
-        ],
+        &["-p", &pass, "-c", &settings.fullname, "-m", &settings.username],
     )
     .await;
     super::super::pkexec("root", "usermod", &["-aG", "wheel", &settings.username]).await?;

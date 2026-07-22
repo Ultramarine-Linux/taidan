@@ -11,9 +11,8 @@ impl super::Step for Script {
         settings: &mut crate::backend::settings::Settings,
         _: relm4::Sender<crate::pages::InstallingPageMsg>,
     ) -> color_eyre::Result<()> {
-        let f = std::fs::File::create(SETTINGS_FILE).wrap_err(const_format::formatcp!(
-            "cannot create file `{SETTINGS_FILE}`"
-        ))?;
+        let f = std::fs::File::create(SETTINGS_FILE)
+            .wrap_err(const_format::formatcp!("cannot create file `{SETTINGS_FILE}`"))?;
         serde_json::to_writer(f, settings)?;
         // `f` is moved into to_write() and is therefore dropped by now
         let mut process = tokio::process::Command::new("bash");

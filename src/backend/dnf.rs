@@ -31,9 +31,7 @@ pub(super) async fn handle_dnf(
         .spawn()
         .wrap_err("fail to run `dnf5`")?;
     let log_path = &*crate::TEMP_DIR.join("dnf5.stdout.log");
-    let mut log = tokio::fs::File::create(log_path)
-        .await
-        .expect("cannot create log file");
+    let mut log = tokio::fs::File::create(log_path).await.expect("cannot create log file");
     let mut stdout_lines = tokio::io::BufReader::new(reader).lines();
     loop {
         let line = futures::select! {
@@ -90,8 +88,7 @@ impl EnableRepo {
     pub(super) async fn enable_repo(&mut self, repo: &str) -> color_eyre::Result<()> {
         tracing::debug!("Enabling repo");
         if let Some((doc, b)) = self.files.iter_mut().find_map(|(_, (doc, b))| {
-            doc.starts_with(format!("[{repo}]\n").as_bytes())
-                .then_some((doc, b))
+            doc.starts_with(format!("[{repo}]\n").as_bytes()).then_some((doc, b))
         }) {
             const TARGET: &[u8] = b"\nenabled=";
             if memchr::memmem::find(doc, b"\nenabled=1").is_some() {

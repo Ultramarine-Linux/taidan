@@ -25,9 +25,8 @@ pub fn user_already_exists() -> bool {
                 tracing::error!(?l, "cannot parse line in /etc/passwd");
                 return false;
             };
-            let Ok(uid) = uid
-                .parse::<usize>()
-                .inspect_err(|e| tracing::error!(?e, ?uid, "cannot parse uid"))
+            let Ok(uid) =
+                uid.parse::<usize>().inspect_err(|e| tracing::error!(?e, ?uid, "cannot parse uid"))
             else {
                 return false;
             };

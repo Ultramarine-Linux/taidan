@@ -32,13 +32,9 @@ fn derive_username(fullname: &str) -> Option<String> {
         return Some(String::new());
     }
 
-    let first = fullname
-        .split_once(|c: char| c.is_whitespace())
-        .map_or(fullname, |(a, _)| a);
+    let first = fullname.split_once(|c: char| c.is_whitespace()).map_or(fullname, |(a, _)| a);
     derive_part(first).or_else(|| {
-        let last = fullname
-            .rsplit_once(|c: char| c.is_whitespace())
-            .map_or(fullname, |(_, b)| b);
+        let last = fullname.rsplit_once(|c: char| c.is_whitespace()).map_or(fullname, |(_, b)| b);
         derive_part(last)
     })
 }

@@ -31,9 +31,7 @@ pub async fn start_install(
 ) -> color_eyre::Result<()> {
     tracing::info!("Starting installation");
     for stage in steps::Stage::all() {
-        sender
-            .send(InstallingPageMsg::UpdStage(*stage))
-            .expect("sender dropped?");
+        sender.send(InstallingPageMsg::UpdStage(*stage)).expect("sender dropped?");
         tracing::debug!(?stage, "Running pre()");
         stage.pre(&mut settings, sender.clone()).await?;
         tracing::info!(?stage, "Running stage");
@@ -41,9 +39,7 @@ pub async fn start_install(
             .wrap_err("stage failed")
             .with_note(|| format!("Stage: {stage:?}"))?;
     }
-    sender
-        .send(InstallingPageMsg::Finish)
-        .expect("sender dropped?");
+    sender.send(InstallingPageMsg::Finish).expect("sender dropped?");
     Ok(())
 }
 
@@ -69,20 +65,12 @@ pub async fn start_simple_install(
 ) -> color_eyre::Result<()> {
     tracing::info!("Starting installation");
     tracing::info!("Running UserAdd");
-    steps::Stage::UserAdd(Default::default())
-        .run(&settings, sender.clone())
-        .await?;
+    steps::Stage::UserAdd(Default::default()).run(&settings, sender.clone()).await?;
     tracing::info!("Running Script");
-    steps::Stage::Script(Default::default())
-        .run(&settings, sender.clone())
-        .await?;
+    steps::Stage::Script(Default::default()).run(&settings, sender.clone()).await?;
     tracing::info!("Running DriversCodecs");
-    steps::Stage::DriversCodecs(Default::default())
-        .run(&settings, sender.clone())
-        .await?;
-    sender
-        .send(InstallingPageMsg::Finish)
-        .expect("sender dropped?");
+    steps::Stage::DriversCodecs(Default::default()).run(&settings, sender.clone()).await?;
+    sender.send(InstallingPageMsg::Finish).expect("sender dropped?");
     Ok(())
 }
 
@@ -97,15 +85,8 @@ mod parseutil {
         s: &'static str,
         output: &mut tokio::process::Child,
     ) -> color_eyre::Result<()> {
-        let status = output
-            .wait()
-            .await
-            .wrap_err(format!("waiting for `{s}` failed"))?;
-        if status.success() {
-            Ok(())
-        } else {
-            Err(eyre!("`{s}` failed with status: {status}"))
-        }
+        let status = output.wait().await.wrap_err(format!("waiting for `{s}` failed"))?;
+        if status.success() { Ok(()) } else { Err(eyre!("`{s}` failed with status: {status}")) }
     }
 
     /// # Panics
@@ -116,9 +97,7 @@ mod parseutil {
             return;
         }
         sender
-            .send(crate::pages::InstallingPageMsg::UpdDnfProg(
-                f64::from(num) / f64::from(den),
-            ))
+            .send(crate::pages::InstallingPageMsg::UpdDnfProg(f64::from(num) / f64::from(den)))
             .expect("ui sender fails");
     }
 }

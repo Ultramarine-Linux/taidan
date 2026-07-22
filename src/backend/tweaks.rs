@@ -108,8 +108,7 @@ impl Tweak {
     pub fn from_dir(path: PathBuf) -> std::io::Result<Self> {
         debug_assert!(path.is_dir());
         let Some(up) = std::fs::read_dir(&path)?.find_map(|f| {
-            f.ok()
-                .filter(|f| f.path().is_file() && f.file_name().as_encoded_bytes() == b"up")
+            f.ok().filter(|f| f.path().is_file() && f.file_name().as_encoded_bytes() == b"up")
         }) else {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,

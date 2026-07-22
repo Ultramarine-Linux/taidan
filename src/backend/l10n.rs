@@ -20,18 +20,12 @@ static PO_ASSETS: LazyLock<Arc<B>> = LazyLock::new(|| {
         FileSystemAssets::try_new(PO_PATH)
             .inspect_err(|e| tracing::error!(?e, "Cannot load assets in {PO_PATH}"))
             .inspect_err(|_| tracing::warn!("Falling back to global compile-time assets"))
-            .map_or_else(
-                |_| Box::new(crate::Localizations) as B,
-                |a| Box::new(a) as B,
-            ),
+            .map_or_else(|_| Box::new(crate::Localizations) as B, |a| Box::new(a) as B),
     )
 });
 
-static PO_AVAILABLE_LANGS: LazyLock<Vec<LanguageIdentifier>> = LazyLock::new(|| {
-    fluent_language_loader!()
-        .available_languages(&***PO_ASSETS)
-        .unwrap()
-});
+static PO_AVAILABLE_LANGS: LazyLock<Vec<LanguageIdentifier>> =
+    LazyLock::new(|| fluent_language_loader!().available_languages(&***PO_ASSETS).unwrap());
 
 /// Create a new loader according to the list of languages.
 ///

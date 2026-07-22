@@ -11,10 +11,7 @@ impl super::Step for DnfInstallApps {
         if CFG.taidan0.skip_dnf || settings.nointernet {
             return Ok(());
         }
-        match (
-            settings.actions[1].is_empty(),
-            settings.actions[2].is_empty(),
-        ) {
+        match (settings.actions[1].is_empty(), settings.actions[2].is_empty()) {
             (true, true) => {}
             (true, false) => {
                 super::super::flatpak::handle_flatpak(sender.clone(), |flatpak| {

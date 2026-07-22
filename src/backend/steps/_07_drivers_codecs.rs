@@ -117,9 +117,7 @@ impl Drivers {
         let pkgs = Self::list_nvidia_packages().await?;
         let mut args = vec!["install", "-y"];
         args.extend(pkgs.iter().map(String::as_str));
-        root("rpm-ostree", &args)
-            .await
-            .with_note(|| format!("pkgs={pkgs:?}"))?;
+        root("rpm-ostree", &args).await.with_note(|| format!("pkgs={pkgs:?}"))?;
         root(
             "rpm-ostree",
             &[
@@ -149,9 +147,7 @@ impl Drivers {
         let pkgs = Self::list_nvidia_packages().await?;
         let mut args = vec!["in", "-y", "--allowerasing", "--best"];
         args.extend(pkgs.iter().map(String::as_str));
-        root("dnf", &args)
-            .await
-            .with_note(|| format!("pkgs={pkgs:?}"))?;
+        root("dnf", &args).await.with_note(|| format!("pkgs={pkgs:?}"))?;
 
         if primary_gpu {
             root(
