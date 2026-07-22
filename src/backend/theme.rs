@@ -49,10 +49,7 @@ impl AccentColor {
         let args = [
             ["DISPLAY=:0", "gsettings"],
             ["set", "org.gnome.desktop.interface"],
-            [
-                "color-scheme",
-                if is_dark { "prefer-dark" } else { "default" },
-            ],
+            ["color-scheme", if is_dark { "prefer-dark" } else { "default" }],
         ];
         pkexec(user, "env", &args.concat()).await?;
 
@@ -153,10 +150,7 @@ pub async fn set_night_light(user: Option<&str>, enabled: bool) -> color_eyre::R
         let args = [
             ["DISPLAY=:0", "gsettings"],
             ["set", "org.gnome.settings-daemon.plugins.color"],
-            [
-                "night-light-enabled",
-                if enabled { "true" } else { "false" },
-            ],
+            ["night-light-enabled", if enabled { "true" } else { "false" }],
         ];
         pkexec(user, "env", &args.concat()).await?;
     }

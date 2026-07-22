@@ -1,6 +1,18 @@
 [workspace]
+members = ["taidan_proc_macros", "libtaidan"]
 
-members = ["taidan_proc_macros"]
+[workspace.dependencies]
+futures = "0.3.31"
+itertools = "0.15.0"
+regex = "1.13.1"
+serde = { version = "1.0.229", features = ["derive"] }
+tempfile = { version = "3.20.0", default-features = false }
+tracing = "0.1.44"
+
+[workspace.dependencies.tokio]
+version = "1.46.1"
+features = ["fs", "io-util", "macros", "process"]
+
 
 [package]
 name = "taidan"
@@ -17,7 +29,7 @@ basic-toml = "0.1.10"
 color-eyre = "0.6.5"
 const_format = "0.2.34"
 enum_dispatch = "0.3.13"
-futures = "0.3.31"
+futures = { workspace = true }
 gvdb = "0.9.0"
 i18n-embed = { version = "0.16.0", features = [
     "desktop-requester",
@@ -27,7 +39,7 @@ i18n-embed = { version = "0.16.0", features = [
 i18n-embed-fl = "0.10.0"
 iso3166 = "1.2.1"
 isolang = { version = "2.4.0", features = ["local_names"] }
-itertools = "0.14.0"
+itertools = { workspace = true }
 kurage = { version = "0.1.4" }
 libc = "0.2.174"
 # libappstream = "0.3.0"
@@ -37,7 +49,7 @@ parking_lot = "0.12.4"
 paste = "1.0.15"
 phf = { version = "0.13.1", features = ["macros"] }
 poly_l10n = "0.0.7"
-regex = "1.11.1"
+regex = { workspace = true }
 relm4 = { version = "0.9.1", default-features = false, features = ["macros"] }
 reqwest = { version = "0.12.22", features = [
     "http2",
@@ -50,14 +62,9 @@ serde = "1.0.219"
 serde_json = "1.0.140"
 strip-ansi-escapes = "0.2.1"
 taidan_proc_macros = { path = "taidan_proc_macros" }
-tempfile = { version = "3.20.0", default-features = false }
-tokio = { version = "1.46.1", features = [
-    "fs",
-    "io-util",
-    "macros",
-    "process",
-] }
-tracing = "0.1.41"
+tempfile = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
 tracing-appender = "0.2.3"
 tracing-error = "0.2.1"
 tracing-journald = "0.3.1"
