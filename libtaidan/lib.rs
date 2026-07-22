@@ -48,7 +48,7 @@ impl<F: Fn(InstallMsg)> Callback for F {
 /// Stage failures are propagated.
 #[tracing::instrument(skip(callback))]
 pub async fn start_install(
-    mut settings: settings::Settings,
+    settings: &mut settings::Settings,
     cfg: &cfg::Config,
     callback: &impl Callback,
 ) -> Res<()> {
@@ -56,9 +56,9 @@ pub async fn start_install(
     for stage in steps::Stage::all() {
         callback.send(InstallMsg::UpdStage(*stage));
         tracing::debug!(?stage, "Running pre()");
-        stage.pre(&mut settings, cfg, callback).await?;
+        stage.pre(settings, cfg, callback).await?;
         tracing::info!(?stage, "Running stage");
-        stage.run(&settings, cfg, callback).await?;
+        stage.run(settings, cfg, callback).await?;
     }
     callback.send(InstallMsg::Finish);
     Ok(())

@@ -1,8 +1,6 @@
-#[derive(Clone, Debug, Default, serde::Serialize)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
-    pub langlocale: &'static str,
-
     pub skipconfig: bool,
     pub nointernet: bool,
 
@@ -19,7 +17,7 @@ pub struct Settings {
 
     pub install_codecs_drivers: bool,
 
-    pub ims: Vec<&'static str>,
+    pub ims: Vec<String>,
     pub imf: crate::i18n::I18nImf,
 
     pub actions: [Vec<String>; crate::cfg::ACTION_TYPES],

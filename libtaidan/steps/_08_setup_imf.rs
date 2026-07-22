@@ -77,7 +77,7 @@ async fn write_fcitx5_profile(
         .as_bytes(),
     );
 
-    for (i, &im) in ims.iter().enumerate() {
+    for (i, im) in ims.iter().enumerate() {
         buf.extend_from_slice(
             format!(
                 "\
@@ -88,7 +88,7 @@ async fn write_fcitx5_profile(
                     Layout=\n\n\
                 ",
                 i + 1,
-                i18n::str_to_im(im).fcitx5_ref.unwrap()
+                i18n::str_to_im(&im).fcitx5_ref.unwrap()
             )
             .as_bytes(),
         );

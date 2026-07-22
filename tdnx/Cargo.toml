@@ -1,0 +1,14 @@
+[package]
+name = "tdnx"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "tdnx"
+path = "./main.rs"
+
+[dependencies]
+tracing-subscriber = { workspace = true }
+libtaidan = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
