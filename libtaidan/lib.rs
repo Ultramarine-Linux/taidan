@@ -4,6 +4,7 @@ pub mod dnf;
 pub mod err;
 pub mod flatpak;
 pub mod i18n;
+pub mod oobe;
 pub mod passwd;
 pub mod prelude;
 pub mod settings;
