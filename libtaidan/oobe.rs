@@ -4,6 +4,9 @@
 //! The local web service can expose it over a narrow API, while libtaidan's
 //! privileged operation implementations remain separate from the UI layer.
 
+/// Canonical local port for the Ultramarine Server OOBE web service.
+pub const DEFAULT_OOBE_PORT: u16 = 3972;
+
 use std::{
     fs,
     io::Write,
