@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, Default, serde::Serialize)]
+#[derive(Clone, Debug, serde::Serialize)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub langlocale: &'static str,
@@ -27,4 +27,27 @@ pub struct Settings {
     pub actions: [Vec<String>; crate::cfg::ACTION_TYPES],
 
     pub tweaks: Vec<bool>,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            langlocale: Default::default(),
+            skipconfig: Default::default(),
+            nointernet: Default::default(),
+            kb_layout: Default::default(),
+            kb_variant: Default::default(),
+            device_name: Default::default(),
+            hostname: Default::default(),
+            fullname: Default::default(),
+            username: Default::default(),
+            passwd: Default::default(),
+            install_codecs_drivers: true,
+            ims: Default::default(),
+            theme_is_dark: Default::default(),
+            accent: Default::default(),
+            actions: Default::default(),
+            tweaks: Default::default(),
+        }
+    }
 }
