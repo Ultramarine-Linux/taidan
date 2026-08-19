@@ -22,7 +22,7 @@ features = ["fs", "io-util", "macros", "process"]
 
 [package]
 name = "taidan"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2024"
 description = "Out-Of-Box-Experience (OOBE) and Welcome App"
 license = "GPL-2.0-or-later"
@@ -53,16 +53,16 @@ libhelium = "0.12.0"
 memchr = "2.7.5"
 parking_lot = "0.12.4"
 paste = "1.0.15"
-phf = { version = "0.13.1", features = ["macros"] }
+phf = { version = "0.14.0", features = ["macros"] }
 poly_l10n = "0.0.7"
 regex = { workspace = true }
 relm4 = { version = "0.9.1", default-features = false, features = ["macros"] }
-reqwest = { version = "0.12.22", features = [
+reqwest = { version = "0.13.4", features = [
     "http2",
     "default-tls",
 ], default-features = false }
 rust-embed = { version = "8.7.2", features = ["include-exclude"] }
-sentry = { version = "0.46.0", features = ["logs", "tracing"] }
+sentry = { version = "0.49.1", features = ["logs", "tracing"] }
 sentry-eyre = "0.3.0"
 serde = "1.0.219"
 serde_json = "1.0.140"
@@ -79,7 +79,7 @@ uzers = "0.12.1"
 xcrypt = "0.3.1"
 
 [build-dependencies]
-glib-build-tools = "0.21.0"
+glib-build-tools = "0.22.8"
 
 [lints.clippy]
 # cargo = { level = "warn", priority = -1 }
