@@ -2,7 +2,7 @@
 members = ["taidan_proc_macros", "libtaidan", "tdnx"]
 
 [workspace.dependencies]
-futures = "0.3.31"
+futures = "0.3.32"
 itertools = "0.15.0"
 libtaidan = { path = "./libtaidan" }
 regex = "1.13.1"
