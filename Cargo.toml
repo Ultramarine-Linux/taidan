@@ -29,43 +29,47 @@ license = "GPL-2.0-or-later"
 repository = "https://github.com/Ultramarine-Linux/taidan"
 readme = "README.md"
 keywords = ["oobe", "ultramarine", "linux"]
+build = "build.rs"
 
 [dependencies]
+atomic_float = "1.1.0"
 basic-toml = "0.1.10"
 color-eyre = "0.6.5"
 const_format = "0.2.34"
 enum_dispatch = "0.3.13"
+fluent = "0.17.0"
 futures = { workspace = true }
-gvdb = "0.9.0"
+hex = "0.4.3"
 i18n-embed = { version = "0.16.0", features = [
     "desktop-requester",
     "filesystem-assets",
     "fluent-system",
 ] }
 i18n-embed-fl = "0.10.0"
+icu = { version = "2.3.1", features = ["unstable"] }
 iso3166 = "1.2.1"
 isolang = { version = "2.4.0", features = ["local_names"] }
 itertools = { workspace = true }
-kurage = { version = "0.1.4" }
 libc = "0.2.174"
-# libappstream = "0.3.0"
-libhelium = "0.12.0"
+libtaidan = { version = "0.3.0", path = "libtaidan" }
 memchr = "2.7.5"
 parking_lot = "0.12.4"
 paste = "1.0.15"
 phf = { version = "0.14.0", features = ["macros"] }
 poly_l10n = "0.0.7"
 regex = { workspace = true }
-relm4 = { version = "0.9.1", default-features = false, features = ["macros"] }
 reqwest = { version = "0.13.4", features = [
     "http2",
     "default-tls",
 ], default-features = false }
 rust-embed = { version = "8.7.2", features = ["include-exclude"] }
-sentry = { version = "0.49.1", features = ["logs", "tracing"] }
+# NOTE: current tree requires this version too?
+# sentry = { version = "0.46.2", features = ["logs", "tracing"] }
+sentry = { version = "0.49.2", features = ["logs", "tracing"] }
 sentry-eyre = "0.3.0"
 serde = "1.0.219"
 serde_json = "1.0.140"
+slint = "1.17.1"
 strip-ansi-escapes = "0.2.1"
 taidan_proc_macros = { path = "taidan_proc_macros" }
 tempfile = { workspace = true }
@@ -76,10 +80,11 @@ tracing-error = "0.2.1"
 tracing-journald = "0.3.1"
 tracing-subscriber = { workspace = true }
 uzers = "0.12.1"
+xcb = { version = "1.7.1", features = ["randr"] }
 xcrypt = "0.3.1"
 
 [build-dependencies]
-glib-build-tools = "0.22.8"
+slint-build = "1.17.1"
 
 [lints.clippy]
 # cargo = { level = "warn", priority = -1 }

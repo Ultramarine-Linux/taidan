@@ -1,22 +1,23 @@
-use crate::backend::passwd::user_already_exists;
+use libtaidan::passwd::user_already_exists;
 
 pub const ACTION_TYPES: usize = 5;
 
 #[allow(clippy::unsafe_derive_deserialize)]
-#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
 pub struct Config {
     #[serde(skip)]
     pub distro: String,
     #[serde(default)]
     pub edition: String,
 
-    #[serde(default)]
-    pub skip_pages: Vec<crate::Page>,
+    // TODO: skip_pages
+    // #[serde(default)]
+    // pub skip_pages: Vec<crate::Page>,
     #[serde(default = "_default_org")]
     pub org: String,
 
     #[serde(default)]
-    pub i18n: crate::backend::i18n::I18nCfg,
+    pub i18n: libtaidan::i18n::I18nCfg,
 
     #[serde(default)]
     pub taidan0: Taidan0Config,
@@ -90,7 +91,7 @@ impl Config {
     }
 }
 
-#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
 pub struct Taidan0Config {
     #[serde(default)]
     pub continue_if_user_exists: bool,

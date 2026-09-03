@@ -1,89 +1,71 @@
-use crate::prelude::*;
+use slint::{Model, ToSharedString};
 
-// FIXME: labels don't update when language changes
-#[relm4::widget_template(pub)]
-impl WidgetTemplate for PrevNextBtns {
-    view! {
-        gtk::Box {
-            set_valign: gtk::Align::End,
+slint::include_modules!();
 
-            #[name = "prev"]
-            libhelium::Button {
-                set_is_pill: true,
-                set_color: libhelium::ButtonColor::Surface,
-                #[watch]
-                set_label: &t!("prev"),
-                inline_css: "padding-left: 48px; padding-right: 48px",
-            },
-
-            gtk::Box { set_hexpand: true },
-
-            #[name = "next"]
-            libhelium::Button {
-                set_is_pill: true,
-                #[watch]
-                set_label: &t!("next"),
-                inline_css: "padding-left: 48px; padding-right: 48px",
-                add_css_class: "suggested-action",
-            },
-        },
-    }
-}
-
-#[relm4::widget_template(pub)]
-impl WidgetTemplate for SwitchBox {
-    view! {
-        libhelium::MiniContentBlock {
-            #[wrap(Some)]
-            #[name(switch)]
-            set_widget = &gtk::Switch {
-                set_halign: gtk::Align::End,
-                set_hexpand: true
+pub fn run() {
+    tracing::debug!("Starting Taidan");
+    let ui = AppWindow::new().expect("cannot create app");
+    // TODO: refactor
+    let theme = ui.global::<Theme<'_>>();
+    theme.set_mode(ThemeMode::Light);
+    crate::l10n::initialize_ui(ui.as_weak(), ui.global::<Lang<'_>>());
+    let cfg: Cfg<'_> = ui.global();
+    cfg.set_version(env!("CARGO_PKG_VERSION").into());
+    cfg.on_get_string(|path, default| {
+        if let Some(serde_json::Value::String(s)) = cfg_get_val(&path) {
+            s.to_shared_string()
+        } else {
+            default
+        }
+    });
+    cfg.on_get_image(|path, default| {
+        if let Some(serde_json::Value::String(path)) = cfg_get_val(&path) {
+            slint::Image::load_from_path(std::path::Path::new(&path))
+                .inspect_err(|e| tracing::error!(?path, ?e, "cannot load image"))
+                .unwrap_or(default)
+        } else {
+            default
+        }
+    });
+    cfg.on_get_brush(|path, default| {
+        if let Some(serde_json::Value::String(s)) = cfg_get_val(&path) {
+            if let Some(code) = s.strip_prefix('#') {
+                let Ok(v) = hex::decode(code).inspect_err(|e| tracing::error!(?path, s, ?e)) else {
+                    return default;
+                };
+                return slint::Brush::SolidColor(match v[..] {
+                    [a, r, g, b] => slint::Color::from_argb_u8(a, r, g, b),
+                    [r, g, b] => slint::Color::from_rgb_u8(r, g, b),
+                    _ => {
+                        tracing::error!(?path, s, "invalid length, expected #aarrggbb or #rrggbb");
+                        return default;
+                    }
+                });
+            } else {
+                tracing::error!(?path, s, "invalid brush/color, expected #aarrggbb or #rrggbb");
+                return default;
             }
         }
-    }
+        default
+    });
+
+    // autoscale(&ui);
+    ui.run().expect("cannot run ui");
 }
 
-#[relm4::widget_template(pub)]
-impl WidgetTemplate for Category {
-    view! {
-        // libhelium::ViewDual
-        #[name(viewdual)]
-        gtk::Box {
-            set_orientation: gtk::Orientation::Horizontal,
-            set_valign: gtk::Align::Fill,
-            set_halign: gtk::Align::Fill,
-            set_vexpand: true,
-            set_hexpand: true,
-            // set_show_handle: false,
-
-            // #[wrap(Some)]
-            // set_child_start = &gtk::ScrolledWindow {
-            gtk::ScrolledWindow {
-                #[name(browsers)]
-                gtk::ListBox {
-                    add_css_class: "content-list",
-                    set_selection_mode: gtk::SelectionMode::Multiple,
-                    set_vexpand: true,
-                    set_hexpand: true,
-                    set_valign: gtk::Align::Fill,
-                    set_halign: gtk::Align::Fill,
-                }
-            },
-            #[name(optlist)]
-            // #[wrap(Some)]
-            // set_child_end = &gtk::ScrolledWindow {
-            gtk::ScrolledWindow {
-                // #[name(optlist)]
-                // gtk::ListBox {
-                //     add_css_class: "content-list",
-                //     set_selection_mode: gtk::SelectionMode::Single,
-                //     set_vexpand: true,
-                //     set_hexpand: true,
-                //     set_valign: gtk::Align::Center,
-                //     set_halign: gtk::Align::Center,
-                // },
-            }
+fn cfg_get_val(id: &str) -> Option<serde_json::Value> {
+    let mut val = serde_json::to_value(&*crate::CFG).expect("cannot serialize cfg");
+    let mut it = id.split('.');
+    while let Some(component) = it.next() {
+        if let Ok(i) = component.parse::<usize>()
+            && let serde_json::Value::Array(arr) = val
+        {
+            val = arr.into_iter().nth(i)?;
+        } else if let serde_json::Value::Object(mut obj) = val {
+            val = obj.remove(component)?;
+        } else {
+            return None;
         }
     }
+    Some(val)
 }
