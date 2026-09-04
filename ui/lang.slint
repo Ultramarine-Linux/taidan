@@ -8,6 +8,14 @@ export struct Language {
     native_name: string,
 }
 
+export struct KeymapVariant { id: string, name: string }
+
+export struct Keymap {
+    id: string,
+    name: string,
+    variants: [KeymapVariant],
+}
+
 export global Lang {
     in-out property <Language> current_language;
     in property <[Language]> languages;
@@ -23,4 +31,6 @@ export global Lang {
     }
     pure callback _name(lang: Language, current_language: Language) -> string;
     _name(lang, current_language) => "Lang.name(" + lang.locale + ")";
+    in property <[Keymap]> keymaps;
+    in property <Keymap> current_keymap;
 }

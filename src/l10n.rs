@@ -153,7 +153,7 @@ fn display_hdl<T>(
 }
 
 pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, lang: crate::ui::Lang<'_>) {
-    use crate::ui::{FluentArg, Language};
+    use crate::ui::{FluentArg, Keymap, KeymapVariant, Language};
     use slint::{Model, ToSharedString};
     lang.on__t(|id, args, _current_language| {
         tracing::trace!(?id);
@@ -185,17 +185,15 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, lang: crate::ui::Lan
             hdl.of(&locale).to_shared_string()
         })
     });
-    lang.set_languages({
-        slint::ModelRc::new(
-            crate::l10n::LANGS
-                .iter()
-                .map(|crate::l10n::LanguageRow { locale, native_name }| Language {
-                    locale: locale.to_shared_string(),
-                    native_name: native_name.to_shared_string(),
-                })
-                .collect::<slint::VecModel<_>>(),
-        )
-    });
+    lang.set_languages(slint::ModelRc::new(
+        crate::l10n::LANGS
+            .iter()
+            .map(|crate::l10n::LanguageRow { locale, native_name }| Language {
+                locale: locale.to_shared_string(),
+                native_name: native_name.to_shared_string(),
+            })
+            .collect::<slint::VecModel<_>>(),
+    ));
     lang.on_set_lang(move |lang| {
         use slint::ComponentHandle;
         if lang.locale == "en-owo" {
@@ -205,4 +203,23 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, lang: crate::ui::Lan
         }
         ui.upgrade_in_event_loop(|ui| ui.window().request_redraw()).expect("event loop err");
     });
+    lang.set_keymaps(slint::ModelRc::new(
+        libtaidan::i18n::LAYOUTS
+            .entries()
+            .map(|(id, layout)| Keymap {
+                id: id.to_shared_string(),
+                name: layout.name.to_shared_string(),
+                variants: slint::ModelRc::new(
+                    layout
+                        .variants
+                        .entries()
+                        .map(|(id, name)| KeymapVariant {
+                            id: id.to_shared_string(),
+                            name: name.to_shared_string(),
+                        })
+                        .collect::<slint::VecModel<_>>(),
+                ),
+            })
+            .collect::<slint::VecModel<_>>(),
+    ));
 }
