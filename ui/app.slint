@@ -1,0 +1,64 @@
+import { Button, VerticalBox } from "std-widgets.slint";
+import { WelcomePage } from "pages/0010_welcome.slint";
+import { Lang } from "lang.slint";
+import { Cfg } from "cfg.slint";
+import { Step, StepHdl } from "page.slint";
+import { LanguagePage } from "pages/0020_language.slint";
+import { Theme } from "slintcn/theme/tokens.slint";
+import { WhoAreYouPage } from "pages/0040_whoareyou.slint";
+import { KeyboardPage } from "pages/0030_keyboard.slint";
+export { Lang, Cfg, Step, StepHdl, Theme }
+export enum PageType { welcome, language, keyboard, whoareyou }
+
+export component AppWindow inherits Window {
+    in-out property <PageType> pagetype: welcome;
+    in-out property <int> pagenum: 0;
+    // property <float> scale;
+    // public function set_scale(scale: float) { self.scale = scale; }
+    // inner := VerticalLayout {
+    //     padding: 4rem;
+    //     if scale != 1: Rectangle { }
+    //     HorizontalLayout {
+    //         if scale != 1: Rectangle { }
+    //         if pagetype == PageType.welcome: WelcomePage {
+    //             transform-scale: scale;
+    //             horizontal-stretch: 0;
+    //             vertical-stretch: 0;
+    //         }
+    //         if scale != 1: Rectangle { }
+    //     }
+    //
+    //     if scale != 1: Rectangle { }
+    // }
+
+    title: "Taidan";
+    // no-frame: true;
+    // full-screen: true;
+    icon: Cfg.distro_icon();
+
+    preferred-width: 800px;
+    preferred-height: 800px;
+
+    WelcomePage {
+        x: pagenum > 0 ? -self.width : 0;
+        next_page => { pagenum += 1; parent.pagetype = PageType.language; }
+    }
+
+    LanguagePage {
+        x: pagenum > 1 ? -self.width : (pagenum < 1 ? self.width : 0);
+        prev_page => { pagenum -= 1; parent.pagetype = PageType.welcome; }
+        next_page => { pagenum += 1; parent.pagetype = PageType.keyboard; }
+    }
+
+    KeyboardPage {
+        x: pagenum > 2 ? -self.width : (pagenum < 2 ? self.width : 0);
+        prev_page => { pagenum -= 1; parent.pagetype = PageType.language; }
+        next_page => { pagenum += 1; parent.pagetype = PageType.whoareyou; }
+    }
+
+    WhoAreYouPage {
+        x: pagenum > 3 ? -self.width : (pagenum < 3 ? self.width : 0);
+        prev_page => { pagenum -= 1; parent.pagetype = PageType.keyboard; }
+        // next_page => { pagenum += 1; parent.pagetype = PageType.whoareyou; }
+    }
+}

@@ -1,0 +1,36 @@
+export struct FluentArg {
+    key: string,
+    value: string,
+}
+
+export struct Language {
+    locale: string,
+    native_name: string,
+}
+
+export struct KeymapVariant { id: string, name: string }
+
+export struct Keymap {
+    id: string,
+    name: string,
+    variants: [KeymapVariant],
+}
+
+export global Lang {
+    in-out property <Language> current_language;
+    in property <[Language]> languages;
+    changed current_language => set_lang(current_language);
+    public pure function t(id: string, args: [FluentArg]) -> string {
+        _t(id, args, current_language);
+    }
+    pure callback _t(id: string, args: [FluentArg], current_language: Language) -> string;
+    _t(id, args, current_language) => "t(" + id + ")";
+    callback set_lang(lang: Language);
+    public pure function name(lang: Language) -> string {
+        _name(lang, current_language);
+    }
+    pure callback _name(lang: Language, current_language: Language) -> string;
+    _name(lang, current_language) => "Lang.name(" + lang.locale + ")";
+    in property <[Keymap]> keymaps;
+    in property <Keymap> current_keymap;
+}

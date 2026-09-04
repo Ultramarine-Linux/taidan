@@ -1,20 +1,15 @@
 #![warn(rust_2018_idioms)]
-pub mod backend;
 pub mod cfg;
+pub mod l10n;
 pub mod macros;
-pub mod pages;
 pub mod prelude;
 pub mod ui;
 
 use std::sync::LazyLock;
 
 use crate::prelude::*;
-use gtk::glib::translate::FromGlibPtrNone;
 use i18n_embed::LanguageLoader;
 use parking_lot::RwLock;
-use relm4::{
-    Component, ComponentController, ComponentParts, ComponentSender, RelmApp, SimpleComponent,
-};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 const APPID: &str = "com.fyralabs.Taidan";
@@ -34,16 +29,19 @@ pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     tracing::debug!("Populated cfg::Config (turn on `trace` to see body)");
     cfg
 });
-pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::SharedState::new();
 /// Language Loader
 pub static LL: std::sync::LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
     std::sync::LazyLock::new(|| RwLock::new(handle_l10n()));
+
+pub static SETTINGS: LazyLock<RwLock<libtaidan::settings::Settings>> =
+    LazyLock::new(Default::default);
 
 #[derive(rust_embed::RustEmbed)]
 #[folder = "po/"]
 #[exclude = "en-owo/*.ftl"]
 struct Localizations;
 
+/*
 generate_pages!(Page AppModel AppMsg:
     00: Language,
     01: Welcome,
@@ -240,7 +238,7 @@ impl AppModel {
             }
         });
     }
-}
+}*/
 
 fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
     use i18n_embed::{LanguageLoader, fluent::fluent_language_loader};
@@ -258,6 +256,43 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
     loader
 }
 
+fn get_screen_resolution() -> xcb::Result<(u16, u16)> {
+    use xcb::x;
+    // TODO: how to do this the pure wayland way
+    tracing::debug!("connecting to xcb");
+    let (conn, screen_num) = xcb::Connection::connect(None)?;
+    let setup = conn.get_setup();
+    let screen = setup.roots().nth(screen_num as usize).unwrap();
+    let window: xcb::x::Window = conn.generate_id();
+    let cookie = conn.send_request_checked(&x::CreateWindow {
+        depth: x::COPY_FROM_PARENT as u8,
+        wid: window,
+        parent: screen.root(),
+        x: 0,
+        y: 0,
+        width: 150,
+        height: 150,
+        border_width: 0,
+        class: x::WindowClass::InputOutput,
+        visual: screen.root_visual(),
+        // this list must be in same order than `Cw` enum order
+        value_list: &[
+            x::Cw::BackPixel(screen.white_pixel()),
+            x::Cw::EventMask(x::EventMask::EXPOSURE | x::EventMask::KEY_PRESS),
+        ],
+    });
+    // We now check if the window creation worked.
+    // A cookie can't be cloned; it is moved to the function.
+    conn.check_request(cookie)?;
+    let cookie = conn.send_request(&xcb::randr::GetScreenInfo { window });
+    tracing::debug!("wait for GetScreenInfoCookie");
+    let reply = conn.wait_for_reply(cookie).expect("cannot wait for GetScreenInfoCookie");
+    let sizes = reply.sizes();
+    let size = sizes.first().expect("no screens?");
+    tracing::debug!(width = size.width, height = size.height);
+    Ok((size.width, size.height))
+}
+
 #[allow(clippy::missing_errors_doc)]
 #[allow(clippy::missing_panics_doc)]
 fn main() {
@@ -266,24 +301,30 @@ fn main() {
     // FIXME: temp hack to set nointernet to true here (should be default value), please refactor
     SETTINGS.write().nointernet = true;
 
-    gtk::gio::resources_register_include!("icons.gresource").unwrap();
-
-    // SAFETY: placeholder
-    let color =
-        unsafe {
-            libhelium::RGBColor::from_glib_none(std::ptr::from_mut(
-                &mut libhelium::ffi::HeRGBColor { r: 0.0, g: 7.0, b: 143.0 },
-            ))
-        };
-    let app = libhelium::Application::builder()
-        .application_id(APPID)
-        .flags(gtk::gio::ApplicationFlags::default())
-        .default_accent_color(&color)
-        .build();
-
-    tracing::debug!("Starting Taidan");
-    RelmApp::from_app(app).run::<AppModel>(());
+    ui::run();
 }
+
+/*
+fn autoscale(ui: &AppWindow) {
+    let (full_w, full_h) = get_screen_resolution().expect("cannot get screen resolution");
+    ui.as_weak()
+        .upgrade_in_event_loop(move |ui| {
+            ui.show().expect("cannot show ui");
+            let mut size = ui.window().size();
+            let wf = 0.8 * (full_w as f32) / (size.width as f32);
+            let hf = 0.8 * (full_h as f32) / (size.height as f32);
+            tracing::debug!(?size, wf, hf);
+            let scale = if wf < hf { wf } else { hf };
+            size.width = ((size.width as f32) * scale) as u32;
+            size.height = ((size.height as f32) * scale) as u32;
+            tracing::debug!(?size, scale);
+            ui.invoke_set_scale(scale * 0.9);
+            // BUG: this does not set the width somehow?
+            // ui.window().set_size(size);
+            ui.window().set_fullscreen(true);
+        })
+        .expect("cannot scale");
+}*/
 
 pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
     let dir = tempfile::Builder::new()
@@ -302,15 +343,17 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 /// - cannot create taidan tempdir
 #[allow(clippy::cognitive_complexity)]
 fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
+    #[cfg(not(debug_assertions))]
     let sentry_guard = sentry::init((
         SENTRY_LINK,
         sentry::ClientOptions::new()
             .maybe_release(sentry::release_name!())
             // Capture user IPs and potentially sensitive headers when using HTTP server integrations
             // see https://docs.sentry.io/platforms/rust/data-management/data-collected for more info
-            .send_default_pii(true)
-            .enable_logs(true),
+            .send_default_pii(true),
     ));
+    #[cfg(debug_assertions)]
+    let sentry_guard = ();
     color_eyre::install().expect("install color_eyre");
     let file_appender = tracing_appender::rolling::never(&*TEMP_DIR, "taidan.log");
     let (non_blocking, tracing_guard) = tracing_appender::non_blocking(file_appender);

@@ -1,0 +1,70 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { HorizontalBox, Button, ScrollView } from "std-widgets.slint";
+import { TdnText, TdnBtn, TdnInput } from "../components.slint";
+import { Cfg } from "../cfg.slint";
+import { Card } from "../slintcn/components/card.slint";
+
+export component KeyboardPage inherits TdnPage {
+    pageid: "keyboard";
+    step_i: 0;
+
+    // TODO: impl
+    Card {
+        variant: solid;
+
+        DragArea {
+            width: parent.width;
+            height: parent.height;
+        }
+
+        VerticalLayout {
+            padding: 1rem;
+            spacing: 1rem;
+            search := TdnInput {
+                placeholder: Lang.t("page-language-search-lang", []);
+                icon: @image-url("../../data/icons/system-search-symbolic.svg");
+                // TODO: impl
+                edited(text) => { debug("edited: " + text) }
+                text: "TODO impl this!!!";
+            }
+
+            scrollview := ScrollView {
+                GridLayout {
+                    spacing-horizontal: 1rem;
+                    spacing-vertical: 0.5rem;
+                    for lang[i] in Lang.languages: Row {
+                        lbl_name := TdnText {
+                            text: Lang.name(lang);
+                            horizontal-alignment: right;
+                            height: 2rem;
+
+                            area := TouchArea {
+                                x: parent.x;
+                                width: lbl_name.width + lbl_native.width;
+                                height: parent.height;
+                                clicked => { Lang.current_language = lang; }
+                                mouse-cursor: pointer;
+                            }
+
+                            Rectangle {
+                                x: area.x;
+                                y: area.y;
+                                z: -1;
+                                width: area.width;
+                                height: area.height;
+                                border-radius: 0.25rem;
+                                background: grey.transparentize(area.has-hover ? 0.8 : 1.0);
+                            }
+                        }
+
+                        lbl_native := TdnText {
+                            text: lang.native-name;
+                            horizontal-alignment: left;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
