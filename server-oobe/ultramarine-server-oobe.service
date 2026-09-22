@@ -1,0 +1,16 @@
+[Unit]
+Description=Ultramarine Server OOBE
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/share/ultramarine-server-oobe
+ExecStart=/usr/bin/node /usr/share/ultramarine-server-oobe/index.js
+Environment=OOBE_STATE_PATH=/var/lib/ultramarine-server-oobe/state.json
+RuntimeDirectory=ultramarine-server-oobe
+RuntimeDirectoryMode=0700
+Environment=PORT=6623
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

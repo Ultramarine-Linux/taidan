@@ -1,0 +1,51 @@
+name: Server OOBE accessibility
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/server-oobe-accessibility.yml"
+      - "server-oobe/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/server-oobe-accessibility.yml"
+      - "server-oobe/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  accessibility:
+    name: Server OOBE accessibility
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server-oobe
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up PNPM
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+        with:
+          cache: true
+          runtime: node@lts
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Locate Chromium
+        run: |
+          chromium_path="$(command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$chromium_path" ]; then
+            echo "Chromium is not installed on the runner" >&2
+            exit 1
+          fi
+          echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE=$chromium_path" >> "$GITHUB_ENV"
+
+      - name: Run accessibility tests
+        run: pnpm test:accessibility:ci
