@@ -34,6 +34,7 @@ jobs:
         with:
           cache: true
           runtime: node@lts
+          working-directory: server-oobe
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
