@@ -18,6 +18,7 @@ export struct Keymap {
 
 export global Lang {
     in-out property <Language> current_language;
+    in-out property <KeymapVariant> current_variant;
     in property <[Language]> languages;
     changed current_language => set_lang(current_language);
     public pure function t(id: string, args: [FluentArg]) -> string {

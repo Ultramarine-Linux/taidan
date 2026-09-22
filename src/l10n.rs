@@ -152,7 +152,10 @@ fn display_hdl<T>(
     })
 }
 
-pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, lang: crate::ui::Lang<'_>) {
+pub fn initialize_ui(
+    ui: slint::Weak<impl slint::ComponentHandle + 'static>,
+    lang: crate::ui::Lang<'_>,
+) {
     use crate::ui::{FluentArg, Keymap, KeymapVariant, Language};
     use slint::{Model, ToSharedString};
     lang.on__t(|id, args, _current_language| {

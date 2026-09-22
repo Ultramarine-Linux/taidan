@@ -80,6 +80,7 @@ tracing-error = "0.2.1"
 tracing-journald = "0.3.1"
 tracing-subscriber = { workspace = true }
 uzers = "0.12.1"
+which = { version = "8.0.6", features = ["tracing"] }
 xcb = { version = "1.7.1", features = ["randr"] }
 xcrypt = "0.3.1"
 

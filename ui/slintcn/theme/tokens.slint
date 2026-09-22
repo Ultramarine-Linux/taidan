@@ -13,13 +13,14 @@ import { Palette } from "palette.slint";
 export enum ThemeMode { dark, light }
 
 export global Theme {
-    in-out property <ThemeMode> mode: ThemeMode.dark;
+    // in-out property <ThemeMode> mode: ThemeMode.dark;
+    in-out property <ThemeMode> mode: ThemeMode.light;
 }
 
 export global Tokens {
     // surfaces
     out property <color> color-background:
-        Theme.mode == ThemeMode.light ? Palette.neutral-50  : Palette.neutral-950;
+        Theme.mode == ThemeMode.light ? Palette.neutral-50 : Palette.neutral-950;
     out property <color> color-foreground:
         Theme.mode == ThemeMode.light ? Palette.neutral-900 : Palette.neutral-50;
     out property <color> color-card:
@@ -31,7 +32,7 @@ export global Tokens {
     out property <color> color-primary:
         Theme.mode == ThemeMode.light ? Palette.neutral-900 : Palette.neutral-200;
     out property <color> color-primary-foreground:
-        Theme.mode == ThemeMode.light ? Palette.neutral-50  : Palette.neutral-900;
+        Theme.mode == ThemeMode.light ? Palette.neutral-50 : Palette.neutral-900;
     out property <color> color-secondary:
         Theme.mode == ThemeMode.light ? Palette.neutral-100 : Palette.neutral-800;
     out property <color> color-muted:
@@ -56,8 +57,8 @@ export global Tokens {
     // Translucent ring for the shadcn `ring-[3px] ring-ring/50` focus look.
     out property <color> color-ring-muted:
         Theme.mode == ThemeMode.light
-            ? Palette.neutral-700.with-alpha(0.5)
-            : Palette.neutral-500.with-alpha(0.5);
+        ? Palette.neutral-700.with-alpha(0.5)
+        : Palette.neutral-500.with-alpha(0.5);
     out property <length> focus-ring-width:  3px;
     out property <length> focus-ring-offset: 2px;
 
@@ -85,28 +86,28 @@ export global Tokens {
     // motion
     out property <duration> motion-fast: 150ms;
     out property <duration> motion-base: 200ms;
-    out property <easing>   motion-easing-standard:    cubic-bezier(0.4, 0.0, 0.2, 1.0);
-    out property <easing>   motion-easing-emphasized:  cubic-bezier(0.05, 0.7, 0.1, 1.0);
+    out property <easing> motion-easing-standard:    cubic-bezier(0.4, 0.0, 0.2, 1.0);
+    out property <easing> motion-easing-emphasized:  cubic-bezier(0.05, 0.7, 0.1, 1.0);
 
     // elevation shadows (same shadow tone for both themes — natural)
     out property <length> shadow-e2-blur:     8px;
     out property <length> shadow-e2-offset-y: 2px;
-    out property <color>  shadow-e2-color:    Palette.alpha-b-32;
+    out property <color> shadow-e2-color:    Palette.alpha-b-32;
     out property <length> shadow-e3-blur:     24px;
     out property <length> shadow-e3-offset-y: 8px;
-    out property <color>  shadow-e3-color:    Palette.alpha-b-38;
+    out property <color> shadow-e3-color:    Palette.alpha-b-38;
 
     // glow effects (subtler tint in light mode)
     out property <length> shadow-glow-md-blur:  16px;
-    out property <color>  shadow-glow-md-color:
+    out property <color> shadow-glow-md-color:
         Theme.mode == ThemeMode.light ? Palette.alpha-b-20-on-light : Palette.alpha-w-25;
     out property <length> shadow-glow-lg-blur:  24px;
-    out property <color>  shadow-glow-lg-color:
+    out property <color> shadow-glow-lg-color:
         Theme.mode == ThemeMode.light ? Palette.alpha-b-32 : Palette.alpha-w-35;
 
     // typography
-    out property <int>    typography-weight-medium:     500;
-    out property <int>    typography-weight-semibold:   600;
+    out property <int> typography-weight-medium:     500;
+    out property <int> typography-weight-semibold:   600;
     out property <length> typography-body-sm-size:      13px;  // text-sm-ish
     out property <length> typography-body-size:         14px;  // text-sm
     out property <length> typography-label-size:        12px;  // text-xs

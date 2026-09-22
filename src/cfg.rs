@@ -113,3 +113,65 @@ impl Taidan0Config {
         }
     }
 }
+
+fn cfg_get_val(id: &str) -> Option<serde_json::Value> {
+    let mut val = serde_json::to_value(&*crate::CFG).expect("cannot serialize cfg");
+    let mut it = id.split('.');
+    while let Some(component) = it.next() {
+        if let Ok(i) = component.parse::<usize>()
+            && let serde_json::Value::Array(arr) = val
+        {
+            val = arr.into_iter().nth(i)?;
+        } else if let serde_json::Value::Object(mut obj) = val {
+            val = obj.remove(component)?;
+        } else {
+            return None;
+        }
+    }
+    Some(val)
+}
+
+pub fn initialize_ui(
+    ui: slint::Weak<impl slint::ComponentHandle + 'static>,
+    cfg: crate::ui::Cfg<'_>,
+) {
+    use slint::ToSharedString;
+    cfg.set_version(env!("CARGO_PKG_VERSION").into());
+    cfg.on_get_string(|path, default| {
+        if let Some(serde_json::Value::String(s)) = cfg_get_val(&path) {
+            s.to_shared_string()
+        } else {
+            default
+        }
+    });
+    cfg.on_get_image(|path, default| {
+        if let Some(serde_json::Value::String(path)) = cfg_get_val(&path) {
+            slint::Image::load_from_path(std::path::Path::new(&path))
+                .inspect_err(|e| tracing::error!(?path, ?e, "cannot load image"))
+                .unwrap_or(default)
+        } else {
+            default
+        }
+    });
+    cfg.on_get_brush(|path, default| {
+        if let Some(serde_json::Value::String(s)) = cfg_get_val(&path) {
+            if let Some(code) = s.strip_prefix('#') {
+                let Ok(v) = hex::decode(code).inspect_err(|e| tracing::error!(?path, s, ?e)) else {
+                    return default;
+                };
+                return slint::Brush::SolidColor(match v[..] {
+                    [a, r, g, b] => slint::Color::from_argb_u8(a, r, g, b),
+                    [r, g, b] => slint::Color::from_rgb_u8(r, g, b),
+                    _ => {
+                        tracing::error!(?path, s, "invalid length, expected #aarrggbb or #rrggbb");
+                        return default;
+                    }
+                });
+            } else {
+                tracing::error!(?path, s, "invalid brush/color, expected #aarrggbb or #rrggbb");
+                return default;
+            }
+        }
+        default
+    });
+}

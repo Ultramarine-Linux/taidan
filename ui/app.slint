@@ -5,10 +5,14 @@ import { Cfg } from "cfg.slint";
 import { Step, StepHdl } from "page.slint";
 import { LanguagePage } from "pages/0020_language.slint";
 import { Theme } from "slintcn/theme/tokens.slint";
+import { Dialog } from "slintcn/components/dialog.slint";
 import { WhoAreYouPage } from "pages/0040_whoareyou.slint";
 import { KeyboardPage } from "pages/0030_keyboard.slint";
-export { Lang, Cfg, Step, StepHdl, Theme }
-export enum PageType { welcome, language, keyboard, whoareyou }
+import { PasswordPage } from "pages/0050_password.slint";
+import { TdnText, TdnBtn } from "components.slint";
+import { Actions } from "actions.slint";
+export { Lang, Cfg, Step, StepHdl, Theme, Actions }
+export enum PageType { welcome, language, keyboard, whoareyou, password }
 
 export component AppWindow inherits Window {
     in-out property <PageType> pagetype: welcome;
@@ -39,26 +43,104 @@ export component AppWindow inherits Window {
     preferred-width: 800px;
     preferred-height: 800px;
 
+    MenuBar {
+        visible: false;
+        Menu {
+            MenuItem {
+                title: "Open Terminal";
+                activated => { Actions.open-terminal(); }
+                shortcut: @keys(Alt + Shift + T);
+            }
+        }
+    }
+
     WelcomePage {
         x: pagenum > 0 ? -self.width : 0;
         next_page => { pagenum += 1; parent.pagetype = PageType.language; }
     }
 
     LanguagePage {
-        x: pagenum > 1 ? -self.width : (pagenum < 1 ? self.width : 0);
+        x: pagenum > 1 ? -self.width : (pagenum < 1 ? +self.width : 0);
         prev_page => { pagenum -= 1; parent.pagetype = PageType.welcome; }
         next_page => { pagenum += 1; parent.pagetype = PageType.keyboard; }
     }
 
     KeyboardPage {
-        x: pagenum > 2 ? -self.width : (pagenum < 2 ? self.width : 0);
+        x: pagenum > 2 ? -self.width : (pagenum < 2 ? +self.width : 0);
         prev_page => { pagenum -= 1; parent.pagetype = PageType.language; }
         next_page => { pagenum += 1; parent.pagetype = PageType.whoareyou; }
     }
 
     WhoAreYouPage {
-        x: pagenum > 3 ? -self.width : (pagenum < 3 ? self.width : 0);
+        x: pagenum > 3 ? -self.width : (pagenum < 3 ? +self.width : 0);
         prev_page => { pagenum -= 1; parent.pagetype = PageType.keyboard; }
+        next_page => { pagenum += 1; parent.pagetype = PageType.password; }
+    }
+
+    PasswordPage {
+        x: pagenum > 4 ? -self.width : (pagenum < 4 ? +self.width : 0);
+        prev_page => { pagenum -= 1; parent.pagetype = PageType.whoareyou; }
         // next_page => { pagenum += 1; parent.pagetype = PageType.whoareyou; }
+    }
+}
+
+export component ErrorDialog inherits Window {
+    in property <string> body;
+    no-frame: true;
+    background: transparent;
+
+    min-width: 600px;
+    min-height: 200px;
+
+    Rectangle {
+        border-radius: 10px;
+        background: white;
+
+        icon := Image {
+            x: 3rem;
+            y: 2rem;
+            height: 5rem;
+            source: @image-url("../data/icons/dialog-error-symbolic.svg");
+        }
+
+        Rectangle {
+            x: icon.x + icon.width + 1rem;
+            y: icon.y;
+            width: parent.width - icon.width - 8rem;
+            height: closebtn.y - self.y - 1rem;
+
+            t_title := TdnText {
+                x: 0;
+                y: 0;
+                horizontal-alignment: left;
+                vertical-alignment: center;
+                color: red;
+                font-size: 2rem;
+                text: "Error";
+            }
+
+            t_body := TdnText {
+                x: 0;
+                y: t_title.height + 0.2rem;
+                horizontal-alignment: left;
+                vertical-alignment: center;
+                text: body;
+            }
+        }
+
+        closebtn := TdnBtn {
+            x: parent.width - self.width - 3rem;
+            y: parent.height - self.height - 2rem;
+            height: 3rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            background_color: black;
+            TdnText {
+                color: white;
+                text: "Close";
+            }
+
+            clicked => root.close();
+        }
     }
 }

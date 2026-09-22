@@ -775,7 +775,7 @@ dependencies = [
  "rustc-hash 1.1.0",
  "shlex",
  "syn 2.0.117",
- "which",
+ "which 4.4.2",
 ]
 
 [[package]]
@@ -6961,6 +6961,7 @@ dependencies = [
  "tracing-journald",
  "tracing-subscriber",
  "uzers",
+ "which 8.0.6",
  "xcb",
  "xcrypt",
 ]
@@ -8149,6 +8150,16 @@ dependencies = [
  "home",
  "once_cell",
  "rustix 0.38.44",
+]
+
+[[package]]
+name = "which"
+version = "8.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bae2f2b2b816647a1cab1acc91f5bd20812d53cb344382635ec2181940c8034f"
+dependencies = [
+ "libc",
+ "tracing",
 ]
 
 [[package]]

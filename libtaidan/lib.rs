@@ -8,6 +8,7 @@ pub mod passwd;
 pub mod prelude;
 pub mod settings;
 pub mod steps;
+pub mod time;
 pub mod tweaks;
 
 use crate::prelude::*;
