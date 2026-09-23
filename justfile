@@ -12,8 +12,12 @@ test-desktop:
 install-server-oobe:
   pnpm --dir server-oobe install --frozen-lockfile
 
-build-server-oobe: install-server-oobe
+build-server-oobe: install-server-oobe build-server-oobe-backend
   pnpm --dir server-oobe build
+
+# Build the optional libtaidan-backed validation bridge used by the packaged OOBE.
+build-server-oobe-backend:
+  cargo build --release -p tdnx --no-default-features --features server-oobe
 
 check-server-oobe: install-server-oobe
   pnpm --dir server-oobe check

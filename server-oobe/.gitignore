@@ -30,6 +30,8 @@ blob-report/
 # Local OOBE runtime state and development credentials
 .local/
 state/
+!src/routes/api/oobe/state/
+!src/routes/api/oobe/state/+server.ts
 run/
 *.pem
 *.key

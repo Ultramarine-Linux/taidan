@@ -24,22 +24,84 @@ import { promisify } from 'node:util';
 import { isIP } from 'node:net';
 import type { StepId, OperationResult } from '$lib/oobe-state';
 
+const ALLOWED_OPERATIONS = new Set([
+	'state.patch',
+	'state.reset',
+	'hostname.apply',
+	'keyboard.apply',
+	'user.create',
+	'password.set',
+	'network.interfaces',
+	'network.scan_wifi',
+	'network.connect_wifi',
+	'network.set_config',
+	'network.check',
+	'tetra.detect',
+	'tetra.start',
+	'ssh-key.apply',
+	'tweaks.apply',
+	'fyra.begin',
+	'system.reboot',
+	'system.poweroff',
+	'dashboard.install',
+	'dashboard.handoff',
+	'cloudflare.install'
+]);
+
 const execFileAsync = promisify(execFile);
 
-function chpasswd(user: string, password: string): Promise<void> {
+const LIBTAIDAN_ENABLED = process.env.OOBE_LIBTAIDAN === 'true';
+
+function validateWithLibtaidan(
+	step: StepId,
+	operation: string,
+	payload: Record<string, unknown>
+): Promise<void> {
+	if (!LIBTAIDAN_ENABLED) return Promise.resolve();
 	return new Promise((resolve, reject) => {
-		const child = spawn('chpasswd', [], { stdio: ['pipe', 'pipe', 'pipe'] });
+		const child = spawn(process.env.TDNX_PATH || 'tdnx', ['server-oobe'], {
+			stdio: ['pipe', 'pipe', 'pipe']
+		});
+		let stdout = '';
 		let stderr = '';
-		child.stderr.on('data', (data) => {
-			stderr += data.toString();
-		});
-		child.on('error', (err) => reject(err));
+		child.stdout.on('data', (data) => (stdout += data.toString()));
+		child.stderr.on('data', (data) => (stderr += data.toString()));
+		child.on('error', reject);
 		child.on('close', (code) => {
-			if (code !== 0) reject(new Error(stderr || `chpasswd exited ${code}`));
-			else resolve();
+			if (code !== 0) {
+				reject(new Error(stderr.trim() || stdout.trim() || `libtaidan exited with code ${code}`));
+				return;
+			}
+			try {
+				const response = JSON.parse(stdout.trim()) as { ok?: boolean; error?: string };
+				if (response.ok !== true)
+					reject(new Error(response.error || 'libtaidan rejected operation'));
+				else resolve();
+			} catch {
+				reject(new Error('Invalid response from libtaidan backend'));
+			}
 		});
-		child.stdin.write(`${user}:${password}\n`);
-		child.stdin.end();
+		child.stdin.end(JSON.stringify({ step, operation, payload }));
+	});
+}
+
+function hashPassword(password: string): Promise<string> {
+	return new Promise((resolve, reject) => {
+		// The password is sent only on stdin. Tetra receives the resulting crypt
+		// hash through its typed users.set_password operation, never plaintext.
+		const child = spawn('openssl', ['passwd', '-6', '-stdin'], {
+			stdio: ['pipe', 'pipe', 'pipe']
+		});
+		let stdout = '';
+		let stderr = '';
+		child.stdout.on('data', (data) => (stdout += data.toString()));
+		child.stderr.on('data', (data) => (stderr += data.toString()));
+		child.on('error', reject);
+		child.on('close', (code) => {
+			if (code !== 0) reject(new Error(stderr || `password hashing exited ${code}`));
+			else resolve(stdout.trim());
+		});
+		child.stdin.end(`${password}\n`);
 	});
 }
 
@@ -134,6 +196,22 @@ export const POST: RequestHandler = async ({ request }) => {
 		const body = (await request.json()) as OperationRequest;
 		const { step, operation, payload = {} } = body;
 		const opId = `op-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+		if (!step || !ALLOWED_OPERATIONS.has(operation)) {
+			return json(result(opId, step, 'failed', false, 'Unsupported setup operation'));
+		}
+		try {
+			await validateWithLibtaidan(step, operation, payload);
+		} catch (e) {
+			return json(
+				result(
+					opId,
+					step,
+					'failed',
+					true,
+					e instanceof Error ? e.message : 'libtaidan validation failed'
+				)
+			);
+		}
 
 		const state = await loadState();
 
@@ -369,23 +447,28 @@ export const POST: RequestHandler = async ({ request }) => {
 					return json(result(opId, step, 'failed', true, 'Missing user or password'));
 				}
 				try {
-					const resp = await tetraSetPassword(name, plaintext);
-					if (!resp.ok) throw new Error(resp.error || 'Tetra could not set password');
-				} catch (tetraError: any) {
-					try {
-						await chpasswd(name, plaintext);
-					} catch (e: any) {
+					const passwordHash = await hashPassword(plaintext);
+					const resp = await tetraSetPassword(name, passwordHash);
+					if (!resp.ok)
 						return json(
-							result(opId, step, 'failed', true, e.stderr || e.message || tetraError.message)
+							result(opId, step, 'failed', true, resp.error || 'Tetra could not set password')
 						);
-					}
+				} catch (e: any) {
+					return json(result(opId, step, 'failed', true, e.message || 'Failed to set password'));
 				}
 				return json(result(opId, step, 'succeeded', false));
 			}
 
 			case 'tetra.detect': {
-				const resp = await tetraCapabilities();
-				const installed = !resp.error;
+				let resp: Awaited<ReturnType<typeof tetraCapabilities>>;
+				try {
+					resp = await tetraCapabilities();
+				} catch (e: any) {
+					state.tetra = { installed: false, running: false, paired: false };
+					await saveState(state);
+					return json(result(opId, step, 'succeeded', true, e.message || 'Tetra is not available'));
+				}
+				const installed = resp.ok && !resp.error;
 				state.tetra.installed = installed;
 				if (installed) {
 					const svc = await tetraServiceStatus('tetra.service');

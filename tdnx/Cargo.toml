@@ -7,8 +7,16 @@ edition = "2024"
 name = "tdnx"
 path = "./main.rs"
 
+[features]
+default = []
+# Enables the libtaidan-backed local server OOBE contract. The desktop Taidan
+# build does not enable this feature.
+server-oobe = ["dep:libtaidan"]
+# Retains the legacy desktop installation entry point as an explicit option.
+desktop-install = ["dep:libtaidan"]
+
 [dependencies]
 tracing-subscriber = { workspace = true }
-libtaidan = { workspace = true }
+libtaidan = { workspace = true, optional = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "io-util"] }

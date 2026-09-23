@@ -49,10 +49,10 @@ function normalizeState(raw: unknown): OobeState {
 		networkInterfaces: partial.networkInterfaces ?? [],
 		dashboardDomain: partial.dashboardDomain ?? '',
 		dashboardPort: partial.dashboardPort ?? 3972,
-		dashboard: { installed: false, installing: false },
-		tetra: { installed: true, running: true, paired: false },
-		fyra: { status: 'not-started' },
-		cloudflare: { installed: false, installing: false }
+		dashboard: partial.dashboard ?? { installed: false, installing: false },
+		tetra: partial.tetra ?? { installed: false, running: false, paired: false },
+		fyra: partial.fyra ?? { status: 'not-started' },
+		cloudflare: partial.cloudflare ?? { installed: false, installing: false }
 	};
 }
 
