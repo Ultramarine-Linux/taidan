@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en" data-brand="ultramarine">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" href="/ultramarine-favicon.ico" sizes="any" />
+		<link rel="icon" href="/ultramarine-favicon-32x32.png" type="image/png" sizes="32x32" />
+		<link rel="icon" href="/ultramarine-favicon-16x16.png" type="image/png" sizes="16x16" />
+		<link rel="apple-touch-icon" href="/ultramarine-apple-touch-icon.png" />
+		<script>
+			if (localStorage.getItem('oobe-theme') === 'dark')
+				document.documentElement.classList.add('dark');
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

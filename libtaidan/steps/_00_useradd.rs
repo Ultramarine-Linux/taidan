@@ -20,7 +20,7 @@ async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
     let crypt_setting = xcrypt::crypt_gensalt(None, 0, None)?;
     let pass = xcrypt::crypt(&settings.passwd, &crypt_setting)?;
 
-    // ignore err in case recreate user
+    // Ignore useradd errors so rerunning setup can recreate an interrupted account.
     _ = super::super::pkexec(
         "root",
         "useradd",
@@ -28,7 +28,6 @@ async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
     )
     .await;
     super::super::pkexec("root", "usermod", &["-aG", "wheel", &settings.username]).await?;
-
     Ok(())
 }
 
