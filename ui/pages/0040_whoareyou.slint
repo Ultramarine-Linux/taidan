@@ -1,0 +1,63 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { HorizontalBox, Button, ScrollView } from "std-widgets.slint";
+import { TdnText, TdnBtn, TdnInput } from "../components.slint";
+import { Cfg } from "../cfg.slint";
+import { Card } from "../slintcn/components/card.slint";
+import { Label } from "../slintcn/components/label.slint";
+import { Input } from "../slintcn/components/input.slint";
+
+export component WhoAreYouPage inherits TdnPage {
+    pageid: "whoareyou";
+    step_i: 1;
+
+    Rectangle {
+        height: 2rem;
+    }
+
+    Label {
+        text: "Name";
+        variant: required;
+        clicked => {
+            nameinput.focus();
+        }
+    }
+
+    nameinput := Input {
+        // TODO: impl
+        text: "TODO impl!!!";
+    }
+
+    TdnText {
+        text: "Your name, shown on the login screen.";
+        color: dimgray;
+        height: 1.5rem;
+        horizontal-alignment: left;
+        vertical-alignment: center;
+    }
+
+    Rectangle {
+        height: 2rem;
+    }
+
+    Label {
+        text: "Username";
+        variant: required;
+        clicked => {
+            nameinput.focus();
+        }
+    }
+
+    userinput := Input {
+        // TODO: impl
+        text: "TODO impl!!!";
+    }
+
+    TdnText {
+        text: "The name of your home folder.";
+        color: dimgray;
+        height: 1.5rem;
+        horizontal-alignment: left;
+        vertical-alignment: center;
+    }
+}

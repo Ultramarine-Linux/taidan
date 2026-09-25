@@ -1,0 +1,163 @@
+import { TdnText, TdnBtn } from "components.slint";
+import { Cfg } from "cfg.slint";
+import { Lang } from "lang.slint";
+import { Tokens } from "slintcn/theme/tokens.slint";
+
+export enum Step {
+    language,
+    account_creation,
+    region_and_connectivity,
+    privacy,
+}
+
+export global StepHdl {
+    out property <[Step]> steps: [
+        Step.language,
+        Step.account_creation,
+        Step.region-and-connectivity,
+        Step.privacy
+    ];
+}
+
+export component TdnBasePg {
+    in property <string> pageid;
+    callback next_page;
+    callback prev_page;
+
+    out property <length> h <=> self.height;
+    out property <length> w <=> self.width;
+
+    width: 100%;
+    height: 100%;
+
+    animate x {
+        duration: 200ms;
+        easing: ease-out-quad;
+    }
+
+    @children
+}
+
+export component TdnPage inherits TdnBasePg {
+    // FIXME: this doesn't change on the first time the language is changed
+    // but consequent changes do trigger slint to reload this, not sure why
+    in property <string> name: Lang.t("page-" + self.pageid, []);
+    // in property <image> icon;
+    in property <int> step_i;
+    property <Step> step: StepHdl.steps[step_i];
+
+    width: 100%;
+    height: 100%;
+
+    top := HorizontalLayout {
+        // FIXME: to compensate right hand side margin
+        x: -0.5rem;
+        y: 0;
+        padding-top: 1rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        height: 3rem;
+        spacing: 1rem;
+
+        distro-logo := Image {
+            horizontal-stretch: 0;
+            source: Cfg.distro_icon();
+            accessible-label: "Distribution logo";
+            height: parent.height;
+            width: self.height;
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            height: parent.height;
+            HorizontalLayout {
+                spacing: 4px;
+                padding-top: 0.3rem;
+                for step[i] in StepHdl.steps: Rectangle {
+                    width: (root.w - 12rem) / StepHdl.steps.length;
+                    height: 0.75rem;
+                    // x: parent.x + i * (self.width);
+                    border-radius: self.height / 2;
+                    border-color: Cfg.get_brush("accent_color", #00078f);
+                    border-width: 2px;
+                    background: root.step_i == i ? Cfg.get_brush("accent_color", #00078f) : (i < step_i ? black : transparent);
+                }
+            }
+
+            TdnText {
+                color: #444444;
+                // TODO: make this change
+                text: Lang.t("step-account-creation", []);
+                horizontal-alignment: left;
+                vertical-alignment: TextVerticalAlignment.bottom;
+            }
+        }
+
+        a11y-btn := TdnBtn {
+            horizontal-stretch: 0;
+            accessible-label: "accessibility button";
+            accessible-role: button;
+            background_color: black;
+            border-radius: 0.5rem;
+            height: parent.height;
+            width: self.height;
+            Image {
+                source: @image-url("../data/icons/settings-accessibility-symbolic.svg");
+                colorize: white;
+            }
+        }
+    }
+
+    title := TdnText {
+        x: 2rem;
+        y: top.height + 2rem;
+        font-size: 2rem;
+        font-weight: 600;
+        text: name;
+    }
+
+    VerticalLayout {
+        y: title.y + title.height + 1rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        spacing: 1rem;
+        height: bottom.y - self.y - 1rem;
+
+        @children
+    }
+
+    bottom := HorizontalLayout {
+        property <length> bot-margin: 1rem;
+        y: root.h - self.height - bot-margin;
+        height: 3rem;
+        width: root.w;
+        padding-left: 3rem;
+        padding-right: 3rem;
+
+        TdnBtn {
+            background_color: black;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            TdnText {
+                text: Lang.t("prev", []);
+                color: Tokens.color-background;
+            }
+
+            clicked => root.prev_page();
+        }
+
+        Rectangle { }
+
+        TdnBtn {
+            background_color: Cfg.get_brush("accent_color", #00078f);
+            padding-left: 1rem;
+            padding-right: 1rem;
+            TdnText {
+                text: Lang.t("next", []);
+                color: Tokens.color-background;
+            }
+
+            clicked => root.next_page();
+        }
+    }
+}

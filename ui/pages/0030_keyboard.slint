@@ -1,0 +1,107 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { HorizontalBox, Button, ScrollView } from "std-widgets.slint";
+import { TdnText, TdnBtn, TdnInput } from "../components.slint";
+import { Cfg } from "../cfg.slint";
+import { Card } from "../slintcn/components/card.slint";
+
+export component KeyboardPage inherits TdnPage {
+    pageid: "keyboard";
+    step_i: 0;
+
+    // TODO: impl
+    Card {
+        variant: solid;
+
+        DragArea {
+            width: parent.width;
+            height: parent.height;
+        }
+
+        HorizontalLayout {
+            VerticalLayout {
+                padding: 1rem;
+                spacing: 1rem;
+                search_lang := TdnInput {
+                    placeholder: Lang.t("page-keyboard-search-variant", []);
+                    icon: @image-url("../../data/icons/system-search-symbolic.svg");
+                // TODO: impl
+                edited(text) => { debug("edited: " + text) }
+                    text: "TODO impl this!!!";
+                }
+
+                ScrollView {
+                    VerticalLayout {
+                        spacing: 0.5rem;
+
+                        for keymap[i] in Lang.keymaps: TdnText {
+                            text: keymap.name;
+                            horizontal-alignment: left;
+                            height: 2rem;
+
+                            leftarea := TouchArea {
+                                x: parent.x;
+                                width: parent.width;
+                                height: parent.height;
+                                clicked => { Lang.current_keymap = keymap; }
+                                mouse-cursor: pointer;
+                            }
+
+                            Rectangle {
+                                x: leftarea.x;
+                                y: leftarea.y;
+                                z: -1;
+                                width: leftarea.width;
+                                height: leftarea.height;
+                                border-radius: 0.25rem;
+                                background: grey.transparentize(leftarea.has-hover ? 0.8 : 1.0);
+                            }
+                        }
+                    }
+                }
+            }
+
+            VerticalLayout {
+                padding: 1rem;
+                spacing: 1rem;
+                search_var := TdnInput {
+                    placeholder: Lang.t("page-keyboard-search-variant", []);
+                    icon: @image-url("../../data/icons/system-search-symbolic.svg");
+                // TODO: impl
+                edited(text) => { debug("edited: " + text) }
+                    text: "TODO impl this!!!";
+                }
+
+                ScrollView {
+                    VerticalLayout {
+                        spacing: 0.5rem;
+
+                        for variant[i] in Lang.current_keymap.variants: TdnText {
+                            text: variant.name;
+                            horizontal-alignment: left;
+                            height: 2rem;
+
+                            rightarea := TouchArea {
+                                x: parent.x;
+                                width: parent.width;
+                                height: parent.height;
+                                clicked => { Lang.current_variant = variant; }
+                                mouse-cursor: pointer;
+                            }
+
+                            Rectangle {
+                                x: rightarea.x;
+                                y: rightarea.y;
+                                z: -1;
+                                width: rightarea.width;
+                                height: rightarea.height;
+                                border-radius: 0.25rem;
+                                background: grey.transparentize(rightarea.has-hover ? 0.8 : 1.0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
