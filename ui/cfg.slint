@@ -1,0 +1,11 @@
+export global Cfg {
+    pure callback get_string(path: string, default: string) -> string;
+    pure callback get_image(path: string, default: image) -> image;
+    pure callback get_brush(path: string, default: brush) -> brush;
+    pure callback distro_icon() -> image;
+    distro_icon() => { @image-url("../data/icons/distro-icon.svg") }
+    get_string(path, default) => default;
+    get_image(path, default) => default;
+    get_brush(path, default) => default;
+    in-out property <string> version: "0.0.0";
+}

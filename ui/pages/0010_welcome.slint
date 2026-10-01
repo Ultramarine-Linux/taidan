@@ -1,0 +1,76 @@
+import { TdnPage, TdnBasePg } from "../page.slint";
+import { Lang } from "../lang.slint";
+// import {
+//     Button,
+//     ButtonVariant,
+//     ButtonSize,
+// } from "../slintcn/components/button.slint";
+import { HorizontalBox, Button } from "std-widgets.slint";
+import { TdnText, TdnBtn } from "../components.slint";
+import { Cfg } from "../cfg.slint";
+
+export component WelcomePage inherits TdnBasePg {
+    width: 100%;
+    height: 100%;
+
+    img := Image {
+        x: 0;
+        y: 0;
+        image-fit: ImageFit.cover;
+        source: Cfg.get_image("welcome.hero_image", @image-url("/usr/share/backgrounds/default.png"));
+        width: root.w;
+        height: root.h - bottom.height;
+        accessible-role: none;
+    }
+
+    t0 := Text {
+        x: img.x + 1rem;
+        y: img.y + img.height - t0.height - 1rem;
+        text: Cfg.get_string("welcome.t0", "Ultramarine Technical Preview, please edit welcome.t0\nin /etc/taidan.toml");
+        color: Cfg.get_brush("welcome.t0_color", white);
+        vertical-alignment: TextVerticalAlignment.center;
+        horizontal-stretch: 0;
+    }
+
+    t1 := Text {
+        x: img.x + 1rem;
+        y: img.y + img.height - t0.height - 1rem;
+        width: t0.width;
+        text: "\nTaidan " + Cfg.version;
+        color: Cfg.get_brush("welcome.t1_color", white);
+        vertical-alignment: TextVerticalAlignment.center;
+        horizontal-alignment: right;
+        horizontal-stretch: 0;
+    }
+
+    bottom := HorizontalLayout {
+        x: -0.5rem;
+        y: img.height;
+        width: img.width;
+        height: 10rem;
+        padding: 3rem;
+        welcome := Text {
+            vertical-alignment: center;
+            font-size: 3rem;
+            font-weight: 700;
+            // TODO: t()
+            text: "Welcome!";
+        }
+
+        Rectangle { }
+
+        TdnBtn {
+            background_color: Cfg.get_brush("accent_color", #00078f);
+            padding-left: 1rem; // ignore warning
+            padding-right: 1rem; // ignore warning
+            TdnText {
+                // TODO: t()
+                text: Cfg.get_string("welcome.next", "Let's Go ↵");
+                font-size: 1.5rem;
+                color: white;
+            }
+
+            clicked => root.next_page();
+        }
+    }
+}

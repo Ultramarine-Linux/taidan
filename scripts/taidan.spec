@@ -19,6 +19,7 @@ Requires:       kwin
 Requires:       swaybg
 Requires:       nmgui network-manager-applet
 Requires:       capnet-assist
+Requires:       xdg-terminal-exec
 # required for running homectl
 Requires:       script
 BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl

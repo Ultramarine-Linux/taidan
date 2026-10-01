@@ -1,89 +1,29 @@
-use crate::prelude::*;
+use slint::ToSharedString;
 
-// FIXME: labels don't update when language changes
-#[relm4::widget_template(pub)]
-impl WidgetTemplate for PrevNextBtns {
-    view! {
-        gtk::Box {
-            set_valign: gtk::Align::End,
+slint::include_modules!();
 
-            #[name = "prev"]
-            libhelium::Button {
-                set_is_pill: true,
-                set_color: libhelium::ButtonColor::Surface,
-                #[watch]
-                set_label: &t!("prev"),
-                inline_css: "padding-left: 48px; padding-right: 48px",
-            },
-
-            gtk::Box { set_hexpand: true },
-
-            #[name = "next"]
-            libhelium::Button {
-                set_is_pill: true,
-                #[watch]
-                set_label: &t!("next"),
-                inline_css: "padding-left: 48px; padding-right: 48px",
-                add_css_class: "suggested-action",
-            },
-        },
-    }
+pub fn run() {
+    tracing::debug!("Starting Taidan");
+    let ui = AppWindow::new().expect("cannot create app");
+    // TODO: refactor
+    let theme = ui.global::<Theme<'_>>();
+    theme.set_mode(ThemeMode::Light);
+    crate::l10n::initialize_ui(ui.as_weak(), ui.global::<Lang<'_>>());
+    let cfg: Cfg<'_> = ui.global();
+    crate::cfg::initialize_ui(ui.as_weak(), cfg);
+    init_actions(ui.as_weak(), ui.global());
+    // autoscale(&ui);
+    ui.run().expect("cannot run ui");
 }
 
-#[relm4::widget_template(pub)]
-impl WidgetTemplate for SwitchBox {
-    view! {
-        libhelium::MiniContentBlock {
-            #[wrap(Some)]
-            #[name(switch)]
-            set_widget = &gtk::Switch {
-                set_halign: gtk::Align::End,
-                set_hexpand: true
-            }
-        }
-    }
-}
-
-#[relm4::widget_template(pub)]
-impl WidgetTemplate for Category {
-    view! {
-        // libhelium::ViewDual
-        #[name(viewdual)]
-        gtk::Box {
-            set_orientation: gtk::Orientation::Horizontal,
-            set_valign: gtk::Align::Fill,
-            set_halign: gtk::Align::Fill,
-            set_vexpand: true,
-            set_hexpand: true,
-            // set_show_handle: false,
-
-            // #[wrap(Some)]
-            // set_child_start = &gtk::ScrolledWindow {
-            gtk::ScrolledWindow {
-                #[name(browsers)]
-                gtk::ListBox {
-                    add_css_class: "content-list",
-                    set_selection_mode: gtk::SelectionMode::Multiple,
-                    set_vexpand: true,
-                    set_hexpand: true,
-                    set_valign: gtk::Align::Fill,
-                    set_halign: gtk::Align::Fill,
-                }
-            },
-            #[name(optlist)]
-            // #[wrap(Some)]
-            // set_child_end = &gtk::ScrolledWindow {
-            gtk::ScrolledWindow {
-                // #[name(optlist)]
-                // gtk::ListBox {
-                //     add_css_class: "content-list",
-                //     set_selection_mode: gtk::SelectionMode::Single,
-                //     set_vexpand: true,
-                //     set_hexpand: true,
-                //     set_valign: gtk::Align::Center,
-                //     set_halign: gtk::Align::Center,
-                // },
-            }
-        }
-    }
+fn init_actions(ui: slint::Weak<impl slint::ComponentHandle + 'static>, actions: Actions<'_>) {
+    actions.on_open_terminal(|| {
+        // TODO: handle this
+        std::process::Command::new("pkexec")
+            .args(["--user", "root", "env"])
+            .args(std::env::vars().map(|(k, v)| format!("{k}={v}")))
+            .args(["xdg-terminal-exec", "--", "sh", "-c"])
+            .arg("echo 'Taidan has detected Alt+Shift+T. A terminal with superuser privilege is opened for debugging purposes. Only proceed if you know what you are doing, OTHERWISE YOU MAY RISK DATA LOSS OR CAUSE DAMAGES TO YOUR DEVICE. To exit the terminal, press Ctrl+D.' && sh")
+            .spawn().expect("cannot spawn pkexec");
+    });
 }
