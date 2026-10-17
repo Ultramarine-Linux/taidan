@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Generated framework/build output
+.svelte-kit/
+.vite/
+.output/
+build/
+dist/
+coverage/
+
+# Browser test artifacts
+test-results/
+playwright-report/
+blob-report/
+
+# Local runtime state
+.local/
+state/
+run/
