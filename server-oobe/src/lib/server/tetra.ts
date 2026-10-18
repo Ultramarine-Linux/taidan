@@ -13,6 +13,7 @@ import { env } from 'node:process';
 import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { MockTetraClient } from './tetra-mock';
+import type { WifiSecurityProfile } from '$lib/oobe-state';
 import {
 	DEFAULT_TETRA_SOCKET,
 	type AccessRequest,
@@ -291,7 +292,7 @@ export async function tetraNetworkConnectWifi(
 	token: string,
 	interfaceName: string,
 	ssid: string,
-	security: Record<string, unknown>
+	security: WifiSecurityProfile
 ): Promise<TetraResponse> {
 	return dispatchTetra(token, 'network', 'connect_wifi', {
 		interface: interfaceName,

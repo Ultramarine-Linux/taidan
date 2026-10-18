@@ -103,17 +103,21 @@ network-wifi-password = Password
 network-wifi-connect = Connect
 network-wifi-eap = EAP method
 network-wifi-phase2 = Inner authentication
-network-wifi-domain = Domain
-network-wifi-username = Username
-network-wifi-anonymous-identity = Anonymous identity
-network-wifi-ca-certificate = CA certificate path (optional)
-network-wifi-ca-upload = CA certificate (optional)
-network-wifi-no-certificate = No certificate selected
+network-wifi-anonymous-identity = Anonymous identity (optional)
+network-wifi-no-certificate = No file selected
+network-8021x-identity = Identity
+network-8021x-domain = Server domain (optional)
+network-8021x-domain-help = Only trust an authentication server whose certificate is for this domain or one of its subdomains.
+network-8021x-ca-cert = CA certificate (optional)
+network-8021x-client-cert = Client certificate
+network-8021x-private-key = Private key
+network-8021x-private-key-password = Private key password (optional)
+network-8021x-not-pem = Choose a PEM file (text starting with -----BEGIN).
 
 # Internet — wired 802.1X
 network-wired-8021x-title = Wired 802.1X
 network-wired-8021x-enable = Use wired 802.1X
-network-wired-8021x-description = Authenticate this Ethernet connection with enterprise credentials. Certificates are optional.
+network-wired-8021x-description = Authenticate this Ethernet connection with enterprise credentials.
 
 # Step 7 — Updates
 step-updates-label = Updates

@@ -1,3 +1,5 @@
+import type { Eap8021x } from './eap-8021x';
+
 export type StepId =
 	| 'welcome'
 	| 'devicename'
@@ -91,20 +93,11 @@ export type WifiNetwork = {
 	phase2Methods?: string[];
 };
 
-export type WifiSecurityProfile = {
-	type: WifiSecurity;
-	password?: string;
-	eap?: string;
-	phase2?: string;
-	domain?: string;
-	username?: string;
-	anonymousIdentity?: string;
-	caCertificate?: string;
-	caCertificateName?: string;
-	clientCertificate?: string;
-	privateKey?: string;
-	privateKeyPassword?: string;
-};
+/** `security` for Tetra's `network.connect_wifi`, tagged by `type`. */
+export type WifiSecurityProfile =
+	| { type: 'open' }
+	| { type: 'wpa-personal'; password: string }
+	| ({ type: 'wpa-enterprise' } & Eap8021x);
 
 export type OobeState = {
 	version: 1;

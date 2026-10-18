@@ -1,5 +1,14 @@
 <script lang="ts">
+	import Eap8021xFields from '$lib/components/Eap8021xFields.svelte';
 	import StepLayout from '$lib/components/StepLayout.svelte';
+	import {
+		EAP_METHODS,
+		PHASE2_METHODS,
+		eap8021xSettings,
+		emptyEap8021xForm,
+		type EapMethod,
+		type Phase2Method
+	} from '$lib/eap-8021x';
 	import { t } from '$lib/i18n.svelte';
 	import type { NetworkInterface, WifiNetwork, WifiSecurityProfile } from '$lib/oobe-state';
 	let status = $state<'unknown' | 'online' | 'offline'>('unknown');
@@ -15,25 +24,9 @@
 	let wifiSsid = $state('');
 	let wifiSecurity = $state<WifiSecurityProfile['type']>('wpa-personal');
 	let wifiPassword = $state('');
-	let wifiEap = $state('peap');
-	let wifiPhase2 = $state('mschapv2');
-	let wifiDomain = $state('');
-	let wifiUsername = $state('');
-	let wifiAnonymousIdentity = $state('');
-	let wifiCaCertificate = $state('');
-	let wifiCaCertificateName = $state('');
-	let wifiClientCertificate = $state('');
-	let wifiPrivateKey = $state('');
-	let wifiPrivateKeyPassword = $state('');
+	let wifiEnterprise = $state(emptyEap8021xForm());
 	let wired8021x = $state(false);
-	let wiredEap = $state('peap');
-	let wiredPhase2 = $state('mschapv2');
-	let wiredDomain = $state('');
-	let wiredUsername = $state('');
-	let wiredAnonymousIdentity = $state('');
-	let wiredCaCertificate = $state('');
-	let wiredCaCertificateName = $state('');
-	let wiredPassword = $state('');
+	let wiredSettings = $state(emptyEap8021xForm());
 	let hiddenSsid = $state(false);
 	let hiddenSsidName = $state('');
 	let wifiError = $state('');
@@ -71,6 +64,17 @@
 		Boolean(selectedNetworkInterface?.wireless || selectedInterface.startsWith('wl'))
 	);
 	let selectedWifi = $derived(wifiNetworks.find((network) => network.ssid === wifiSsid));
+	// Only offer methods Tetra accepts, whatever the scan reports.
+	let wifiEapMethods = $derived(
+		selectedWifi?.eapMethods?.filter((method): method is EapMethod =>
+			(EAP_METHODS as readonly string[]).includes(method)
+		)
+	);
+	let wifiPhase2Methods = $derived(
+		selectedWifi?.phase2Methods?.filter((method): method is Phase2Method =>
+			(PHASE2_METHODS as readonly string[]).includes(method)
+		)
+	);
 
 	$effect(() => {
 		if (selectedWifi && selectedWifi.security !== 'unknown') {
@@ -98,24 +102,10 @@
 		wifiError = '';
 		const security: WifiSecurityProfile =
 			wifiSecurity === 'wpa-enterprise'
-				? {
-						type: wifiSecurity,
-						eap: wifiEap,
-						phase2: wifiPhase2,
-						domain: wifiDomain.trim() || undefined,
-						username: wifiUsername.trim(),
-						anonymousIdentity: wifiAnonymousIdentity.trim() || undefined,
-						password: wifiPassword,
-						caCertificate: wifiCaCertificate.trim() || undefined,
-						caCertificateName: wifiCaCertificateName || undefined,
-						clientCertificate: wifiClientCertificate.trim() || undefined,
-						privateKey: wifiPrivateKey.trim() || undefined,
-						privateKeyPassword: wifiPrivateKeyPassword || undefined
-					}
-				: {
-						type: wifiSecurity,
-						password: wifiSecurity === 'wpa-personal' ? wifiPassword : undefined
-					};
+				? { type: 'wpa-enterprise', ...eap8021xSettings(wifiEnterprise) }
+				: wifiSecurity === 'wpa-personal'
+					? { type: 'wpa-personal', password: wifiPassword }
+					: { type: 'open' };
 		try {
 			await onWifiConnect(selectedInterface, ssid, security);
 		} catch (error) {
@@ -141,20 +131,7 @@
 								.map((server) => server.trim())
 								.filter(Boolean)
 						},
-			wired8021x:
-				!isWireless && wired8021x
-					? {
-							enabled: true,
-							eap: wiredEap,
-							phase2: wiredPhase2,
-							domain: wiredDomain.trim() || undefined,
-							username: wiredUsername.trim(),
-							anonymousIdentity: wiredAnonymousIdentity.trim() || undefined,
-							caCertificate: wiredCaCertificate.trim() || undefined,
-							caCertificateName: wiredCaCertificateName || undefined,
-							password: wiredPassword
-						}
-					: { enabled: false }
+			wired_8021x: !isWireless && wired8021x ? eap8021xSettings(wiredSettings) : undefined
 		};
 	}
 
@@ -249,7 +226,7 @@
 								</select></label
 							>
 						{/if}
-						{#if (hiddenSsid && wifiSecurity !== 'open') || (!hiddenSsid && selectedWifi && wifiSecurity === 'wpa-personal')}
+						{#if (hiddenSsid || selectedWifi) && wifiSecurity === 'wpa-personal'}
 							<label class="field-label" for="wifi-password"
 								>{t('network-wifi-password')}<input
 									id="wifi-password"
@@ -260,72 +237,12 @@
 							>
 						{/if}
 						{#if (hiddenSsid && wifiSecurity === 'wpa-enterprise') || (!hiddenSsid && selectedWifi?.security === 'wpa-enterprise' && wifiSecurity === 'wpa-enterprise')}
-							<label class="field-label" for="wifi-eap">
-								{t('network-wifi-eap')}<select id="wifi-eap" bind:value={wifiEap}>
-									{#each selectedWifi?.eapMethods ?? ['peap', 'tls', 'ttls'] as method}<option
-											value={method}>{method.toUpperCase()}</option
-										>{/each}
-								</select></label
-							>
-							<label class="field-label" for="wifi-phase2"
-								>{t('network-wifi-phase2')}<select id="wifi-phase2" bind:value={wifiPhase2}>
-									{#each selectedWifi?.phase2Methods ?? ['mschapv2', 'pap'] as method}<option
-											value={method}>{method.toUpperCase()}</option
-										>{/each}
-								</select></label
-							>
-							<label class="field-label" for="wifi-domain"
-								>{t('network-wifi-domain')}<input id="wifi-domain" bind:value={wifiDomain} /></label
-							>
-							<label class="field-label" for="wifi-username"
-								>{t('network-wifi-username')}<input
-									id="wifi-username"
-									bind:value={wifiUsername}
-									autocomplete="username"
-								/></label
-							>
-							<label class="field-label" for="wifi-anonymous-identity"
-								>{t('network-wifi-anonymous-identity')}<input
-									id="wifi-anonymous-identity"
-									bind:value={wifiAnonymousIdentity}
-								/></label
-							>
-							<label class="field-label" for="wifi-ca-certificate"
-								>{t('network-wifi-ca-certificate')}<input
-									id="wifi-ca-certificate"
-									bind:value={wifiCaCertificate}
-								/></label
-							>
-							<div class="certificate-upload-row">
-								<span class="certificate-upload-label">{t('network-wifi-ca-upload')}</span>
-								<span class="certificate-upload-name"
-									>{wifiCaCertificateName || t('network-wifi-no-certificate')}</span
-								>
-								<label class="certificate-browse" for="wifi-ca-upload"
-									>{t('network-wifi-browse')}</label
-								>
-								<input
-									id="wifi-ca-upload"
-									class="certificate-file-input"
-									type="file"
-									accept=".pem,.crt,.cer,application/x-pem-file"
-									onchange={async (event) => {
-										const file = event.currentTarget.files?.[0];
-										if (!file) return;
-										wifiCaCertificate = await file.text();
-										wifiCaCertificateName = file.name;
-									}}
-								/>
-							</div>
-							{#if wifiCaCertificateName}<p class="field-help">{wifiCaCertificateName}</p>{/if}
-							<label class="field-label" for="wifi-enterprise-password"
-								>{t('network-wifi-password')}<input
-									id="wifi-enterprise-password"
-									type="password"
-									bind:value={wifiPassword}
-									autocomplete="current-password"
-								/></label
-							>
+							<Eap8021xFields
+								idPrefix="wifi"
+								bind:settings={wifiEnterprise}
+								eapMethods={wifiEapMethods?.length ? wifiEapMethods : undefined}
+								phase2Methods={wifiPhase2Methods?.length ? wifiPhase2Methods : undefined}
+							/>
 						{/if}
 						<button
 							class="primary-button"
@@ -419,74 +336,7 @@
 							<input id="wired-8021x" type="checkbox" bind:checked={wired8021x} />
 						</label>
 						{#if wired8021x}
-							<label class="field-label" for="wired-eap"
-								>{t('network-wifi-eap')}<select id="wired-eap" bind:value={wiredEap}
-									><option value="peap">PEAP</option><option value="tls">TLS</option><option
-										value="ttls">TTLS</option
-									></select
-								></label
-							>
-							<label class="field-label" for="wired-phase2"
-								>{t('network-wifi-phase2')}<select id="wired-phase2" bind:value={wiredPhase2}
-									><option value="mschapv2">MSCHAPv2</option><option value="pap">PAP</option
-									></select
-								></label
-							>
-							<label class="field-label" for="wired-domain"
-								>{t('network-wifi-domain')}<input
-									id="wired-domain"
-									bind:value={wiredDomain}
-								/></label
-							>
-							<label class="field-label" for="wired-username"
-								>{t('network-wifi-username')}<input
-									id="wired-username"
-									bind:value={wiredUsername}
-									autocomplete="username"
-								/></label
-							>
-							<label class="field-label" for="wired-anonymous-identity"
-								>{t('network-wifi-anonymous-identity')}<input
-									id="wired-anonymous-identity"
-									bind:value={wiredAnonymousIdentity}
-								/></label
-							>
-							<label class="field-label" for="wired-ca-certificate"
-								>{t('network-wifi-ca-certificate')}<input
-									id="wired-ca-certificate"
-									bind:value={wiredCaCertificate}
-								/></label
-							>
-							<div class="certificate-upload-row">
-								<span class="certificate-upload-label">{t('network-wifi-ca-upload')}</span>
-								<span class="certificate-upload-name"
-									>{wiredCaCertificateName || t('network-wifi-no-certificate')}</span
-								>
-								<label class="certificate-browse" for="wired-ca-upload"
-									>{t('network-wifi-browse')}</label
-								>
-								<input
-									id="wired-ca-upload"
-									class="certificate-file-input"
-									type="file"
-									accept=".pem,.crt,.cer,application/x-pem-file"
-									onchange={async (event) => {
-										const file = event.currentTarget.files?.[0];
-										if (!file) return;
-										wiredCaCertificate = await file.text();
-										wiredCaCertificateName = file.name;
-									}}
-								/>
-							</div>
-							{#if wiredCaCertificateName}<p class="field-help">{wiredCaCertificateName}</p>{/if}
-							<label class="field-label" for="wired-password"
-								>{t('network-wifi-password')}<input
-									id="wired-password"
-									type="password"
-									bind:value={wiredPassword}
-									autocomplete="current-password"
-								/></label
-							>
+							<Eap8021xFields idPrefix="wired" bind:settings={wiredSettings} />
 						{/if}
 					</fieldset>
 				{/if}

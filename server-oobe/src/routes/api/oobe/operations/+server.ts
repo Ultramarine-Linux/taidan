@@ -27,7 +27,8 @@ import {
 	type TetraResponse
 } from '$lib/server/tetra';
 import { validateDnsCredentials } from '$lib/dns-providers';
-import type { StepId, OperationResult } from '$lib/oobe-state';
+import { validateEap8021x } from '$lib/eap-8021x';
+import type { StepId, OperationResult, WifiSecurityProfile } from '$lib/oobe-state';
 
 // Every operation that changes the host is a Tetra call made with the
 // caller's setup session token. The OOBE runs unprivileged and changes
@@ -141,28 +142,25 @@ function result(
 	return { id, step, status, retryable, message };
 }
 
-function validateWifiSecurity(security: unknown): string | undefined {
+/** Validate Wi-Fi security into Tetra's `security` object, or return an error message. */
+function wifiSecurity(security: unknown): WifiSecurityProfile | string {
 	if (!security || typeof security !== 'object') return 'Wi-Fi security profile is required';
 	const profile = security as Record<string, unknown>;
-	const type = profile.type;
-	if (!['open', 'wpa-personal', 'wpa-enterprise'].includes(type as string))
-		return 'Unsupported Wi-Fi security type';
-	if (type === 'wpa-personal' && (typeof profile.password !== 'string' || !profile.password)) {
-		return 'Wi-Fi password is required';
-	}
-	if (type === 'wpa-enterprise') {
-		if (typeof profile.eap !== 'string' || !profile.eap) return 'EAP method is required';
-		if (typeof profile.username !== 'string' || !profile.username.trim())
-			return 'Enterprise username is required';
+	if (profile.type === 'open') return { type: 'open' };
+	if (profile.type === 'wpa-personal') {
 		if (typeof profile.password !== 'string' || !profile.password)
-			return 'Enterprise password is required';
-		if (profile.phase2 !== undefined && typeof profile.phase2 !== 'string')
-			return 'Invalid phase 2 method';
+			return 'Wi-Fi password is required';
+		return { type: 'wpa-personal', password: profile.password };
 	}
-	return undefined;
+	if (profile.type === 'wpa-enterprise') {
+		const settings = validateEap8021x(profile, ['type']);
+		return typeof settings === 'string' ? settings : { type: 'wpa-enterprise', ...settings };
+	}
+	return 'Unsupported Wi-Fi security type';
 }
 
-function validateNetworkConfig(payload: Record<string, unknown>): string | undefined {
+/** Validate a wired configuration into the payload sent to Tetra, or return an error message. */
+function networkConfig(payload: Record<string, unknown>): Record<string, unknown> | string {
 	const iface = payload.interface;
 	if (typeof iface !== 'string' || !/^[a-zA-Z0-9_.-]+$/.test(iface))
 		return 'Invalid network interface';
@@ -195,18 +193,10 @@ function validateNetworkConfig(payload: Record<string, unknown>): string | undef
 		return 'IPv4 method must be dhcp or static';
 	}
 
-	const wired = payload.wired8021x;
-	if (wired !== undefined) {
-		if (!wired || typeof wired !== 'object') return 'Invalid wired 802.1X configuration';
-		const settings = wired as Record<string, unknown>;
-		if (settings.enabled) {
-			if (typeof settings.eap !== 'string' || !settings.eap) return 'Wired EAP method is required';
-			if (typeof settings.username !== 'string' || !settings.username.trim())
-				return 'Wired username is required';
-			if (typeof settings.password !== 'string' || !settings.password)
-				return 'Wired password is required';
-		}
-	}
+	if (payload.wired_8021x === undefined) return { interface: iface, ipv4 };
+	const wired = validateEap8021x(payload.wired_8021x);
+	if (typeof wired === 'string') return `Wired 802.1X: ${wired}`;
+	return { interface: iface, ipv4, wired_8021x: wired };
 }
 
 /** Validate an access.set payload into Tetra's request. Returns an error message on failure. */
@@ -425,24 +415,19 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 				if (!interfaceName || !/^[a-zA-Z0-9_.-]+$/.test(interfaceName) || !ssid) {
 					return json(result(opId, step, 'failed', true, 'Wi-Fi interface and SSID are required'));
 				}
-				const securityError = validateWifiSecurity(payload.security);
-				if (securityError) return json(result(opId, step, 'failed', true, securityError));
+				const security = wifiSecurity(payload.security);
+				if (typeof security === 'string') return json(result(opId, step, 'failed', true, security));
 				return fromTetra(
-					await tetraNetworkConnectWifi(
-						token,
-						interfaceName,
-						ssid,
-						payload.security as Record<string, unknown>
-					),
+					await tetraNetworkConnectWifi(token, interfaceName, ssid, security),
 					'Wi-Fi connection failed'
 				);
 			}
 
 			case 'network.set_config': {
-				const validationError = validateNetworkConfig(payload);
-				if (validationError) return json(result(opId, step, 'failed', true, validationError));
+				const config = networkConfig(payload);
+				if (typeof config === 'string') return json(result(opId, step, 'failed', true, config));
 				return fromTetra(
-					await tetraNetworkSetConfig(token, payload),
+					await tetraNetworkSetConfig(token, config),
 					'Network configuration failed'
 				);
 			}

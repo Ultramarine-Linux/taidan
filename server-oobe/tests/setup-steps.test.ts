@@ -1,5 +1,6 @@
-// The update policy, remote access and dashboard access steps (steps 4-6), at
-// the API (against the mock Tetra in fixture mode) and in the browser.
+// The network 802.1X settings and the update policy, remote access and
+// dashboard access steps, at the API (against the mock Tetra in fixture mode)
+// and in the browser.
 import { expect, localURL, test } from './accessibility';
 import type { APIRequestContext, Page } from '@playwright/test';
 import { FIXTURE_SETUP_CODE } from '../src/lib/fixture';
@@ -41,6 +42,42 @@ test.describe('setup operations', () => {
 				message: 'Unsupported setup operation'
 			});
 		}
+	});
+
+	test('Wi-Fi security uses Tetra field names', async ({ request }) => {
+		const connect = (security: Record<string, unknown>) =>
+			op(request, 'internet', 'network.connect_wifi', {
+				interface: 'wlan0',
+				ssid: 'Corp Wi-Fi',
+				security
+			});
+		expect(
+			await connect({ type: 'wpa-enterprise', eap: 'peap', username: 'alice', password: 'p' })
+		).toMatchObject({ status: 'failed', message: 'Unknown 802.1X setting: username' });
+		expect(
+			await connect({
+				type: 'wpa-enterprise',
+				eap: 'peap',
+				identity: 'alice',
+				anonymous_identity: 'anonymous',
+				password: 'p',
+				domain_suffix_match: 'radius.example.com',
+				phase2: 'mschapv2'
+			})
+		).toMatchObject({ status: 'succeeded' });
+		expect(
+			await connect({
+				type: 'wpa-enterprise',
+				eap: 'peap',
+				identity: 'a',
+				password: 'p',
+				ca_cert: '/etc/ca.pem'
+			})
+		).toMatchObject({ status: 'failed', message: 'CA certificate must be a PEM file' });
+		expect(await connect({ type: 'wpa-personal', password: 'p', extra: 1 })).toMatchObject({
+			status: 'succeeded'
+		});
+		expect(await connect({ type: 'open' })).toMatchObject({ status: 'succeeded' });
 	});
 
 	test('update policy accepts only automatic or notify', async ({ request }) => {
@@ -167,6 +204,51 @@ async function walkTo(page: Page, title: string) {
 }
 
 test.describe('setup steps', () => {
+	test('wired 802.1X asks for Tetra settings by EAP method', async ({ page }) => {
+		await walkTo(page, 'Configure your network');
+		await page.locator('#network-interface').selectOption('enp1s0');
+		await page.locator('#wired-8021x').check();
+		await expect(page.locator('#wired-identity')).toBeVisible();
+		await expect(page.locator('#wired-anonymous-identity')).toBeVisible();
+		await expect(page.locator('#wired-password')).toBeVisible();
+		await expect(page.locator('#wired-domain')).toBeVisible();
+		await expect(page.locator('#wired-clientCert-upload')).toHaveCount(0);
+
+		await page.locator('#wired-eap').selectOption('tls');
+		await expect(page.locator('#wired-password')).toHaveCount(0);
+		await expect(page.locator('#wired-phase2')).toHaveCount(0);
+		await expect(page.locator('#wired-anonymous-identity')).toHaveCount(0);
+		await expect(page.locator('#wired-private-key-password')).toBeVisible();
+
+		await page.locator('#wired-privateKey-upload').setInputFiles({
+			name: 'client.der',
+			mimeType: 'application/octet-stream',
+			buffer: Buffer.from([0x30, 0x82, 0x01, 0x0a])
+		});
+		await expect(page.getByRole('alert')).toContainText('Choose a PEM file');
+		await page.locator('#wired-privateKey-upload').setInputFiles({
+			name: 'client.key',
+			mimeType: 'application/x-pem-file',
+			buffer: Buffer.from('-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n')
+		});
+		await expect(page.getByRole('alert')).toHaveCount(0);
+		await expect(page.getByText('client.key')).toBeVisible();
+	});
+
+	test('enterprise Wi-Fi asks for an identity, not a username', async ({ page }) => {
+		await walkTo(page, 'Configure your network');
+		await page.locator('#network-interface').selectOption('wlan0');
+		await page.getByRole('button', { name: 'Scan for networks' }).click();
+		await page.locator('#wifi-network').selectOption('Corp Wi-Fi');
+		await expect(page.locator('#wifi-identity')).toBeVisible();
+		await expect(page.locator('#wifi-domain')).toBeVisible();
+		await expect(page.locator('#wifi-password')).toHaveCount(1);
+		await expect(page.locator('#wifi-username')).toHaveCount(0);
+		await page.locator('#wifi-eap').selectOption('tls');
+		await expect(page.locator('#wifi-password')).toHaveCount(0);
+		await expect(page.locator('#wifi-clientCert-upload')).toHaveCount(1);
+	});
+
 	test('update policy defaults to automatic', async ({ page }) => {
 		await walkTo(page, 'Choose an update policy');
 		await expect(page.locator('#updates-automatic')).toBeChecked();
