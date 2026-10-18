@@ -415,7 +415,7 @@ h3 {
 	margin: 1.25rem 0;
 }
 
-.network-section {
+:is(.network-section, .form-section) {
 	display: grid;
 	gap: 1rem;
 	border: 1px solid var(--border);
@@ -423,11 +423,11 @@ h3 {
 	padding: 1rem;
 }
 
-.network-section .field-label {
+:is(.network-section, .form-section) .field-label {
 	margin: 0;
 }
 
-.network-section fieldset {
+:is(.network-section, .form-section) fieldset {
 	display: grid;
 	gap: 0.65rem;
 	min-width: 0;
@@ -436,7 +436,7 @@ h3 {
 	padding: 0.85rem;
 }
 
-.network-section legend {
+:is(.network-section, .form-section) legend {
 	padding: 0 0.4rem;
 	color: var(--foreground);
 	font-size: 0.78rem;
@@ -455,8 +455,8 @@ h3 {
 	grid-column: span 2;
 }
 
-.network-section select,
-.network-section input:not([type='radio']):not([type='checkbox']) {
+:is(.network-section, .form-section) select,
+:is(.network-section, .form-section) input:not([type='radio']):not([type='checkbox']) {
 	width: 100%;
 	min-height: 2.55rem;
 	border: 1px solid color-mix(in srgb, var(--border) 70%, var(--foreground));
@@ -465,8 +465,8 @@ h3 {
 	padding: 0.6rem 0.7rem;
 }
 
-.network-section select:hover,
-.network-section input:not([type='radio']):not([type='checkbox']):hover {
+:is(.network-section, .form-section) select:hover,
+:is(.network-section, .form-section) input:not([type='radio']):not([type='checkbox']):hover {
 	border-color: var(--ring);
 }
 
@@ -524,14 +524,14 @@ h3 {
 	white-space: nowrap;
 }
 
-.network-section select:focus,
-.network-section input:not([type='radio']):not([type='checkbox']):focus {
+:is(.network-section, .form-section) select:focus,
+:is(.network-section, .form-section) input:not([type='radio']):not([type='checkbox']):focus {
 	border-color: var(--primary);
 	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
 	outline: none;
 }
 
-.network-section .toggle-option {
+:is(.network-section, .form-section) .toggle-option {
 	display: grid;
 	grid-template-columns: 1fr auto;
 	align-items: center;
@@ -541,28 +541,28 @@ h3 {
 	padding: 0.7rem;
 }
 
-.network-section .toggle-option:has(input:checked) {
+:is(.network-section, .form-section) .toggle-option:has(input:checked) {
 	border-color: color-mix(in srgb, var(--primary) 65%, var(--border));
 	background: color-mix(in srgb, var(--primary) 12%, var(--card));
 }
 
-.network-section .toggle-option strong,
-.network-section .toggle-option small {
+:is(.network-section, .form-section) .toggle-option strong,
+:is(.network-section, .form-section) .toggle-option small {
 	display: block;
 }
 
-.network-section .toggle-option strong {
+:is(.network-section, .form-section) .toggle-option strong {
 	color: var(--foreground);
 	font-size: 0.86rem;
 }
 
-.network-section .toggle-option small {
+:is(.network-section, .form-section) .toggle-option small {
 	margin-top: 0.2rem;
 	line-height: 1.4;
 }
 
-.network-section input[type='radio'],
-.network-section input[type='checkbox'] {
+:is(.network-section, .form-section) input[type='radio'],
+:is(.network-section, .form-section) input[type='checkbox'] {
 	width: 1.1rem;
 	height: 1.1rem;
 	accent-color: var(--primary);

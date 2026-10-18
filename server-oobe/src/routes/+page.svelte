@@ -5,20 +5,24 @@
 	import UserStep from '$lib/components/steps/04-user.svelte';
 	import PasswordStep from '$lib/components/steps/05-password.svelte';
 	import InternetStep from '$lib/components/steps/06-internet.svelte';
-	import TweaksStep from '$lib/components/steps/07-tweaks.svelte';
+	import UpdatesStep from '$lib/components/steps/07-updates.svelte';
+	import RemoteAccessStep from '$lib/components/steps/08-remote-access.svelte';
 	import SshKeyStep from '$lib/components/steps/08-ssh-key.svelte';
 	import DashboardStep from '$lib/components/steps/09-dashboard.svelte';
 	import CompleteStep from '$lib/components/steps/10-complete.svelte';
-	import { api } from '$lib/oobe-api';
+	import { api, SetupSessionRequiredError } from '$lib/oobe-api';
 	import {
 		fixtureState,
 		fixtureSteps,
 		stepIndex,
-		type StepId,
-		type OobeState
+		type AccessForm,
+		type OobeState,
+		type RemoteAccessForm,
+		type SetupCompleteResult,
+		type StepId
 	} from '$lib/oobe-state';
 	import { onMount } from 'svelte';
-	import { detectLocale } from '$lib/i18n.svelte';
+	import { detectLocale, t } from '$lib/i18n.svelte';
 	import { detectKeyboardLayout } from '$lib/keyboard-detect';
 
 	let oobeState = $state<OobeState>(fixtureState);
@@ -26,10 +30,31 @@
 	let errorMessage = $state('');
 	let operationLoading = $state(false);
 	let password = $state('');
-	let redirecting = $state(false);
 	let retryStep = $state<StepId | null>(null);
 	let networkConfig = $state<Record<string, unknown>>({});
 	let ipAddresses = $state<string[]>([]);
+	let authenticated = $state(false);
+	let setupCode = $state('');
+	let setupCodeError = $state('');
+	let finished = $state<SetupCompleteResult | null>(null);
+	// Secrets (auth keys, tunnel tokens, DNS credentials) live only here, are
+	// sent to Tetra once, and are cleared afterwards. They are never persisted.
+	let remoteAccessForm = $state<RemoteAccessForm>({
+		tailscale: false,
+		tailscaleAuthKey: '',
+		tailscaleServe: true,
+		tailscaleFunnel: false,
+		funnelConfirmed: false,
+		cloudflared: false,
+		cloudflaredToken: ''
+	});
+	let accessForm = $state<AccessForm>({
+		mode: 'domain',
+		hostname: '',
+		challenge: 'http-01',
+		dnsProvider: '',
+		dnsCredentials: {}
+	});
 
 	let selectedStep = $derived(oobeState.activeStep);
 	let currentIndex = $derived(stepIndex(selectedStep));
@@ -56,18 +81,66 @@
 			.then((res) => (res.ok ? res.json() : { addresses: [] }))
 			.then((data: { addresses?: string[] }) => (ipAddresses = data.addresses ?? []))
 			.catch(() => (ipAddresses = []));
-		withTimeout(api.getState(), 5000)
-			.then((s) => {
-				oobeState = s;
+		withTimeout(api.getSession(), 5000)
+			.then(async (session) => {
+				if (session.error === 'unavailable') errorMessage = t('setup-code-unavailable');
+				else if (!session.setupRequired) errorMessage = t('setup-code-complete');
+				authenticated = session.authenticated;
+				if (authenticated) await loadState();
 				loaded = true;
-				if (s.activeStep === 'internet') void refreshNetworkInterfaces();
 			})
 			.catch((err) => {
-				console.error('Failed to load OOBE state:', err);
-				errorMessage = 'Unable to load setup state. Using defaults.';
+				console.error('Failed to check setup session:', err);
+				errorMessage = t('setup-code-unavailable');
 				loaded = true;
 			});
 	});
+
+	async function loadState() {
+		try {
+			const s = await withTimeout(api.getState(), 5000);
+			oobeState = s;
+			accessForm = {
+				...accessForm,
+				mode: s.access.mode,
+				hostname: s.access.hostname,
+				challenge: s.access.challenge,
+				dnsProvider: s.access.dnsProvider ?? ''
+			};
+			if (s.activeStep === 'internet') void refreshNetworkInterfaces();
+		} catch (err) {
+			if (err instanceof SetupSessionRequiredError) return requireSetupCode();
+			console.error('Failed to load OOBE state:', err);
+			errorMessage = 'Unable to load setup state. Using defaults.';
+		}
+	}
+
+	/** The setup session is missing or expired: ask for the code again on Welcome. */
+	function requireSetupCode() {
+		authenticated = false;
+		retryStep = null;
+		setupCodeError = t('setup-code-expired');
+		oobeState = { ...oobeState, activeStep: 'welcome' };
+	}
+
+	async function redeemSetupCode(): Promise<boolean> {
+		setupCodeError = '';
+		const session = await api.redeemSetupCode(setupCode);
+		if (session.authenticated) {
+			authenticated = true;
+			setupCode = '';
+			return true;
+		}
+		setupCodeError =
+			session.error === 'rate_limited'
+				? t('setup-code-rate-limited', { seconds: session.retryAfter ?? 60 })
+				: session.error === 'setup_complete'
+					? t('setup-code-complete')
+					: session.error === 'unavailable'
+						? t('setup-code-unavailable')
+						: t('setup-code-invalid');
+		return false;
+	}
 
 	async function refreshNetworkInterfaces() {
 		try {
@@ -81,6 +154,7 @@
 	}
 
 	async function saveActiveStep(step: StepId) {
+		if (!authenticated && step !== 'welcome') return;
 		try {
 			await callStatePatch({ activeStep: step });
 			oobeState = { ...oobeState, activeStep: step };
@@ -123,12 +197,8 @@
 	}
 
 	async function callStatePatch(payload: Record<string, unknown>) {
-		const res = await fetch('/api/oobe/operations', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ step: selectedStep, operation: 'state.patch', payload })
-		});
-		if (!res.ok) throw new Error(`HTTP ${res.status}`);
+		const res = await api.startOperation(selectedStep, 'state.patch', payload);
+		if (res.status === 'failed') throw new Error(res.message || 'Failed to save setup state');
 	}
 
 	function onBack() {
@@ -153,36 +223,40 @@
 		}
 	}
 
-	async function markCompleted() {
-		try {
-			await callStatePatch({ completed: true });
-			oobeState = { ...oobeState, completed: true };
-		} catch (err) {
-			console.error('Failed to mark completed:', err);
-			oobeState = { ...oobeState, completed: true };
-		}
-	}
-
 	async function onContinue() {
 		if (operationLoading) return;
 		errorMessage = '';
 
 		const step = selectedStep;
 
-		// Last step: finish or hand off to local dashboard.
+		// Nothing else can run until Tetra has accepted the setup code.
+		if (step === 'welcome' && !authenticated) {
+			operationLoading = true;
+			try {
+				if (!(await redeemSetupCode())) return;
+				await loadState();
+				// Resume where a previous session left off.
+				if (oobeState.activeStep !== 'welcome') return;
+			} catch (err) {
+				errorMessage = String(err);
+				return;
+			} finally {
+				operationLoading = false;
+			}
+		}
+
+		// Last step. setup.complete ends this setup session, disables the code,
+		// starts the dashboard and stops this OOBE a few seconds later, so it is
+		// the final call and the final screen comes from its response.
 		if (currentIndex >= fixtureSteps.length - 1) {
 			operationLoading = true;
 			try {
-				await markCompleted();
-
-				await callOperation('dashboard.install');
-				await callOperation('dashboard.handoff');
-				redirecting = true;
-				await new Promise((resolve) => setTimeout(resolve, 4000));
-				window.location.href = '/';
+				const result = await callOperation('setup.complete');
+				finished = JSON.parse(result.message ?? '{}') as SetupCompleteResult;
+				authenticated = false;
 			} catch (err) {
-				errorMessage = String(err);
-				redirecting = false;
+				if (err instanceof SetupSessionRequiredError) requireSetupCode();
+				else errorMessage = String(err);
 			} finally {
 				operationLoading = false;
 			}
@@ -228,19 +302,64 @@
 				}
 				await callOperation('network.check');
 			}
-			if (step === 'tweaks') {
-				const tweaks = oobeState.tweaks ?? { ssh: true, firewall: true, automaticUpdates: true };
-				await callOperation('tweaks.apply', tweaks);
-				await callStatePatch({ tweaks });
+			if (step === 'updates') {
+				await callOperation('updates.set_policy', { policy: oobeState.updatePolicy });
+			}
+			if (step === 'remote-access') {
+				const form = remoteAccessForm;
+				if (form.tailscale) {
+					await callOperation('remote_access.tailscale_up', {
+						auth_key: form.tailscaleAuthKey,
+						serve: form.tailscaleServe,
+						funnel: form.tailscaleFunnel,
+						confirmFunnel: form.funnelConfirmed
+					});
+					form.tailscaleAuthKey = '';
+					oobeState.remoteAccess = {
+						...oobeState.remoteAccess,
+						tailscale: true,
+						tailscaleServe: form.tailscaleServe,
+						tailscaleFunnel: form.tailscaleFunnel
+					};
+				}
+				if (form.cloudflared) {
+					await callOperation('remote_access.cloudflared_set_token', {
+						token: form.cloudflaredToken
+					});
+					form.cloudflaredToken = '';
+					oobeState.remoteAccess = { ...oobeState.remoteAccess, cloudflared: true };
+				}
 			}
 			if (step === 'ssh-key' && oobeState.sshPublicKey) {
 				await callOperation('ssh-key.apply', { publicKey: oobeState.sshPublicKey });
 			}
 			if (step === 'dashboard') {
-				await callStatePatch({
-					dashboardDomain: oobeState.dashboardDomain,
-					dashboardPort: oobeState.dashboardPort
-				});
+				const form = accessForm;
+				const hostname = form.hostname.trim();
+				const payload =
+					form.mode === 'ip'
+						? { mode: 'ip', hostname }
+						: form.challenge === 'http-01'
+							? { mode: 'domain', hostname, challenge: 'http-01' }
+							: {
+									mode: 'domain',
+									hostname,
+									challenge: 'dns-01',
+									dns_provider: form.dnsProvider,
+									dns_credentials: form.dnsCredentials
+								};
+				const result = await callOperation('access.set', payload);
+				const applied = JSON.parse(result.message ?? '{}') as { passkeysAvailable?: boolean };
+				form.dnsCredentials = {};
+				oobeState.access = {
+					mode: form.mode,
+					hostname,
+					challenge: form.challenge,
+					dnsProvider:
+						form.mode === 'domain' && form.challenge === 'dns-01' ? form.dnsProvider : undefined,
+					applied: true,
+					passkeysAvailable: applied.passkeysAvailable
+				};
 			}
 
 			await api.completeStep(step);
@@ -252,6 +371,10 @@
 			const nextStep = fixtureSteps[currentIndex + 1]?.id;
 			if (nextStep) await saveActiveStep(nextStep);
 		} catch (err) {
+			if (err instanceof SetupSessionRequiredError) {
+				requireSetupCode();
+				return;
+			}
 			errorMessage = String(err);
 			retryStep = step;
 			await patchStepStatus(step, 'failed');
@@ -293,79 +416,78 @@
 		<p>Loading setup state…</p>
 	</div>
 {:else}
-	{#if redirecting}
-		<div class="redirect-overlay">
-			<p class="redirect-title">Starting dashboard…</p>
-			<p class="redirect-sub">You will be redirected automatically.</p>
-		</div>
-	{:else}
-		{#if errorMessage}
-			<div class="global-error" role="alert">
-				<p>{errorMessage}</p>
-				{#if retryStep}
-					<button
-						type="button"
-						onclick={() => {
-							errorMessage = '';
-							void onContinue();
-						}}
-					>
-						Retry
-					</button>
-				{/if}
+	{#if errorMessage}
+		<div class="global-error" role="alert">
+			<p>{errorMessage}</p>
+			{#if retryStep}
 				<button
 					type="button"
 					onclick={() => {
 						errorMessage = '';
-						retryStep = null;
-					}}>Dismiss</button
+						void onContinue();
+					}}
 				>
-			</div>
-		{/if}
-
-		<Shell steps={oobeState.steps} {selectedStep} onSelectStep={saveActiveStep}>
-			{#if selectedStep === 'welcome'}
-				<WelcomeStep {onBack} {onContinue} {ipAddresses} />
-			{:else if selectedStep === 'devicename'}
-				<DeviceNameStep bind:hostname={oobeState.hostname} {onBack} {onContinue} />
-			{:else if selectedStep === 'whoareyou'}
-				<UserStep bind:username={oobeState.administrator} {onBack} {onContinue} />
-			{:else if selectedStep === 'password'}
-				<PasswordStep bind:password {onBack} {onContinue} />
-			{:else if selectedStep === 'internet'}
-				<InternetStep
-					bind:interfaces={oobeState.networkInterfaces}
-					bind:networkConfig
-					onWifiScan={scanWifi}
-					onWifiConnect={connectWifi}
-					{onBack}
-					{onContinue}
-				/>
-			{:else if selectedStep === 'tweaks'}
-				<TweaksStep bind:settings={oobeState.tweaks} {onBack} {onContinue} />
-			{:else if selectedStep === 'ssh-key'}
-				<SshKeyStep bind:value={oobeState.sshPublicKey} {onBack} {onContinue} />
-			{:else if selectedStep === 'dashboard'}
-				<DashboardStep
-					bind:dashboardDomain={oobeState.dashboardDomain}
-					bind:dashboardPort={oobeState.dashboardPort}
-					{onBack}
-					{onContinue}
-				/>
-			{:else}
-				<CompleteStep
-					{onBack}
-					{onContinue}
-					{onReboot}
-					{onShutdown}
-					hostname={oobeState.hostname}
-					administrator={oobeState.administrator}
-					dashboardDomain={oobeState.dashboardDomain}
-					dashboardPort={oobeState.dashboardPort}
-				/>
+					Retry
+				</button>
 			{/if}
-		</Shell>
+			<button
+				type="button"
+				onclick={() => {
+					errorMessage = '';
+					retryStep = null;
+				}}>Dismiss</button
+			>
+		</div>
 	{/if}
+
+	<Shell steps={oobeState.steps} {selectedStep} onSelectStep={saveActiveStep}>
+		{#if selectedStep === 'welcome'}
+			<WelcomeStep
+				{onBack}
+				{onContinue}
+				{ipAddresses}
+				needsSetupCode={!authenticated}
+				bind:setupCode
+				{setupCodeError}
+			/>
+		{:else if selectedStep === 'devicename'}
+			<DeviceNameStep bind:hostname={oobeState.hostname} {onBack} {onContinue} />
+		{:else if selectedStep === 'whoareyou'}
+			<UserStep bind:username={oobeState.administrator} {onBack} {onContinue} />
+		{:else if selectedStep === 'password'}
+			<PasswordStep bind:password {onBack} {onContinue} />
+		{:else if selectedStep === 'internet'}
+			<InternetStep
+				bind:interfaces={oobeState.networkInterfaces}
+				bind:networkConfig
+				onWifiScan={scanWifi}
+				onWifiConnect={connectWifi}
+				{onBack}
+				{onContinue}
+			/>
+		{:else if selectedStep === 'updates'}
+			<UpdatesStep bind:policy={oobeState.updatePolicy} {onBack} {onContinue} />
+		{:else if selectedStep === 'remote-access'}
+			<RemoteAccessStep bind:form={remoteAccessForm} {onBack} {onContinue} />
+		{:else if selectedStep === 'ssh-key'}
+			<SshKeyStep bind:value={oobeState.sshPublicKey} {onBack} {onContinue} />
+		{:else if selectedStep === 'dashboard'}
+			<DashboardStep bind:form={accessForm} {ipAddresses} {onBack} {onContinue} />
+		{:else}
+			<CompleteStep
+				{onBack}
+				{onContinue}
+				{onReboot}
+				{onShutdown}
+				hostname={oobeState.hostname}
+				administrator={oobeState.administrator}
+				access={oobeState.access}
+				updatePolicy={oobeState.updatePolicy}
+				remoteAccess={oobeState.remoteAccess}
+				{finished}
+			/>
+		{/if}
+	</Shell>
 {/if}
 
 <style>
@@ -396,27 +518,5 @@
 		padding: 0.25rem 0.5rem;
 		border-radius: 0.25rem;
 		cursor: pointer;
-	}
-	.redirect-overlay {
-		position: fixed;
-		inset: 0;
-		z-index: 200;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		background: var(--background);
-		color: var(--foreground);
-	}
-	.redirect-title {
-		font-size: 1.25rem;
-		font-weight: 600;
-		margin: 0;
-	}
-	.redirect-sub {
-		color: var(--muted-foreground);
-		font-size: 0.9rem;
-		margin: 0;
 	}
 </style>

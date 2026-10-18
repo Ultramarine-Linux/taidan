@@ -24,6 +24,7 @@
 		"@sveltejs/vite-plugin-svelte": "^7.2.0",
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/node": "^22.0.0",
+		"@types/ws": "^8.18.2",
 		"prettier": "^3.9.5",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
@@ -34,6 +35,7 @@
 		"vite": "^8.1.5"
 	},
 	"dependencies": {
-		"@fluent/bundle": "^0.19.1"
+		"@fluent/bundle": "^0.19.1",
+		"ws": "^8.22.0"
 	}
 }

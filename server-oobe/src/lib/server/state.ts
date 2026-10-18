@@ -2,9 +2,18 @@ import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname } from 'node:path';
 import { tmpdir } from 'node:os';
-import { fixtureSteps, type OobeState, type StepId } from '$lib/oobe-state';
+import {
+	defaultAccess,
+	defaultRemoteAccess,
+	fixtureSteps,
+	type OobeState,
+	type StepId
+} from '$lib/oobe-state';
 
-/** Canonical local port for the Ultramarine Server OOBE web service. */
+/**
+ * Port browsers use to reach the OOBE. Tetra serves it through Caddy with
+ * `tls internal`; Node itself listens only on 127.0.0.1:6624.
+ */
 export const DEFAULT_OOBE_PORT = 6623;
 
 const DEFAULT_STATE_PATH = '/var/lib/ultramarine-server-oobe/state.json';
@@ -44,15 +53,11 @@ function normalizeState(raw: unknown): OobeState {
 		administrator: partial.administrator ?? '',
 		keyboardLayout: partial.keyboardLayout,
 		keyboardVariant: partial.keyboardVariant,
-		tweaks: partial.tweaks ?? { ssh: true, firewall: true, automaticUpdates: true },
+		updatePolicy: partial.updatePolicy === 'notify' ? 'notify' : 'automatic',
 		sshPublicKey: partial.sshPublicKey ?? '',
 		networkInterfaces: partial.networkInterfaces ?? [],
-		dashboardDomain: partial.dashboardDomain ?? '',
-		dashboardPort: partial.dashboardPort ?? 3972,
-		dashboard: partial.dashboard ?? { installed: false, installing: false },
-		tetra: partial.tetra ?? { installed: false, running: false, paired: false },
-		fyra: partial.fyra ?? { status: 'not-started' },
-		cloudflare: partial.cloudflare ?? { installed: false, installing: false }
+		access: { ...defaultAccess, ...partial.access },
+		remoteAccess: { ...defaultRemoteAccess, ...partial.remoteAccess }
 	};
 }
 
@@ -65,15 +70,11 @@ function defaultState(): OobeState {
 		hostname: '',
 		administrator: '',
 		keyboardVariant: undefined,
-		tweaks: { ssh: true, firewall: true, automaticUpdates: true },
+		updatePolicy: 'automatic',
 		sshPublicKey: '',
 		networkInterfaces: [],
-		dashboardDomain: '',
-		dashboardPort: 3972,
-		dashboard: { installed: false, installing: false },
-		tetra: { installed: true, running: true, paired: false },
-		fyra: { status: 'not-started' },
-		cloudflare: { installed: false, installing: false }
+		access: { ...defaultAccess },
+		remoteAccess: { ...defaultRemoteAccess }
 	};
 }
 

@@ -59,15 +59,16 @@ impl std::error::Error for ValidationError {}
 /// Arbitrary commands, executable paths, and argument vectors are rejected.
 pub fn validate_operation(operation: &SetupOperation) -> Result<(), ValidationError> {
     const STEPS: &[&str] = &[
-        "welcome", "devicename", "whoareyou", "password", "internet", "tweaks",
-        "ssh-key", "dashboard", "complete",
+        "welcome", "devicename", "whoareyou", "password", "ssh-key", "internet", "updates",
+        "remote-access", "dashboard", "complete",
     ];
     const OPERATIONS: &[&str] = &[
         "state.patch", "state.reset", "hostname.apply", "keyboard.apply", "user.create",
         "password.set", "network.interfaces", "network.scan_wifi", "network.connect_wifi",
-        "network.set_config", "network.check", "tetra.detect", "tetra.start", "ssh-key.apply",
-        "tweaks.apply", "fyra.begin", "system.reboot", "system.poweroff", "dashboard.install",
-        "dashboard.handoff", "cloudflare.install",
+        "network.set_config", "network.check", "ssh-key.apply", "updates.set_policy",
+        "remote_access.status", "remote_access.tailscale_up",
+        "remote_access.cloudflared_set_token", "access.set", "system.reboot", "system.poweroff",
+        "setup.complete",
     ];
     if !STEPS.contains(&operation.step.as_str()) {
         return Err(ValidationError::InvalidStep);
@@ -90,5 +91,65 @@ mod tests {
             payload: serde_json::Value::Null,
         };
         assert_eq!(validate_operation(&operation), Err(ValidationError::InvalidOperation));
+    }
+
+    #[test]
+    fn rejects_removed_enrollment() {
+        let operation = SetupOperation {
+            step: "dashboard".into(),
+            operation: "fyra.begin".into(),
+            payload: serde_json::Value::Null,
+        };
+        assert_eq!(validate_operation(&operation), Err(ValidationError::InvalidOperation));
+    }
+
+    #[test]
+    fn rejects_removed_host_operations() {
+        for removed in [
+            "dashboard.install",
+            "dashboard.handoff",
+            "cloudflare.install",
+            "tweaks.apply",
+            "tetra.detect",
+            "tetra.start",
+        ] {
+            let operation = SetupOperation {
+                step: "dashboard".into(),
+                operation: removed.into(),
+                payload: serde_json::Value::Null,
+            };
+            assert_eq!(
+                validate_operation(&operation),
+                Err(ValidationError::InvalidOperation),
+                "{removed}"
+            );
+        }
+    }
+
+    #[test]
+    fn accepts_new_setup_steps() {
+        for (step, operation) in [
+            ("updates", "updates.set_policy"),
+            ("remote-access", "remote_access.tailscale_up"),
+            ("remote-access", "remote_access.cloudflared_set_token"),
+            ("dashboard", "access.set"),
+        ] {
+            let operation = SetupOperation {
+                step: step.into(),
+                operation: operation.into(),
+                payload: serde_json::Value::Null,
+            };
+            assert_eq!(validate_operation(&operation), Ok(()));
+        }
+    }
+
+    #[test]
+    fn accepts_setup_complete() {
+        let operation = SetupOperation {
+            step: "complete".into(),
+            operation: "setup.complete".into(),
+            payload: serde_json::Value::Null,
+        };
+        assert_eq!(validate_operation(&operation), Ok(()));
     }
 }

@@ -1,5 +1,6 @@
 import { expect, localURL, test } from './accessibility';
 import type { Page } from '@playwright/test';
+import { FIXTURE_SETUP_CODE } from '../src/lib/fixture';
 
 const stepIds = [
 	'welcome',
@@ -8,12 +9,15 @@ const stepIds = [
 	'password',
 	'ssh-key',
 	'internet',
-	'tweaks',
+	'updates',
+	'remote-access',
 	'dashboard',
 	'complete'
 ] as const;
 
 async function resetState(page: Page) {
+	// Every API call needs a setup session from the (mock) Tetra.
+	await page.request.post(`${localURL}/api/oobe/session`, { data: { code: FIXTURE_SETUP_CODE } });
 	await page.request.post(`${localURL}/api/oobe/operations`, {
 		data: {
 			step: 'welcome',
@@ -41,6 +45,9 @@ for (const theme of ['light', 'dark'] as const) {
 			expect(results.violations, `Accessibility violations on ${stepId}`).toEqual([]);
 
 			// Fill required fields before continuing past form steps
+			if (stepId === 'welcome') {
+				await browserPage.locator('#setup-code').fill(FIXTURE_SETUP_CODE);
+			}
 			if (stepId === 'devicename') {
 				await browserPage.locator('#device-name').fill('test-device');
 				await browserPage.locator('#hostname').fill('test-device');
@@ -48,6 +55,9 @@ for (const theme of ['light', 'dark'] as const) {
 			if (stepId === 'whoareyou') {
 				await browserPage.locator('#full-name').fill('Test User');
 				await browserPage.locator('#username').fill('testuser');
+			}
+			if (stepId === 'dashboard') {
+				await browserPage.locator('#access-hostname').fill('server.example.com');
 			}
 			if (stepId === 'password') {
 				await browserPage.locator('#password').fill('securepassword123');
@@ -63,5 +73,11 @@ for (const theme of ['light', 'dark'] as const) {
 				await expect(browserPage.locator('.workspace h2')).toBeVisible();
 			}
 		}
+
+		// The final screen comes from setup.complete's response.
+		await browserPage.locator('button.primary-button').filter({ hasText: 'Finish setup' }).click();
+		await expect(browserPage.locator('.workspace h2')).toHaveText('Setup complete');
+		const results = await makeAxeBuilder().analyze();
+		expect(results.violations, 'Accessibility violations on the final screen').toEqual([]);
 	});
 }

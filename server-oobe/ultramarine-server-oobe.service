@@ -1,17 +1,32 @@
 [Unit]
 Description=Ultramarine Server OOBE
-After=network.target
+Documentation=https://github.com/Ultramarine-Linux/tetra/blob/main/docs/auth-protocol.md
+After=network.target tetra.socket
+Wants=tetra.socket
+# setup.complete writes this marker; the OOBE has nothing to do afterwards.
+ConditionPathExists=!/var/lib/tetra/setup-complete
 
 [Service]
 Type=simple
+# Unprivileged. Every host change is a Tetra call made with the setup session
+# Tetra issues for the setup code. Tetra identifies this UID on its socket;
+# ultramarine-oobe is in the tetra group (ultramarine-server-oobe.sysusers.conf).
+User=ultramarine-oobe
+Group=ultramarine-oobe
 WorkingDirectory=/usr/share/ultramarine-server-oobe
 ExecStart=/usr/bin/node /usr/share/ultramarine-server-oobe/index.js
+StateDirectory=ultramarine-server-oobe
 Environment=OOBE_STATE_PATH=/var/lib/ultramarine-server-oobe/state.json
-Environment=OOBE_LIBTAIDAN=true
 Environment=TDNX_PATH=/usr/libexec/ultramarine-server-oobe/tdnx
-RuntimeDirectory=ultramarine-server-oobe
-RuntimeDirectoryMode=0700
-Environment=PORT=6623
+# Loopback only. Tetra serves port 6623 through Caddy with `tls internal` and
+# proxies to this address. Caddy sets X-Forwarded-Proto and appends the
+# browser's address to X-Forwarded-For; Caddy is the only proxy, so the client
+# address is the last entry (XFF_DEPTH=1).
+Environment=HOST=127.0.0.1
+Environment=PORT=6624
+Environment=PROTOCOL_HEADER=x-forwarded-proto
+Environment=ADDRESS_HEADER=X-Forwarded-For
+Environment=XFF_DEPTH=1
 Restart=on-failure
 
 [Install]

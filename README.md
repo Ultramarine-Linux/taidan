@@ -48,9 +48,11 @@ pnpm --dir server-oobe build
 cargo build --release -p tdnx --no-default-features --features server-oobe
 ```
 
-The packaged `ultramarine-server-oobe.service` enables the bridge with
-`OOBE_LIBTAIDAN=true` and points `TDNX_PATH` at the installed feature-enabled
-`tdnx` binary. The bridge is not enabled in default `tdnx` builds. The `justfile`
+The server OOBE always validates operations through this bridge; an operation
+fails if `tdnx` is missing or rejects it. The packaged
+`ultramarine-server-oobe.service` points `TDNX_PATH` at the installed
+feature-enabled `tdnx` binary. The bridge is not built into default `tdnx`
+builds. The `justfile`
 provides equivalent `build-desktop`, `build-server-oobe`, and `build-all` recipes.
 
 ## Testing
