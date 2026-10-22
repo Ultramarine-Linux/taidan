@@ -2,10 +2,12 @@ import { json, type Handle } from '@sveltejs/kit';
 import { checkSetupSession, clearSessionCookie } from '$lib/server/setup-session';
 
 /**
- * API routes that work without a setup session: redeeming the setup code, and
- * the address list the welcome screen shows before the code is entered.
+ * API routes that work without a setup session: redeeming the setup code, the
+ * address list the welcome screen shows before the code is entered, and
+ * keeping a network change from a new address (its change id is the
+ * credential; see network-change.ts).
  */
-const PUBLIC_API = new Set(['/api/oobe/session', '/api/oobe/network']);
+const PUBLIC_API = new Set(['/api/oobe/session', '/api/oobe/network', '/api/oobe/network/confirm']);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const path = event.url.pathname;

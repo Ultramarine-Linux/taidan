@@ -445,14 +445,18 @@ h3 {
 
 .network-fields {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(7rem, 0.35fr);
-	gap: 0 0.75rem;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.65rem 0.75rem;
 	padding-top: 0.25rem;
 }
 
-.network-fields .field-label:nth-child(3),
-.network-fields .field-label:nth-child(4) {
+/* Addresses and their help text take the full width; gateway and DNS share a row. */
+.network-fields > :nth-child(-n + 2) {
 	grid-column: span 2;
+}
+
+.network-fields .field-help {
+	margin: -0.35rem 0 0;
 }
 
 :is(.network-section, .form-section) select,
@@ -573,8 +577,7 @@ h3 {
 		grid-template-columns: 1fr;
 	}
 
-	.network-fields .field-label:nth-child(3),
-	.network-fields .field-label:nth-child(4) {
+	.network-fields > :nth-child(-n + 2) {
 		grid-column: auto;
 	}
 }

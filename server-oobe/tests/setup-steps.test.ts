@@ -1,15 +1,31 @@
-// The network 802.1X settings and the update policy, remote access and
-// dashboard access steps, at the API (against the mock Tetra in fixture mode)
-// and in the browser.
+// The network (addressing, safe apply, Wi-Fi and 802.1X) and the update
+// policy, remote access and dashboard access steps, at the API (against the
+// mock Tetra in fixture mode) and in the browser. Network operations in the
+// browser also go to the mock Tetra, on the fixture host the
+// `oobe_fixture_host` cookie picks.
 import { expect, localURL, test } from './accessibility';
 import type { APIRequestContext, Page } from '@playwright/test';
 import { FIXTURE_SETUP_CODE } from '../src/lib/fixture';
+import { FIXTURE_HOST_COOKIE, type FixtureHostName } from '../src/lib/fixture-hosts';
 
-async function login(request: APIRequestContext) {
+async function login(request: APIRequestContext, host?: FixtureHostName) {
 	const res = await request.post(`${localURL}/api/oobe/session`, {
-		data: { code: FIXTURE_SETUP_CODE }
+		data: { code: FIXTURE_SETUP_CODE },
+		headers: host ? { cookie: `${FIXTURE_HOST_COOKIE}=${host}` } : {}
 	});
 	expect(res.status()).toBe(200);
+}
+
+let changes = 0;
+/** A change id for network.configure and network.connect_wifi. */
+function newChangeId() {
+	changes += 1;
+	return `test-${process.pid}-${Date.now()}-${changes}`;
+}
+
+async function confirm(request: APIRequestContext, changeId: string) {
+	const res = await request.post(`${localURL}/api/oobe/network/confirm`, { data: { changeId } });
+	return (await res.json()) as { status: string; message?: string };
 }
 
 async function op(
@@ -35,7 +51,8 @@ test.describe('setup operations', () => {
 			'cloudflare.install',
 			'tweaks.apply',
 			'tetra.start',
-			'fyra.begin'
+			'fyra.begin',
+			'network.set_config'
 		]) {
 			expect(await op(request, 'dashboard', operation, {}), operation).toMatchObject({
 				status: 'failed',
@@ -47,6 +64,7 @@ test.describe('setup operations', () => {
 	test('Wi-Fi security uses Tetra field names', async ({ request }) => {
 		const connect = (security: Record<string, unknown>) =>
 			op(request, 'internet', 'network.connect_wifi', {
+				changeId: newChangeId(),
 				interface: 'wlan0',
 				ssid: 'Corp Wi-Fi',
 				security
@@ -78,6 +96,44 @@ test.describe('setup operations', () => {
 			status: 'succeeded'
 		});
 		expect(await connect({ type: 'open' })).toMatchObject({ status: 'succeeded' });
+	});
+
+	test('network.configure checks the change before Tetra sees it', async ({ request }) => {
+		const configure = (payload: Record<string, unknown>) =>
+			op(request, 'internet', 'network.configure', { changeId: newChangeId(), ...payload });
+		expect(
+			await op(request, 'internet', 'network.configure', { interface: 'enp1s0' })
+		).toMatchObject({ status: 'failed', message: 'Missing change id' });
+		// Fewer than 128 bits.
+		expect(
+			await op(request, 'internet', 'network.configure', {
+				changeId: 'abcdefghijklmnopqrstu',
+				interface: 'enp1s0'
+			})
+		).toMatchObject({ status: 'failed', message: 'Missing change id' });
+		expect(
+			await configure({
+				interface: 'enp1s0',
+				ipv4: { method: 'disabled' },
+				ipv6: { method: 'disabled' }
+			})
+		).toMatchObject({ status: 'failed', message: 'IPv4 and IPv6 cannot both be off' });
+		expect(
+			await configure({
+				interface: 'enp1s0',
+				ipv4: { method: 'static', address: '192.0.2.10', prefix_length: 24 }
+			})
+		).toMatchObject({ status: 'failed', message: 'Unknown IPv4 setting: address' });
+		// Without sections Tetra uses automatic addressing for both families.
+		expect(await configure({ interface: 'enp1s0' })).toMatchObject({
+			status: 'succeeded',
+			message: JSON.stringify({ confirmationRequired: false })
+		});
+	});
+
+	test('network.check reports addresses per family and DNS', async ({ request }) => {
+		const check = await op(request, 'internet', 'network.check', {});
+		expect(JSON.parse(check.message ?? '{}')).toEqual({ ipv4: true, ipv6: true, dns: true });
 	});
 
 	test('update policy accepts only automatic or notify', async ({ request }) => {
@@ -177,6 +233,106 @@ test.describe('setup operations', () => {
 	});
 });
 
+test.describe('network on an IPv6-only host', () => {
+	test.beforeEach(async ({ request }) => login(request, 'ipv6-only'));
+
+	test('manual IPv6 is applied and kept after network.confirm', async ({ request }) => {
+		const interfaces = await op(request, 'internet', 'network.interfaces', {});
+		expect(JSON.parse(interfaces.message ?? '[]')).toEqual([
+			{
+				name: 'enp1s0',
+				type: 'ethernet',
+				operstate: 'up',
+				addresses: [
+					expect.objectContaining({ address: '2001:db8:10::2', scope: 'global' }),
+					expect.objectContaining({ family: 'ipv6', scope: 'link-local' })
+				]
+			}
+		]);
+		const check = await op(request, 'internet', 'network.check', {});
+		expect(JSON.parse(check.message ?? '{}')).toEqual({ ipv4: false, ipv6: true, dns: true });
+
+		const changeId = newChangeId();
+		expect(
+			await op(request, 'internet', 'network.configure', {
+				changeId,
+				interface: 'enp1s0',
+				ipv4: { method: 'disabled' },
+				ipv6: {
+					method: 'manual',
+					addresses: [{ address: '2001:db8:10::20', prefix_length: 64 }],
+					gateway: 'fe80::1',
+					dns: ['2606:4700:4700::1111']
+				}
+			})
+		).toMatchObject({
+			status: 'succeeded',
+			message: JSON.stringify({ confirmationRequired: true, rollbackInSeconds: 60 })
+		});
+		// Tetra holds one change at a time.
+		expect(
+			await op(request, 'internet', 'network.configure', {
+				changeId: newChangeId(),
+				interface: 'enp1s0'
+			})
+		).toMatchObject({
+			status: 'failed',
+			message: expect.stringContaining('awaiting confirmation')
+		});
+
+		expect(await confirm(request, changeId)).toEqual({ status: 'kept' });
+		const after = await op(request, 'internet', 'network.interfaces', {});
+		expect(after.message).toContain('2001:db8:10::20');
+		expect(after.message).not.toContain('2001:db8:10::2"');
+		expect(
+			await op(request, 'dashboard', 'access.set', { mode: 'ip', hostname: '[2001:db8:10::20]' })
+		).toMatchObject({
+			status: 'succeeded',
+			message: JSON.stringify({
+				passkeysAvailable: false,
+				dashboardUrl: 'https://[2001:db8:10::20]'
+			})
+		});
+	});
+});
+
+test.describe('network on a Wi-Fi host', () => {
+	test.beforeEach(async ({ request }) => login(request, 'wifi'));
+
+	test('scan_wifi and connect_wifi', async ({ request }) => {
+		const scan = await op(request, 'internet', 'network.scan_wifi', { interface: 'wlp2s0' });
+		expect(JSON.parse(scan.message ?? '[]')).toContainEqual({
+			ssid: 'Ultramarine-Setup',
+			security: 'wpa-personal',
+			signal: 86,
+			frequency: 5180,
+			in_use: true
+		});
+		const changeId = newChangeId();
+		expect(
+			await op(request, 'internet', 'network.connect_wifi', {
+				changeId,
+				interface: 'wlp2s0',
+				ssid: 'Hidden Lab',
+				hidden: true,
+				security: { type: 'wpa-personal', password: 'correct horse' }
+			})
+		).toMatchObject({
+			status: 'succeeded',
+			message: JSON.stringify({ confirmationRequired: false })
+		});
+		expect(await confirm(request, changeId)).toEqual({ status: 'kept' });
+		expect(await op(request, 'internet', 'network.scan_wifi', { interface: 'lo' })).toMatchObject({
+			status: 'failed'
+		});
+	});
+});
+
+/** Pick the mock Tetra's fixture host for this browser (before logging in). */
+async function useHost(page: Page, host: FixtureHostName) {
+	await page.context().addCookies([{ name: FIXTURE_HOST_COOKIE, value: host, url: localURL }]);
+}
+
 /** Enter the setup code and continue until `title` is showing. */
 async function walkTo(page: Page, title: string) {
 	await page.goto(localURL);
@@ -207,6 +363,8 @@ test.describe('setup steps', () => {
 	test('wired 802.1X asks for Tetra settings by EAP method', async ({ page }) => {
 		await walkTo(page, 'Configure your network');
 		await page.locator('#network-interface').selectOption('enp1s0');
+		await expect(page.locator('#wired-8021x')).toHaveCount(0);
+		await page.locator('#network-configure').check();
 		await page.locator('#wired-8021x').check();
 		await expect(page.locator('#wired-identity')).toBeVisible();
 		await expect(page.locator('#wired-anonymous-identity')).toBeVisible();
@@ -247,6 +405,143 @@ test.describe('setup steps', () => {
 		await page.locator('#wifi-eap').selectOption('tls');
 		await expect(page.locator('#wifi-password')).toHaveCount(0);
 		await expect(page.locator('#wifi-clientCert-upload')).toHaveCount(1);
+	});
+
+	test('IPv6-only host: manual IPv6 survives losing the connection', async ({ page }) => {
+		await useHost(page, 'ipv6-only');
+		await walkTo(page, 'Configure your network');
+		await expect(page.locator('.network-current-addresses')).toContainText('2001:db8:10::2/64');
+		await expect(page.locator('#ipv4-auto')).toHaveCount(0);
+		await page.locator('#network-configure').check();
+		await expect(page.locator('#ipv4-auto')).toBeChecked();
+		await expect(page.locator('#ipv6-auto')).toBeChecked();
+
+		const next = page.locator('button.primary-button');
+		await page.locator('#ipv4-disabled').check();
+		await page.locator('#ipv6-disabled').check();
+		await expect(page.getByRole('alert')).toContainText("IPv4 and IPv6 can't both be off");
+		await expect(next).toBeDisabled();
+
+		await page.locator('#ipv6-manual').check();
+		await page.locator('#ipv6-addresses').fill('2001:db8:10::20/64');
+		await page.locator('#ipv6-gateway').fill('fe80::1');
+		await page.locator('#ipv6-dns').fill('2606:4700:4700::1111');
+		await expect(next).toBeEnabled();
+
+		// The server applies the change, but the browser never hears back, and
+		// can't reach the OOBE for the first few tries.
+		await page.route('**/api/oobe/operations', async (route) => {
+			if (route.request().postDataJSON()?.operation !== 'network.configure') {
+				return route.continue();
+			}
+			await route.fetch();
+			await route.abort('connectionreset');
+		});
+		let unreachable = 2;
+		await page.route('**/api/oobe/network/confirm', (route) =>
+			unreachable-- > 0 ? route.abort('addressunreachable') : route.continue()
+		);
+		await next.click();
+
+		const apply = page.locator('.network-apply');
+		await expect(apply).toContainText('Waiting to reach setup again');
+		await expect(apply.getByRole('link')).toHaveText(['https://[2001:db8:10::20]:6623']);
+		await expect(apply.getByRole('link')).toHaveAttribute(
+			'href',
+			/^https:\/\/\[2001:db8:10::20\]:6623\/\?network-change=[\w-]+$/
+		);
+		// Fluent isolates the number with U+2068 and U+2069.
+		await expect(apply).toContainText(/within \W?60\W? seconds/);
+		await expect(page.locator('.workspace h2')).toHaveText('Choose an update policy');
+	});
+
+	test('a change nobody confirms is reported as rolled back', async ({ page }) => {
+		await useHost(page, 'ipv6-only');
+		await walkTo(page, 'Configure your network');
+		await page.locator('#network-configure').check();
+		await page.locator('#ipv6-manual').check();
+		await page.locator('#ipv6-addresses').fill('2001:db8:10::21/64');
+		await page.route('**/api/oobe/network/confirm', (route) =>
+			route.fulfill({ json: { status: 'rolled-back' } })
+		);
+		await page.locator('button.primary-button').click();
+		await expect(page.locator('.network-apply')).toContainText(
+			'so the server went back to its previous network settings'
+		);
+		await expect(page.locator('.workspace h2')).toHaveText('Configure your network');
+	});
+
+	test('Wi-Fi host: addressing is automatic', async ({ page }) => {
+		await useHost(page, 'wifi');
+		await walkTo(page, 'Configure your network');
+		await expect(page.locator('#network-interface')).toHaveValue('wlp2s0');
+		await expect(
+			page.getByText('Wi-Fi gets its IPv4 and IPv6 addresses automatically.')
+		).toBeVisible();
+		await expect(page.locator('#network-configure')).toHaveCount(0);
+		await expect(page.locator('#ipv4-auto')).toHaveCount(0);
+
+		await page.getByRole('button', { name: 'Scan for networks' }).click();
+		await page.locator('#wifi-network').selectOption('Ultramarine-Setup');
+		await page.locator('#wifi-password').fill('correct horse');
+		await page.getByRole('button', { name: 'Connect', exact: true }).click();
+		await expect(page.locator('.network-apply')).toContainText('Network settings applied.');
+	});
+
+	test('only Ethernet interfaces offer wired settings', async ({ page }) => {
+		await walkTo(page, 'Configure your network');
+		await page.locator('#network-interface').selectOption('virbr0');
+		await expect(page.locator('.network-other-interface')).toBeVisible();
+		await expect(page.locator('#network-configure')).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Scan for networks' })).toHaveCount(0);
+		await page.locator('#network-interface').selectOption('enp1s0');
+		await expect(page.locator('#network-configure')).toBeVisible();
+	});
+
+	test('without a type from Tetra, wl* interfaces are Wi-Fi', async ({ page }) => {
+		// An older Tetra that does not report `type`.
+		await page.route('**/api/oobe/operations', async (route) => {
+			if (route.request().postDataJSON()?.operation !== 'network.interfaces') {
+				return route.continue();
+			}
+			await route.fulfill({
+				json: {
+					id: 'op',
+					step: 'internet',
+					status: 'succeeded',
+					retryable: false,
+					message: JSON.stringify([
+						{ name: 'eth0', operstate: 'up', addresses: [] },
+						{ name: 'wlan1', operstate: 'down', addresses: [] }
+					])
+				}
+			});
+		});
+		await walkTo(page, 'Configure your network');
+		await expect(page.locator('#network-interface')).toHaveValue('eth0');
+		await expect(page.locator('#network-configure')).toBeVisible();
+		await page.locator('#network-interface').selectOption('wlan1');
+		await expect(page.getByRole('button', { name: 'Scan for networks' })).toBeVisible();
+		await expect(page.locator('#network-configure')).toHaveCount(0);
+	});
+
+	test('check connection reports each family and DNS', async ({ page }) => {
+		await useHost(page, 'ipv6-only');
+		await walkTo(page, 'Configure your network');
+		await page.getByRole('button', { name: 'Check connection' }).click();
+		await expect(page.locator('.network-check li')).toHaveText([
+			'No routable IPv4 address.',
+			'This server has an IPv6 address others can reach.',
+			'DNS resolves names.'
+		]);
+	});
+
+	test('IP mode offers the IPv6 address, bracketed in the URL', async ({ page }) => {
+		await useHost(page, 'ipv6-only');
+		await walkTo(page, 'Choose how to reach the Dashboard');
+		await page.locator('#access-ip').check();
+		await expect(page.locator('#access-ip-address')).toHaveValue('2001:db8:10::2');
+		await expect(page.locator('.dashboard-preview strong')).toHaveText('https://[2001:db8:10::2]');
 	});
 
 	test('update policy defaults to automatic', async ({ page }) => {

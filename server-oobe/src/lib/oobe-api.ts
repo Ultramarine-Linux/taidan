@@ -77,9 +77,39 @@ export const liveApi: OobeApi = {
 	}
 };
 
+export type NetworkChangeStatus = 'kept' | 'rolled-back' | 'failed' | 'unknown';
+
+/**
+ * Ask the OOBE to keep the network change `changeId` (see
+ * src/lib/server/network-change.ts). Resolves to undefined when the OOBE
+ * cannot be reached, which is expected while the host changes addresses.
+ */
+export async function confirmNetworkChange(
+	changeId: string,
+	timeoutMs = 5000
+): Promise<{ status: NetworkChangeStatus; message?: string } | undefined> {
+	try {
+		const res = await fetch('/api/oobe/network/confirm', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ changeId }),
+			signal: AbortSignal.timeout(timeoutMs)
+		});
+		if (res.status >= 500) return undefined;
+		return (await res.json()) as { status: NetworkChangeStatus; message?: string };
+	} catch {
+		return undefined;
+	}
+}
+
 let fixtureAuthenticated = false;
 
-/** Fixture API for development without a backend. Accepts `FIXTURE_SETUP_CODE`. */
+/**
+ * Fixture API for development: Welcome accepts `FIXTURE_SETUP_CODE` and most
+ * steps only pretend. Network operations go to the dev server, which runs them
+ * against the mock Tetra, so the internet step sees the fixture host picked by
+ * the `oobe_fixture_host` cookie (src/lib/fixture-hosts.ts).
+ */
 export const fixtureApi: OobeApi = {
 	async getSession() {
 		return { authenticated: fixtureAuthenticated, setupRequired: true };
@@ -87,6 +117,8 @@ export const fixtureApi: OobeApi = {
 	async redeemSetupCode(code) {
 		const normalize = (value: string) => value.toUpperCase().replace(/[^0-9A-Z]/g, '');
 		fixtureAuthenticated = normalize(code) === normalize(FIXTURE_SETUP_CODE);
+		// A setup session with the mock Tetra, for the network operations.
+		if (fixtureAuthenticated) await liveApi.redeemSetupCode(code);
 		return fixtureAuthenticated
 			? { authenticated: true, setupRequired: true, adminExists: false }
 			: { authenticated: false, setupRequired: true, error: 'invalid_code' };
@@ -98,25 +130,7 @@ export const fixtureApi: OobeApi = {
 		return { id: `fixture-${step}`, step, status: 'succeeded', retryable: false };
 	},
 	async startOperation(step, operation, payload = {}) {
-		if (operation === 'network.scan_wifi') {
-			return {
-				id: `fixture-${operation}`,
-				step,
-				status: 'succeeded',
-				retryable: false,
-				message: JSON.stringify([
-					{ ssid: 'Ultramarine-Setup', security: 'wpa-personal', signal: 86 },
-					{
-						ssid: 'Corp Wi-Fi',
-						security: 'wpa-enterprise',
-						signal: 72,
-						eapMethods: ['peap', 'tls'],
-						phase2Methods: ['mschapv2', 'pap']
-					},
-					{ ssid: 'Guest Network', security: 'open', signal: 58 }
-				])
-			};
-		}
+		if (operation.startsWith('network.')) return liveApi.startOperation(step, operation, payload);
 		const fixtureResults: Record<string, unknown> = {
 			'access.set': { passkeysAvailable: payload.mode === 'domain' },
 			'setup.complete': {
@@ -137,15 +151,6 @@ export const fixtureApi: OobeApi = {
 				status: 'succeeded',
 				retryable: false,
 				message: JSON.stringify(fixtureResults[operation])
-			};
-		}
-		if (operation === 'network.interfaces') {
-			return {
-				id: `fixture-${operation}`,
-				step,
-				status: 'succeeded',
-				retryable: false,
-				message: JSON.stringify(fixtureState.networkInterfaces ?? [])
 			};
 		}
 		return {

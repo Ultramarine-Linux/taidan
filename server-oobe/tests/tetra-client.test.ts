@@ -209,8 +209,87 @@ test.describe('MockTetraClient', () => {
 			{ remoteAddr: undefined, ok: false },
 			{ remoteAddr: '192.0.2.44', ok: true }
 		]);
-		expect(await tetra.dispatch(token, 'network', 'interfaces')).toEqual({ interfaces: [] });
+		const { interfaces } = await tetra.dispatch(token, 'network', 'interfaces');
+		expect((interfaces as { name: string }[]).map((entry) => entry.name)).toEqual([
+			'enp1s0',
+			'lo',
+			'virbr0',
+			'wlan0'
+		]);
 		expect(tetra.calls).toEqual([{ module: 'network', action: 'interfaces', payload: {} }]);
+	});
+
+	test('network.configure follows Tetra: unknown fields, safe apply, confirm', async () => {
+		const tetra = new MockTetraClient('ABCD-EFGH');
+		const { token } = await tetra.redeemSetupCode('ABCD-EFGH');
+		tetra.useFixtureHost(token, 'ipv6-only');
+		await expect(
+			tetra.dispatch(token, 'network', 'configure', {
+				interface: 'enp1s0',
+				ipv4: { method: 'dhcp' }
+			})
+		).rejects.toMatchObject({ code: 'bad_request' });
+		await expect(
+			tetra.dispatch(token, 'network', 'configure', {
+				interface: 'enp1s0',
+				ipv6: { method: 'auto', enabled: true }
+			})
+		).rejects.toMatchObject({ code: 'bad_request' });
+		await expect(
+			tetra.dispatch(token, 'network', 'configure', {
+				interface: 'enp1s0',
+				ipv4: { method: 'disabled' },
+				ipv6: { method: 'link-local' }
+			})
+		).rejects.toMatchObject({ code: 'bad_request' });
+
+		// Keeping the current address needs no confirmation.
+		expect(
+			await tetra.dispatch(token, 'network', 'configure', {
+				interface: 'enp1s0',
+				ipv4: { method: 'disabled' },
+				ipv6: { method: 'manual', addresses: [{ address: '2001:db8:10::2', prefix_length: 64 }] }
+			})
+		).toMatchObject({ applied: true, confirmation_required: false });
+
+		const moved = await tetra.dispatch(token, 'network', 'configure', {
+			interface: 'enp1s0',
+			ipv4: { method: 'disabled' },
+			ipv6: { method: 'manual', addresses: [{ address: '2001:db8:10::99', prefix_length: 64 }] }
+		});
+		expect(moved).toMatchObject({ confirmation_required: true, rollback_in_seconds: 60 });
+		await expect(
+			tetra.dispatch(token, 'network', 'confirm', { token: 'wrong' })
+		).rejects.toMatchObject({ code: 'action_failed' });
+		expect(
+			await tetra.dispatch(token, 'network', 'confirm', { token: moved.confirmation_token })
+		).toMatchObject({ confirmed: true });
+		expect(JSON.stringify(tetra.interfaces(token))).toContain('2001:db8:10::99');
+	});
+
+	test('network actions follow the interface type', async () => {
+		const tetra = new MockTetraClient('ABCD-EFGH');
+		const { token } = await tetra.redeemSetupCode('ABCD-EFGH');
+		const { interfaces } = await tetra.dispatch(token, 'network', 'interfaces');
+		expect(
+			(interfaces as { name: string; type: string }[]).map(({ name, type }) => [name, type])
+		).toEqual([
+			['enp1s0', 'ethernet'],
+			['lo', 'other'],
+			['virbr0', 'other'],
+			['wlan0', 'wifi']
+		]);
+		for (const name of ['wlan0', 'virbr0']) {
+			await expect(
+				tetra.dispatch(token, 'network', 'configure', { interface: name })
+			).rejects.toMatchObject({ code: 'action_failed' });
+		}
+		await expect(
+			tetra.dispatch(token, 'network', 'scan_wifi', { interface: 'enp1s0' })
+		).rejects.toMatchObject({ code: 'action_failed' });
+		expect(
+			await tetra.dispatch(token, 'network', 'scan_wifi', { interface: 'wlan0' })
+		).toMatchObject({ networks: expect.any(Array) });
 	});
 
 	test('setup.complete needs an administrator and ends setup sessions', async () => {

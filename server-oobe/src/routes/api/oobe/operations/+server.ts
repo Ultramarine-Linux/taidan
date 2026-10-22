@@ -3,6 +3,11 @@ import type { RequestHandler } from './$types';
 import { isIP } from 'node:net';
 import { spawn } from 'node:child_process';
 import { loadState, saveState } from '$lib/server/state';
+import { validateWithLibtaidan } from '$lib/server/libtaidan';
+import { applyChange, CHANGE_ID_PATTERN } from '$lib/server/network-change';
+import { checkNetwork } from '$lib/server/network-check';
+import { validateNetworkConfig } from '$lib/server/network-config';
+import { INTERFACE_TYPES } from '$lib/network-config';
 import { SETUP_SESSION_COOKIE } from '$lib/server/setup-session';
 import {
 	tetraClient,
@@ -10,11 +15,10 @@ import {
 	tetraAddAdmin,
 	tetraCloudflaredSetToken,
 	tetraCreateUser,
+	tetraNetworkConfigure,
 	tetraNetworkConnectWifi,
 	tetraNetworkInterfaces,
 	tetraNetworkScanWifi,
-	tetraNetworkSetConfig,
-	tetraNetworkStatus,
 	tetraPower,
 	tetraRemoteAccessStatus,
 	tetraSetAuthorizedKeys,
@@ -28,7 +32,12 @@ import {
 } from '$lib/server/tetra';
 import { validateDnsCredentials } from '$lib/dns-providers';
 import { validateEap8021x } from '$lib/eap-8021x';
-import type { StepId, OperationResult, WifiSecurityProfile } from '$lib/oobe-state';
+import type {
+	NetworkInterface,
+	OperationResult,
+	StepId,
+	WifiSecurityProfile
+} from '$lib/oobe-state';
 
 // Every operation that changes the host is a Tetra call made with the
 // caller's setup session token. The OOBE runs unprivileged and changes
@@ -43,7 +52,7 @@ const ALLOWED_OPERATIONS = new Set([
 	'network.interfaces',
 	'network.scan_wifi',
 	'network.connect_wifi',
-	'network.set_config',
+	'network.configure',
 	'network.check',
 	'ssh-key.apply',
 	'updates.set_policy',
@@ -62,49 +71,6 @@ const HOSTNAME_PATTERN =
 	/^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?)*$/;
 const DOMAIN_PATTERN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const SSH_KEY_PATTERN = /^(ssh-(rsa|ed25519|dss)|ecdsa-sha2-nistp\d+|sk-ssh-)[^\s]+\s+[^\s]+/;
-
-// Every operation is validated by libtaidan (`tdnx server-oobe`) before it
-// runs. There is no opt-out: if tdnx is missing or rejects the request, the
-// operation fails. Fixture mode (development and tests only) has no tdnx.
-function validateWithLibtaidan(
-	step: StepId,
-	operation: string,
-	payload: Record<string, unknown>
-): Promise<void> {
-	if (FIXTURE_MODE) return Promise.resolve();
-	return new Promise((resolve, reject) => {
-		const child = spawn(process.env.TDNX_PATH || 'tdnx', ['server-oobe'], {
-			stdio: ['pipe', 'pipe', 'pipe']
-		});
-		let stdout = '';
-		let stderr = '';
-		child.stdout.on('data', (data) => (stdout += data.toString()));
-		child.stderr.on('data', (data) => (stderr += data.toString()));
-		child.on('error', (e) => reject(new Error(`libtaidan validation unavailable: ${e.message}`)));
-		child.on('close', (code) => {
-			let response: { ok?: boolean; error?: string } | undefined;
-			try {
-				response = JSON.parse(stdout.trim()) as { ok?: boolean; error?: string };
-			} catch {
-				response = undefined;
-			}
-			if (code === 0 && response?.ok === true) {
-				resolve();
-				return;
-			}
-			reject(
-				new Error(
-					response?.error ||
-						stderr.trim() ||
-						(code === 0
-							? 'Invalid response from libtaidan backend'
-							: `libtaidan exited with code ${code}`)
-				)
-			);
-		});
-		child.stdin.end(JSON.stringify({ step, operation, payload }));
-	});
-}
 
 function hashPassword(password: string): Promise<string> {
 	return new Promise((resolve, reject) => {
@@ -159,44 +125,37 @@ function wifiSecurity(security: unknown): WifiSecurityProfile | string {
 	return 'Unsupported Wi-Fi security type';
 }
 
-/** Validate a wired configuration into the payload sent to Tetra, or return an error message. */
-function networkConfig(payload: Record<string, unknown>): Record<string, unknown> | string {
-	const iface = payload.interface;
-	if (typeof iface !== 'string' || !/^[a-zA-Z0-9_.-]+$/.test(iface))
-		return 'Invalid network interface';
+/** Tetra's `network.interfaces` entries without loopback, keeping the fields the OOBE shows. */
+function networkInterfaces(value: unknown): NetworkInterface[] {
+	return (Array.isArray(value) ? value : [])
+		.filter((entry) => typeof entry?.name === 'string' && entry.name !== 'lo')
+		.map((entry) => ({
+			name: entry.name,
+			type: INTERFACE_TYPES.includes(entry.type) ? entry.type : undefined,
+			operstate: typeof entry.operstate === 'string' ? entry.operstate : undefined,
+			addresses: (Array.isArray(entry.addresses) ? entry.addresses : []).filter(
+				(address: Record<string, unknown>) =>
+					(address?.family === 'ipv4' || address?.family === 'ipv6') &&
+					typeof address.address === 'string'
+			)
+		}));
+}
 
-	const ipv4 = payload.ipv4;
-	if (!ipv4 || typeof ipv4 !== 'object') return 'IPv4 configuration is required';
-	const config = ipv4 as Record<string, unknown>;
-	if (config.method === 'dhcp') {
-		// DHCP has no additional required values.
-	} else if (config.method === 'static') {
-		if (typeof config.address !== 'string' || isIP(config.address) !== 4)
-			return 'Invalid static IPv4 address';
-		if (
-			typeof config.prefix_length !== 'number' ||
-			config.prefix_length < 1 ||
-			config.prefix_length > 32
-		) {
-			return 'Invalid IPv4 prefix length';
-		}
-		if (typeof config.gateway !== 'string' || isIP(config.gateway) !== 4)
-			return 'Invalid IPv4 gateway';
-		if (
-			!Array.isArray(config.dns) ||
-			config.dns.length === 0 ||
-			config.dns.some((server) => typeof server !== 'string' || isIP(server) === 0)
-		) {
-			return 'At least one valid DNS server is required';
-		}
-	} else {
-		return 'IPv4 method must be dhcp or static';
-	}
+/** The change id the browser chose for a safe-apply change; see network-change.ts. */
+function changeId(payload: Record<string, unknown>): string | undefined {
+	return typeof payload.changeId === 'string' && CHANGE_ID_PATTERN.test(payload.changeId)
+		? payload.changeId
+		: undefined;
+}
 
-	if (payload.wired_8021x === undefined) return { interface: iface, ipv4 };
-	const wired = validateEap8021x(payload.wired_8021x);
-	if (typeof wired === 'string') return `Wired 802.1X: ${wired}`;
-	return { interface: iface, ipv4, wired_8021x: wired };
+/** The result of a safe-apply change; the browser confirms it through /api/oobe/network/confirm. */
+function changeResult(resp: TetraResponse): string {
+	const payload = resp.payload ?? {};
+	return JSON.stringify({
+		confirmationRequired: payload.confirmation_required === true,
+		rollbackInSeconds:
+			typeof payload.rollback_in_seconds === 'number' ? payload.rollback_in_seconds : undefined
+	});
 }
 
 /** Validate an access.set payload into Tetra's request. Returns an error message on failure. */
@@ -392,8 +351,8 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 			case 'network.interfaces': {
 				const resp = await tetraNetworkInterfaces(token);
 				if (!resp.ok) return fromTetra(resp, 'Network query failed');
-				const interfaces = Array.isArray(resp.payload?.interfaces) ? resp.payload.interfaces : [];
-				state.networkInterfaces = interfaces as typeof state.networkInterfaces;
+				const interfaces = networkInterfaces(resp.payload?.interfaces);
+				state.networkInterfaces = interfaces;
 				await saveState(state);
 				return json(result(opId, step, 'succeeded', false, JSON.stringify(interfaces)));
 			}
@@ -410,34 +369,45 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 			}
 
 			case 'network.connect_wifi': {
-				const interfaceName = payload.interface as string;
-				const ssid = payload.ssid as string;
+				const { changeId: _, ...request } = payload;
+				const id = changeId(payload);
+				const interfaceName = request.interface as string;
+				const ssid = request.ssid as string;
+				if (!id) return json(result(opId, step, 'failed', true, 'Missing change id'));
 				if (!interfaceName || !/^[a-zA-Z0-9_.-]+$/.test(interfaceName) || !ssid) {
 					return json(result(opId, step, 'failed', true, 'Wi-Fi interface and SSID are required'));
 				}
-				const security = wifiSecurity(payload.security);
+				const security = wifiSecurity(request.security);
 				if (typeof security === 'string') return json(result(opId, step, 'failed', true, security));
-				return fromTetra(
-					await tetraNetworkConnectWifi(token, interfaceName, ssid, security),
-					'Wi-Fi connection failed'
+				const resp = await applyChange(id, token, () =>
+					tetraNetworkConnectWifi(token, interfaceName, ssid, request.hidden === true, security)
 				);
+				if (!resp.ok) return fromTetra(resp, 'Wi-Fi connection failed');
+				return json(result(opId, step, 'succeeded', false, changeResult(resp)));
 			}
 
-			case 'network.set_config': {
-				const config = networkConfig(payload);
+			case 'network.configure': {
+				const { changeId: _, ...request } = payload;
+				const id = changeId(payload);
+				if (!id) return json(result(opId, step, 'failed', true, 'Missing change id'));
+				const config = validateNetworkConfig(request);
 				if (typeof config === 'string') return json(result(opId, step, 'failed', true, config));
-				return fromTetra(
-					await tetraNetworkSetConfig(token, config),
-					'Network configuration failed'
-				);
+				const resp = await applyChange(id, token, () => tetraNetworkConfigure(token, config));
+				if (!resp.ok) return fromTetra(resp, 'Network configuration failed');
+				return json(result(opId, step, 'succeeded', false, changeResult(resp)));
 			}
 
-			case 'network.check':
-				return fromTetra(
-					await tetraNetworkStatus(token),
-					'Network check failed',
-					'Network is available'
+			case 'network.check': {
+				// Whether the host has an address others can reach, per family, and
+				// whether DNS works. Fixture mode does not resolve real names.
+				const resp = await tetraNetworkInterfaces(token);
+				if (!resp.ok) return fromTetra(resp, 'Network check failed');
+				const check = await checkNetwork(
+					resp.payload?.interfaces,
+					FIXTURE_MODE ? async () => true : undefined
 				);
+				return json(result(opId, step, 'succeeded', false, JSON.stringify(check)));
+			}
 
 			case 'updates.set_policy': {
 				const policy = payload.policy;

@@ -1,4 +1,6 @@
 import type { Eap8021x } from './eap-8021x';
+import { fixtureHost } from './fixture-hosts';
+import type { InterfaceAddress, InterfaceType } from './network-config';
 
 export type StepId =
 	| 'welcome'
@@ -76,21 +78,42 @@ export type SetupCompleteResult = {
 	handoffInSeconds: number;
 };
 
+/** An interface from Tetra's `network.interfaces`, without its MAC address. */
 export type NetworkInterface = {
 	name: string;
-	state?: string;
-	addresses?: string[];
-	wireless?: boolean;
+	/** Missing from older Tetra; see `interfaceType`. */
+	type?: InterfaceType;
+	operstate?: string;
+	addresses?: InterfaceAddress[];
 };
 
 export type WifiSecurity = 'open' | 'wpa-personal' | 'wpa-enterprise' | 'unknown';
 
+/** A network from Tetra's `network.scan_wifi`. */
 export type WifiNetwork = {
 	ssid: string;
 	security: WifiSecurity;
 	signal?: number;
-	eapMethods?: string[];
-	phase2Methods?: string[];
+	frequency?: number;
+	in_use?: boolean;
+};
+
+/** Result of the `network.check` operation. */
+export type NetworkCheck = { ipv4: boolean; ipv6: boolean; dns: boolean };
+
+/**
+ * A network change being applied (`network.configure` or
+ * `network.connect_wifi`), shown while the browser may lose its connection.
+ */
+export type NetworkApplyState = {
+	status: 'applying' | 'waiting' | 'kept' | 'rolled-back' | 'failed';
+	/** Where the OOBE should be reachable afterwards. */
+	urls: { label: string; href: string }[];
+	/** Some addresses come from DHCP or SLAAC and may differ from `urls`. */
+	automatic: boolean;
+	/** Seconds Tetra waits for a confirmation before it rolls the change back. */
+	rollbackInSeconds: number;
+	message?: string;
 };
 
 /** `security` for Tetra's `network.connect_wifi`, tagged by `type`. */
@@ -222,10 +245,7 @@ export const fixtureState: OobeState = {
 	keyboardVariant: undefined,
 	updatePolicy: 'automatic',
 	sshPublicKey: '',
-	networkInterfaces: [
-		{ name: 'enp1s0', state: 'connected', addresses: ['192.168.1.42'], wireless: false },
-		{ name: 'wlan0', state: 'disconnected', addresses: [], wireless: true }
-	],
+	networkInterfaces: fixtureHost().interfaces.filter((entry) => entry.name !== 'lo'),
 	access: { ...defaultAccess },
 	remoteAccess: { ...defaultRemoteAccess }
 };

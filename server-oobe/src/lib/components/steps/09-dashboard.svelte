@@ -2,6 +2,7 @@
 	import StepLayout from '$lib/components/StepLayout.svelte';
 	import { t } from '$lib/i18n.svelte';
 	import { DNS_PROVIDERS, dnsProvider, validateDnsCredentials } from '$lib/dns-providers';
+	import { ipFamily, stripBrackets, urlHost } from '$lib/net';
 	import type { AccessForm } from '$lib/oobe-state';
 	let {
 		form = $bindable<AccessForm>(),
@@ -16,12 +17,12 @@
 	} = $props();
 
 	const domainPattern = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
-	const ipPattern = /^(\d{1,3}(\.\d{1,3}){3}|[0-9a-f:]+)$/i;
 
 	let provider = $derived(dnsProvider(form.dnsProvider));
-	let hostname = $derived(form.hostname.trim().toLowerCase().replace(/\.$/, ''));
+	// IPv4 or IPv6 (the latter with or without brackets).
+	let hostname = $derived(stripBrackets(form.hostname.trim().toLowerCase().replace(/\.$/, '')));
 	let hostnameValid = $derived(
-		form.mode === 'domain' ? domainPattern.test(hostname) : ipPattern.test(hostname)
+		form.mode === 'domain' ? domainPattern.test(hostname) : ipFamily(hostname) !== 0
 	);
 	let canContinue = $derived(
 		hostnameValid &&
@@ -29,9 +30,7 @@
 				form.challenge === 'http-01' ||
 				!validateDnsCredentials(form.dnsProvider, form.dnsCredentials))
 	);
-	let address = $derived(
-		hostname ? `https://${hostname.includes(':') ? `[${hostname}]` : hostname}` : ''
-	);
+	let address = $derived(hostname ? `https://${urlHost(hostname)}` : '');
 
 	function setMode(mode: AccessForm['mode']) {
 		form.mode = mode;

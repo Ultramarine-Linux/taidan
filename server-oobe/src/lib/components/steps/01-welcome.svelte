@@ -5,14 +5,15 @@
 	let {
 		onBack,
 		onContinue,
-		ipAddresses = [],
+		urls = [],
 		needsSetupCode = false,
 		setupCode = $bindable(''),
 		setupCodeError = ''
 	}: {
 		onBack: () => void;
 		onContinue: () => void;
-		ipAddresses?: string[];
+		/** Where other devices reach this OOBE, e.g. `https://[2001:db8::1]:6623`. */
+		urls?: string[];
 		needsSetupCode?: boolean;
 		setupCode?: string;
 		setupCodeError?: string;
@@ -31,11 +32,15 @@
 		<div>
 			<h3>{t('welcome-ready-title')}</h3>
 			<p>{t('welcome-ready-description')}</p>
-			{#if ipAddresses.length > 0}
-				<p class="ip-addresses">
+			{#if urls.length > 0}
+				<div class="ip-addresses">
 					<strong>{t('welcome-ip-addresses')}</strong>
-					{ipAddresses.join(', ')}
-				</p>
+					<ul>
+						{#each urls as url (url)}
+							<li>{url}</li>
+						{/each}
+					</ul>
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -76,6 +81,12 @@
 </StepLayout>
 
 <style>
+	.ip-addresses ul {
+		margin: 0;
+		padding-left: 1.2rem;
+		overflow-wrap: anywhere;
+	}
+
 	.setup-code {
 		margin-top: 1rem;
 	}

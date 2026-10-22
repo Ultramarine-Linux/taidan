@@ -65,8 +65,8 @@ pub fn validate_operation(operation: &SetupOperation) -> Result<(), ValidationEr
     const OPERATIONS: &[&str] = &[
         "state.patch", "state.reset", "hostname.apply", "keyboard.apply", "user.create",
         "password.set", "network.interfaces", "network.scan_wifi", "network.connect_wifi",
-        "network.set_config", "network.check", "ssh-key.apply", "updates.set_policy",
-        "remote_access.status", "remote_access.tailscale_up",
+        "network.configure", "network.confirm", "network.check", "ssh-key.apply",
+        "updates.set_policy", "remote_access.status", "remote_access.tailscale_up",
         "remote_access.cloudflared_set_token", "access.set", "system.reboot", "system.poweroff",
         "setup.complete",
     ];
@@ -123,6 +123,23 @@ mod tests {
                 Err(ValidationError::InvalidOperation),
                 "{removed}"
             );
+        }
+    }
+
+    #[test]
+    fn network_uses_structured_configuration() {
+        let operation = |name: &str| SetupOperation {
+            step: "internet".into(),
+            operation: name.into(),
+            payload: serde_json::Value::Null,
+        };
+        // Raw keyfile writes are not a setup operation; Tetra refuses them too.
+        assert_eq!(
+            validate_operation(&operation("network.set_config")),
+            Err(ValidationError::InvalidOperation)
+        );
+        for allowed in ["network.configure", "network.confirm", "network.connect_wifi"] {
+            assert_eq!(validate_operation(&operation(allowed)), Ok(()), "{allowed}");
         }
     }
 

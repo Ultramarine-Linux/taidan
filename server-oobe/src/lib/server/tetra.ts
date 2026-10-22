@@ -13,7 +13,8 @@ import { env } from 'node:process';
 import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { MockTetraClient } from './tetra-mock';
-import type { WifiSecurityProfile } from '$lib/oobe-state';
+import type { WifiSecurityProfile } from '../oobe-state';
+import type { NetworkConfigureRequest } from '../network-config';
 import {
 	DEFAULT_TETRA_SOCKET,
 	type AccessRequest,
@@ -285,31 +286,42 @@ export async function tetraNetworkScanWifi(
 	token: string,
 	interfaceName: string
 ): Promise<TetraResponse> {
-	return dispatchTetra(token, 'network', 'scan_wifi', { interface: interfaceName });
+	return dispatchTetra(token, 'network', 'scan_wifi', { interface: interfaceName, rescan: true });
 }
 
+/** `network.connect_wifi`: Tetra writes the profile and applies it safely, like `configure`. */
 export async function tetraNetworkConnectWifi(
 	token: string,
 	interfaceName: string,
 	ssid: string,
+	hidden: boolean,
 	security: WifiSecurityProfile
 ): Promise<TetraResponse> {
 	return dispatchTetra(token, 'network', 'connect_wifi', {
 		interface: interfaceName,
 		ssid,
+		hidden,
 		security
 	});
 }
 
-export async function tetraNetworkSetConfig(
+/**
+ * `network.configure`. The result may hold `confirmation_required` and a
+ * `confirmation_token` for `network.confirm`; see network-change.ts.
+ */
+export async function tetraNetworkConfigure(
 	token: string,
-	config: Record<string, unknown>
+	request: NetworkConfigureRequest
 ): Promise<TetraResponse> {
-	return dispatchTetra(token, 'network', 'set_config', config);
+	return dispatchTetra(token, 'network', 'configure', { ...request });
 }
 
-export async function tetraNetworkStatus(token: string): Promise<TetraResponse> {
-	return dispatchTetra(token, 'network', 'status');
+/** `network.confirm`: keep a change Tetra would otherwise roll back. */
+export async function tetraNetworkConfirm(
+	token: string,
+	confirmationToken: string
+): Promise<TetraResponse> {
+	return dispatchTetra(token, 'network', 'confirm', { token: confirmationToken });
 }
 
 export async function tetraSetHostname(token: string, hostname: string): Promise<TetraResponse> {

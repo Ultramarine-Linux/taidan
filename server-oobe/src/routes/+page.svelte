@@ -10,16 +10,22 @@
 	import SshKeyStep from '$lib/components/steps/08-ssh-key.svelte';
 	import DashboardStep from '$lib/components/steps/09-dashboard.svelte';
 	import CompleteStep from '$lib/components/steps/10-complete.svelte';
-	import { api, SetupSessionRequiredError } from '$lib/oobe-api';
+	import { api, confirmNetworkChange, SetupSessionRequiredError } from '$lib/oobe-api';
+	import { oobeUrl } from '$lib/net';
+	import { expectedAddresses, type NetworkConfigureRequest } from '$lib/network-config';
 	import {
 		fixtureState,
 		fixtureSteps,
 		stepIndex,
 		type AccessForm,
+		type NetworkApplyState,
+		type NetworkCheck,
 		type OobeState,
 		type RemoteAccessForm,
 		type SetupCompleteResult,
-		type StepId
+		type StepId,
+		type WifiNetwork,
+		type WifiSecurityProfile
 	} from '$lib/oobe-state';
 	import { onMount } from 'svelte';
 	import { detectLocale, t } from '$lib/i18n.svelte';
@@ -31,7 +37,9 @@
 	let operationLoading = $state(false);
 	let password = $state('');
 	let retryStep = $state<StepId | null>(null);
-	let networkConfig = $state<Record<string, unknown>>({});
+	let networkConfig = $state<NetworkConfigureRequest | null>(null);
+	let networkApply = $state<NetworkApplyState | null>(null);
+	let notice = $state('');
 	let ipAddresses = $state<string[]>([]);
 	let authenticated = $state(false);
 	let setupCode = $state('');
@@ -56,6 +64,12 @@
 		dnsCredentials: {}
 	});
 
+	// Tetra waits up to 10 s for the interface's old addresses before it answers,
+	// then up to 60 s for network.confirm before it rolls the change back.
+	const NETWORK_SETTLE_SECONDS = 10;
+	const NETWORK_ROLLBACK_SECONDS = 60;
+	const CONFIRM_POLL_MS = 2000;
+
 	let selectedStep = $derived(oobeState.activeStep);
 	let currentIndex = $derived(stepIndex(selectedStep));
 
@@ -77,10 +91,17 @@
 	onMount(() => {
 		detectLocale();
 		oobeState.keyboardLayout = detectKeyboardLayout();
-		fetch('/api/oobe/network')
-			.then((res) => (res.ok ? res.json() : { addresses: [] }))
-			.then((data: { addresses?: string[] }) => (ipAddresses = data.addresses ?? []))
-			.catch(() => (ipAddresses = []));
+		loadAddresses();
+		// Opened from a link shown while a network change was applied: reaching
+		// the OOBE here is what keeps the change.
+		const changeId = new URLSearchParams(location.search).get('network-change');
+		if (changeId) {
+			history.replaceState(history.state, '', location.pathname);
+			void confirmNetworkChange(changeId, 20_000).then((result) => {
+				if (result?.status === 'kept') notice = t('network-change-kept');
+				else if (result?.status === 'rolled-back') errorMessage = t('network-apply-rolled-back');
+			});
+		}
 		withTimeout(api.getSession(), 5000)
 			.then(async (session) => {
 				if (session.error === 'unavailable') errorMessage = t('setup-code-unavailable');
@@ -95,6 +116,13 @@
 				loaded = true;
 			});
 	});
+
+	function loadAddresses() {
+		fetch('/api/oobe/network')
+			.then((res) => (res.ok ? res.json() : { addresses: [] }))
+			.then((data: { addresses?: string[] }) => (ipAddresses = data.addresses ?? []))
+			.catch(() => (ipAddresses = []));
+	}
 
 	async function loadState() {
 		try {
@@ -158,6 +186,7 @@
 		try {
 			await callStatePatch({ activeStep: step });
 			oobeState = { ...oobeState, activeStep: step };
+			networkApply = null;
 			if (step === 'internet') void refreshNetworkInterfaces();
 		} catch (err) {
 			console.error('Failed to save active step:', err);
@@ -170,22 +199,100 @@
 			interface: interfaceName
 		});
 		if (result.status === 'failed') throw new Error(result.message || 'Wi-Fi scan failed');
-		return result.message
-			? (JSON.parse(result.message) as import('$lib/oobe-state').WifiNetwork[])
-			: [];
+		return result.message ? (JSON.parse(result.message) as WifiNetwork[]) : [];
+	}
+
+	function newChangeId(): string {
+		const bytes = crypto.getRandomValues(new Uint8Array(18));
+		return btoa(String.fromCharCode(...bytes))
+			.replaceAll('+', '-')
+			.replaceAll('/', '_');
+	}
+
+	const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+	/**
+	 * Apply a network change (`network.configure` or `network.connect_wifi`)
+	 * and keep it. The change can move the server to addresses this page is not
+	 * using, so before sending it this shows where setup will be, then asks the
+	 * OOBE to keep the change as soon as it answers again (here, or in a tab
+	 * opened from one of those links). Tetra rolls the change back if nobody
+	 * does. Resolves to whether the change was kept.
+	 */
+	async function applyNetworkChange(
+		operation: 'network.configure' | 'network.connect_wifi',
+		payload: Record<string, unknown>,
+		expected: { addresses: string[]; automatic: boolean }
+	): Promise<boolean> {
+		const changeId = newChangeId();
+		const deadline = Date.now() + (NETWORK_SETTLE_SECONDS + NETWORK_ROLLBACK_SECONDS + 5) * 1000;
+		networkApply = {
+			status: 'applying',
+			urls: expected.addresses.map((address) => ({
+				label: oobeUrl(address),
+				href: `${oobeUrl(address)}/?network-change=${changeId}`
+			})),
+			automatic: expected.automatic,
+			rollbackInSeconds: NETWORK_ROLLBACK_SECONDS
+		};
+		const settle = (status: NetworkApplyState['status'], message?: string) => {
+			if (networkApply) networkApply = { ...networkApply, status, message };
+			return status === 'kept';
+		};
+
+		let failure: string | undefined;
+		let lost = false;
+		let answered = false;
+		const request = withTimeout(
+			api.startOperation('internet', operation, { ...payload, changeId }),
+			(NETWORK_SETTLE_SECONDS + 15) * 1000
+		)
+			.then((res) => {
+				if (res.status === 'failed') failure = res.message || t('network-apply-failed');
+			})
+			.catch((err) => {
+				if (err instanceof SetupSessionRequiredError) failure = err.message;
+				// Otherwise the connection is gone, as expected when the address changed.
+				else lost = true;
+			})
+			.finally(() => (answered = true));
+		await Promise.race([request, sleep(1000)]);
+
+		while (Date.now() < deadline) {
+			if (failure !== undefined) return settle('failed', failure);
+			const result = await confirmNetworkChange(changeId);
+			if (result?.status === 'kept') return settle('kept');
+			if (result?.status === 'rolled-back') return settle('rolled-back');
+			if (result?.status === 'failed') return settle('failed', result.message);
+			if (answered && (lost || !result)) settle('waiting');
+			await sleep(CONFIRM_POLL_MS);
+		}
+		return settle('rolled-back');
 	}
 
 	async function connectWifi(
 		interfaceName: string,
 		ssid: string,
-		security: import('$lib/oobe-state').WifiSecurityProfile
+		hidden: boolean,
+		security: WifiSecurityProfile
 	) {
-		const result = await api.startOperation('internet', 'network.connect_wifi', {
-			interface: interfaceName,
-			ssid,
-			security
-		});
-		if (result.status === 'failed') throw new Error(result.message || 'Wi-Fi connection failed');
+		const current =
+			oobeState.networkInterfaces?.find((entry) => entry.name === interfaceName)?.addresses ?? [];
+		// Wi-Fi addresses are automatic: the current ones are the best guess.
+		const kept = await applyNetworkChange(
+			'network.connect_wifi',
+			{ interface: interfaceName, ssid, hidden, security },
+			expectedAddresses({}, current)
+		);
+		if (kept) {
+			await refreshNetworkInterfaces();
+			loadAddresses();
+		}
+	}
+
+	async function checkNetwork(): Promise<NetworkCheck> {
+		const result = await callOperation('network.check');
+		return JSON.parse(result.message ?? '{}') as NetworkCheck;
 	}
 
 	async function callOperation(operation: string, payload?: Record<string, unknown>) {
@@ -287,20 +394,28 @@
 					password = '';
 				}
 			}
-			if (step === 'internet') {
-				const interfaces = await callOperation('network.interfaces');
-				if (interfaces.message) {
-					try {
-						oobeState.networkInterfaces = JSON.parse(interfaces.message);
-					} catch {
-						// The operation succeeded; an older server may not return interface details.
-					}
+			if (step === 'internet' && networkConfig) {
+				const config = networkConfig;
+				const current =
+					oobeState.networkInterfaces?.find((entry) => entry.name === config.interface)
+						?.addresses ?? [];
+				const kept = await applyNetworkChange(
+					'network.configure',
+					config,
+					expectedAddresses(config, current)
+				);
+				if (!kept) {
+					throw new Error(
+						networkApply?.message ||
+							t(
+								networkApply?.status === 'rolled-back'
+									? 'network-apply-rolled-back'
+									: 'network-apply-failed'
+							)
+					);
 				}
-				if (Object.keys(networkConfig).length > 0) {
-					await callOperation('network.set_config', networkConfig);
-					await callStatePatch({ networkInterfaces: oobeState.networkInterfaces });
-				}
-				await callOperation('network.check');
+				await refreshNetworkInterfaces();
+				loadAddresses();
 			}
 			if (step === 'updates') {
 				await callOperation('updates.set_policy', { policy: oobeState.updatePolicy });
@@ -416,6 +531,12 @@
 		<p>Loading setup state…</p>
 	</div>
 {:else}
+	{#if notice}
+		<div class="global-notice" role="status">
+			<p>{notice}</p>
+			<button type="button" onclick={() => (notice = '')}>Dismiss</button>
+		</div>
+	{/if}
 	{#if errorMessage}
 		<div class="global-error" role="alert">
 			<p>{errorMessage}</p>
@@ -445,7 +566,7 @@
 			<WelcomeStep
 				{onBack}
 				{onContinue}
-				{ipAddresses}
+				urls={ipAddresses.map((address) => oobeUrl(address))}
 				needsSetupCode={!authenticated}
 				bind:setupCode
 				{setupCodeError}
@@ -460,8 +581,10 @@
 			<InternetStep
 				bind:interfaces={oobeState.networkInterfaces}
 				bind:networkConfig
+				apply={networkApply}
 				onWifiScan={scanWifi}
 				onWifiConnect={connectWifi}
+				onCheck={checkNetwork}
 				{onBack}
 				{onContinue}
 			/>
@@ -510,6 +633,28 @@
 		display: flex;
 		gap: 0.75rem;
 		align-items: center;
+	}
+	.global-notice {
+		position: fixed;
+		bottom: 1rem;
+		left: 50%;
+		transform: translateX(-50%);
+		background: var(--primary);
+		color: var(--primary-foreground);
+		padding: 0.75rem 1rem;
+		border-radius: 0.5rem;
+		z-index: 100;
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+	}
+	.global-notice button {
+		background: var(--primary-foreground);
+		color: var(--primary);
+		border: none;
+		padding: 0.25rem 0.5rem;
+		border-radius: 0.25rem;
+		cursor: pointer;
 	}
 	.global-error button {
 		background: white;

@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { tetraClient, TetraError } from '$lib/server/tetra';
+import { MockTetraClient } from '$lib/server/tetra-mock';
+import { FIXTURE_HOST_COOKIE } from '$lib/fixture-hosts';
 import { checkSetupSession, clearSessionCookie, setSessionCookie } from '$lib/server/setup-session';
 import type { SessionResponse } from '$lib/oobe-state';
 
@@ -53,7 +55,12 @@ export const POST: RequestHandler = async ({ request, cookies, url, getClientAdd
 	try {
 		// With the unit's ADDRESS_HEADER/XFF_DEPTH this is the browser's address as
 		// Caddy saw it, not Caddy's own.
-		const session = await tetraClient().redeemSetupCode(code, getClientAddress());
+		const client = tetraClient();
+		const session = await client.redeemSetupCode(code, getClientAddress());
+		// Fixture mode: the session sees the host the tests picked.
+		if (client instanceof MockTetraClient) {
+			client.useFixtureHost(session.token, cookies.get(FIXTURE_HOST_COOKIE));
+		}
 		setSessionCookie(cookies, session, url.protocol === 'https:');
 		return json({
 			authenticated: true,
