@@ -27,6 +27,33 @@ pkgconfig(openssl)
 pkgconfig(libhelium-1)
 ```
 
+## Desktop and server builds
+
+The repository contains two independent applications:
+
+- `taidan`: the native desktop OOBE. It does not require Node.js, pnpm, or the web OOBE.
+- `server-oobe`: the optional Ultramarine Server web OOBE.
+
+Build the desktop application only:
+
+```sh
+cargo build --release -p taidan
+```
+
+Build or check the optional server application and its libtaidan bridge:
+
+```sh
+pnpm --dir server-oobe install --frozen-lockfile
+pnpm --dir server-oobe build
+cargo build --release -p tdnx --no-default-features --features server-oobe
+```
+
+The server OOBE always validates operations through this bridge; an operation
+fails if `tdnx` is missing or rejects it. The packaged
+`ultramarine-server-oobe.service` points `TDNX_PATH` at the installed
+feature-enabled `tdnx` binary. The `justfile` provides 
+equivalent `build-desktop`, `build-server-oobe`, and `build-all` recipes.
+
 ## Testing
 
 ```sh
