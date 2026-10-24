@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Callout from '$lib/components/Callout.svelte';
 	import StepLayout from '$lib/components/StepLayout.svelte';
 	import { t } from '$lib/i18n.svelte';
 	import type { RemoteAccessForm } from '$lib/oobe-state';
@@ -26,9 +27,13 @@
 	});
 </script>
 
-<StepLayout title={t('remote-access-title')} {onBack} {onContinue} {canContinue}>
-	<p class="lead">{t('remote-access-description')}</p>
-
+<StepLayout
+	title={t('remote-access-title')}
+	description={t('remote-access-description')}
+	{onBack}
+	{onContinue}
+	{canContinue}
+>
 	<section class="form-section">
 		<label class="toggle-option" for="tailscale-enable">
 			<span>
@@ -71,21 +76,17 @@
 				/>
 			</label>
 			{#if form.tailscaleFunnel}
-				<div class="panel error-panel" role="alert">
-					<div class="status-icon">!</div>
-					<div>
-						<h3>{t('tailscale-funnel-warning-title')}</h3>
-						<p>{t('tailscale-funnel-warning')}</p>
-						<label class="confirm" for="tailscale-funnel-confirm">
-							<input
-								id="tailscale-funnel-confirm"
-								type="checkbox"
-								bind:checked={form.funnelConfirmed}
-							/>
-							{t('tailscale-funnel-confirm')}
-						</label>
-					</div>
-				</div>
+				<Callout tone="warning" role="alert" title={t('tailscale-funnel-warning-title')}>
+					<p>{t('tailscale-funnel-warning')}</p>
+					<label class="confirm" for="tailscale-funnel-confirm">
+						<input
+							id="tailscale-funnel-confirm"
+							type="checkbox"
+							bind:checked={form.funnelConfirmed}
+						/>
+						{t('tailscale-funnel-confirm')}
+					</label>
+				</Callout>
 			{/if}
 		{/if}
 	</section>
@@ -116,38 +117,14 @@
 </StepLayout>
 
 <style>
-	.lead {
-		margin-bottom: 1rem;
-		color: var(--muted-foreground);
-		line-height: 1.5;
-	}
-
-	.form-section + .form-section {
-		margin-top: 1rem;
-	}
-
-	.field-label small {
-		color: var(--muted-foreground);
-		font-size: 0.75rem;
-		font-weight: 400;
-		line-height: 1.4;
-	}
-
-	.error-panel {
-		margin: 0;
-	}
-
-	.error-panel h3 {
-		margin: 0;
-	}
-
 	.confirm {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		margin-top: 0.5rem;
+		margin-top: 0.25rem;
 		color: var(--foreground);
-		font-size: 0.85rem;
-		font-weight: 600;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		cursor: pointer;
 	}
 </style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Callout from '$lib/components/Callout.svelte';
 	import StepLayout from '$lib/components/StepLayout.svelte';
 	import { t } from '$lib/i18n.svelte';
 	import type {
@@ -52,67 +53,91 @@
 </script>
 
 {#if finished}
-	<div class="workspace-heading">
-		<h2>{t('finished-title')}</h2>
-	</div>
-	<div class="step-content">
-		<div class="panel success-panel" role="status">
-			<div class="status-icon">✓</div>
-			<div>
-				<h3>{t('finished-dashboard-starting')}</h3>
-				<p>{t('finished-handoff', { seconds: finished.handoffInSeconds })}</p>
-				{#if finished.dashboardUrl}
-					<p>
-						<a class="dashboard-link" href={finished.dashboardUrl}>{finished.dashboardUrl}</a>
-					</p>
-				{/if}
-			</div>
-		</div>
-	</div>
+	<StepLayout title={t('finished-title')} description="" showActions={false}>
+		<Callout tone="success" role="status" title={t('finished-dashboard-starting')}>
+			<p>{t('finished-handoff', { seconds: finished.handoffInSeconds })}</p>
+			{#if finished.dashboardUrl}
+				<p>
+					<a class="dashboard-link code-value" href={finished.dashboardUrl}
+						>{finished.dashboardUrl}</a
+					>
+				</p>
+			{/if}
+		</Callout>
+	</StepLayout>
 {:else}
 	<StepLayout title={t('complete-title')} {onBack} {onContinue} continueKey="finish-setup">
-		<div class="summary-grid">
-			<div><span>{t('complete-hostname')}</span><strong>{hostname}</strong></div>
-			<div><span>{t('complete-administrator')}</span><strong>{administrator}</strong></div>
+		<dl class="summary-list">
 			<div>
-				<span>{t('complete-dashboard-address')}</span><strong>{address || '—'}</strong>
+				<dt>{t('complete-hostname')}</dt>
+				<dd>{hostname}</dd>
 			</div>
 			<div>
-				<span>{t('complete-updates')}</span><strong
-					>{updatePolicy === 'notify' ? t('updates-notify') : t('updates-automatic')}</strong
+				<dt>{t('complete-administrator')}</dt>
+				<dd>{administrator}</dd>
+			</div>
+			<div>
+				<dt>{t('complete-dashboard-address')}</dt>
+				<dd class="code-value">{address || '—'}</dd>
+			</div>
+			<div>
+				<dt>{t('complete-updates')}</dt>
+				<dd>{updatePolicy === 'notify' ? t('updates-notify') : t('updates-automatic')}</dd>
+			</div>
+			<div>
+				<dt>{t('complete-remote-access')}</dt>
+				<dd>{remote}</dd>
+			</div>
+			<div>
+				<dt>{t('complete-passkeys')}</dt>
+				<dd>
+					{access.mode === 'domain' ? t('complete-passkeys-yes') : t('complete-passkeys-no')}
+				</dd>
+			</div>
+		</dl>
+		<section class="power-section" aria-labelledby="power-heading">
+			<div>
+				<h3 id="power-heading">{t('complete-power-title')}</h3>
+				<p>{t('complete-power-description')}</p>
+			</div>
+			<div class="inline-actions">
+				<button type="button" class="secondary-button button-sm" onclick={onReboot}
+					>{t('reboot')}</button
+				>
+				<button type="button" class="secondary-button button-sm" onclick={onShutdown}
+					>{t('shutdown')}</button
 				>
 			</div>
-			<div><span>{t('complete-remote-access')}</span><strong>{remote}</strong></div>
-			<div>
-				<span>{t('complete-passkeys')}</span><strong
-					>{access.mode === 'domain'
-						? t('complete-passkeys-yes')
-						: t('complete-passkeys-no')}</strong
-				>
-			</div>
-		</div>
-		<div class="complete-actions">
-			<button type="button" class="secondary-button" onclick={onReboot}>{t('reboot')}</button>
-			<button type="button" class="secondary-button" onclick={onShutdown}>{t('shutdown')}</button>
-		</div>
+		</section>
 	</StepLayout>
 {/if}
 
 <style>
-	.complete-actions {
+	.power-section {
 		display: flex;
-		gap: 0.75rem;
-		margin-top: 1rem;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem 1rem;
+		border-top: 1px solid var(--border);
+		padding-top: 1.25rem;
 	}
-	.complete-actions button {
-		flex: 1;
+
+	.power-section h3 {
+		font-size: 0.875rem;
+		font-weight: 600;
 	}
-	.success-panel h3 {
-		margin: 0;
+
+	.power-section p {
+		margin-top: 0.125rem;
+		color: var(--muted-foreground);
+		font-size: 0.75rem;
 	}
+
 	.dashboard-link {
 		color: var(--foreground);
-		font-weight: 700;
+		font-weight: 600;
+		text-decoration: underline;
 		overflow-wrap: anywhere;
 	}
 </style>

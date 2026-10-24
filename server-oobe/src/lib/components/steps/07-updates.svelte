@@ -13,8 +13,7 @@
 	} = $props();
 </script>
 
-<StepLayout title={t('updates-title')} {onBack} {onContinue}>
-	<p class="lead">{t('updates-description')}</p>
+<StepLayout title={t('updates-title')} description={t('updates-description')} {onBack} {onContinue}>
 	<section class="form-section">
 		<fieldset>
 			<legend>{t('updates-policy')}</legend>
@@ -47,11 +46,3 @@
 		</fieldset>
 	</section>
 </StepLayout>
-
-<style>
-	.lead {
-		margin-bottom: 1rem;
-		color: var(--muted-foreground);
-		line-height: 1.5;
-	}
-</style>

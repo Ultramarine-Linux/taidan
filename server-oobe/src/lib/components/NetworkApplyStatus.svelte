@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Callout from './Callout.svelte';
 	import { t } from '$lib/i18n.svelte';
 	import type { NetworkApplyState } from '$lib/oobe-state';
 
@@ -14,47 +15,36 @@
 	let pending = $derived(apply.status === 'applying' || apply.status === 'waiting');
 </script>
 
-<div
-	class="panel network-apply"
-	class:success-panel={apply.status === 'kept'}
-	class:error-panel={apply.status === 'rolled-back' || apply.status === 'failed'}
+<Callout
+	class="network-apply"
+	tone={pending ? 'pending' : apply.status === 'kept' ? 'success' : 'danger'}
 	role={pending ? 'status' : 'alert'}
-	aria-live="polite"
+	title={t(titles[apply.status])}
 >
-	<div class="status-icon">{pending ? '…' : apply.status === 'kept' ? '✓' : '!'}</div>
-	<div>
-		<h3>{t(titles[apply.status])}</h3>
-		{#if apply.message && apply.status === 'failed'}<p>{apply.message}</p>{/if}
-		{#if pending}
-			{#if apply.urls.length > 0}
-				<p>{t('network-apply-urls')}</p>
-				<ul class="network-apply-urls">
-					{#each apply.urls as url (url.href)}
-						<li><a href={url.href}>{url.label}</a></li>
-					{/each}
-				</ul>
-				{#if apply.automatic}<p>{t('network-apply-automatic')}</p>{/if}
-			{:else}
-				<p>{t('network-apply-no-urls')}</p>
-			{/if}
-			<p>{t('network-apply-rollback', { seconds: apply.rollbackInSeconds })}</p>
+	{#if apply.message && apply.status === 'failed'}<p>{apply.message}</p>{/if}
+	{#if pending}
+		{#if apply.urls.length > 0}
+			<p>{t('network-apply-urls')}</p>
+			<ul class="network-apply-urls">
+				{#each apply.urls as url (url.href)}
+					<li><a class="code-value" href={url.href}>{url.label}</a></li>
+				{/each}
+			</ul>
+			{#if apply.automatic}<p>{t('network-apply-automatic')}</p>{/if}
+		{:else}
+			<p>{t('network-apply-no-urls')}</p>
 		{/if}
-	</div>
-</div>
+		<p>{t('network-apply-rollback', { seconds: apply.rollbackInSeconds })}</p>
+	{/if}
+</Callout>
 
 <style>
-	.network-apply h3 {
-		margin: 0;
-	}
-
-	.network-apply p {
-		margin: 0.4rem 0 0;
-	}
-
 	.network-apply-urls {
-		margin: 0.4rem 0 0;
-		padding-left: 1.2rem;
-		font-size: 0.85rem;
 		overflow-wrap: anywhere;
+	}
+
+	.network-apply-urls a {
+		color: var(--foreground);
+		font-weight: 500;
 	}
 </style>

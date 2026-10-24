@@ -29,7 +29,6 @@
 >
 	<label class="field-label" for="device-name"
 		>{t('device-name-label')}<input
-			class="text-input"
 			id="device-name"
 			bind:value={deviceName}
 			oninput={() => derive(deviceName)}
@@ -37,11 +36,11 @@
 	>
 	<label class="field-label" for="hostname"
 		>{t('hostname-label')}<input
-			class="text-input"
 			id="hostname"
 			bind:value={hostname}
 			oninput={() => (touched = true)}
 			aria-describedby="hostname-error"
+			aria-invalid={hostnameError ? 'true' : undefined}
 		/></label
 	>
 	{#if hostnameError}<p class="field-error" id="hostname-error">{hostnameError}</p>{/if}

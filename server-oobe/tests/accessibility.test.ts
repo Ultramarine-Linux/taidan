@@ -27,12 +27,23 @@ async function resetState(page: Page) {
 	});
 }
 
-for (const theme of ['light', 'dark'] as const) {
-	test(`Ultramarine ${theme} OOBE steps`, async ({ page: browserPage, makeAxeBuilder }) => {
-		await browserPage.addInitScript((selectedTheme) => {
-			localStorage.setItem('oobe-theme', selectedTheme);
-			document.documentElement.classList.toggle('dark', selectedTheme === 'dark');
-		}, theme);
+const appearances = [
+	{ theme: 'light', contrast: 'off' },
+	{ theme: 'dark', contrast: 'off' },
+	{ theme: 'light', contrast: 'on' },
+	{ theme: 'dark', contrast: 'on' }
+] as const;
+
+for (const { theme, contrast } of appearances) {
+	const name = contrast === 'on' ? `${theme} high contrast` : theme;
+	test(`Ultramarine ${name} OOBE steps`, async ({ page: browserPage, makeAxeBuilder }) => {
+		await browserPage.addInitScript(
+			([selectedTheme, selectedContrast]) => {
+				localStorage.setItem('oobe-theme', selectedTheme);
+				localStorage.setItem('oobe-contrast', selectedContrast);
+			},
+			[theme, contrast] as const
+		);
 
 		// Reset persisted state so every run starts at Welcome
 		await resetState(browserPage);
@@ -81,3 +92,17 @@ for (const theme of ['light', 'dark'] as const) {
 		expect(results.violations, 'Accessibility violations on the final screen').toEqual([]);
 	});
 }
+
+test('the step drawer on small screens', async ({ page, makeAxeBuilder }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await resetState(page);
+	await page.goto(localURL);
+	await page.getByRole('button', { name: 'Show setup steps' }).click();
+	const drawer = page.getByRole('dialog', { name: 'Setup steps' });
+	await expect(drawer).toBeVisible();
+	await expect(drawer.locator('[aria-current="step"]')).toContainText('Welcome');
+	const results = await makeAxeBuilder().analyze();
+	expect(results.violations, 'Accessibility violations in the step drawer').toEqual([]);
+	await page.keyboard.press('Escape');
+	await expect(drawer).toBeHidden();
+});

@@ -28,7 +28,6 @@
 >
 	<label class="field-label" for="full-name"
 		>{t('full-name-label')}<input
-			class="text-input"
 			id="full-name"
 			value={fullName}
 			oninput={(event) => updateName(event.currentTarget.value)}
@@ -36,7 +35,6 @@
 	>
 	<label class="field-label" for="username"
 		>{t('username-label')}<input
-			class="text-input"
 			id="username"
 			bind:value={username}
 			oninput={() => {
@@ -44,6 +42,7 @@
 				touched = true;
 			}}
 			aria-describedby="username-error"
+			aria-invalid={usernameError ? 'true' : undefined}
 		/></label
 	>
 	{#if usernameError}<p class="field-error" id="username-error">{usernameError}</p>{/if}

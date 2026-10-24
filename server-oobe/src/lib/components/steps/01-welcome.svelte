@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Callout from '$lib/components/Callout.svelte';
 	import StepLayout from '$lib/components/StepLayout.svelte';
 	import { t } from '$lib/i18n.svelte';
 	import { FIXTURE_SETUP_CODE } from '$lib/fixture';
@@ -27,23 +28,20 @@
 	showBack={false}
 	canContinue={!needsSetupCode || setupCode.trim().length > 0}
 >
-	<div class="panel success-panel">
-		<div class="status-icon">✓</div>
-		<div>
-			<h3>{t('welcome-ready-title')}</h3>
-			<p>{t('welcome-ready-description')}</p>
-			{#if urls.length > 0}
-				<div class="ip-addresses">
-					<strong>{t('welcome-ip-addresses')}</strong>
-					<ul>
-						{#each urls as url (url)}
-							<li>{url}</li>
-						{/each}
-					</ul>
-				</div>
-			{/if}
+	<Callout tone="success" title={t('welcome-ready-title')}>
+		<p>{t('welcome-ready-description')}</p>
+	</Callout>
+
+	{#if urls.length > 0}
+		<div class="ip-addresses">
+			<p class="ip-addresses-label">{t('welcome-ip-addresses')}</p>
+			<ul class="summary-list">
+				{#each urls as url (url)}
+					<li><span class="code-value">{url}</span></li>
+				{/each}
+			</ul>
 		</div>
-	</div>
+	{/if}
 
 	{#if needsSetupCode}
 		<form
@@ -56,7 +54,7 @@
 			<label class="field-label" for="setup-code">
 				{t('setup-code-label')}
 				<input
-					class="text-input"
+					class="mono-input"
 					id="setup-code"
 					bind:value={setupCode}
 					placeholder="XXXX-XXXX"
@@ -81,20 +79,39 @@
 </StepLayout>
 
 <style>
+	.ip-addresses {
+		display: grid;
+		gap: 0.5rem;
+	}
+
+	.ip-addresses-label {
+		color: var(--foreground);
+		font-size: 0.875rem;
+		font-weight: 500;
+	}
+
 	.ip-addresses ul {
-		margin: 0;
-		padding-left: 1.2rem;
+		padding: 0;
+		list-style: none;
+	}
+
+	.ip-addresses li {
+		padding: 0.625rem 1rem;
 		overflow-wrap: anywhere;
 	}
 
-	.setup-code {
-		margin-top: 1rem;
+	.ip-addresses li + li {
+		border-top: 1px solid var(--border);
 	}
 
-	.setup-code small {
-		color: var(--muted-foreground);
-		font-size: 0.75rem;
-		font-weight: 400;
-		line-height: 1.4;
+	.setup-code {
+		display: grid;
+		gap: 0.5rem;
+	}
+
+	.setup-code input {
+		max-width: 16rem;
+		height: 2.5rem;
+		font-size: 1rem;
 	}
 </style>

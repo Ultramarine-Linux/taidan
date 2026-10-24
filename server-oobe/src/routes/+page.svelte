@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from '$lib/components/Icon.svelte';
 	import Shell from '$lib/components/Shell.svelte';
 	import WelcomeStep from '$lib/components/steps/01-welcome.svelte';
 	import DeviceNameStep from '$lib/components/steps/03-device-name.svelte';
@@ -139,7 +140,7 @@
 		} catch (err) {
 			if (err instanceof SetupSessionRequiredError) return requireSetupCode();
 			console.error('Failed to load OOBE state:', err);
-			errorMessage = 'Unable to load setup state. Using defaults.';
+			errorMessage = t('setup-state-unavailable');
 		}
 	}
 
@@ -527,41 +528,54 @@
 </svelte:head>
 
 {#if !loaded}
-	<div class="loading-screen">
-		<p>Loading setup state…</p>
-	</div>
+	<main class="loading-screen">
+		<span class="spinner" aria-hidden="true"></span>
+		<p role="status">{t('loading-setup')}</p>
+	</main>
 {:else}
-	{#if notice}
-		<div class="global-notice" role="status">
-			<p>{notice}</p>
-			<button type="button" onclick={() => (notice = '')}>Dismiss</button>
-		</div>
-	{/if}
-	{#if errorMessage}
-		<div class="global-error" role="alert">
-			<p>{errorMessage}</p>
-			{#if retryStep}
-				<button
-					type="button"
-					onclick={() => {
-						errorMessage = '';
-						void onContinue();
-					}}
-				>
-					Retry
-				</button>
-			{/if}
-			<button
-				type="button"
-				onclick={() => {
-					errorMessage = '';
-					retryStep = null;
-				}}>Dismiss</button
-			>
-		</div>
-	{/if}
+	{#snippet banners()}
+		{#if notice}
+			<div class="banner banner-notice" role="status">
+				<Icon name="check-circle" />
+				<p>{notice}</p>
+				<div class="banner-actions">
+					<button class="ghost-button" type="button" onclick={() => (notice = '')}
+						>{t('dismiss')}</button
+					>
+				</div>
+			</div>
+		{/if}
+		{#if errorMessage}
+			<div class="banner banner-error" role="alert">
+				<Icon name="alert-circle" />
+				<p>{errorMessage}</p>
+				<div class="banner-actions">
+					{#if retryStep}
+						<button
+							class="ghost-button"
+							type="button"
+							onclick={() => {
+								errorMessage = '';
+								void onContinue();
+							}}
+						>
+							{t('retry')}
+						</button>
+					{/if}
+					<button
+						class="ghost-button"
+						type="button"
+						onclick={() => {
+							errorMessage = '';
+							retryStep = null;
+						}}>{t('dismiss')}</button
+					>
+				</div>
+			</div>
+		{/if}
+	{/snippet}
 
-	<Shell steps={oobeState.steps} {selectedStep} onSelectStep={saveActiveStep}>
+	<Shell steps={oobeState.steps} {selectedStep} onSelectStep={saveActiveStep} {banners}>
 		{#if selectedStep === 'welcome'}
 			<WelcomeStep
 				{onBack}
@@ -612,56 +626,3 @@
 		{/if}
 	</Shell>
 {/if}
-
-<style>
-	.loading-screen {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 100vh;
-	}
-	.global-error {
-		position: fixed;
-		top: 1rem;
-		left: 50%;
-		transform: translateX(-50%);
-		background: #b91c1c;
-		color: white;
-		padding: 0.75rem 1rem;
-		border-radius: 0.5rem;
-		z-index: 100;
-		display: flex;
-		gap: 0.75rem;
-		align-items: center;
-	}
-	.global-notice {
-		position: fixed;
-		bottom: 1rem;
-		left: 50%;
-		transform: translateX(-50%);
-		background: var(--primary);
-		color: var(--primary-foreground);
-		padding: 0.75rem 1rem;
-		border-radius: 0.5rem;
-		z-index: 100;
-		display: flex;
-		gap: 0.75rem;
-		align-items: center;
-	}
-	.global-notice button {
-		background: var(--primary-foreground);
-		color: var(--primary);
-		border: none;
-		padding: 0.25rem 0.5rem;
-		border-radius: 0.25rem;
-		cursor: pointer;
-	}
-	.global-error button {
-		background: white;
-		color: #b91c1c;
-		border: none;
-		padding: 0.25rem 0.5rem;
-		border-radius: 0.25rem;
-		cursor: pointer;
-	}
-</style>

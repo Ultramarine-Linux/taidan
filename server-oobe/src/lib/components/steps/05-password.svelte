@@ -27,7 +27,6 @@
 >
 	<label class="field-label" for="password"
 		>{t('password-label')}<input
-			class="text-input"
 			id="password"
 			type="password"
 			bind:value={password}
@@ -36,12 +35,12 @@
 	>
 	<label class="field-label" for="password-confirm"
 		>{t('password-confirm-label')}<input
-			class="text-input"
 			id="password-confirm"
 			type="password"
 			bind:value={confirmation}
 			autocomplete="new-password"
 			aria-describedby="password-error"
+			aria-invalid={error ? 'true' : undefined}
 		/></label
 	>
 	{#if error}<p class="field-error" id="password-error">{error}</p>{/if}

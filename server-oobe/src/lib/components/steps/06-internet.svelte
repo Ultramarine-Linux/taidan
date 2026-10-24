@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Callout from '$lib/components/Callout.svelte';
 	import Eap8021xFields from '$lib/components/Eap8021xFields.svelte';
 	import NetworkApplyStatus from '$lib/components/NetworkApplyStatus.svelte';
 	import StepLayout from '$lib/components/StepLayout.svelte';
@@ -156,6 +157,13 @@
 		}
 	}
 
+	/** Enter in the network name or password connects, rather than continuing. */
+	function connectOnEnter(event: KeyboardEvent) {
+		if (event.key !== 'Enter' || event.isComposing) return;
+		event.preventDefault();
+		if (!wifiLoading && !applying && (wifiSsid || hiddenSsidName)) void connectWifi();
+	}
+
 	async function runCheck() {
 		if (!onCheck) return;
 		checking = true;
@@ -237,31 +245,36 @@
 	{#if apply}
 		<NetworkApplyStatus {apply} />
 	{/if}
-	<div class="panel" class:success-panel={status === 'online'}>
-		<div class="status-icon">{status === 'online' ? '✓' : status === 'offline' ? '!' : '…'}</div>
-		<div>
-			<h3>
-				{status === 'online'
-					? t('network-ready-title')
-					: status === 'offline'
-						? t('network-offline-title')
-						: t('network-unchecked-title')}
-			</h3>
-			{#if check}
-				<ul class="network-check">
-					<li>{t(check.ipv4 ? 'network-check-ipv4-yes' : 'network-check-ipv4-no')}</li>
-					<li>{t(check.ipv6 ? 'network-check-ipv6-yes' : 'network-check-ipv6-no')}</li>
-					<li>{t(check.dns ? 'network-check-dns-yes' : 'network-check-dns-no')}</li>
-				</ul>
-			{/if}
-			<p>
-				{status === 'offline'
-					? t('network-offline-description')
-					: t('network-unchecked-description')}
-			</p>
-			{#if checkError}<p class="field-error" role="alert">{checkError}</p>{/if}
+	<Callout
+		tone={status === 'online' ? 'success' : status === 'offline' ? 'warning' : 'neutral'}
+		title={status === 'online'
+			? t('network-ready-title')
+			: status === 'offline'
+				? t('network-offline-title')
+				: t('network-unchecked-title')}
+	>
+		{#if check}
+			<ul class="network-check">
+				<li>{t(check.ipv4 ? 'network-check-ipv4-yes' : 'network-check-ipv4-no')}</li>
+				<li>{t(check.ipv6 ? 'network-check-ipv6-yes' : 'network-check-ipv6-no')}</li>
+				<li>{t(check.dns ? 'network-check-dns-yes' : 'network-check-dns-no')}</li>
+			</ul>
+		{/if}
+		<p>
+			{status === 'offline' ? t('network-offline-description') : t('network-unchecked-description')}
+		</p>
+		{#if checkError}<p class="field-error" role="alert">{checkError}</p>{/if}
+		<div class="inline-actions">
+			<button
+				class="secondary-button button-sm"
+				type="button"
+				onclick={runCheck}
+				disabled={checking}
+			>
+				{checking ? t('checking-connection') : t('check-connection')}
+			</button>
 		</div>
-	</div>
+	</Callout>
 	<div class="network-settings">
 		{#if interfaces.length > 0}
 			<section class="network-section network-interface-section">
@@ -282,12 +295,12 @@
 					{currentAddresses.length ? currentAddresses.join(', ') : t('network-no-addresses')}
 				</p>
 				{#if isWireless}
-					<fieldset>
+					<fieldset data-enter-continue="off">
 						<legend>{t('network-wifi-title')}</legend>
 						<p class="field-help">{t('network-wifi-addressing')}</p>
-						<div class="wifi-actions">
+						<div class="inline-actions">
 							<button
-								class="secondary-button"
+								class="secondary-button button-sm"
 								type="button"
 								onclick={scanWifi}
 								disabled={wifiLoading}
@@ -308,6 +321,7 @@
 								>{t('network-wifi-ssid')}<input
 									id="wifi-hidden-ssid"
 									bind:value={hiddenSsidName}
+									onkeydown={connectOnEnter}
 								/></label
 							>
 						{:else if wifiNetworks.length > 0}
@@ -337,6 +351,7 @@
 									id="wifi-password"
 									type="password"
 									bind:value={wifiPassword}
+									onkeydown={connectOnEnter}
 									autocomplete="current-password"
 								/></label
 							>
@@ -344,14 +359,16 @@
 						{#if (hiddenSsid && wifiSecurity === 'wpa-enterprise') || (!hiddenSsid && selectedWifi?.security === 'wpa-enterprise' && wifiSecurity === 'wpa-enterprise')}
 							<Eap8021xFields idPrefix="wifi" bind:settings={wifiEnterprise} />
 						{/if}
-						<button
-							class="primary-button"
-							type="button"
-							onclick={connectWifi}
-							disabled={wifiLoading || applying || (!wifiSsid && !hiddenSsidName)}
-						>
-							{t('network-wifi-connect')}
-						</button>
+						<div class="inline-actions">
+							<button
+								class="primary-button button-sm"
+								type="button"
+								onclick={connectWifi}
+								disabled={wifiLoading || applying || (!wifiSsid && !hiddenSsidName)}
+							>
+								{t('network-wifi-connect')}
+							</button>
+						</div>
 						{#if wifiError}<p class="field-error" role="alert">{wifiError}</p>{/if}
 					</fieldset>
 				{:else if !isEthernet}
@@ -395,22 +412,15 @@
 			</section>
 		{/if}
 	</div>
-	<div class="inline-actions">
-		<button class="secondary-button" type="button" onclick={runCheck} disabled={checking}>
-			{checking ? t('checking-connection') : t('check-connection')}
-		</button>
-	</div>
 </StepLayout>
 
 <style>
-	.network-check {
-		margin: 0.4rem 0 0;
-		padding-left: 1.2rem;
-		font-size: 0.85rem;
+	.network-check li {
+		color: var(--foreground);
 	}
 
 	.network-current-addresses {
-		margin: 0;
+		margin-top: -0.5rem;
 		overflow-wrap: anywhere;
 	}
 </style>

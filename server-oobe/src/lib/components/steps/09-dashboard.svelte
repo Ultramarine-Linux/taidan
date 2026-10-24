@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Callout from '$lib/components/Callout.svelte';
 	import StepLayout from '$lib/components/StepLayout.svelte';
 	import { t } from '$lib/i18n.svelte';
 	import { DNS_PROVIDERS, dnsProvider, validateDnsCredentials } from '$lib/dns-providers';
@@ -46,13 +47,12 @@
 
 <StepLayout
 	title={t('access-title')}
+	description={t('access-description')}
 	{onBack}
 	{onContinue}
 	{canContinue}
 	continueKey="review-setup"
 >
-	<p class="lead">{t('access-description')}</p>
-
 	<section class="form-section">
 		<fieldset>
 			<legend>{t('access-mode')}</legend>
@@ -173,67 +173,32 @@
 					/>
 				{/if}
 			</label>
-			<div class="panel error-panel" role="note">
-				<div class="status-icon">!</div>
-				<div>
-					<h3>{t('access-ip-passkeys-title')}</h3>
-					<p>{t('access-ip-passkeys')}</p>
-				</div>
-			</div>
+			<Callout tone="warning" role="note" title={t('access-ip-passkeys-title')}>
+				<p>{t('access-ip-passkeys')}</p>
+			</Callout>
 		{/if}
 	</section>
 
 	{#if address}
-		<div class="panel dashboard-preview" aria-live="polite">
+		<div class="panel info-panel dashboard-preview" aria-live="polite">
 			<div>
 				<h3>{t('dashboard-address-preview')}</h3>
 				<p>{t('dashboard-address-description')}</p>
 			</div>
-			<strong>{address}</strong>
+			<strong class="code-value">{address}</strong>
 		</div>
 	{/if}
 </StepLayout>
 
 <style>
-	.lead {
-		margin-bottom: 1rem;
-		color: var(--muted-foreground);
-		line-height: 1.5;
-	}
-
-	.note {
-		margin: 0;
-		color: var(--muted-foreground);
-		font-size: 0.75rem;
-		line-height: 1.4;
-	}
-
-	.error-panel {
-		margin: 0;
-	}
-
-	.error-panel h3 {
-		margin: 0;
-	}
-
 	.dashboard-preview {
 		align-items: center;
 		justify-content: space-between;
-		margin-top: 1rem;
-	}
-
-	.dashboard-preview h3,
-	.dashboard-preview p {
-		margin: 0;
-	}
-
-	.dashboard-preview p {
-		margin-top: 0.35rem;
 	}
 
 	.dashboard-preview strong {
 		color: var(--foreground);
-		font-size: 0.85rem;
+		font-weight: 500;
 		overflow-wrap: anywhere;
 	}
 

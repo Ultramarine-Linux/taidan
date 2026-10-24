@@ -81,3 +81,28 @@ test.describe('welcome step', () => {
 		await expect(page.locator('.workspace h2')).toHaveText('Name your server');
 	});
 });
+
+test.describe('keyboard', () => {
+	test('Enter in a field continues once the step allows it', async ({ page }) => {
+		await page.goto(localURL);
+		const heading = page.locator('.workspace h2');
+		const code = page.locator('#setup-code');
+
+		// Nothing to submit yet.
+		await code.press('Enter');
+		await expect(heading).toHaveText('Welcome to Ultramarine Server');
+
+		await code.fill(FIXTURE_SETUP_CODE);
+		await code.press('Enter');
+		await expect(heading).toHaveText('Name your server');
+
+		const hostname = page.locator('#hostname');
+		await hostname.fill('Not Valid!');
+		await hostname.press('Enter');
+		await expect(heading).toHaveText('Name your server');
+
+		await hostname.fill('enter-test');
+		await hostname.press('Enter');
+		await expect(heading).toHaveText('Create a user');
+	});
+});
