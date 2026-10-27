@@ -27,6 +27,17 @@ pkgconfig(openssl)
 pkgconfig(libhelium-1)
 ```
 
+## tdnx
+
+`tdnx` is a small libtaidan bridge used by
+[Ultramarine Server OOBE](https://github.com/Ultramarine-Linux/server-oobe) to
+validate setup operations. It isn't part of the desktop build or the taidan
+package. `server-oobe` builds it from this repo:
+
+```sh
+cargo build --release -p tdnx --no-default-features --features server-oobe
+```
+
 ## Testing
 
 ```sh

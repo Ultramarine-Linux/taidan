@@ -7,6 +7,7 @@ pub mod i18n;
 pub mod passwd;
 pub mod prelude;
 pub mod settings;
+pub mod server_setup;
 pub mod steps;
 pub mod time;
 pub mod tweaks;

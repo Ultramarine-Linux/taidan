@@ -2,7 +2,7 @@
 members = ["taidan_proc_macros", "libtaidan", "tdnx"]
 
 [workspace.dependencies]
-futures = "0.3.31"
+futures = "0.3.32"
 itertools = "0.15.0"
 libtaidan = { path = "./libtaidan" }
 regex = "1.13.1"
@@ -25,7 +25,7 @@ name = "taidan"
 version = "0.2.7"
 edition = "2024"
 description = "Out-Of-Box-Experience (OOBE) and Welcome App"
-license = "GPL-2.0-or-later"
+license = "GPL-3.0-or-later"
 repository = "https://github.com/Ultramarine-Linux/taidan"
 readme = "README.md"
 keywords = ["oobe", "ultramarine", "linux"]
