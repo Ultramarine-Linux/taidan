@@ -1,3 +1,5 @@
+use secrecy::ExposeSecret;
+
 use crate::prelude::*;
 generate_page!(Password {
     btn_next: libhelium::Button,
@@ -47,7 +49,7 @@ generate_page!(Password {
             set_placeholder_text: Some(&t!("page-password-pw")),
             connect_changed[sender, tf_repeat] => move |en| {
                 sender.input(Self::Input::SetBtnSensitive(en.text() == tf_repeat.text() && !en.text().is_empty()));
-                SETTINGS.write().passwd = en.text().to_string();
+                SETTINGS.write().passwd = en.text().to_string().into();
             },
         },
 
@@ -60,7 +62,7 @@ generate_page!(Password {
             set_placeholder_text: Some(&t!("page-password-rp")),
             connect_changed[sender] => move |en| {
                 let pass = en.text().to_string();
-                sender.input(Self::Input::SetBtnSensitive(SETTINGS.read().passwd == pass && !pass.is_empty()));
+                sender.input(Self::Input::SetBtnSensitive(SETTINGS.read().passwd.expose_secret() == pass && !pass.is_empty()));
             },
             connect_activate => Self::Input::Enter,
         },

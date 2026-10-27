@@ -1,3 +1,5 @@
+use secrecy::SecretString;
+
 #[derive(Clone, Debug, serde::Serialize)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
@@ -15,7 +17,8 @@ pub struct Settings {
     pub fullname: String,
     pub username: String,
 
-    pub passwd: String,
+    #[serde(skip_serializing)]
+    pub passwd: SecretString,
 
     pub install_codecs_drivers: bool,
 
@@ -49,5 +52,28 @@ impl Default for Settings {
             actions: Default::default(),
             tweaks: Default::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_output_redacts_password() {
+        let settings =
+            Settings { passwd: "correct_horse_battery_staple".into(), ..Settings::default() };
+        let rendered = format!("{settings:?}");
+        assert!(!rendered.contains("correct_horse_battery_staple"), "{rendered}");
+        assert!(rendered.contains("[REDACTED]"), "{rendered}");
+    }
+
+    #[test]
+    fn serialized_output_omits_password() {
+        let settings =
+            Settings { passwd: "correct_horse_battery_staple".into(), ..Settings::default() };
+        let json = serde_json::to_string(&settings).unwrap();
+        assert!(!json.contains("correct_horse_battery_staple"), "{json}");
+        assert!(!json.contains("passwd"), "{json}");
     }
 }

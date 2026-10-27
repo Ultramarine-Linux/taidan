@@ -1,3 +1,4 @@
+use secrecy::ExposeSecret;
 use tokio::io::AsyncWriteExt;
 
 use crate::prelude::*;
@@ -18,7 +19,7 @@ impl super::Step for UserAdd {
 
 async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
     let crypt_setting = xcrypt::crypt_gensalt(None, 0, None)?;
-    let pass = xcrypt::crypt(&settings.passwd, &crypt_setting)?;
+    let pass = xcrypt::crypt(settings.passwd.expose_secret(), &crypt_setting)?;
 
     // Ignore useradd errors so rerunning setup can recreate an interrupted account.
     _ = super::super::pkexec(
@@ -42,7 +43,7 @@ async fn homed(settings: &crate::settings::Settings) -> Res<()> {
         .stdin(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| Err::FailToRunProgram("pkexec", e))?;
-    let pass = &settings.passwd;
+    let pass = settings.passwd.expose_secret();
     let mut stdin = p.stdin.take().expect("why is there no stdin?");
     _ = stdin
         .write_all(format!("{pass}\n{pass}\n").as_bytes())
