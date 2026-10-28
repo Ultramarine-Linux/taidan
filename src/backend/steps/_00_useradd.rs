@@ -1,4 +1,5 @@
 use color_eyre::eyre::OptionExt;
+use secrecy::ExposeSecret;
 use tokio::io::AsyncWriteExt;
 
 use crate::prelude::*;
@@ -20,8 +21,8 @@ async fn useradd(settings: &crate::backend::settings::Settings) -> color_eyre::R
     let crypt_setting = xcrypt::crypt_gensalt(None, 0, None)
         .wrap_err("fail to encrypt password")
         .map_err(|e| e.note("fail: crypt_gensalt()"))?;
-    let pass =
-        xcrypt::crypt(&settings.passwd, &crypt_setting).wrap_err("fail to encrypt password")?;
+    let pass = xcrypt::crypt(settings.passwd.expose_secret(), &crypt_setting)
+        .wrap_err("fail to encrypt password")?;
 
     // ignore err in case recreate user
     _ = super::super::pkexec(
@@ -46,7 +47,7 @@ async fn homed(settings: &crate::backend::settings::Settings) -> color_eyre::Res
         .stdin(std::process::Stdio::piped())
         .spawn()
         .wrap_err("fail to run `homectl`")?;
-    let pass = &settings.passwd;
+    let pass = settings.passwd.expose_secret();
     let mut stdin = p.stdin.take().ok_or_eyre("stdin")?;
     _ = stdin
         .write_all(format!("{pass}\n{pass}\n").as_bytes())
