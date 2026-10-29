@@ -2,14 +2,14 @@
 members = ["taidan_proc_macros", "libtaidan", "tdnx"]
 
 [workspace.dependencies]
-futures = "0.3.32"
+futures = "0.3.34"
 itertools = "0.15.0"
 libtaidan = { path = "./libtaidan" }
 regex = "1.13.1"
 secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.140"
-tempfile = { version = "3.20.0", default-features = false }
+serde_json = "1.0.154"
+tempfile = { version = "3.27.0", default-features = false }
 tracing = "0.1.44"
 
 [workspace.dependencies.tracing-subscriber]
@@ -17,7 +17,7 @@ version = "0.3.23"
 features = ["env-filter", "tracing-log"]
 
 [workspace.dependencies.tokio]
-version = "1.46.1"
+version = "1.54.1"
 features = ["fs", "io-util", "macros", "process"]
 
 
@@ -34,7 +34,7 @@ keywords = ["oobe", "ultramarine", "linux"]
 [dependencies]
 basic-toml = "0.1.10"
 color-eyre = "0.6.5"
-const_format = "0.2.34"
+const_format = "0.2.37"
 enum_dispatch = "0.3.13"
 futures = { workspace = true }
 gvdb = "0.9.0"
@@ -43,42 +43,42 @@ i18n-embed = { version = "0.16.0", features = [
     "filesystem-assets",
     "fluent-system",
 ] }
-i18n-embed-fl = "0.10.0"
+i18n-embed-fl = "0.10.1"
 iso3166 = "1.2.1"
 isolang = { version = "2.4.0", features = ["local_names"] }
 itertools = { workspace = true }
 kurage = { version = "0.1.4" }
-libc = "0.2.174"
+libc = "0.2.191"
 # libappstream = "0.3.0"
 libhelium = "0.12.0"
-memchr = "2.7.5"
-parking_lot = "0.12.4"
+memchr = "2.8.3"
+parking_lot = "0.12.5"
 paste = "1.0.15"
 phf = { version = "0.14.0", features = ["macros"] }
 poly_l10n = "0.0.7"
 regex = { workspace = true }
 relm4 = { version = "0.9.1", default-features = false, features = ["macros"] }
-reqwest = { version = "0.13.4", features = [
+reqwest = { version = "0.13.5", features = [
     "http2",
     "default-tls",
 ], default-features = false }
-rust-embed = { version = "8.7.2", features = ["include-exclude"] }
+rust-embed = { version = "8.13.0", features = ["include-exclude"] }
 secrecy = { workspace = true }
-sentry = { version = "0.49.1", features = ["logs", "tracing"] }
+sentry = { version = "0.49.5", features = ["logs", "tracing"] }
 sentry-eyre = "0.3.0"
-serde = "1.0.219"
-serde_json = "1.0.140"
+serde = "1.0.229"
+serde_json = "1.0.154"
 strip-ansi-escapes = "0.2.1"
 taidan_proc_macros = { path = "taidan_proc_macros" }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-tracing-appender = "0.2.3"
+tracing-appender = "0.2.5"
 tracing-error = "0.2.1"
-tracing-journald = "0.3.1"
+tracing-journald = "0.3.2"
 tracing-subscriber = { workspace = true }
-uzers = "0.12.1"
-xcrypt = "0.3.1"
+uzers = "0.12.2"
+xcrypt = "0.3.2"
 
 [build-dependencies]
 glib-build-tools = "0.22.8"
