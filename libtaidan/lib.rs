@@ -6,8 +6,8 @@ pub mod flatpak;
 pub mod i18n;
 pub mod passwd;
 pub mod prelude;
-pub mod settings;
 pub mod server_setup;
+pub mod settings;
 pub mod steps;
 pub mod time;
 pub mod tweaks;
@@ -98,8 +98,8 @@ mod parseutil {
 /// # Errors
 /// - command failed to run
 /// - command exited with non-zero status code
-pub async fn pkexec<'u, I: IntoIterator + std::fmt::Debug>(
-    user: &'u str,
+pub async fn pkexec<I: IntoIterator + std::fmt::Debug>(
+    user: &str,
     name: &'static str,
     args: I,
 ) -> Res<()>

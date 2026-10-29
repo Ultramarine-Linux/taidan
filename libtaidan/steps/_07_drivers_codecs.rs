@@ -85,7 +85,7 @@ impl Drivers {
     }
 
     async fn get_nvidia_chipset() -> Res<String> {
-        Ok(String::from_utf8_lossy(&Command::new("sh").arg("-c").arg("lspci | grep -i NVIDIA | head -n 1 | cut -d ':' -f 3 | cut -d '[' -f 1 | sed -e 's/^[[:space:]]*//'").stdout(std::process::Stdio::piped()).output().await.map_err(|e| Err::FailToRunProgram("sh", e)).wrap_msg("cannot detect nvidia chipset")?.stdout.rsplit(|&c| c == b' ').next().expect("malformatted output from shell").to_vec()).to_string())
+        Ok(String::from_utf8_lossy(Command::new("sh").arg("-c").arg("lspci | grep -i NVIDIA | head -n 1 | cut -d ':' -f 3 | cut -d '[' -f 1 | sed -e 's/^[[:space:]]*//'").stdout(std::process::Stdio::piped()).output().await.map_err(|e| Err::FailToRunProgram("sh", e)).wrap_msg("cannot detect nvidia chipset")?.stdout.rsplit(|&c| c == b' ').next().expect("malformatted output from shell")).to_string())
     }
 
     ///    Returns a list of Nvidia packages to install

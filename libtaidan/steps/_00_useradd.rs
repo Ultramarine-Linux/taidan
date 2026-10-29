@@ -37,7 +37,7 @@ async fn homed(settings: &crate::settings::Settings) -> Res<()> {
         .args(["--user", "root", "script", "-c"])
         .arg(format!(
             "homectl create {} -G wheel -c {} --enforce-password-policy=no",
-            &settings.username, &settings.fullname
+            settings.username, settings.fullname
         ))
         .stdin(std::process::Stdio::piped())
         .spawn()

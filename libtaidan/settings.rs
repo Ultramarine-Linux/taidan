@@ -27,8 +27,6 @@ pub struct Settings {
 
 impl Settings {
     pub fn new() -> Self {
-        let mut ret = Self::default();
-        ret.tweaks = vec![false; crate::tweaks::TWEAKS.len()];
-        ret
+        Settings { tweaks: vec![false; crate::tweaks::TWEAKS.len()], ..Default::default() }
     }
 }

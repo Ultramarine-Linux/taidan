@@ -20,9 +20,7 @@ async fn main() {
     let mut settings: libtaidan::settings::Settings =
         serde_json::from_str(&settings_content).expect("cannot parse settings json");
     let cfg = libtaidan::cfg::Config::new().expect("cannot read system taidan config");
-    libtaidan::start_install(&mut settings, &cfg, &|_| {})
-        .await
-        .expect("taidan install failed");
+    libtaidan::start_install(&mut settings, &cfg, &|_| {}).await.expect("taidan install failed");
 }
 
 #[cfg(feature = "server-oobe")]
@@ -33,9 +31,7 @@ fn main() {
         .init();
 
     let mut input = String::new();
-    io::stdin()
-        .read_to_string(&mut input)
-        .expect("failed to read setup operation");
+    io::stdin().read_to_string(&mut input).expect("failed to read setup operation");
     let operation: libtaidan::server_setup::SetupOperation =
         serde_json::from_str(&input).expect("invalid setup operation JSON");
 
@@ -53,6 +49,8 @@ fn main() {
 
 #[cfg(not(any(feature = "desktop-install", feature = "server-oobe")))]
 fn main() {
-    eprintln!("tdnx was built without a backend feature; enable `server-oobe` or `desktop-install`");
+    eprintln!(
+        "tdnx was built without a backend feature; enable `server-oobe` or `desktop-install`"
+    );
     std::process::exit(2);
 }

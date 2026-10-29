@@ -1,5 +1,4 @@
 /// Setting date & time.
-
 pub fn set_datetime() -> crate::Res<()> {
     crate::steps::cmd(
         "not_found",

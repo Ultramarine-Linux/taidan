@@ -72,7 +72,7 @@ async fn write_fcitx5_profile(
                 # Layout\n\
                 Layout=\n\n\
             ",
-            var = &kb_variant.as_ref().map(|variant| format!("-{variant}")).unwrap_or_default(),
+            var = kb_variant.as_ref().map(|variant| format!("-{variant}")).unwrap_or_default(),
         )
         .as_bytes(),
     );
@@ -88,7 +88,7 @@ async fn write_fcitx5_profile(
                     Layout=\n\n\
                 ",
                 i + 1,
-                i18n::str_to_im(&im).fcitx5_ref.unwrap()
+                i18n::str_to_im(im).fcitx5_ref.unwrap()
             )
             .as_bytes(),
         );
@@ -110,7 +110,7 @@ async fn write_fcitx5_profile(
             output: String::from_utf8_lossy(&p.stderr).to_string(),
             rc: p.status.code(),
         })
-        .wrap_message(|_| format!("failed to write to ~/.config/fcitx5/profile"));
+        .wrap_message(|_| "failed to write to ~/.config/fcitx5/profile".to_string());
     }
 
     // https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg?ref_type=heads
@@ -136,7 +136,7 @@ async fn write_fcitx5_profile(
             output: String::from_utf8_lossy(&p.stderr).to_string(),
             rc: p.status.code(),
         })
-        .wrap_message(|_| format!("failed to write to ~/.config/kwinrc"));
+        .wrap_message(|_| "failed to write to ~/.config/kwinrc".to_string());
     }
 
     Ok(())
@@ -188,7 +188,7 @@ async fn write_ibus_profile(
             output: String::from_utf8_lossy(&p.stderr).to_string(),
             rc: p.status.code(),
         })
-        .wrap_message(|_| format!("failed to write to ~/.config/kwinrc"));
+        .wrap_message(|_| "failed to write to ~/.config/kwinrc".to_string());
     }
 
     Ok(())
