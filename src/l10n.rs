@@ -60,6 +60,19 @@ pub struct LanguageRow {
 
 taidan_proc_macros::comptime_localedef_langrows!(LANGS);
 
+impl LanguageRow {
+    /// `localedef` also lists legacy glibc aliases (`bokmal`, `deutsch`, …) that aren't locales.
+    /// Real ones have a territory (`en_US`) or are a bare 2–3 letter language code (`eo`).
+    fn is_alias(&self) -> bool {
+        !self.locale.contains('_') && self.locale.len() > 3
+    }
+
+    /// [`Self::locale`] as a BCP-47 tag (`en-US`); `localedef` gives POSIX names (`en_US`).
+    fn bcp47(&self) -> slint::SharedString {
+        self.locale.replace('_', "-").into()
+    }
+}
+
 #[macro_export]
 macro_rules! t {
     (@$msgid:literal) => {
@@ -158,7 +171,7 @@ fn display_hdl<T>(
 }
 
 /// # Panics
-/// If `en-US` is missing from [`LANGS`].
+/// If `en_US` is missing from [`LANGS`].
 pub fn initialize_ui<T: slint::ComponentHandle + 'static>(
     ui: slint::Weak<T>,
     lang: &crate::ui::Lang<'_>,
@@ -179,9 +192,9 @@ pub fn initialize_ui<T: slint::ComponentHandle + 'static>(
             crate::LL.read().get(&id).into()
         }
     });
-    let eng = crate::l10n::LANGS.iter().find(|lang| lang.locale == "en-US").expect("no english");
+    let eng = LANGS.iter().find(|lang| lang.locale == "en_US").expect("no english");
     lang.set_current_language(Language {
-        locale: eng.locale.to_shared_string(),
+        locale: eng.bcp47(),
         native_name: eng.native_name.to_shared_string(),
     });
     lang.on__name(|lang, current_language| {
@@ -191,16 +204,17 @@ pub fn initialize_ui<T: slint::ComponentHandle + 'static>(
         display_hdl(&current_language, |hdl| {
             let locale = icu::locale::Locale::try_from_str(&lang.locale)
                 .unwrap_or_else(|e| panic!("cannot parse locale {lang:?}: {e}"));
-            assert!(locale != icu::locale::Locale::UNKNOWN, "locale {lang:?} is unk");
+            assert_ne!(locale, icu::locale::Locale::UNKNOWN, "locale {lang:?} is unk");
             hdl.of(&locale).to_shared_string()
         })
     });
     lang.set_languages(slint::ModelRc::new(
         crate::l10n::LANGS
             .iter()
-            .map(|crate::l10n::LanguageRow { locale, native_name, .. }| Language {
-                locale: locale.to_shared_string(),
-                native_name: native_name.to_shared_string(),
+            .filter(|row| row.locale == "en-owo" || !row.is_alias())
+            .map(|row| Language {
+                locale: row.bcp47(),
+                native_name: row.native_name.to_shared_string(),
             })
             .collect::<slint::VecModel<_>>(),
     ));
