@@ -189,13 +189,21 @@ pub fn initialize_ui<T: slint::ComponentHandle + 'static>(
         if crate::l10n::PO_LOADER.read().has(&id) {
             crate::l10n::PO_LOADER.read().get_args_fluent(&id, Some(&fargs)).into()
         } else {
-            crate::LL.read().get(&id).into()
+            crate::LL.read().get_args_fluent(&id, Some(&fargs)).into()
         }
     });
-    let eng = LANGS.iter().find(|lang| lang.locale == "en_US").expect("no english");
+    // Start in the system language if we have it, otherwise English.
+    let initial = poly_l10n::system_want_langids()
+        .find_map(|li| {
+            let tag = li.to_string();
+            LANGS.iter().find(|row| row.bcp47() == tag)
+        })
+        .or_else(|| LANGS.iter().find(|lang| lang.locale == "en_US"))
+        .expect("no english");
+    set_lang(&initial.bcp47());
     lang.set_current_language(Language {
-        locale: eng.bcp47(),
-        native_name: eng.native_name.to_shared_string(),
+        locale: initial.bcp47(),
+        native_name: initial.native_name.to_shared_string(),
     });
     lang.on__name(|lang, current_language| {
         if lang.locale == "en-owo" {

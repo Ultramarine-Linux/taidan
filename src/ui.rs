@@ -10,6 +10,9 @@ pub use generated::*;
 pub fn run() {
     tracing::debug!("Starting Taidan");
     let ui = AppWindow::new().expect("cannot create app");
+    // Wayland ignores the window `icon`; compositors look up `<app_id>.desktop` instead.
+    // Must be set after the platform exists (AppWindow::new) and before the window is shown.
+    slint::set_xdg_app_id(crate::APPID).expect("cannot set xdg app id");
     // TODO: refactor
     let theme = ui.global::<Theme<'_>>();
     theme.set_mode(ThemeMode::Light);

@@ -20,7 +20,12 @@ export global Lang {
     in-out property <Language> current_language;
     in-out property <KeymapVariant> current_variant;
     in property <[Language]> languages;
-    changed current_language => set_lang(current_language);
+    // Load the translations *before* changing `current_language`, so bindings that
+    // re-evaluate on the change (e.g. during layout) already see the new language.
+    public function select(lang: Language) {
+        set_lang(lang);
+        current_language = lang;
+    }
     public pure function t(id: string, args: [FluentArg]) -> string {
         _t(id, args, current_language);
     }

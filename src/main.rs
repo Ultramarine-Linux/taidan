@@ -12,7 +12,6 @@ use i18n_embed::LanguageLoader;
 use parking_lot::RwLock;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-#[expect(dead_code, reason = "used by src/pages, not yet ported to slint")]
 const APPID: &str = "com.fyralabs.Taidan";
 #[cfg(not(debug_assertions))]
 const SENTRY_LINK: &str =

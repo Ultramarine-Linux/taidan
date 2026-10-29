@@ -39,8 +39,6 @@ export component TdnBasePg {
 }
 
 export component TdnPage inherits TdnBasePg {
-    // FIXME: this doesn't change on the first time the language is changed
-    // but consequent changes do trigger slint to reload this, not sure why
     in property <string> name: Lang.t("page-" + self.pageid, []);
     // in property <image> icon;
     in property <int> step_i;

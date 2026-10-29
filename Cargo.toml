@@ -130,3 +130,60 @@ unimplemented = "warn"
 unneeded_field_pattern = "warn"
 unwrap_in_result = "warn"
 needless_for_each = "allow"
+
+# Optimise only the crates doing per-frame work (rendering, text, images) in dev builds,
+# so the UI is usable without paying to optimise every dependency.
+[profile.dev.package."i-slint-core"]
+opt-level = 3
+[profile.dev.package."i-slint-backend-winit"]
+opt-level = 3
+[profile.dev.package."i-slint-renderer-femtovg"]
+opt-level = 3
+[profile.dev.package."i-slint-renderer-software"]
+opt-level = 3
+[profile.dev.package.femtovg]
+opt-level = 3
+[profile.dev.package.lyon_geom]
+opt-level = 3
+[profile.dev.package.lyon_path]
+opt-level = 3
+[profile.dev.package.lyon_algorithms]
+opt-level = 3
+[profile.dev.package.kurbo]
+opt-level = 3
+[profile.dev.package.parley]
+opt-level = 3
+[profile.dev.package.fontique]
+opt-level = 3
+[profile.dev.package.harfrust]
+opt-level = 3
+[profile.dev.package.skrifa]
+opt-level = 3
+[profile.dev.package."read-fonts"]
+opt-level = 3
+[profile.dev.package.swash]
+opt-level = 3
+[profile.dev.package.zeno]
+opt-level = 3
+[profile.dev.package."ttf-parser"]
+opt-level = 3
+[profile.dev.package.icu_segmenter]
+opt-level = 3
+[profile.dev.package.resvg]
+opt-level = 3
+[profile.dev.package.usvg]
+opt-level = 3
+[profile.dev.package."tiny-skia"]
+opt-level = 3
+[profile.dev.package."tiny-skia-path"]
+opt-level = 3
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package."zune-jpeg"]
+opt-level = 3

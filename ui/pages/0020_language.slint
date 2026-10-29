@@ -37,7 +37,7 @@ export component LanguagePage inherits TdnPage {
                                 x: parent.x;
                                 width: lbl_name.width + lbl_native.width;
                                 height: parent.height;
-                                clicked => { Lang.current_language = lang; }
+                                clicked => { Lang.select(lang); }
                                 mouse-cursor: pointer;
                             }
 
