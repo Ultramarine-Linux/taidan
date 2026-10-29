@@ -69,7 +69,7 @@ sentry = { version = "0.49.2", features = ["logs", "tracing"] }
 sentry-eyre = "0.3.0"
 serde = "1.0.219"
 serde_json = "1.0.140"
-slint = "1.17.1"
+slint = "1.18.1"
 strip-ansi-escapes = "0.2.1"
 taidan_proc_macros = { path = "taidan_proc_macros" }
 tempfile = { workspace = true }
@@ -85,7 +85,7 @@ xcb = { version = "1.7.1", features = ["randr"] }
 xcrypt = "0.3.1"
 
 [build-dependencies]
-slint-build = "1.17.1"
+slint-build = "1.18.1"
 
 [lints.clippy]
 # cargo = { level = "warn", priority = -1 }

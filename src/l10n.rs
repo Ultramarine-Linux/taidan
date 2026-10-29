@@ -54,6 +54,7 @@ pub static PO_LOADER: LazyLock<RwLock<FluentLanguageLoader>> = LazyLock::new(|| 
 #[derive(Debug)]
 pub struct LanguageRow {
     pub locale: &'static str,
+    pub name: &'static str,
     pub native_name: &'static str,
 }
 
@@ -191,7 +192,7 @@ pub fn initialize_ui(
     lang.set_languages(slint::ModelRc::new(
         crate::l10n::LANGS
             .iter()
-            .map(|crate::l10n::LanguageRow { locale, native_name }| Language {
+            .map(|crate::l10n::LanguageRow { locale, native_name, .. }| Language {
                 locale: locale.to_shared_string(),
                 native_name: native_name.to_shared_string(),
             })
