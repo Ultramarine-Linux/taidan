@@ -12,7 +12,9 @@ use i18n_embed::LanguageLoader;
 use parking_lot::RwLock;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
+#[expect(dead_code, reason = "used by src/pages, not yet ported to slint")]
 const APPID: &str = "com.fyralabs.Taidan";
+#[cfg(not(debug_assertions))]
 const SENTRY_LINK: &str =
     "https://26f566a221c052a686581b9170c2c9e6@o271654.ingest.us.sentry.io/4510401485799427";
 static LOCALE_SOLVER: LazyLock<poly_l10n::LocaleFallbackSolver> = LazyLock::new(Default::default);
@@ -256,16 +258,20 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
     loader
 }
 
+#[expect(dead_code, reason = "used by autoscale, currently commented out")]
 fn get_screen_resolution() -> xcb::Result<(u16, u16)> {
     use xcb::x;
     // TODO: how to do this the pure wayland way
     tracing::debug!("connecting to xcb");
     let (conn, screen_num) = xcb::Connection::connect(None)?;
     let setup = conn.get_setup();
+    #[expect(clippy::cast_sign_loss, reason = "xcb never returns a negative screen number")]
     let screen = setup.roots().nth(screen_num as usize).unwrap();
     let window: xcb::x::Window = conn.generate_id();
+    #[expect(clippy::cast_possible_truncation, reason = "COPY_FROM_PARENT is 0")]
+    let depth = x::COPY_FROM_PARENT as u8;
     let cookie = conn.send_request_checked(&x::CreateWindow {
-        depth: x::COPY_FROM_PARENT as u8,
+        depth,
         wid: window,
         parent: screen.root(),
         x: 0,
@@ -286,7 +292,7 @@ fn get_screen_resolution() -> xcb::Result<(u16, u16)> {
     conn.check_request(cookie)?;
     let cookie = conn.send_request(&xcb::randr::GetScreenInfo { window });
     tracing::debug!("wait for GetScreenInfoCookie");
-    let reply = conn.wait_for_reply(cookie).expect("cannot wait for GetScreenInfoCookie");
+    let reply = conn.wait_for_reply(cookie)?;
     let sizes = reply.sizes();
     let size = sizes.first().expect("no screens?");
     tracing::debug!(width = size.width, height = size.height);

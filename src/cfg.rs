@@ -92,6 +92,7 @@ impl Config {
 }
 
 #[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[expect(clippy::struct_excessive_bools, reason = "independent config flags")]
 pub struct Taidan0Config {
     #[serde(default)]
     pub continue_if_user_exists: bool,
@@ -116,8 +117,8 @@ impl Taidan0Config {
 
 fn cfg_get_val(id: &str) -> Option<serde_json::Value> {
     let mut val = serde_json::to_value(&*crate::CFG).expect("cannot serialize cfg");
-    let mut it = id.split('.');
-    while let Some(component) = it.next() {
+    let it = id.split('.');
+    for component in it {
         if let Ok(i) = component.parse::<usize>()
             && let serde_json::Value::Array(arr) = val
         {
@@ -131,9 +132,9 @@ fn cfg_get_val(id: &str) -> Option<serde_json::Value> {
     Some(val)
 }
 
-pub fn initialize_ui(
-    ui: slint::Weak<impl slint::ComponentHandle + 'static>,
-    cfg: crate::ui::Cfg<'_>,
+pub fn initialize_ui<T: slint::ComponentHandle + 'static>(
+    _ui: slint::Weak<T>,
+    cfg: &crate::ui::Cfg<'_>,
 ) {
     use slint::ToSharedString;
     cfg.set_version(env!("CARGO_PKG_VERSION").into());
@@ -156,10 +157,10 @@ pub fn initialize_ui(
     cfg.on_get_brush(|path, default| {
         if let Some(serde_json::Value::String(s)) = cfg_get_val(&path) {
             if let Some(code) = s.strip_prefix('#') {
-                let Ok(v) = hex::decode(code).inspect_err(|e| tracing::error!(?path, s, ?e)) else {
+                let Ok(bytes) = hex::decode(code).inspect_err(|e| tracing::error!(?path, s, ?e)) else {
                     return default;
                 };
-                return slint::Brush::SolidColor(match v[..] {
+                return slint::Brush::SolidColor(match bytes[..] {
                     [a, r, g, b] => slint::Color::from_argb_u8(a, r, g, b),
                     [r, g, b] => slint::Color::from_rgb_u8(r, g, b),
                     _ => {
@@ -167,10 +168,9 @@ pub fn initialize_ui(
                         return default;
                     }
                 });
-            } else {
-                tracing::error!(?path, s, "invalid brush/color, expected #aarrggbb or #rrggbb");
-                return default;
             }
+            tracing::error!(?path, s, "invalid brush/color, expected #aarrggbb or #rrggbb");
+            return default;
         }
         default
     });

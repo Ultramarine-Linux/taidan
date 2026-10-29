@@ -95,6 +95,10 @@ macro_rules! t {
     };
 }
 
+/// Switch the UI to `lang`, falling back to `en-US` if no translation is available.
+///
+/// # Panics
+/// If the fluent translations cannot be loaded.
 pub fn set_lang(lang: &str) {
     if let Ok(locale) = (lang)
         .split_once('.')
@@ -153,9 +157,11 @@ fn display_hdl<T>(
     })
 }
 
-pub fn initialize_ui(
-    ui: slint::Weak<impl slint::ComponentHandle + 'static>,
-    lang: crate::ui::Lang<'_>,
+/// # Panics
+/// If `en-US` is missing from [`LANGS`].
+pub fn initialize_ui<T: slint::ComponentHandle + 'static>(
+    ui: slint::Weak<T>,
+    lang: &crate::ui::Lang<'_>,
 ) {
     use crate::ui::{FluentArg, Keymap, KeymapVariant, Language};
     use slint::{Model, ToSharedString};
@@ -199,11 +205,10 @@ pub fn initialize_ui(
             .collect::<slint::VecModel<_>>(),
     ));
     lang.on_set_lang(move |lang| {
-        use slint::ComponentHandle;
         if lang.locale == "en-owo" {
-            crate::l10n::set_lang("en-Xowo");
+            set_lang("en-Xowo");
         } else {
-            crate::l10n::set_lang(&lang.locale);
+            set_lang(&lang.locale);
         }
         ui.upgrade_in_event_loop(|ui| ui.window().request_redraw()).expect("event loop err");
     });

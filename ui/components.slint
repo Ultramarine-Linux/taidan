@@ -19,10 +19,12 @@ export component TdnBtn {
 
     in property <brush> background_color;
     in property <length> border-radius: 1rem;
+    // Extra horizontal space on each side of the background.
+    in property <length> padding-x;
     rect := Rectangle {
         z: -1;
-        width: parent.width + parent.padding-left + parent.padding-right;
-        height: parent.height + parent.padding-top + parent.padding-bottom;
+        width: parent.width + 2 * padding-x;
+        height: parent.height;
         background: background_color.transparentize(has-hover ? (pressed ? 0.2 : 0.1) : 0.0);
         border-radius: border-radius;
         animate background { duration: 100ms; }

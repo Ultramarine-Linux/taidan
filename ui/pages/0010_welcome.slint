@@ -61,8 +61,7 @@ export component WelcomePage inherits TdnBasePg {
 
         TdnBtn {
             background_color: Cfg.get_brush("accent_color", #00078f);
-            padding-left: 1rem; // ignore warning
-            padding-right: 1rem; // ignore warning
+            padding-x: 1rem;
             TdnText {
                 // TODO: t()
                 text: Cfg.get_string("welcome.next", "Let's Go ↵");
