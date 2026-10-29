@@ -112,6 +112,8 @@ export component DialogPanel inherits Rectangle {
     forward-focus: focus-scope;
     focus-scope := FocusScope {
         enabled: root.trap-focus;
+        // this sits on top of the close button; grabbing focus on press would eat the first click
+        focus-on-click: false;
         key-pressed(event) => {
             if (event.text == "\u{1b}") {
                 root.closed();

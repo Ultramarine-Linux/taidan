@@ -158,6 +158,8 @@ export component Button inherits Rectangle {
     forward-focus: focus-scope;
     focus-scope := FocusScope {
         enabled: !root.disabled;
+        // this sits on top of the TouchArea; grabbing focus on press would eat the first click
+        focus-on-click: false;
         key-pressed(event) => {
             if (event.text == "\n" || event.text == " ") {
                 if (!root.disabled) { root.clicked(); }
