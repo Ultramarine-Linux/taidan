@@ -6653,6 +6653,7 @@ dependencies = [
  "which 8.0.6",
  "xcb",
  "xcrypt",
+ "zbus",
 ]
 
 [[package]]

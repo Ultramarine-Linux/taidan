@@ -155,8 +155,17 @@ export component TdnPage inherits TdnBasePg {
     in property <bool> show-steps: true;
     in property <string> next-text: Lang.t("next", []);
 
+    // when set, Next and Enter call `next-intercepted` instead, e.g. to confirm first
+    in property <bool> intercept-next;
+    callback next-intercepted;
+
     public function try-next() {
-        if can-next { root.next_page(); }
+        if !can-next { return; }
+        if intercept-next {
+            root.next-intercepted();
+        } else {
+            root.next_page();
+        }
     }
 
     // pages with inputs focus those instead
@@ -207,7 +216,7 @@ export component TdnPage inherits TdnBasePg {
                 enter-hint: true;
                 background-color: TdnStyle.accent;
                 foreground-color: TdnStyle.accent-foreground;
-                clicked => { root.next_page(); }
+                clicked => { root.try-next(); }
             }
         }
     }

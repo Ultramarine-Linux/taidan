@@ -2,7 +2,7 @@ import { TdnPage } from "../page.slint";
 import { Lang } from "../lang.slint";
 import { Account } from "../account.slint";
 import { Camera } from "../camera.slint";
-import { TdnInput, TdnField, TdnText, TdnStyle, TdnBtn, TdnSpinner } from "../components.slint";
+import { TdnInput, TdnField, TdnText, TdnStyle, TdnBtn, TdnSpinner, TdnDialog } from "../components.slint";
 import { Card } from "../slintcn/components/card.slint";
 import { FocusRing } from "../slintcn/components/focus-ring.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
@@ -186,90 +186,57 @@ component IconPicker inherits VerticalLayout {
 }
 
 // live camera preview for taking the user icon, shown over the whole window
-export component CameraDialog inherits Rectangle {
-    background: #00000099;
-    forward-focus: take;
-
+export component CameraDialog inherits TdnDialog {
+    title: Lang.t("page-whoareyou-camera", []);
+    dismissed => { Camera.stop(); }
     init => { take.focus(); }
 
-    // keeps clicks from reaching the page underneath
-    TouchArea { }
+    HorizontalLayout {
+        alignment: center;
 
-    FocusScope {
-        key-pressed(event) => {
-            if event.text == Key.Escape {
-                Camera.stop();
-                return accept;
+        Rectangle {
+            width: 14rem;
+            height: self.width;
+            border-radius: self.width / 2;
+            clip: true;
+            background: Camera.frame.width > 0 ? transparent : Tokens.color-card;
+
+            Image {
+                width: 100%;
+                height: 100%;
+                image-fit: cover;
+                source: Camera.frame;
+                accessible-role: none;
             }
-            reject
+
+            if Camera.error == "" && Camera.frame.width == 0: TdnSpinner { }
+
+            if Camera.error != "": TdnText {
+                width: parent.width - 2rem;
+                text: Lang.t("page-whoareyou-camera-error", []) + "\n" + Camera.error;
+                color: Tokens.color-destructive;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: space-between;
+
+        TdnBtn {
+            in-dialog: true;
+            text: Lang.t("cancel", []);
+            clicked => { Camera.stop(); }
         }
 
-        Card {
-            x: (root.width - self.width) / 2;
-            y: (root.height - self.height) / 2;
-            width: 22rem;
-            height: content.preferred-height;
-            background: Tokens.color-background;
-            card-radius: lg;
-
-            content := VerticalLayout {
-                padding: 1.25rem;
-                spacing: 1rem;
-
-                TdnText {
-                    text: Lang.t("page-whoareyou-camera", []);
-                    font-size: 1.4rem;
-                    font-weight: 500;
-                    horizontal-alignment: left;
-                }
-
-                HorizontalLayout {
-                    alignment: center;
-
-                    Rectangle {
-                        width: 14rem;
-                        height: self.width;
-                        border-radius: self.width / 2;
-                        clip: true;
-                        background: Camera.frame.width > 0 ? transparent : Tokens.color-card;
-
-                        Image {
-                            width: 100%;
-                            height: 100%;
-                            image-fit: cover;
-                            source: Camera.frame;
-                            accessible-role: none;
-                        }
-
-                        if Camera.error == "" && Camera.frame.width == 0: TdnSpinner { }
-
-                        if Camera.error != "": TdnText {
-                            width: parent.width - 2rem;
-                            text: Lang.t("page-whoareyou-camera-error", []) + "\n" + Camera.error;
-                            color: Tokens.color-destructive;
-                            wrap: word-wrap;
-                        }
-                    }
-                }
-
-                HorizontalLayout {
-                    alignment: space-between;
-
-                    TdnBtn {
-                        text: Lang.t("cancel", []);
-                        clicked => { Camera.stop(); }
-                    }
-
-                    take := TdnBtn {
-                        text: Lang.t("page-whoareyou-camera-take", []);
-                        enter-hint: true;
-                        enabled: Camera.error == "" && Camera.frame.width > 0;
-                        background-color: TdnStyle.accent;
-                        foreground-color: TdnStyle.accent-foreground;
-                        clicked => { Camera.capture(); }
-                    }
-                }
-            }
+        take := TdnBtn {
+            in-dialog: true;
+            text: Lang.t("page-whoareyou-camera-take", []);
+            enter-hint: true;
+            enabled: Camera.error == "" && Camera.frame.width > 0;
+            background-color: TdnStyle.accent;
+            foreground-color: TdnStyle.accent-foreground;
+            clicked => { Camera.capture(); }
         }
     }
 }

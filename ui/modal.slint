@@ -1,0 +1,8 @@
+import { Camera } from "camera.slint";
+import { Network } from "network.slint";
+
+// whether a dialog is open, and while one is, only controls with `in-dialog` set can take keyboard
+// focus, so Tab can't wander to the page underneath
+export global Modal {
+    out property <bool> open: Camera.open || Network.password-ssid != "" || Network.enterprise-ssid != "" || Network.offline-prompt;
+}

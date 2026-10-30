@@ -86,6 +86,7 @@ v4l = "0.14.0"
 which = { version = "8.0.6", features = ["tracing"] }
 xcb = { version = "1.7.1", features = ["randr"] }
 xcrypt = "0.3.1"
+zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking-api"] }
 
 [build-dependencies]
 slint-build = "1.18.1"

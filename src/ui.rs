@@ -19,6 +19,7 @@ pub fn run() {
     crate::account::initialize_ui(ui.as_weak(), &ui.global());
     crate::install::initialize_ui(&ui.as_weak(), &ui.global());
     crate::avatar::initialize_ui(&ui.as_weak(), &ui.global());
+    crate::network::initialize_ui(&ui.as_weak(), &ui.global());
     init_actions(ui.as_weak(), &ui.global());
     // autoscale(&ui);
     ui.run().expect("cannot run ui");

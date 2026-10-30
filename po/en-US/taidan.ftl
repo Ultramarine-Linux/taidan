@@ -11,6 +11,7 @@ cancel = Cancel
 # btn (skip anything)
 skip = Skip
 steps-useradd = Creating Your Account…
+steps-sethostname = Naming Your Device…
 steps-settheme = Applying Your Theme…
 steps-dnfdownloadupdate = Downloading System Update…
 steps-dnfinstallupdate = Installing System Update…
@@ -126,13 +127,48 @@ page-password-tip-bad-desc = Much harder to remember, and cracks in 12 days!
 ## [Internet]
 
 # page title
-page-internet = Let's Get Online
-page-internet-desc = Connect to the Internet to get the latest and greatest.
-page-internet-skip = I don't have Internet
+page-internet = Get Online
+page-internet-desc = Connect to the internet to install codecs, drivers, and apps.
+page-internet-skip = I Don't Have Internet
 page-internet-warn = Codecs, drivers and some apps won't be installed without internet.
 page-internet-open = Connect to a WiFi Network
 page-internet-ok = You're connected! Press next to continue.
-page-internet-portal = Login with Web Browser
+# btn, opens a browser to log in to networks like hotel or airport wi-fi
+page-internet-portal = Captive Portal
+# btn, next to each wi-fi network
+page-internet-connect = Connect
+# shown next to the network in use
+page-internet-connected = Connected
+# btn, scans for wi-fi networks again
+page-internet-refresh = Refresh
+page-internet-scanning = Searching…
+page-internet-no-wifi = No Wi-Fi adapter was found. You can still connect with a cable.
+page-internet-no-networks = No Wi-Fi networks found.
+page-internet-wired = Wired Connection
+page-internet-devicename = Device Name
+page-internet-devicename-desc = How this device shows up to others on the network.
+# $hostname: the name derived from the device name, e.g. janes-laptop
+page-internet-hostname = Hostname: { $hostname }
+# dialog title; $ssid is the name of the wi-fi network
+page-internet-connect-to = Connect to { $ssid }
+page-internet-password = Password
+page-internet-error = Couldn't connect to this network.
+page-internet-error-password = Couldn't connect. Check the password and try again.
+page-internet-error-timeout = Connecting took too long. Try moving closer to the router.
+# for networks like eduroam, which take a username and password
+page-internet-error-login = Couldn't connect. Check your username and password, or the server under Advanced.
+page-internet-username = Username
+page-internet-username-placeholder = name@university.edu
+# btn, shows more settings for the network login
+page-internet-advanced = Advanced
+# label for picking how to log in to the network, e.g. PEAP or TTLS
+page-internet-method = Authentication
+page-internet-server = Authentication Server
+page-internet-server-desc = Your password is only sent to a server with a valid certificate for this domain.
+page-internet-noverify = Don't verify the server (less secure)
+# dialog when continuing without internet
+page-internet-offline = No Network Selected
+page-internet-offline-desc = If you don't connect to the internet, drivers and codecs won't be installed.
 
 ## [Analytics and Crash Reporting]
 ## this page is currently not in use, we recommend skipping
@@ -232,6 +268,8 @@ page-drivers-builtin = Built-in Drivers
 page-summary = Everything Look Right, { $name }?
 page-summary-account = Your Account
 page-summary-region = Region and Connectivity
+page-summary-network = Network
+page-summary-network-none = Not Connected
 page-summary-software = Additional Software
 page-summary-software-none = No additional software will be installed.
 # btn (next page), starts setting up the system

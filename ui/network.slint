@@ -1,0 +1,69 @@
+export enum Security { open, password, enterprise, unsupported }
+
+export struct WifiNetwork {
+    ssid: string,
+    // signal strength as the number of lit arcs in the wi-fi icon, 0–3
+    strength: int,
+    security: Security,
+    // whether a connection for it is saved, so connecting needs no password
+    known: bool,
+    connected: bool,
+}
+
+export enum NetState { offline, connecting, limited, portal, online }
+
+export enum EapMethod { peap, ttls }
+
+export struct EnterpriseLogin {
+    ssid: string,
+    username: string,
+    password: string,
+    method: EapMethod,
+    // the authentication server's domain to check, or empty to not verify the server
+    domain: string,
+}
+
+// wi-fi and connectivity, driven from Rust (`src/network.rs`)
+export global Network {
+    in property <NetState> state;
+    // whether there is a wi-fi adapter
+    in property <bool> wifi-available: true;
+    in property <bool> wired;
+    in property <[WifiNetwork]> networks;
+    // the wi-fi network in use, empty if none
+    in property <string> connected-ssid;
+    in property <bool> scanning;
+    // whether an "eduroam" network is in range
+    in property <bool> eduroam-nearby;
+    // the network being connected to, if any
+    in property <string> connecting-ssid;
+    // translation id of why the last connection failed, for `error-ssid`
+    in property <string> error-id;
+    in property <string> error-ssid;
+    // shows "I Don't Have Internet" even when online, from `taidan0.persist_no_internet_btn`
+    in property <bool> persist-offline-btn;
+
+    // network the password dialog is open for, empty if closed
+    in-out property <string> password-ssid;
+    // network the enterprise (e.g. eduroam) login dialog is open for, empty if closed
+    in-out property <string> enterprise-ssid;
+    // whether the "No Network Selected" dialog is open
+    in-out property <bool> offline-prompt;
+
+    // pretty name for this device, and the hostname derived from it
+    in-out property <string> device-name;
+    out property <string> hostname: derive-hostname(device-name);
+    pure callback derive-hostname(name: string) -> string;
+    derive-hostname(name) => name;
+    // the part of a username after the `@`
+    pure callback realm(username: string) -> string;
+    realm(username) => "";
+
+    callback refresh();
+    // `password` is empty for open or saved networks
+    callback connect(ssid: string, password: string);
+    callback connect-enterprise(login: EnterpriseLogin);
+    callback open-portal();
+    // writes the device name and whether setup should go without internet to the settings
+    callback save(offline: bool);
+}

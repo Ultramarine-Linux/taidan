@@ -9,15 +9,17 @@ import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
 import { Camera } from "camera.slint";
 import { KeyboardPage } from "pages/0020_keyboard.slint";
 import { PasswordPage } from "pages/0050_password.slint";
+import { NetworkPage, PasswordDialog, EnterpriseDialog, OfflineDialog } from "pages/0060_network.slint";
+import { Network, NetState } from "network.slint";
 import { DriversPage } from "pages/0100_drivers.slint";
 import { SummaryPage } from "pages/0120_summary.slint";
 import { InstallingPage } from "pages/0130_installing.slint";
 import { DonePage } from "pages/0140_done.slint";
 import { ErrorPage } from "pages/0150_error.slint";
 import { Install, InstallState, Drivers } from "install.slint";
-import { TdnText, TdnBtn } from "components.slint";
+import { TdnText, TdnBtn, Modal } from "components.slint";
 import { Actions } from "actions.slint";
-export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera }
+export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network }
 
 export component AppWindow inherits Window {
     in-out property <int> pagenum: 0;
@@ -52,32 +54,42 @@ export component AppWindow inherits Window {
     // the designs use 14px and all `rem` sizes derive from this
     default-font-size: 14 * Tokens.unit;
 
-    // move keyboard focus to the page being shown
+    // pages that are jumped to, rather than reached with Next and Back
+    property <int> installing-page: 8;
+    property <int> done-page: 9;
+    property <int> error-page: 10;
+
+    // move keyboard focus to the page being shown, unless a dialog has it
     function focus-page() {
+        if Modal.open { return; }
         if pagenum == 0 { language.focus(); }
         else if pagenum == 1 { keyboard.focus(); }
         else if pagenum == 2 { welcome.focus(); }
         else if pagenum == 3 { whoareyou.focus(); }
         else if pagenum == 4 { password.focus(); }
-        else if pagenum == 5 { drivers.focus(); }
-        else if pagenum == 6 { summary.focus(); }
-        else if pagenum == 8 { done.focus(); }
-        else if pagenum == 9 { error.focus(); }
+        else if pagenum == 5 { network.focus(); }
+        else if pagenum == 6 { drivers.focus(); }
+        else if pagenum == 7 { summary.focus(); }
+        else if pagenum == done-page { done.focus(); }
+        else if pagenum == error-page { error.focus(); }
     }
-    changed pagenum => { focus-page(); }
+    changed pagenum => {
+        focus-page();
+        if pagenum == 5 { Network.refresh(); }
+    }
     init => { focus-page(); }
 
-    // back to the page when the camera dialog closes
-    property <bool> camera-open: Camera.open;
-    changed camera-open => {
-        if !camera-open { focus-page(); }
+    // back to the page when a dialog closes
+    property <bool> dialog-open: Modal.open;
+    changed dialog-open => {
+        if !dialog-open { focus-page(); }
     }
 
     // leave the installing page once the installation ends
     property <InstallState> install-state: Install.state;
     changed install-state => {
-        if install-state == InstallState.done { pagenum = 8; }
-        else if install-state == InstallState.failed { pagenum = 9; }
+        if install-state == InstallState.done { pagenum = done-page; }
+        else if install-state == InstallState.failed { pagenum = error-page; }
     }
 
     MenuBar {
@@ -130,31 +142,51 @@ export component AppWindow inherits Window {
         }
     }
 
-    drivers := DriversPage {
+    network := NetworkPage {
         index: 5;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => {
+            Network.save(Network.state != NetState.online);
+            pagenum += 1;
+        }
+    }
+
+    drivers := DriversPage {
+        index: 6;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => { pagenum += 1; }
     }
 
     summary := SummaryPage {
-        index: 6;
+        index: 7;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => {
             Install.start();
-            pagenum = 7;
+            pagenum = installing-page;
         }
     }
 
     InstallingPage {
-        index: 7;
+        index: installing-page;
         current: pagenum;
     }
 
     done := DonePage {
-        index: 8;
+        index: done-page;
         current: pagenum;
+    }
+
+    error := ErrorPage {
+        index: error-page;
+        current: pagenum;
+        // the retry button
+        next_page => {
+            Install.start();
+            pagenum = installing-page;
+        }
     }
 
     if Camera.open: CameraDialog {
@@ -162,13 +194,23 @@ export component AppWindow inherits Window {
         height: 100%;
     }
 
-    error := ErrorPage {
-        index: 9;
-        current: pagenum;
-        // the retry button
-        next_page => {
-            Install.start();
-            pagenum = 7;
+    if Network.password-ssid != "": PasswordDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.enterprise-ssid != "": EnterpriseDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.offline-prompt: OfflineDialog {
+        width: 100%;
+        height: 100%;
+        skipped => {
+            Network.offline-prompt = false;
+            Network.save(true);
+            pagenum += 1;
         }
     }
 }

@@ -2,6 +2,7 @@ import { TdnPage } from "../page.slint";
 import { Lang } from "../lang.slint";
 import { Account } from "../account.slint";
 import { Drivers } from "../install.slint";
+import { Network, NetState } from "../network.slint";
 import { TdnText, TdnStyle } from "../components.slint";
 import { DriverList } from "0100_drivers.slint";
 import { UserIcon } from "0040_whoareyou.slint";
@@ -50,6 +51,9 @@ export component SummaryPage inherits TdnPage {
     step_i: 3;
     name: Lang.t("page-summary", [{ key: "name", value: Account.first-name(Account.fullname, Account.username) }]);
     next-text: Lang.t("page-summary-confirm", []);
+
+    // the wi-fi network in use, if any
+    property <string> connected-ssid: Network.connected-ssid;
 
     HorizontalLayout {
         spacing: 2rem;
@@ -107,6 +111,14 @@ export component SummaryPage inherits TdnPage {
                 icon: @image-url("../../data/icons/input-keyboard-symbolic.svg");
                 label: Lang.t("page-keyboard", []);
                 value: Lang.current_variant.id == "" ? Lang.current_keymap.name : Lang.current_variant.name;
+            }
+
+            InfoRow {
+                icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
+                label: Lang.t("page-summary-network", []);
+                value: Network.state != NetState.online ? Lang.t("page-summary-network-none", [])
+                    : root.connected-ssid != "" ? root.connected-ssid
+                    : Lang.t("page-internet-wired", []);
             }
         }
 

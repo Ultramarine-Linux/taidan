@@ -5,6 +5,7 @@ pub mod cfg;
 pub mod install;
 pub mod l10n;
 pub mod macros;
+pub mod network;
 pub mod prelude;
 pub mod ui;
 
@@ -314,8 +315,6 @@ fn get_screen_resolution() -> xcb::Result<(u16, u16)> {
 fn main() {
     let _guard = setup_logs_and_install_panic_hook();
     std::sync::LazyLock::force(&LL);
-    // FIXME: temp hack to set nointernet to true here (should be default value), please refactor
-    SETTINGS.write().nointernet = true;
 
     ui::run();
 }

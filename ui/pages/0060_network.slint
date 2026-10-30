@@ -1,0 +1,471 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { Network, NetState, Security, WifiNetwork, EapMethod } from "../network.slint";
+import { TdnText, TdnBtn, TdnInput, TdnField, TdnStyle, TdnSpinner, TdnToggleRow, TdnWifiIcon, TdnConnectedBadge, TdnDialog } from "../components.slint";
+import { Card } from "../slintcn/components/card.slint";
+import { Separator } from "../slintcn/components/separator.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+import { ScrollView } from "std-widgets.slint";
+
+component NetworkRow inherits HorizontalLayout {
+    in property <WifiNetwork> net;
+
+    // starts connecting, asking for a password or login first if one is needed
+    function connect() {
+        if root.net.known || root.net.security == Security.open {
+            Network.connect(root.net.ssid, "");
+        } else if root.net.security == Security.enterprise {
+            Network.enterprise-ssid = root.net.ssid;
+        } else {
+            Network.password-ssid = root.net.ssid;
+        }
+    }
+
+    height: 2.6rem;
+    spacing: 0.6rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+
+    VerticalLayout {
+        alignment: center;
+        horizontal-stretch: 0;
+
+        TdnWifiIcon {
+            strength: root.net.strength;
+        }
+    }
+
+    TdnText {
+        text: root.net.ssid;
+        font-size: 1.05rem;
+        horizontal-alignment: left;
+        overflow: elide;
+    }
+
+    VerticalLayout {
+        alignment: center;
+        horizontal-stretch: 0;
+
+        if root.net.connected: TdnConnectedBadge {
+            text: Lang.t("page-internet-connected", []);
+        }
+
+        if !root.net.connected && Network.connecting-ssid == root.net.ssid: TdnSpinner {
+            width: 1.1rem;
+        }
+
+        if !root.net.connected && Network.connecting-ssid != root.net.ssid: TdnBtn {
+            outline: true;
+            text: Lang.t("page-internet-connect", []);
+            accessible-label: Lang.t("page-internet-connect", []) + " " + root.net.ssid;
+            foreground-color: Tokens.color-foreground;
+            font-size: Tokens.typography-label-size;
+            min-size: 1.6rem;
+            padding-x: 0.5rem;
+            enabled: Network.connecting-ssid == "" && root.net.security != Security.unsupported;
+            clicked => { root.connect(); }
+        }
+    }
+}
+
+export component NetworkPage inherits TdnPage {
+    pageid: "internet";
+    step_i: 1;
+    intercept-next: Network.state != NetState.online;
+    next-intercepted => { Network.offline-prompt = true; }
+    forward-focus: device-name;
+
+    HorizontalLayout {
+        spacing: 1rem;
+
+        VerticalLayout {
+            alignment: start;
+            horizontal-stretch: 100;
+            max-width: 15rem;
+            spacing: 1.5rem;
+
+            TdnText {
+                text: Lang.t("page-internet-desc", []);
+                horizontal-alignment: left;
+                wrap: word-wrap;
+                font-size: 1.1rem;
+            }
+
+            VerticalLayout {
+                alignment: start;
+                spacing: 0.75rem;
+
+                // only matters once connected to a network that wants a login first
+                if Network.state == NetState.portal || Network.state == NetState.limited: HorizontalLayout {
+                    alignment: start;
+                    min-height: 2.25rem;
+                    TdnBtn {
+                        text: Lang.t("page-internet-portal", []);
+                        background-color: #1f6aa5;
+                        foreground-color: white;
+                        clicked => { Network.open-portal(); }
+                    }
+                }
+
+                if Network.eduroam-nearby: HorizontalLayout {
+                    alignment: start;
+                    min-height: 2.25rem;
+                    TdnBtn {
+                        text: "eduroam";
+                        background-color: #7c4ddb;
+                        foreground-color: white;
+                        clicked => { Network.enterprise-ssid = "eduroam"; }
+                    }
+                }
+
+                if Network.state != NetState.online || Network.persist-offline-btn: HorizontalLayout {
+                    alignment: start;
+                    min-height: 2.25rem;
+                    TdnBtn {
+                        text: Lang.t("page-internet-skip", []);
+                        background-color: Tokens.color-destructive;
+                        foreground-color: white;
+                        clicked => { Network.offline-prompt = true; }
+                    }
+                }
+            }
+        }
+
+        // pushes the list to the right edge on wider windows
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 0;
+            width: 18rem;
+            spacing: 1rem;
+
+            Card {
+                vertical-stretch: 1;
+                card-radius: md;
+
+                VerticalLayout {
+                    padding: 0.6rem;
+                    spacing: 0.5rem;
+
+                    if Network.wired: HorizontalLayout {
+                        height: 2.6rem;
+                        spacing: 0.6rem;
+                        padding-left: 0.25rem;
+                        padding-right: 0.25rem;
+
+                        TdnText {
+                            text: Lang.t("page-internet-wired", []);
+                            font-size: 1.05rem;
+                            horizontal-alignment: left;
+                            overflow: elide;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 0;
+                            TdnConnectedBadge {
+                                text: Lang.t("page-internet-connected", []);
+                            }
+                        }
+                    }
+
+                    if Network.wired && Network.networks.length > 0: Separator { }
+
+                    if !Network.wifi-available: TdnText {
+                        vertical-stretch: 1;
+                        text: Lang.t("page-internet-no-wifi", []);
+                        color: Tokens.color-muted-foreground;
+                        wrap: word-wrap;
+                    }
+
+                    if Network.wifi-available && Network.networks.length == 0: TdnText {
+                        vertical-stretch: 1;
+                        text: Network.scanning ? Lang.t("page-internet-scanning", []) : Lang.t("page-internet-no-networks", []);
+                        color: Tokens.color-muted-foreground;
+                        wrap: word-wrap;
+                    }
+
+                    if Network.wifi-available && Network.networks.length > 0: ScrollView {
+                        vertical-stretch: 1;
+
+                        VerticalLayout {
+                            alignment: start;
+                            padding-right: 0.9rem;
+
+                            for net in Network.networks: NetworkRow {
+                                net: net;
+                            }
+                        }
+                    }
+
+                    if Network.wifi-available: HorizontalLayout {
+                        alignment: center;
+
+                        TdnBtn {
+                            text: Network.scanning ? Lang.t("page-internet-scanning", []) : Lang.t("page-internet-refresh", []);
+                            enabled: !Network.scanning;
+                            min-size: 1.9rem;
+                            clicked => { Network.refresh(); }
+                        }
+                    }
+                }
+            }
+
+            TdnField {
+                vertical-stretch: 0;
+                label: Lang.t("page-internet-devicename", []);
+                help: Network.hostname != ""
+                    ? Lang.t("page-internet-hostname", [{ key: "hostname", value: Network.hostname }])
+                    : Lang.t("page-internet-devicename-desc", []);
+                label-clicked => { device-name.focus(); }
+
+                device-name := TdnInput {
+                    text <=> Network.device-name;
+                    accepted => { root.try-next(); }
+                }
+            }
+        }
+    }
+}
+
+// asks for the password of a network
+export component PasswordDialog inherits TdnDialog {
+    property <bool> busy: Network.connecting-ssid == Network.password-ssid;
+
+    title: Lang.t("page-internet-connect-to", [{ key: "ssid", value: Network.password-ssid }]);
+    dismissed => { Network.password-ssid = ""; }
+
+    function submit() {
+        if !root.busy && pw.text != "" {
+            Network.connect(Network.password-ssid, pw.text);
+        }
+    }
+
+    TdnField {
+        label: Lang.t("page-internet-password", []);
+        error: Network.error-ssid == Network.password-ssid && Network.error-id != "" ? Lang.t(Network.error-id, []) : "";
+
+        pw := TdnInput {
+            in-dialog: true;
+            password: true;
+            auto-focus: true;
+            enabled: !root.busy;
+            reveal-label: Lang.t("page-password-show", []);
+            accepted => { root.submit(); }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: space-between;
+
+        TdnBtn {
+            in-dialog: true;
+            text: Lang.t("cancel", []);
+            clicked => { root.dismissed(); }
+        }
+
+        HorizontalLayout {
+            spacing: 0.75rem;
+
+            if root.busy: VerticalLayout {
+                alignment: center;
+                TdnSpinner { width: 1.1rem; }
+            }
+
+            TdnBtn {
+                in-dialog: true;
+                text: Lang.t("page-internet-connect", []);
+                enter-hint: true;
+                enabled: !root.busy && pw.text != "";
+                background-color: TdnStyle.accent;
+                foreground-color: TdnStyle.accent-foreground;
+                clicked => { root.submit(); }
+            }
+        }
+    }
+}
+
+// logs in to a WPA-Enterprise network, like eduroam
+export component EnterpriseDialog inherits TdnDialog {
+    property <bool> busy: Network.connecting-ssid == Network.enterprise-ssid;
+    property <bool> advanced;
+    property <EapMethod> method: EapMethod.peap;
+    property <bool> no-verify;
+    // set once the server is edited, so it no longer follows the username
+    property <bool> domain-touched;
+    property <string> domain;
+    property <bool> complete: user.text != "" && pw.text != "" && (root.no-verify || root.domain != "");
+
+    title: Lang.t("page-internet-connect-to", [{ key: "ssid", value: Network.enterprise-ssid }]);
+    dialog-width: 24rem;
+    dismissed => { Network.enterprise-ssid = ""; }
+
+    function submit() {
+        if root.busy || !root.complete { return; }
+        Network.connect-enterprise({
+            ssid: Network.enterprise-ssid,
+            username: user.text,
+            password: pw.text,
+            method: root.method,
+            domain: root.no-verify ? "" : root.domain,
+        });
+    }
+
+    TdnField {
+        label: Lang.t("page-internet-username", []);
+        label-clicked => { user.focus(); }
+
+        user := TdnInput {
+            in-dialog: true;
+            placeholder: Lang.t("page-internet-username-placeholder", []);
+            auto-focus: true;
+            enabled: !root.busy;
+            edited(text) => {
+                if !root.domain-touched { root.domain = Network.realm(text); }
+            }
+            accepted => { pw.focus(); }
+        }
+    }
+
+    TdnField {
+        label: Lang.t("page-internet-password", []);
+        error: Network.error-ssid == Network.enterprise-ssid && Network.error-id != ""
+            ? Lang.t(Network.error-id == "page-internet-error-password" ? "page-internet-error-login" : Network.error-id, [])
+            : "";
+        label-clicked => { pw.focus(); }
+
+        pw := TdnInput {
+            in-dialog: true;
+            password: true;
+            enabled: !root.busy;
+            reveal-label: Lang.t("page-password-show", []);
+            accepted => { root.submit(); }
+        }
+    }
+
+    if !root.advanced: HorizontalLayout {
+        alignment: start;
+        TdnBtn {
+            in-dialog: true;
+            outline: true;
+            text: Lang.t("page-internet-advanced", []);
+            foreground-color: Tokens.color-foreground;
+            min-size: 1.8rem;
+            clicked => { root.advanced = true; }
+        }
+    }
+
+    if root.advanced: HorizontalLayout {
+        spacing: 0.5rem;
+
+        TdnText {
+            text: Lang.t("page-internet-method", []);
+            horizontal-alignment: left;
+            font-weight: Tokens.typography-weight-medium;
+        }
+
+        TdnBtn {
+            in-dialog: true;
+            text: "PEAP";
+            min-size: 1.8rem;
+            background-color: root.method == EapMethod.peap ? TdnStyle.accent : Tokens.color-secondary;
+            foreground-color: root.method == EapMethod.peap ? TdnStyle.accent-foreground : Tokens.color-foreground;
+            clicked => { root.method = EapMethod.peap; }
+        }
+
+        TdnBtn {
+            in-dialog: true;
+            text: "TTLS";
+            min-size: 1.8rem;
+            background-color: root.method == EapMethod.ttls ? TdnStyle.accent : Tokens.color-secondary;
+            foreground-color: root.method == EapMethod.ttls ? TdnStyle.accent-foreground : Tokens.color-foreground;
+            clicked => { root.method = EapMethod.ttls; }
+        }
+    }
+
+    if root.advanced: TdnField {
+        label: Lang.t("page-internet-server", []);
+        help: Lang.t("page-internet-server-desc", []);
+
+        TdnInput {
+            in-dialog: true;
+            text <=> root.domain;
+            enabled: !root.no-verify && !root.busy;
+            edited => { root.domain-touched = true; }
+            accepted => { root.submit(); }
+        }
+    }
+
+    if root.advanced: TdnToggleRow {
+        in-dialog: true;
+        text: Lang.t("page-internet-noverify", []);
+        checked <=> root.no-verify;
+    }
+
+    HorizontalLayout {
+        alignment: space-between;
+
+        TdnBtn {
+            in-dialog: true;
+            text: Lang.t("cancel", []);
+            clicked => { root.dismissed(); }
+        }
+
+        HorizontalLayout {
+            spacing: 0.75rem;
+
+            if root.busy: VerticalLayout {
+                alignment: center;
+                TdnSpinner { width: 1.1rem; }
+            }
+
+            TdnBtn {
+                in-dialog: true;
+                text: Lang.t("page-internet-connect", []);
+                enter-hint: true;
+                enabled: !root.busy && root.complete;
+                background-color: TdnStyle.accent;
+                foreground-color: TdnStyle.accent-foreground;
+                clicked => { root.submit(); }
+            }
+        }
+    }
+}
+
+// confirms going on without internet
+export component OfflineDialog inherits TdnDialog {
+    callback skipped;
+
+    title: Lang.t("page-internet-offline", []);
+    dialog-width: 24rem;
+    dismissed => { Network.offline-prompt = false; }
+    init => { back.focus(); }
+
+    TdnText {
+        text: Lang.t("page-internet-offline-desc", []);
+        color: Tokens.color-muted-foreground;
+        horizontal-alignment: left;
+        wrap: word-wrap;
+    }
+
+    HorizontalLayout {
+        alignment: end;
+        spacing: 0.5rem;
+
+        back := TdnBtn {
+            in-dialog: true;
+            text: Lang.t("prev", []);
+            clicked => { root.dismissed(); }
+        }
+
+        TdnBtn {
+            in-dialog: true;
+            text: Lang.t("skip", []);
+            background-color: Tokens.color-destructive.transparentize(0.8);
+            foreground-color: Tokens.color-destructive;
+            clicked => { root.skipped(); }
+        }
+    }
+}

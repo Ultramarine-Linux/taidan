@@ -4,6 +4,9 @@ import { Label, LabelVariant } from "slintcn/components/label.slint";
 import { Icon } from "slintcn/components/icon.slint";
 import { LucidePaths } from "slintcn/components/lucide-paths.slint";
 import { Cfg } from "cfg.slint";
+import { Modal } from "modal.slint";
+export { Modal }
+import { Card } from "slintcn/components/card.slint";
 
 export global TdnStyle {
     // the distro accent, lightened in dark mode so it still reads on a dark background
@@ -35,6 +38,10 @@ export component TdnBtn inherits Rectangle {
     in property <length> min-size: 2.25rem;
     // shows a ⏎ key after the text, for buttons that Enter activates
     in property <bool> enter-hint;
+    // a bordered button with no fill, for secondary actions in lists
+    in property <bool> outline;
+    // whether this is part of a dialog, see `Modal`
+    in property <bool> in-dialog;
     callback clicked;
     out property <bool> has-hover: area.has-hover;
     out property <bool> pressed: area.pressed;
@@ -51,15 +58,18 @@ export component TdnBtn inherits Rectangle {
     min-height: root.min-size;
     min-width: root.min-size;
     border-radius: Tokens.radius-md;
-    background: !root.enabled
-        ? root.background-color.transparentize(0.6)
+    border-width: root.outline ? 1px : 0;
+    border-color: Tokens.color-border-hairline-strong;
+    opacity: root.outline && !root.enabled ? 0.5 : 1;
+    background: root.outline ? (area.has-hover ? Tokens.color-accent : transparent)
+        : !root.enabled ? root.background-color.transparentize(0.6)
         : area.pressed ? root.background-color.transparentize(0.2)
         : area.has-hover ? root.background-color.transparentize(0.1)
         : root.background-color;
     animate background { duration: Tokens.motion-fast; }
 
     focus := FocusScope {
-        enabled: root.enabled;
+        enabled: root.enabled && Modal.open == root.in-dialog;
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == Key.Return || event.text == " " {
@@ -142,6 +152,8 @@ export component TdnInput inherits Rectangle {
     in property <image> icon;
     // accessible name of the show/hide toggle on password fields
     in property <string> reveal-label;
+    // whether this is part of a dialog, see `Modal`
+    in property <bool> in-dialog;
     // draws the border in the destructive color
     in property <bool> invalid: false;
     // fired on every keystroke with the current text
@@ -207,7 +219,7 @@ export component TdnInput inherits Rectangle {
         font-size: Tokens.typography-body-size;
         single-line: true;
         read-only: root.read-only || !root.enabled;
-        enabled: root.enabled;
+        enabled: root.enabled && Modal.open == root.in-dialog;
         input-type: root.password && !root.revealed ? InputType.password : InputType.text;
         vertical-alignment: center;
         edited => { root.edited(self.text); }
@@ -340,6 +352,8 @@ export component TdnToggleRow inherits Rectangle {
     callback toggled(bool);
     // fired on Enter, while Space toggles
     callback accepted();
+    // whether this is part of a dialog, see `Modal`
+    in property <bool> in-dialog;
 
     property <bool> pointer-focus;
 
@@ -362,6 +376,7 @@ export component TdnToggleRow inherits Rectangle {
     background: Tokens.color-card;
 
     focus := FocusScope {
+        enabled: Modal.open == root.in-dialog;
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == " " {
@@ -461,6 +476,117 @@ export component TdnSpinner inherits Rectangle {
             radius-y: root.r / 1px;
             large-arc: true;
             sweep: true;
+        }
+    }
+}
+
+// wi-fi signal icon with `strength` (0–3) of its three arcs lit
+export component TdnWifiIcon inherits Rectangle {
+    in property <int> strength: 3;
+    in property <color> tint: Tokens.color-foreground;
+
+    width: 1.25rem;
+    height: self.width;
+    accessible-role: none;
+
+    Icon {
+        commands: LucidePaths.wifi-dot;
+        size: parent.width;
+        tint: root.tint;
+    }
+
+    Icon {
+        commands: LucidePaths.wifi-1;
+        size: parent.width;
+        tint: root.strength >= 1 ? root.tint : root.tint.transparentize(0.75);
+    }
+
+    Icon {
+        commands: LucidePaths.wifi-2;
+        size: parent.width;
+        tint: root.strength >= 2 ? root.tint : root.tint.transparentize(0.75);
+    }
+
+    Icon {
+        commands: LucidePaths.wifi-3;
+        size: parent.width;
+        tint: root.strength >= 3 ? root.tint : root.tint.transparentize(0.75);
+    }
+}
+
+// a small green "Connected" badge
+export component TdnConnectedBadge inherits Rectangle {
+    in property <string> text;
+
+    height: 1.6rem;
+    border-radius: Tokens.radius-sm;
+    background: Tokens.color-affirm.transparentize(0.75);
+
+    HorizontalLayout {
+        padding-left: 0.4rem;
+        padding-right: 0.5rem;
+        spacing: 0.3rem;
+        alignment: center;
+
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                commands: LucidePaths.check;
+                size: 0.9rem;
+                tint: Tokens.color-foreground;
+            }
+        }
+
+        TdnText {
+            text: root.text;
+            font-size: Tokens.typography-label-size;
+        }
+    }
+}
+
+// a modal dialog over its parent, which should fill the window, with the content as children
+export component TdnDialog inherits Rectangle {
+    in property <string> title;
+    in property <length> dialog-width: 22rem;
+    // fired on Escape, or whatever else should close it
+    callback dismissed;
+
+    background: #00000099;
+
+    // keeps clicks from reaching what's underneath
+    TouchArea { }
+
+    FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.dismissed();
+                return accept;
+            }
+            reject
+        }
+
+        Card {
+            x: (root.width - self.width) / 2;
+            y: (root.height - self.height) / 2;
+            width: min(root.dialog-width, root.width - 2rem);
+            height: content.preferred-height;
+            background: Tokens.color-background;
+            card-radius: lg;
+
+            content := VerticalLayout {
+                padding: 1.25rem;
+                spacing: 1rem;
+
+                TdnText {
+                    text: root.title;
+                    font-size: 1.4rem;
+                    font-weight: 500;
+                    horizontal-alignment: left;
+                    wrap: word-wrap;
+                }
+
+                @children
+            }
         }
     }
 }
