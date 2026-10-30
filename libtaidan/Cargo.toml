@@ -12,7 +12,7 @@ path = "./lib.rs"
 
 [dependencies]
 basic-toml = "0.1.10"
-const_format = "0.2.36"
+const_format = "0.2.37"
 enum_dispatch = "0.3.13"
 futures = { workspace = true }
 itertools = { workspace = true }
@@ -20,14 +20,15 @@ memchr = "2.8.3"
 paste = "1.0.15"
 phf = { version = "0.14.0", features = ["macros", "phf_macros"] }
 regex = { workspace = true }
-reqwest = { version = "0.13.4", features = [
+reqwest = { version = "0.13.5", features = [
   "native-tls",
 ], default-features = false }
+secrecy = { workspace = true }
 serde = { workspace = true }
-serde_json = "1.0.151"
+serde_json = "1.0.154"
 taidan_proc_macros = { path = "../taidan_proc_macros" }
 tempfile = { workspace = true }
-thiserror = "2.0.19"
+thiserror = "2.0.21"
 tokio = { workspace = true }
 tracing = { workspace = true }
 uzers = "0.12.2"

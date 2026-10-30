@@ -2,13 +2,14 @@
 members = ["taidan_proc_macros", "libtaidan", "tdnx"]
 
 [workspace.dependencies]
-futures = "0.3.32"
+futures = "0.3.34"
 itertools = "0.15.0"
 libtaidan = { path = "./libtaidan" }
 regex = "1.13.1"
+secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.140"
-tempfile = { version = "3.20.0", default-features = false }
+serde_json = "1.0.154"
+tempfile = { version = "3.27.0", default-features = false }
 tracing = "0.1.44"
 
 [workspace.dependencies.tracing-subscriber]
@@ -16,7 +17,7 @@ version = "0.3.23"
 features = ["env-filter", "tracing-log"]
 
 [workspace.dependencies.tokio]
-version = "1.46.1"
+version = "1.54.1"
 features = ["fs", "io-util", "macros", "process"]
 
 
@@ -35,7 +36,7 @@ build = "build.rs"
 atomic_float = "1.1.0"
 basic-toml = "0.1.10"
 color-eyre = "0.6.5"
-const_format = "0.2.36"
+const_format = "0.2.37"
 enum_dispatch = "0.3.13"
 fluent = "0.17.0"
 futures = { workspace = true }
@@ -45,47 +46,45 @@ i18n-embed = { version = "0.16.0", features = [
     "filesystem-assets",
     "fluent-system",
 ] }
-i18n-embed-fl = "0.10.0"
-icu = { version = "2.3.1", features = ["unstable"] }
+i18n-embed-fl = "0.10.1"
+icu = { version = "2.4.0", features = ["unstable"] }
 # decodes the welcome image off the UI thread, and gives Slint's `@image-url` the `webp` decoder
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 iso3166 = "1.2.1"
 isolang = { version = "2.4.0", features = ["local_names"] }
 itertools = { workspace = true }
-libc = "0.2.174"
+libc = "0.2.191"
 libtaidan = { version = "0.3.0", path = "libtaidan" }
-memchr = "2.7.5"
-parking_lot = "0.12.4"
+memchr = "2.8.3"
+parking_lot = "0.13.0"
 paste = "1.0.15"
 phf = { version = "0.14.0", features = ["macros"] }
 poly_l10n = "0.0.7"
 regex = { workspace = true }
-reqwest = { version = "0.13.4", features = [
+reqwest = { version = "0.13.5", features = [
     "http2",
     "default-tls",
 ], default-features = false }
-rust-embed = { version = "8.7.2", features = ["include-exclude"] }
-# NOTE: current tree requires this version too?
-# sentry = { version = "0.46.2", features = ["logs", "tracing"] }
-sentry = { version = "0.49.2", features = ["logs", "tracing"] }
-sentry-eyre = "0.3.0"
-serde = "1.0.219"
-serde_json = "1.0.140"
+rust-embed = { version = "8.13.0", features = ["include-exclude"] }
+secrecy = { workspace = true }
+sentry = { version = "0.49.5", features = ["logs", "tracing"] }
+serde = "1.0.229"
+serde_json = "1.0.154"
 slint = "1.18.1"
 strip-ansi-escapes = "0.2.1"
 taidan_proc_macros = { path = "taidan_proc_macros" }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
 tracing = { workspace = true }
-tracing-appender = "0.2.3"
+tracing-appender = "0.2.5"
 tracing-error = "0.2.1"
-tracing-journald = "0.3.1"
+tracing-journald = "0.3.2"
 tracing-subscriber = { workspace = true }
-uzers = "0.12.1"
+uzers = "0.12.2"
 v4l = "0.14.0"
 which = { version = "8.0.6", features = ["tracing"] }
 xcb = { version = "1.7.1", features = ["randr"] }
-xcrypt = "0.3.1"
+xcrypt = "0.3.2"
 zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking-api"] }
 
 [build-dependencies]
@@ -135,8 +134,8 @@ unneeded_field_pattern = "warn"
 unwrap_in_result = "warn"
 needless_for_each = "allow"
 
-# Optimise only the crates doing per-frame work (rendering, text, images) in dev builds,
-# so the UI is usable without paying to optimise every dependency.
+# Optimize only the crates doing per-frame work (rendering, text, images) in dev builds,
+# so the UI is usable without paying to optimize every dependency.
 [profile.dev.package."i-slint-core"]
 opt-level = 3
 [profile.dev.package."i-slint-backend-winit"]

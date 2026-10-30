@@ -130,7 +130,27 @@ component IconPicker inherits VerticalLayout {
 
         UserIcon { }
 
-        VerticalLayout {
+        // once an icon and a username are chosen, preview the account instead of the hint
+        if Account.avatar-id != "" && Account.username-valid: VerticalLayout {
+            alignment: center;
+
+            TdnText {
+                text: Account.fullname != "" ? Account.fullname : Account.username;
+                font-weight: Tokens.typography-weight-medium;
+                horizontal-alignment: left;
+                overflow: elide;
+            }
+
+            if Account.fullname != "": TdnText {
+                text: Account.username;
+                color: Tokens.color-muted-foreground;
+                font-size: Tokens.typography-body-sm-size;
+                horizontal-alignment: left;
+                overflow: elide;
+            }
+        }
+
+        if Account.avatar-id == "" || !Account.username-valid: VerticalLayout {
             alignment: center;
 
             TdnText {

@@ -36,8 +36,8 @@ export component DonePage inherits TdnBasePg {
                     enter-hint: true;
                     background-color: TdnStyle.accent;
                     foreground-color: TdnStyle.accent-foreground;
-                    text: Lang.t("page-done-reboot", []);
-                    clicked => { Install.finish(true); }
+                    text: Lang.t(Install.needs-reboot ? "page-done-reboot" : "page-done-login", []);
+                    clicked => { Install.finish(Install.needs-reboot); }
                 }
             }
         }

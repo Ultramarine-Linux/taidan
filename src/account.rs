@@ -49,7 +49,7 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, account: &crate::ui:
         let fullname = account.get_fullname();
         settings.fullname =
             if fullname.trim().is_empty() { settings.username.clone() } else { fullname.into() };
-        settings.passwd = account.get_password().into();
+        settings.passwd = account.get_password().as_str().into();
         let avatar = account.get_avatar_id();
         settings.avatar = (!avatar.is_empty()).then(|| avatar.as_str().into());
     });

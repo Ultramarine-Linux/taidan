@@ -24,7 +24,8 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 
 #[derive(Debug, Clone)]
 pub enum InstallMsg {
-    UpdStage(crate::steps::Stage),
+    UpdStage(steps::Stage),
+    NeedsReboot,
     Finish,
     StageProgress(f64),
 }
@@ -74,7 +75,10 @@ mod parseutil {
     /// - wait for `output` failed…?
     /// - process exited with non-zero error code
     pub async fn wait_for(s: &'static str, output: &mut tokio::process::Child) -> Res<()> {
-        let status = (output.wait().await.map_err(Err::_fail_to_run(s)))
+        let status = output
+            .wait()
+            .await
+            .map_err(Err::_fail_to_run(s))
             .wrap_message(|_| format!("waiting for `{s}` failed"))?;
         if status.success() {
             Ok(())
@@ -104,7 +108,7 @@ pub async fn pkexec<I: IntoIterator + std::fmt::Debug>(
     args: I,
 ) -> Res<()>
 where
-    <I as std::iter::IntoIterator>::Item: std::convert::AsRef<std::ffi::OsStr>,
+    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
 {
     tracing::debug!(?name, ?args, "running pkexec");
     // TODO: use logic from anda
@@ -134,7 +138,7 @@ where
 /// - command exited with non-zero status code
 pub async fn root<I: IntoIterator + std::fmt::Debug>(name: &'static str, args: I) -> Res<()>
 where
-    <I as std::iter::IntoIterator>::Item: std::convert::AsRef<std::ffi::OsStr>,
+    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
 {
     pkexec("root", name, args).await
 }

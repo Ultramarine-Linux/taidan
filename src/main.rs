@@ -14,6 +14,9 @@ use std::sync::LazyLock;
 use crate::prelude::*;
 use i18n_embed::LanguageLoader;
 use parking_lot::RwLock;
+use sentry::integrations::tracing::{BreadcrumbLayer, ErrorLayer, LogLayer, SpanLayer};
+use tracing::Level;
+use tracing_subscriber::filter::{LevelFilter, filter_fn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 const APPID: &str = "com.fyralabs.Taidan";
@@ -35,8 +38,8 @@ pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     cfg
 });
 /// Language Loader
-pub static LL: std::sync::LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
-    std::sync::LazyLock::new(|| RwLock::new(handle_l10n()));
+pub static LL: LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
+    LazyLock::new(|| RwLock::new(handle_l10n()));
 
 pub static SETTINGS: LazyLock<RwLock<libtaidan::settings::Settings>> =
     LazyLock::new(Default::default);
@@ -278,7 +281,7 @@ fn get_screen_resolution() -> xcb::Result<(u16, u16)> {
     let setup = conn.get_setup();
     #[expect(clippy::cast_sign_loss, reason = "xcb never returns a negative screen number")]
     let screen = setup.roots().nth(screen_num as usize).unwrap();
-    let window: xcb::x::Window = conn.generate_id();
+    let window: x::Window = conn.generate_id();
     #[expect(clippy::cast_possible_truncation, reason = "COPY_FROM_PARENT is 0")]
     let depth = x::COPY_FROM_PARENT as u8;
     let cookie = conn.send_request_checked(&x::CreateWindow {
@@ -375,16 +378,20 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
 
     tracing_subscriber::registry()
         .with(fmt::layer().pretty())
-        .with(sentry::integrations::tracing::layer())
+        .with(SpanLayer::new().with_filter(LevelFilter::INFO))
+        .with(BreadcrumbLayer::new().with_filter(filter_fn(|metadata| {
+            matches!(*metadata.level(), Level::WARN | Level::INFO)
+        })))
+        .with(ErrorLayer::new().with_filter(LevelFilter::ERROR))
+        .with(LogLayer::new().with_filter(LevelFilter::INFO))
         .with(
             EnvFilter::builder()
-                .with_default_directive(tracing::level_filters::LevelFilter::DEBUG.into())
+                .with_default_directive(LevelFilter::DEBUG.into())
                 .with_env_var("TAIDAN_LOG")
                 .from_env_lossy(),
         )
         .with(tracing_journald::layer().unwrap().with_syslog_identifier("taidan".to_owned()))
         .with(fmt::layer().with_writer(non_blocking).with_ansi(false).compact())
-        .with(tracing_error::ErrorLayer::default())
         .init();
 
     if cfg!(debug_assertions) {

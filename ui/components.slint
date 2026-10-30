@@ -101,18 +101,18 @@ export component TdnBtn inherits Rectangle {
 
         if root.enter-hint: VerticalLayout {
             alignment: center;
+            // a soft keycap, tinted from the text color so it works on any button color
             Rectangle {
-                width: root.font-size * 1.45;
-                height: self.width;
-                border-width: 1px;
-                border-radius: 2px;
-                border-color: root.foreground-color;
-                opacity: root.enabled ? 1 : 0.7;
+                width: root.font-size * 1.5;
+                height: root.font-size * 1.35;
+                border-radius: Tokens.radius-sm;
+                background: root.foreground-color.transparentize(0.75);
+                opacity: root.enabled ? 1 : 0.6;
                 Icon {
                     commands: LucidePaths.enter-key;
-                    size: parent.width * 0.95;
+                    size: parent.height * 0.75;
                     tint: root.foreground-color;
-                    stroke-width: 1.5px;
+                    stroke-width: 2px;
                 }
             }
         }

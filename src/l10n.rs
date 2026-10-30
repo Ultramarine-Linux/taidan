@@ -56,7 +56,6 @@ pub static PO_LOADER: LazyLock<RwLock<FluentLanguageLoader>> = LazyLock::new(|| 
 #[derive(Debug)]
 pub struct LanguageRow {
     pub locale: &'static str,
-    pub name: &'static str,
     pub native_name: &'static str,
 }
 
@@ -64,12 +63,13 @@ taidan_proc_macros::comptime_localedef_langrows!(LANGS);
 
 impl LanguageRow {
     /// `localedef` also lists legacy glibc aliases (`bokmal`, `deutsch`, …) that aren't locales.
-    /// Real ones have a territory (`en_US`) or are a bare 2–3 letter language code (`eo`).
+    /// Real ones have a territory (`en-US`) or are a bare 2–3 letter language code (`eo`).
     fn is_alias(&self) -> bool {
-        !self.locale.contains('_') && self.locale.len() > 3
+        !self.locale.contains('-') && self.locale.len() > 3
     }
 
-    /// [`Self::locale`] as a BCP-47 tag (`en-US`); `localedef` gives POSIX names (`en_US`).
+    /// [`Self::locale`] as a BCP-47 tag (`en-US`), the proc macro already normalizes `localedef`'s
+    /// POSIX names (`en_US`) but this keeps any stragglers working.
     fn bcp47(&self) -> slint::SharedString {
         self.locale.replace('_', "-").into()
     }
@@ -115,11 +115,11 @@ macro_rules! t {
 /// # Panics
 /// If the fluent translations cannot be loaded.
 pub fn set_lang(lang: &str) {
-    if let Ok(locale) = (lang)
+    if let Ok(locale) = lang
         .split_once('.')
         .map_or(lang, |(left, _)| left)
         .to_owned()
-        .parse::<i18n_embed::unic_langid::LanguageIdentifier>()
+        .parse::<LanguageIdentifier>()
         .inspect_err(|e| tracing::error!(?e, ?lang, "Cannot apply language"))
     {
         tracing::info!(?locale, lang, "Using selected locale");
@@ -128,7 +128,7 @@ pub fn set_lang(lang: &str) {
             .into_iter()
             .filter(|li| crate::AVAILABLE_LANGS.contains(li))
             .collect_vec();
-        let loader = i18n_embed::fluent::fluent_language_loader!();
+        let loader = fluent_language_loader!();
         if locales.is_empty() {
             locales.push("en-US".parse().unwrap());
         }
@@ -140,9 +140,9 @@ pub fn set_lang(lang: &str) {
 }
 
 thread_local! {
-    static LANG_DISPLAY_HDL: std::cell::RefCell<
+    static LANG_DISPLAY_HDL: RefCell<
         Option<(String, dn::multi::LocaleDisplayNamesFormatter)>,
-    > = const { std::cell::RefCell::new(None) };
+    > = const { RefCell::new(None) };
 }
 
 fn display_hdl<T>(
@@ -161,7 +161,7 @@ fn display_hdl<T>(
                 if current_lang.locale == "en-owo" { "en-US" } else { &current_lang.locale };
             let locale = icu::locale::Locale::try_from_str(locale)
                 .unwrap_or_else(|e| panic!("cannot parse locale {current_lang:?}: {e}"));
-            assert!(locale != icu::locale::Locale::UNKNOWN, "locale {current_lang:?} is unk");
+            assert_ne!(locale, icu::locale::Locale::UNKNOWN, "locale {current_lang:?} is unk");
 
             let fmt = dn::multi::LocaleDisplayNamesFormatter::try_new((&locale).into(), opt)
                 .expect("cannot get hdl");
@@ -213,7 +213,7 @@ fn matches(query: &str, haystacks: &[&str]) -> bool {
 }
 
 /// # Panics
-/// If `en_US` is missing from [`LANGS`].
+/// If `en-US` is missing from [`LANGS`].
 pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
     use crate::ui::{FluentArg, Language};
     use slint::{ComponentHandle, Model, ToSharedString};
@@ -225,8 +225,8 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
             // weird design of `Model::iter()`
             fargs.set(key.to_string(), value.to_string());
         });
-        let s = if crate::l10n::PO_LOADER.read().has(&id) {
-            crate::l10n::PO_LOADER.read().get_args_fluent(&id, Some(&fargs))
+        let s = if PO_LOADER.read().has(&id) {
+            PO_LOADER.read().get_args_fluent(&id, Some(&fargs))
         } else {
             crate::LL.read().get_args_fluent(&id, Some(&fargs))
         };
@@ -239,7 +239,7 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
             let tag = li.to_string();
             LANGS.iter().find(|row| row.bcp47() == tag)
         })
-        .or_else(|| LANGS.iter().find(|lang| lang.locale == "en_US"))
+        .or_else(|| LANGS.iter().find(|lang| lang.locale == "en-US"))
         .expect("no english");
     set_lang(&initial.bcp47());
     lang.set_current_language(Language {

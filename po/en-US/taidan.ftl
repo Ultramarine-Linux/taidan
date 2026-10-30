@@ -279,6 +279,8 @@ page-summary-confirm = Looks Good!
 
 page-done = All Done
 page-done-reboot = Reboot
+# btn, ends the setup and shows the login screen, when no reboot is needed
+page-done-login = Log In
 
 page-finish = Ready to Do Your Thing?
 page-finish-desc = We hope you enjoy Ultramarine!
