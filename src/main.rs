@@ -280,7 +280,7 @@ fn get_screen_resolution() -> xcb::Result<(u16, u16)> {
     let setup = conn.get_setup();
     #[expect(clippy::cast_sign_loss, reason = "xcb never returns a negative screen number")]
     let screen = setup.roots().nth(screen_num as usize).unwrap();
-    let window: xcb::x::Window = conn.generate_id();
+    let window: x::Window = conn.generate_id();
     #[expect(clippy::cast_possible_truncation, reason = "COPY_FROM_PARENT is 0")]
     let depth = x::COPY_FROM_PARENT as u8;
     let cookie = conn.send_request_checked(&x::CreateWindow {
@@ -387,7 +387,7 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
         .with(LogLayer::new().with_filter(LevelFilter::INFO))
         .with(
             EnvFilter::builder()
-                .with_default_directive(tracing::level_filters::LevelFilter::DEBUG.into())
+                .with_default_directive(LevelFilter::DEBUG.into())
                 .with_env_var("TAIDAN_LOG")
                 .from_env_lossy(),
         )
