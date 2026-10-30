@@ -80,6 +80,11 @@ fn start(ui: &slint::Weak<AppWindow>) {
     install.set_stage_count(i32::try_from(Stage::all().len()).expect("too many stages"));
     crate::SETTINGS.write().install_codecs_drivers = app.global::<Drivers<'_>>().get_install();
     let mut settings = crate::SETTINGS.read().clone();
+    // the password is in `SETTINGS` now and there's no way back to its page, so drop the
+    // plaintext copies in the UI instead of keeping them around for the rest of the session
+    let account = app.global::<crate::ui::Account<'_>>();
+    account.set_password("".into());
+    account.set_password_repeat("".into());
     let ui = ui.clone();
     std::thread::spawn(move || {
         let callback = {
