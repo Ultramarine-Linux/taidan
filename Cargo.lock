@@ -6668,6 +6668,7 @@ dependencies = [
 name = "taidan_proc_macros"
 version = "0.1.0"
 dependencies = [
+ "icu",
  "iso3166",
  "itertools 0.14.0",
  "quote",
