@@ -75,7 +75,10 @@ mod parseutil {
     /// - wait for `output` failed…?
     /// - process exited with non-zero error code
     pub async fn wait_for(s: &'static str, output: &mut tokio::process::Child) -> Res<()> {
-        let status = output.wait().await.map_err(Err::_fail_to_run(s))
+        let status = output
+            .wait()
+            .await
+            .map_err(Err::_fail_to_run(s))
             .wrap_message(|_| format!("waiting for `{s}` failed"))?;
         if status.success() {
             Ok(())
