@@ -13,6 +13,9 @@ use std::sync::LazyLock;
 use crate::prelude::*;
 use i18n_embed::LanguageLoader;
 use parking_lot::RwLock;
+use sentry::integrations::tracing::{BreadcrumbLayer, ErrorLayer, LogLayer, SpanLayer};
+use tracing::Level;
+use tracing_subscriber::filter::{LevelFilter, filter_fn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 const APPID: &str = "com.fyralabs.Taidan";
@@ -34,8 +37,8 @@ pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     cfg
 });
 /// Language Loader
-pub static LL: std::sync::LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
-    std::sync::LazyLock::new(|| RwLock::new(handle_l10n()));
+pub static LL: LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
+    LazyLock::new(|| RwLock::new(handle_l10n()));
 
 pub static SETTINGS: LazyLock<RwLock<libtaidan::settings::Settings>> =
     LazyLock::new(Default::default);
@@ -376,7 +379,12 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
 
     tracing_subscriber::registry()
         .with(fmt::layer().pretty())
-        .with(sentry::integrations::tracing::layer())
+        .with(SpanLayer::new().with_filter(LevelFilter::INFO))
+        .with(BreadcrumbLayer::new().with_filter(filter_fn(|metadata| {
+            matches!(*metadata.level(), Level::WARN | Level::INFO)
+        })))
+        .with(ErrorLayer::new().with_filter(LevelFilter::ERROR))
+        .with(LogLayer::new().with_filter(LevelFilter::INFO))
         .with(
             EnvFilter::builder()
                 .with_default_directive(tracing::level_filters::LevelFilter::DEBUG.into())
@@ -385,7 +393,6 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
         )
         .with(tracing_journald::layer().unwrap().with_syslog_identifier("taidan".to_owned()))
         .with(fmt::layer().with_writer(non_blocking).with_ansi(false).compact())
-        .with(tracing_error::ErrorLayer::default())
         .init();
 
     if cfg!(debug_assertions) {
