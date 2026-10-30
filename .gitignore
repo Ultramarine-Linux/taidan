@@ -1,3 +1,5 @@
 /target
 .DS_Store
 .idea
+# placeholder user icons (photos of real people we have no rights to), never commit or ship these
+/data/avatars/

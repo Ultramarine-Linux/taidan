@@ -14,6 +14,8 @@ pub struct Settings {
     pub username: String,
 
     pub passwd: String,
+    /// image to use as the user's icon
+    pub avatar: Option<std::path::PathBuf>,
 
     pub install_codecs_drivers: bool,
 

@@ -13,5 +13,5 @@ jobs:
     uses: FyraLabs/actions/.github/workflows/rust.yml@main
     with:
       test-pre: |
-        dnf install -y openssl-devel libhelium-devel gtk4-devel 'pkgconfig(glib-2.0)' 'pkgconfig(libattr)' 'pkgconfig(gnome-desktop-4)' clang-devel perl-FindBin gcc make clang
+        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
       test-cache: true

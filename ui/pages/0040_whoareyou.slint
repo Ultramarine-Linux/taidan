@@ -1,63 +1,340 @@
 import { TdnPage } from "../page.slint";
 import { Lang } from "../lang.slint";
-import { HorizontalBox, Button, ScrollView } from "std-widgets.slint";
-import { TdnText, TdnBtn, TdnInput } from "../components.slint";
-import { Cfg } from "../cfg.slint";
+import { Account } from "../account.slint";
+import { Camera } from "../camera.slint";
+import { TdnInput, TdnField, TdnText, TdnStyle, TdnBtn, TdnSpinner } from "../components.slint";
 import { Card } from "../slintcn/components/card.slint";
-import { Label } from "../slintcn/components/label.slint";
-import { Input } from "../slintcn/components/input.slint";
+import { FocusRing } from "../slintcn/components/focus-ring.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+
+// the chosen user icon, or a placeholder
+export component UserIcon inherits Rectangle {
+    width: 3rem;
+    height: self.width;
+    border-radius: self.width / 2;
+    clip: true;
+    background: Account.avatar-id == "" ? TdnStyle.accent : transparent;
+    accessible-role: image;
+
+    if Account.avatar-id != "": Image {
+        width: 100%;
+        height: 100%;
+        image-fit: cover;
+        source: Account.avatar;
+    }
+
+    if Account.avatar-id == "": Image {
+        source: @image-url("../../data/icons/system-users-symbolic.svg");
+        colorize: TdnStyle.accent-foreground;
+        width: 55%;
+    }
+}
+
+// a round button in the icon picker
+component IconButton inherits Rectangle {
+    in property <image> image;
+    in property <string> label;
+    in property <bool> selected;
+    in property <bool> enabled: true;
+    // draws `image` as a small icon on a dark circle, instead of filling the circle
+    in property <bool> symbolic;
+    callback clicked;
+
+    property <bool> pointer-focus;
+
+    forward-focus: focus;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-checkable: !root.symbolic;
+    accessible-checked: root.selected;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+
+    width: 3.1rem;
+    height: self.width;
+    border-radius: self.width / 2;
+    border-width: 2px;
+    border-color: root.selected ? TdnStyle.accent : transparent;
+    opacity: root.enabled ? 1 : 0.4;
+
+    Rectangle {
+        width: parent.width - 0.4rem;
+        height: self.width;
+        border-radius: self.width / 2;
+        clip: true;
+        background: root.symbolic ? Tokens.color-primary : transparent;
+
+        if !root.symbolic: Image {
+            width: 100%;
+            height: 100%;
+            image-fit: cover;
+            source: root.image;
+        }
+
+        if root.symbolic: Image {
+            source: root.image;
+            colorize: Tokens.color-primary-foreground;
+            width: 45%;
+        }
+
+        if area.has-hover && root.enabled: Rectangle {
+            border-radius: self.width / 2;
+            background: #ffffff30;
+        }
+    }
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            root.pointer-focus = false;
+            if event.text == " " || event.text == Key.Return {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+
+    area := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
+        }
+        clicked => { root.clicked(); }
+    }
+
+    if focus.has-focus && !root.pointer-focus: FocusRing {
+        host-width: parent.width;
+        host-height: parent.height;
+        radius: parent.width / 2 + self.offset;
+    }
+}
+
+component Preset inherits IconButton {
+    in property <int> index;
+    image: Account.avatars[root.index].image;
+    selected: Account.avatar-id == Account.avatars[root.index].id;
+    label: Lang.t("page-whoareyou-icon", []) + " " + (root.index + 1);
+    clicked => {
+        Account.avatar-id = Account.avatars[root.index].id;
+        Account.avatar = Account.avatars[root.index].image;
+    }
+}
+
+component IconPicker inherits VerticalLayout {
+    spacing: 1.25rem;
+    alignment: start;
+
+    HorizontalLayout {
+        spacing: 0.75rem;
+
+        UserIcon { }
+
+        VerticalLayout {
+            alignment: center;
+
+            TdnText {
+                text: Lang.t("page-whoareyou-icon", []);
+                font-weight: Tokens.typography-weight-medium;
+                horizontal-alignment: left;
+            }
+
+            TdnText {
+                text: Lang.t("page-whoareyou-icon-desc", []);
+                color: Tokens.color-muted-foreground;
+                font-size: Tokens.typography-body-sm-size;
+                horizontal-alignment: left;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    // two, three, then two buttons, with the camera in the middle
+    VerticalLayout {
+        spacing: 0.15rem;
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: 0.4rem;
+            if Account.avatars.length > 0: Preset { index: 0; }
+            if Account.avatars.length > 1: Preset { index: 1; }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: 0.4rem;
+            if Account.avatars.length > 2: Preset { index: 2; }
+
+            IconButton {
+                symbolic: true;
+                image: @image-url("../../data/icons/camera-photo-symbolic.svg");
+                label: Lang.t("page-whoareyou-camera", []);
+                enabled: Camera.available;
+                clicked => { Camera.start(); }
+            }
+
+            if Account.avatars.length > 3: Preset { index: 3; }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: 0.4rem;
+            if Account.avatars.length > 4: Preset { index: 4; }
+            if Account.avatars.length > 5: Preset { index: 5; }
+        }
+    }
+}
+
+// live camera preview for taking the user icon, shown over the whole window
+export component CameraDialog inherits Rectangle {
+    background: #00000099;
+    forward-focus: take;
+
+    init => { take.focus(); }
+
+    // keeps clicks from reaching the page underneath
+    TouchArea { }
+
+    FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                Camera.stop();
+                return accept;
+            }
+            reject
+        }
+
+        Card {
+            x: (root.width - self.width) / 2;
+            y: (root.height - self.height) / 2;
+            width: 22rem;
+            height: content.preferred-height;
+            background: Tokens.color-background;
+            card-radius: lg;
+
+            content := VerticalLayout {
+                padding: 1.25rem;
+                spacing: 1rem;
+
+                TdnText {
+                    text: Lang.t("page-whoareyou-camera", []);
+                    font-size: 1.4rem;
+                    font-weight: 500;
+                    horizontal-alignment: left;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+
+                    Rectangle {
+                        width: 14rem;
+                        height: self.width;
+                        border-radius: self.width / 2;
+                        clip: true;
+                        background: Camera.frame.width > 0 ? transparent : Tokens.color-card;
+
+                        Image {
+                            width: 100%;
+                            height: 100%;
+                            image-fit: cover;
+                            source: Camera.frame;
+                            accessible-role: none;
+                        }
+
+                        if Camera.error == "" && Camera.frame.width == 0: TdnSpinner { }
+
+                        if Camera.error != "": TdnText {
+                            width: parent.width - 2rem;
+                            text: Lang.t("page-whoareyou-camera-error", []) + "\n" + Camera.error;
+                            color: Tokens.color-destructive;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    TdnBtn {
+                        text: Lang.t("cancel", []);
+                        clicked => { Camera.stop(); }
+                    }
+
+                    take := TdnBtn {
+                        text: Lang.t("page-whoareyou-camera-take", []);
+                        enter-hint: true;
+                        enabled: Camera.error == "" && Camera.frame.width > 0;
+                        background-color: TdnStyle.accent;
+                        foreground-color: TdnStyle.accent-foreground;
+                        clicked => { Camera.capture(); }
+                    }
+                }
+            }
+        }
+    }
+}
 
 export component WhoAreYouPage inherits TdnPage {
     pageid: "whoareyou";
-    step_i: 1;
+    step_i: 0;
+    can-next: Account.username-valid;
+    forward-focus: nameinput;
 
-    Rectangle {
-        height: 2rem;
-    }
+    HorizontalLayout {
+        spacing: 1rem;
 
-    Label {
-        text: "Name";
-        variant: required;
-        clicked => {
-            nameinput.focus();
+        VerticalLayout {
+            alignment: start;
+            // grows to its max width before the spacer takes the rest
+            horizontal-stretch: 100;
+            max-width: 23rem;
+            padding-top: 1rem;
+            spacing: 2rem;
+
+            TdnField {
+                label: Lang.t("page-whoareyou-fullname", []);
+                help: Lang.t("page-whoareyou-fullname-desc", []);
+                label-clicked => { nameinput.focus(); }
+
+                nameinput := TdnInput {
+                    text <=> Account.fullname;
+                    edited(text) => {
+                        if !Account.username-touched {
+                            Account.username = Account.suggest-username(text, Account.username);
+                        }
+                    }
+                    accepted => {
+                        userinput.focus();
+                        // typing replaces the suggestion, enter accepts it
+                        userinput.select-all();
+                    }
+                }
+            }
+
+            username-field := TdnField {
+                property <bool> invalid: Account.username != "" && !Account.username-valid;
+                label: Lang.t("page-whoareyou-username", []);
+                help: Lang.t("page-whoareyou-username-desc", []);
+                error: self.invalid ? Lang.t("page-whoareyou-error", []) : "";
+                label-clicked => { userinput.focus(); }
+
+                userinput := TdnInput {
+                    text <=> Account.username;
+                    invalid: username-field.invalid;
+                    // clearing the field hands it back to the suggestion from the full name
+                    edited(text) => { Account.username-touched = text != ""; }
+                    accepted => { root.try-next(); }
+                }
+            }
         }
-    }
 
-    nameinput := Input {
-        // TODO: impl
-        text: "TODO impl!!!";
-    }
-
-    TdnText {
-        text: "Your name, shown on the login screen.";
-        color: dimgray;
-        height: 1.5rem;
-        horizontal-alignment: left;
-        vertical-alignment: center;
-    }
-
-    Rectangle {
-        height: 2rem;
-    }
-
-    Label {
-        text: "Username";
-        variant: required;
-        clicked => {
-            nameinput.focus();
+        Rectangle {
+            horizontal-stretch: 1;
         }
-    }
 
-    userinput := Input {
-        // TODO: impl
-        text: "TODO impl!!!";
-    }
-
-    TdnText {
-        text: "The name of your home folder.";
-        color: dimgray;
-        height: 1.5rem;
-        horizontal-alignment: left;
-        vertical-alignment: center;
+        IconPicker {
+            horizontal-stretch: 0;
+            width: 13.5rem;
+        }
     }
 }

@@ -1,0 +1,45 @@
+import { TdnBasePg, TdnHero } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { Cfg } from "../cfg.slint";
+import { Install } from "../install.slint";
+import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
+
+export component DonePage inherits TdnBasePg {
+    forward-focus: reboot;
+
+    VerticalLayout {
+        TdnHero {
+            vertical-stretch: 1;
+        }
+
+        HorizontalLayout {
+            padding-left: 1.75rem;
+            padding-right: 1.75rem;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+            spacing: 2rem;
+
+            TdnText {
+                text: Lang.t("page-done", []);
+                font-size: 3rem;
+                font-weight: 800;
+                horizontal-alignment: left;
+                horizontal-stretch: 1;
+                wrap: word-wrap;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 0;
+
+                reboot := TdnBtn {
+                    enter-hint: true;
+                    background-color: TdnStyle.accent;
+                    foreground-color: TdnStyle.accent-foreground;
+                    text: Lang.t("page-done-reboot", []);
+                    clicked => { Install.finish(true); }
+                }
+            }
+        }
+    }
+}

@@ -20,11 +20,24 @@ Requires:       swaybg
 Requires:       nmgui network-manager-applet
 Requires:       capnet-assist
 Requires:       xdg-terminal-exec
+Requires:       vercel-geist-fonts
 # required for running homectl
 Requires:       script
+# dlopen()ed by Slint, so not picked up as automatic dependencies
+Requires:       libxkbcommon
+Requires:       libwayland-client
+Requires:       libwayland-cursor
+Requires:       libwayland-egl
+Requires:       libglvnd-egl
 BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl
-BuildRequires:  pkgconfig(libhelium-1)
 BuildRequires:  pkgconfig(openssl)
+BuildRequires:  pkgconfig(fontconfig)
+BuildRequires:  pkgconfig(libxcrypt)
+BuildRequires:  pkgconfig(xcb)
+# taidan_proc_macros: language names, locales and keyboard layouts are read at build time
+BuildRequires:  pkgconfig(icu-i18n)
+BuildRequires:  glibc-all-langpacks
+BuildRequires:  xkeyboard-config
 BuildRequires:  clang-libs
 BuildRequires:  clang-devel
 BuildRequires:  pkgconfig(libacl)
@@ -32,7 +45,7 @@ BuildRequires:  pkgconfig(libattr)
 
 %description
 Taidan is a GUI Out-Of-Box-Experience (OOBE) and Welcome App for Ultramarine
-Linux, written in Rust and the Helium toolkit.
+Linux, written in Rust and the Slint toolkit.
 
 %prep
 %dnl %autosetup -n taidan-%gitcommit

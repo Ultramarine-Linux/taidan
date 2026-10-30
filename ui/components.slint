@@ -1,9 +1,19 @@
-import { Tokens } from "slintcn/theme/tokens.slint";
+import { Tokens, Theme, ThemeMode } from "slintcn/theme/tokens.slint";
 import { FocusRing } from "slintcn/components/focus-ring.slint";
+import { Label, LabelVariant } from "slintcn/components/label.slint";
+import { Icon } from "slintcn/components/icon.slint";
+import { LucidePaths } from "slintcn/components/lucide-paths.slint";
+import { Cfg } from "cfg.slint";
 
+export global TdnStyle {
+    // the distro accent, lightened in dark mode so it still reads on a dark background
+    out property <brush> accent: Theme.mode == ThemeMode.dark
+        ? Cfg.get_brush("accent_color_dark", #4a56e2)
+        : Cfg.get_brush("accent_color", #00078f);
+    out property <color> accent-foreground: white;
+}
 
 export component TdnText inherits Text {
-    font-family: "Noto Sans";
     horizontal-alignment: center;
     vertical-stretch: 0;
     vertical-alignment: center;
@@ -11,73 +21,161 @@ export component TdnText inherits Text {
     font-weight: 400;
 }
 
-export component TdnBtn {
+// button sized by its own content, focusable with Tab and activated by Enter/Space
+export component TdnBtn inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <brush> background-color: Tokens.color-primary;
+    in property <color> foreground-color: Tokens.color-primary-foreground;
+    in property <length> font-size: Tokens.typography-body-size;
+    in property <bool> enabled: true;
+    // horizontal space between the edge and the content
+    in property <length> padding-x: 1rem;
+    in property <length> icon-size: 1.25rem;
+    in property <length> min-size: 2.25rem;
+    // shows a ⏎ key after the text, for buttons that Enter activates
+    in property <bool> enter-hint;
     callback clicked;
-    @children
-    out property <bool> has-hover;
-    out property <bool> pressed;
+    out property <bool> has-hover: area.has-hover;
+    out property <bool> pressed: area.pressed;
+    out property <bool> has-focus: focus.has-focus;
 
-    in property <brush> background_color;
-    in property <length> border-radius: 1rem;
-    // Extra horizontal space on each side of the background.
-    in property <length> padding-x;
-    rect := Rectangle {
-        z: -1;
-        width: parent.width + 2 * padding-x;
-        height: parent.height;
-        background: background_color.transparentize(has-hover ? (pressed ? 0.2 : 0.1) : 0.0);
-        border-radius: border-radius;
-        animate background { duration: 100ms; }
+    property <bool> pointer-focus;
+
+    forward-focus: focus;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+
+    min-height: root.min-size;
+    min-width: root.min-size;
+    border-radius: Tokens.radius-md;
+    background: !root.enabled
+        ? root.background-color.transparentize(0.6)
+        : area.pressed ? root.background-color.transparentize(0.2)
+        : area.has-hover ? root.background-color.transparentize(0.1)
+        : root.background-color;
+    animate background { duration: Tokens.motion-fast; }
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            root.pointer-focus = false;
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
     }
 
+    HorizontalLayout {
+        padding-left: root.padding-x;
+        padding-right: self.padding-left;
+        spacing: 0.5rem;
+        alignment: center;
+
+        if root.icon.width > 0: Image {
+            source: root.icon;
+            colorize: root.foreground-color;
+            width: root.icon-size;
+        }
+
+        if root.text != "": TdnText {
+            text: root.text;
+            color: root.enabled ? root.foreground-color : root.foreground-color.transparentize(0.3);
+            font-size: root.font-size;
+            font-weight: Tokens.typography-weight-medium;
+        }
+
+        if root.enter-hint: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: root.font-size * 1.45;
+                height: self.width;
+                border-width: 1px;
+                border-radius: 2px;
+                border-color: root.foreground-color;
+                opacity: root.enabled ? 1 : 0.7;
+                Icon {
+                    commands: LucidePaths.enter-key;
+                    size: parent.width * 0.95;
+                    tint: root.foreground-color;
+                    stroke-width: 1.5px;
+                }
+            }
+        }
+    }
+
+    // above the FocusScope, so a click doesn't move focus to the button
     area := TouchArea {
-        x: rect.x;
-        y: rect.y;
-        width: rect.width;
-        height: rect.height;
-        clicked => clicked();
-        // mouse-cursor: pressed ? progress : pointer;
-        changed pressed => { pressed = self.pressed; }
-        changed has-hover => { has-hover = self.has-hover; }
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
+        }
+        clicked => { root.clicked(); }
+    }
+
+    if focus.has-focus && !root.pointer-focus: FocusRing {
+        host-width: parent.width;
+        host-height: parent.height;
     }
 }
 
-
 // from slintcn Input
 export component TdnInput inherits Rectangle {
-    // Two-way bound to the field contents.
+    // two-way bound to the field contents
     in-out property <string> text;
-    // Hint shown when the field is empty.
+    // hint shown when the field is empty
     in property <string> placeholder;
-    // When false, the input dims and stops accepting keystrokes.
+    // when false, the input dims and stops accepting keystrokes
     in property <bool> enabled: true;
-    // When true, the user can focus but not edit.
+    // when true, the user can focus but not edit
     in property <bool> read-only: false;
-    // When true, characters render as bullets.
+    // when true, characters render as bullets
     in property <bool> password: false;
-    // When true, the input grabs focus on mount.
+    // when true, the input grabs focus on mount
     in property <bool> auto-focus: false;
+    // leading icon, e.g. a magnifier for search fields
     in property <image> icon;
-    // Fired on every keystroke with the current text.
+    // accessible name of the show/hide toggle on password fields
+    in property <string> reveal-label;
+    // draws the border in the destructive color
+    in property <bool> invalid: false;
+    // fired on every keystroke with the current text
     callback edited(string);
-    // Fired on Enter with the current text.
+    // fired on Enter with the current text
     callback accepted(string);
+    // keys the text field doesn't handle itself (e.g. arrow keys to move through a list)
+    callback key-pressed(KeyEvent) -> EventResult;
+    key-pressed(event) => { reject }
+    public function select-all() { input.select-all(); }
 
-    // True while focus arrived from a pointer press — suppresses the ring so it
-    // is keyboard-only (focus-visible emulation). Set on pointer down, cleared
-    // on any key interaction.
+    // true while focus arrived from a pointer press — suppresses the ring so it
+    // is keyboard-only (focus-visible emulation), set on pointer down, cleared
+    // on any key interaction
     property <bool> pointer-focus: false;
+    property <bool> revealed: false;
+    property <bool> has-icon: root.icon.width > 0;
 
-    forward-focus: field-scope;
+    forward-focus: input;
+    accessible-role: text-input;
+    accessible-label: root.placeholder;
+    accessible-value: root.password ? "" : root.text;
 
     height: Tokens.density-input;
-    background: Tokens.color-surface-1;
-    border-color: input.has-focus ? Tokens.color-ring : Tokens.color-border-hairline;
+    background: Theme.mode == ThemeMode.light ? #ffffff : Tokens.color-surface-1;
+    border-color: root.invalid ? Tokens.color-destructive
+        : input.has-focus ? Tokens.color-ring
+        : Tokens.color-border-hairline;
     border-width: 1px;
     border-radius: Tokens.radius-md;
     opacity: root.enabled ? 1.0 : 0.5;
 
     focus-area := TouchArea {
+        mouse-cursor: MouseCursor.text;
         pointer-event(ev) => {
             if (root.enabled
                 && ev.button == PointerEventButton.left
@@ -88,42 +186,36 @@ export component TdnInput inherits Rectangle {
         clicked => { input.focus(); }
     }
 
-    field-scope := FocusScope {
-        // Zero-size so the scope cannot intercept the first pointer press
-        // (default FocusScope fills its parent and swallows that click).
-        width: 0px;
-        height: 0px;
-        enabled: root.enabled;
-        forward-focus: input;
-        key-pressed(event) => {
-            root.pointer-focus = false;
-            return reject;
-        }
-    }
-
     icon := Image {
+        visible: root.has-icon;
         source: root.icon;
-        x: 12px - 0.25rem;
-        y: 0.5rem;
-        height: parent.height - 1rem;
-        width: self.height;
-        colorize: black;
+        x: 10 * Tokens.unit;
+        width: root.has-icon ? 1.1rem : 0;
+        height: self.width;
+        y: (parent.height - self.height) / 2;
+        colorize: Tokens.color-muted-foreground;
     }
 
     input := TextInput {
-        x: 12px + icon.width;
+        x: root.has-icon ? icon.x + icon.width + 8 * Tokens.unit : 12 * Tokens.unit;
         y: 0;
-        width: parent.width - 24px - icon.width;
+        width: (reveal.visible ? reveal.x - 4 * Tokens.unit : parent.width - 12 * Tokens.unit) - self.x;
         height: parent.height;
         text <=> root.text;
         color: Tokens.color-foreground;
+        selection-background-color: TdnStyle.accent.transparentize(0.6);
         font-size: Tokens.typography-body-size;
         single-line: true;
         read-only: root.read-only || !root.enabled;
-        input-type: root.password ? InputType.password : InputType.text;
+        enabled: root.enabled;
+        input-type: root.password && !root.revealed ? InputType.password : InputType.text;
         vertical-alignment: center;
         edited => { root.edited(self.text); }
         accepted => { root.accepted(self.text); }
+        key-pressed(event) => {
+            root.pointer-focus = false;
+            root.key-pressed(event)
+        }
         init => { if (root.auto-focus) { self.focus(); } }
     }
 
@@ -136,11 +228,239 @@ export component TdnInput inherits Rectangle {
         color: Tokens.color-muted-foreground;
         font-size: Tokens.typography-body-size;
         vertical-alignment: center;
+        overflow: elide;
     }
 
-    // Outer focus ring — keyboard-only, drawn last so it's visually unclipped.
+    // show/hide toggle for password fields
+    reveal := TouchArea {
+        visible: root.password;
+        width: root.password ? parent.height : 0;
+        height: parent.height;
+        x: parent.width - self.width;
+        mouse-cursor: pointer;
+        accessible-role: button;
+        accessible-label: root.reveal-label;
+        accessible-checkable: true;
+        accessible-checked: root.revealed;
+        accessible-action-default => { root.revealed = !root.revealed; }
+        clicked => { root.revealed = !root.revealed; }
+        Image {
+            source: @image-url("../data/icons/eye-open-negative-filled-symbolic.svg");
+            width: 1.1rem;
+            height: self.width;
+            colorize: root.revealed ? Tokens.color-foreground : Tokens.color-muted-foreground;
+        }
+    }
+
+    // outer focus ring — keyboard-only, drawn last so it's visually unclipped
     if input.has-focus && !root.pointer-focus: FocusRing {
         host-width: parent.width;
         host-height: parent.height;
+    }
+}
+
+// a selectable row in a list (languages, keymaps, …)
+export component TdnListRow inherits Rectangle {
+    in property <string> text;
+    // extra text on the trailing side, e.g. a language's native name
+    in property <string> secondary;
+    in property <bool> selected;
+    callback clicked;
+
+    accessible-role: list-item;
+    accessible-label: root.secondary == "" ? root.text : root.text + ", " + root.secondary;
+    accessible-item-selectable: true;
+    accessible-item-selected: root.selected;
+    accessible-action-default => { root.clicked(); }
+
+    height: 2.25rem;
+    border-radius: Tokens.radius-sm;
+    background: root.selected ? TdnStyle.accent
+        : area.has-hover ? Tokens.color-accent
+        : transparent;
+
+    HorizontalLayout {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        spacing: 1rem;
+
+        TdnText {
+            text: root.text;
+            horizontal-alignment: left;
+            overflow: elide;
+            color: root.selected ? TdnStyle.accent-foreground : Tokens.color-foreground;
+        }
+
+        if root.secondary != "": TdnText {
+            text: root.secondary;
+            horizontal-alignment: right;
+            horizontal-stretch: 0;
+            color: root.selected ? TdnStyle.accent-foreground : Tokens.color-muted-foreground;
+        }
+    }
+
+    area := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// a labelled form field, with the input as its child
+export component TdnField inherits VerticalLayout {
+    in property <string> label;
+    in property <bool> required;
+    // shown below the input, replaced by `error` when that is set
+    in property <string> help;
+    in property <string> error;
+    callback label-clicked;
+
+    spacing: 0.4rem;
+
+    Label {
+        text: root.label;
+        variant: root.required ? LabelVariant.required : LabelVariant.default;
+        clicked => { root.label-clicked(); }
+    }
+
+    @children
+
+    if root.help != "" || root.error != "": TdnText {
+        text: root.error != "" ? root.error : root.help;
+        color: root.error != "" ? Tokens.color-destructive : Tokens.color-muted-foreground;
+        font-size: Tokens.typography-body-sm-size;
+        horizontal-alignment: left;
+        wrap: word-wrap;
+    }
+}
+
+// a bordered row with a label and a switch, e.g. "Install Drivers"
+export component TdnToggleRow inherits Rectangle {
+    in property <string> text;
+    in-out property <bool> checked;
+    callback toggled(bool);
+    // fired on Enter, while Space toggles
+    callback accepted();
+
+    property <bool> pointer-focus;
+
+    function toggle() {
+        root.checked = !root.checked;
+        root.toggled(root.checked);
+    }
+
+    forward-focus: focus;
+    accessible-role: switch;
+    accessible-label: root.text;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-action-default => { root.toggle(); }
+
+    height: 3rem;
+    border-radius: Tokens.radius-lg;
+    border-width: 1px;
+    border-color: Tokens.color-border-hairline-strong;
+    background: Tokens.color-card;
+
+    focus := FocusScope {
+        key-pressed(event) => {
+            root.pointer-focus = false;
+            if event.text == " " {
+                root.toggle();
+                return accept;
+            }
+            if event.text == Key.Return {
+                root.accepted();
+                return accept;
+            }
+            reject
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 0.85rem;
+        padding-right: 0.85rem;
+        spacing: 1rem;
+
+        TdnText {
+            text: root.text;
+            horizontal-alignment: left;
+            font-weight: Tokens.typography-weight-medium;
+        }
+
+        VerticalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 2.4rem;
+                height: 1.3rem;
+                border-radius: self.height / 2;
+                background: root.checked ? Tokens.color-primary : Tokens.color-border-hairline-strong;
+                animate background { duration: Tokens.motion-fast; }
+
+                Rectangle {
+                    width: parent.height - 0.3rem;
+                    height: self.width;
+                    y: 0.15rem;
+                    x: root.checked ? parent.width - self.width - 0.15rem : 0.15rem;
+                    border-radius: self.width / 2;
+                    background: root.checked ? Tokens.color-primary-foreground : Tokens.color-background;
+                    animate x { duration: Tokens.motion-fast; easing: Tokens.motion-easing-standard; }
+                }
+            }
+        }
+    }
+
+    TouchArea {
+        mouse-cursor: pointer;
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
+        }
+        clicked => { root.toggle(); }
+    }
+
+    if focus.has-focus && !root.pointer-focus: FocusRing {
+        host-width: parent.width;
+        host-height: parent.height;
+        radius: Tokens.radius-lg + self.offset;
+    }
+}
+
+// an indeterminate progress ring
+export component TdnSpinner inherits Rectangle {
+    in property <color> tint: Tokens.color-foreground;
+    in property <length> stroke: 2.5 * Tokens.unit;
+
+    property <angle> start: mod(animation-tick() / 1ms * 0.36deg, 360deg);
+    property <length> r: (min(self.width, self.height) - self.stroke) / 2;
+
+    width: 1.5rem;
+    height: self.width;
+    accessible-role: progress-indicator;
+
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        stroke: root.tint;
+        stroke-width: root.stroke;
+        stroke-line-cap: round;
+
+        // a 270° arc, rotating
+        MoveTo {
+            x: (root.width / 2 + root.r * cos(root.start)) / 1px;
+            y: (root.height / 2 + root.r * sin(root.start)) / 1px;
+        }
+
+        ArcTo {
+            x: (root.width / 2 + root.r * cos(root.start + 270deg)) / 1px;
+            y: (root.height / 2 + root.r * sin(root.start + 270deg)) / 1px;
+            radius-x: root.r / 1px;
+            radius-y: root.r / 1px;
+            large-arc: true;
+            sweep: true;
+        }
     }
 }

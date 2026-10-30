@@ -1,0 +1,92 @@
+import { TdnBasePg, TdnHeader } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { Install } from "../install.slint";
+import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
+import { ScrollView } from "std-widgets.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+
+export component ErrorPage inherits TdnBasePg {
+    forward-focus: retry;
+
+    VerticalLayout {
+        padding-left: 2rem;
+        padding-right: 2rem;
+        padding-top: 1rem;
+        padding-bottom: 1.5rem;
+        spacing: 1.25rem;
+
+        TdnHeader {
+            step_i: 3;
+        }
+
+        HorizontalLayout {
+            spacing: 1rem;
+
+            Image {
+                source: @image-url("../../data/icons/dialog-error-symbolic.svg");
+                colorize: Tokens.color-destructive;
+                width: 2.75rem;
+                accessible-role: none;
+            }
+
+            VerticalLayout {
+                alignment: center;
+
+                TdnText {
+                    text: Lang.t("page-error", []);
+                    font-size: 1.75rem;
+                    font-weight: 500;
+                    horizontal-alignment: left;
+                }
+
+                TdnText {
+                    text: Lang.t("page-error-desc", []);
+                    color: Tokens.color-muted-foreground;
+                    horizontal-alignment: left;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+            border-radius: Tokens.radius-md;
+            border-width: 1px;
+            border-color: Tokens.color-border-hairline;
+            background: Tokens.color-card;
+
+            ScrollView {
+                // selectable so details can be copied into a bug report
+                TextInput {
+                    x: 0.75rem;
+                    y: 0.75rem;
+                    width: parent.width - 1.5rem;
+                    read-only: true;
+                    single-line: false;
+                    wrap: word-wrap;
+                    text: Install.error;
+                    font-family: "monospace";
+                    font-size: Tokens.typography-body-sm-size;
+                    color: Tokens.color-foreground;
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: space-between;
+
+            TdnBtn {
+                text: Lang.t("page-error-done", []);
+                clicked => { Install.finish(false); }
+            }
+
+            retry := TdnBtn {
+                text: Lang.t("page-error-retry", []);
+                enter-hint: true;
+                background-color: TdnStyle.accent;
+                foreground-color: TdnStyle.accent-foreground;
+                clicked => { root.next_page(); }
+            }
+        }
+    }
+}

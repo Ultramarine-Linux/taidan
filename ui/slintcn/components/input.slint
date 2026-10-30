@@ -2,26 +2,26 @@ import { Tokens } from "../theme/tokens.slint";
 import { FocusRing } from "focus-ring.slint";
 
 export component Input inherits Rectangle {
-    // Two-way bound to the field contents.
+    // two-way bound to the field contents
     in-out property <string> text;
-    // Hint shown when the field is empty.
+    // hint shown when the field is empty
     in property <string> placeholder;
-    // When false, the input dims and stops accepting keystrokes.
+    // when false, the input dims and stops accepting keystrokes
     in property <bool> enabled: true;
-    // When true, the user can focus but not edit.
+    // when true, the user can focus but not edit
     in property <bool> read-only: false;
-    // When true, characters render as bullets.
+    // when true, characters render as bullets
     in property <bool> password: false;
-    // When true, the input grabs focus on mount.
+    // when true, the input grabs focus on mount
     in property <bool> auto-focus: false;
-    // Fired on every keystroke with the current text.
+    // fired on every keystroke with the current text
     callback edited(string);
-    // Fired on Enter with the current text.
+    // fired on Enter with the current text
     callback accepted(string);
 
-    // True while focus arrived from a pointer press — suppresses the ring so it
-    // is keyboard-only (focus-visible emulation). Set on pointer down, cleared
-    // on any key interaction.
+    // true while focus arrived from a pointer press — suppresses the ring so it
+    // is keyboard-only (focus-visible emulation), set on pointer down, cleared
+    // on any key interaction
     property <bool> pointer-focus: false;
 
     forward-focus: field-scope;
@@ -45,8 +45,8 @@ export component Input inherits Rectangle {
     }
 
     field-scope := FocusScope {
-        // Zero-size so the scope cannot intercept the first pointer press
-        // (default FocusScope fills its parent and swallows that click).
+        // zero-size so the scope cannot intercept the first pointer press
+        // (default FocusScope fills its parent and swallows that click)
         width: 0px;
         height: 0px;
         enabled: root.enabled;
@@ -85,7 +85,7 @@ export component Input inherits Rectangle {
         vertical-alignment: center;
     }
 
-    // Outer focus ring — keyboard-only, drawn last so it's visually unclipped.
+    // outer focus ring — keyboard-only, drawn last so it's visually unclipped
     if input.has-focus && !root.pointer-focus : FocusRing {
         host-width: parent.width;
         host-height: parent.height;

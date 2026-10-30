@@ -1,17 +1,24 @@
 # shown on places like "keyboard layout variant: Default"
 default = Default
 # btn (previous page)
-prev = Previous
+prev = Back
 # btn (next page)
 next = Next
+# btn (close a dialog)
+close = Close
+# btn (dismiss a dialog without doing anything)
+cancel = Cancel
 # btn (skip anything)
 skip = Skip
+steps-useradd = Creating Your Account…
+steps-settheme = Applying Your Theme…
 steps-dnfdownloadupdate = Downloading System Update…
 steps-dnfinstallupdate = Installing System Update…
 steps-script = Running Scriptlet…
 steps-dnfdownloadapps = Downloading Apps…
 steps-dnfinstallapps = Installing Apps…
 steps-driverscodecs = Installing Drivers and Codecs…
+steps-setupimf = Setting Up Input Methods…
 imelangs-ch = Chinese
 imelangs-ja = Japanese
 imelangs-ko = Korean
@@ -33,6 +40,12 @@ imelangs-th = Thai
 # use different brackets, etc.
 imelangs-display = { $lang_name } ({ $native_lang_name })
 
+# step-*: name of the current setup stage, shown above every page
+step-account-creation = Account Creation
+step-region-and-connectivity = Region and Connectivity
+step-additional-software = Additional Software
+step-finishing-up = Finishing Up
+
 ## [Language]
 
 page-language = Language
@@ -44,6 +57,8 @@ page-welcome = Welcome to { $distro }
 # page title
 page-welcome-ready = Let's get your device ready.
 page-welcome-go = Let's Go
+# big heading on the first page
+page-welcome-hello = Welcome!
 # .skipcfg: also a "Next" btn, but skips some pages
 page-welcome-skipcfg = Skip Configuration
 
@@ -67,9 +82,21 @@ page-devicename-error = Hostname must start with a letter, and may only contain 
 # remember, if you can't translate things literally, think of what makes sense here as a page heading
 page-whoareyou = Who are You?
 # .fullname: text field placeholder
-page-whoareyou-fullname = Full Name
+page-whoareyou-fullname = Name
 # .username: text field placeholder
 page-whoareyou-username = Username
+# .*-desc: help text below the field
+page-whoareyou-fullname-desc = Your name, shown on the login screen.
+page-whoareyou-username-desc = The name of your home folder.
+# .icon: the picture shown for the user, e.g. on the login screen
+page-whoareyou-icon = User Icon
+page-whoareyou-icon-desc = Pick one, or take a photo.
+# .camera: title of the dialog for taking the user icon with the webcam (also its button)
+page-whoareyou-camera = Take a Photo
+# btn
+page-whoareyou-camera-take = Take Photo
+# followed by the technical reason on the next line
+page-whoareyou-camera-error = Can't use the camera:
 # .error: multiline, explanation pops out if invalid username
 page-whoareyou-error = Username must start with lowercase letters and must only contain lowercase letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
 
@@ -82,6 +109,19 @@ page-password-pw = Password
 # yet another text field placeholder for repeating the password.
 # depending on the language you can just put the word equivalent to "repeat" here
 page-password-rp = Repeat Password
+# shown when the repeated password differs
+page-password-mismatch = Passwords don't match.
+# accessible name of the button that shows/hides the password
+page-password-show = Show password
+# .tip*: advice shown next to the password fields
+page-password-tip-title = Longer is Stronger
+page-password-tip = A phrase is much better than number spaghetti.
+# an example of a good password, keep it a short, memorable phrase joined by hyphens
+page-password-tip-good = if-it-fits-i-sits
+page-password-tip-good-desc = This takes centuries to crack, and you can remember it!
+# an example of a bad password, keep it as is
+page-password-tip-bad = Ds9Csga*XB
+page-password-tip-bad-desc = Much harder to remember, and cracks in 12 days!
 
 ## [Internet]
 
@@ -166,11 +206,41 @@ categories = { $cat }
 ## [Installing]
 
 page-installing = Installing Your Apps
+page-installing-configuring = Configuring your Device
 page-installing-desc = This won't take long!
 page-installing-loading = Loading…
 page-installing-flatpak = Installing {$n} Flatpaks…
 
 ## [Finish]
+
+## [Drivers]
+
+page-drivers = Drivers
+page-drivers-desc = Install additional drivers, codecs, and tools to support hardware detected in this device.
+page-drivers-proprietary = Some drivers may be proprietary.
+# toggle
+page-drivers-install = Install Drivers
+# .nvidia, .broadcom-*, .builtin: items in the list of drivers to install
+page-drivers-nvidia = NVIDIA Graphics
+page-drivers-broadcom-wifi = Broadcom WiFi
+page-drivers-broadcom-bluetooth = Broadcom Bluetooth
+page-drivers-builtin = Built-in Drivers
+
+## [Summary]
+
+# page title, $name is the user's first name
+page-summary = Everything Look Right, { $name }?
+page-summary-account = Your Account
+page-summary-region = Region and Connectivity
+page-summary-software = Additional Software
+page-summary-software-none = No additional software will be installed.
+# btn (next page), starts setting up the system
+page-summary-confirm = Looks Good!
+
+## [Done]
+
+page-done = All Done
+page-done-reboot = Reboot
 
 page-finish = Ready to Do Your Thing?
 page-finish-desc = We hope you enjoy Ultramarine!

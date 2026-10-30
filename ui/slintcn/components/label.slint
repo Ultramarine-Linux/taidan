@@ -2,19 +2,19 @@ import { Tokens } from "../theme/tokens.slint";
 
 export enum LabelVariant { default, muted, required }
 
-// Form label. Wire `clicked` to focus the associated input — shadcn's
-// htmlFor=… without DOM IDs.
+// form label, wire `clicked` to focus the associated input — shadcn's
+// htmlFor=… without DOM IDs
 //
 //   Label { text: "Email"; clicked => { email-input.focus(); } }
 //   Input { email-input := ... }
 //
-// The `required` variant appends a destructive-colored asterisk.
+// the `required` variant appends a destructive-colored asterisk
 export component Label inherits Rectangle {
-    // The label text.
+    // the label text
     in property <string> text;
-    // Visual style — `default`, `muted`, `required` (appends an asterisk).
+    // visual style — `default`, `muted`, `required` (appends an asterisk)
     in property <LabelVariant> variant: LabelVariant.default;
-    // Fired when the label is clicked; useful for forwarding focus.
+    // fired when the label is clicked, useful for forwarding focus
     callback clicked();
 
     background: transparent;

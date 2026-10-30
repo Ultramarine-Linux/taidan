@@ -18,10 +18,11 @@ export struct Keymap {
 
 export global Lang {
     in-out property <Language> current_language;
-    in-out property <KeymapVariant> current_variant;
+    // filtered by `filter_languages`
     in property <[Language]> languages;
-    // Load the translations *before* changing `current_language`, so bindings that
-    // re-evaluate on the change (e.g. during layout) already see the new language.
+    callback filter_languages(query: string);
+    // load the translations *before* changing `current_language`, so bindings that
+    // re-evaluate on the change (e.g. during layout) already see the new language
     public function select(lang: Language) {
         set_lang(lang);
         current_language = lang;
@@ -37,6 +38,17 @@ export global Lang {
     }
     pure callback _name(lang: Language, current_language: Language) -> string;
     _name(lang, current_language) => "Lang.name(" + lang.locale + ")";
+
+    // filtered by `filter_keymaps`
     in property <[Keymap]> keymaps;
+    callback filter_keymaps(query: string);
+    // variants of `current_keymap`, filtered by `filter_variants`
+    in property <[KeymapVariant]> variants;
+    callback filter_variants(query: string);
     in property <Keymap> current_keymap;
+    // `id` is empty for the layout's default variant
+    in property <KeymapVariant> current_variant;
+    // selecting also applies the keymap to the system
+    callback select_keymap(keymap: Keymap);
+    callback select_variant(variant: KeymapVariant);
 }

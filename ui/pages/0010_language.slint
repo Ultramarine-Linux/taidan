@@ -1,0 +1,70 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { ListView } from "std-widgets.slint";
+import { TdnInput, TdnListRow } from "../components.slint";
+import { Card } from "../slintcn/components/card.slint";
+
+export component LanguagePage inherits TdnPage {
+    pageid: "language";
+    show-steps: false;
+    can-prev: false;
+    forward-focus: search;
+
+    property <length> row-height: 2.25rem;
+    // row moved to with the arrow keys, -1 until the user does so
+    property <int> cursor: -1;
+
+    function move-cursor(delta: int) {
+        if Lang.languages.length == 0 { return; }
+        cursor = max(0, min(Lang.languages.length - 1, cursor + delta));
+        Lang.select(Lang.languages[cursor]);
+        // keep the row in view
+        let top = cursor * row-height;
+        if top < -list.content-y {
+            list.content-y = -top;
+        } else if top + row-height > -list.content-y + list.visible-height {
+            list.content-y = list.visible-height - top - row-height;
+        }
+    }
+
+    Card {
+        variant: solid;
+        vertical-stretch: 1;
+
+        VerticalLayout {
+            padding: 1rem;
+            spacing: 0.75rem;
+
+            search := TdnInput {
+                placeholder: Lang.t("page-language-search-lang", []);
+                icon: @image-url("../../data/icons/system-search-symbolic.svg");
+                edited(text) => {
+                    cursor = -1;
+                    list.content-y = 0;
+                    Lang.filter_languages(text);
+                }
+                accepted => { root.try-next(); }
+                key-pressed(event) => {
+                    if event.text == Key.DownArrow { move-cursor(1); return accept; }
+                    if event.text == Key.UpArrow { move-cursor(-1); return accept; }
+                    if event.text == Key.PageDown { move-cursor(10); return accept; }
+                    if event.text == Key.PageUp { move-cursor(-10); return accept; }
+                    reject
+                }
+            }
+
+            list := ListView {
+                for lang[i] in Lang.languages: TdnListRow {
+                    height: row-height;
+                    text: Lang.name(lang);
+                    secondary: lang.native-name;
+                    selected: lang.locale == Lang.current_language.locale;
+                    clicked => {
+                        cursor = i;
+                        Lang.select(lang);
+                    }
+                }
+            }
+        }
+    }
+}

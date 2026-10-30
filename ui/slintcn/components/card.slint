@@ -1,30 +1,30 @@
 import { Tokens } from "../theme/tokens.slint";
 
-// Card is intentionally non-focusable (matches shadcn's <div>-based Card).
-// To make a card keyboard-activatable, wrap it in a Button(variant: ghost)
-// or place a Button inside it as the affordance.
+// cards are intentionally non-focusable (matches shadcn's <div>-based Card)
+// to make a card keyboard-activatable, wrap it in a Button(variant: ghost)
+// or place a Button inside it as the affordance
 //
-// glass: non-interactive translucent surface (e.g. inside a Dialog body).
-// glass-interactive: clickable variant — its border/background respond to hover.
-// Both share the same e3 shadow.
+// glass: non-interactive translucent surface (e.g. inside a Dialog body)
+// glass-interactive: clickable variant — its border/background respond to hover
+// both share the same e3 shadow
 export enum CardVariant { solid, glass, glass-interactive, raised }
 export enum CardSize    { sm, default }
-// Independent padding + radius axes (mirrors the web Card API). `xxl` = 2xl.
+// independent padding + radius axes (mirrors the web Card API), `xxl` = 2xl
 export enum CardPadding { none, sm, md, lg }
 export enum CardRadius  { md, lg, xl, xxl }
 
 export component Card inherits Rectangle {
-    // Surface treatment — solid, raised, ghost, glass.
+    // surface treatment — solid, raised, ghost, glass
     in property <CardVariant> variant: CardVariant.solid;
-    // Padding preset — sm, default, lg.
+    // padding preset — sm, default, lg
     in property <CardSize>    size:    CardSize.default;
-    // Padding override — none, sm, md, lg, xl. Use this OR `size`.
+    // padding override — none, sm, md, lg, xl, use this OR `size`
     in property <CardPadding> card-padding: CardPadding.lg;
-    // Corner radius override — md, lg, xl, full.
+    // corner radius override — md, lg, xl, full
     in property <CardRadius>  card-radius:  CardRadius.xl;
 
-    // Read-only hover signal — driven by the internal TouchArea below.
-    // Consumers can read it (e.g. to drive header chip styling) but never set it.
+    // read-only hover signal — driven by the internal TouchArea below
+    // consumers can read it (e.g. to drive header chip styling) but never set it
     out property <bool> hovered <=> touch.has-hover;
 
     background:
@@ -63,25 +63,25 @@ export component Card inherits Rectangle {
         easing: Tokens.motion-easing-standard;
     }
 
-    // padding-l derives from the `padding` axis (none/sm/md/lg → 0/12/16/24).
-    // gap-l is the in-content rhythm, still keyed off `size`.
+    // padding-l derives from the `padding` axis (none/sm/md/lg → 0/12/16/24)
+    // gap-l is the in-content rhythm, still keyed off `size`
     out property <length> padding-l:
         card-padding == CardPadding.none ? 0px :
         card-padding == CardPadding.sm   ? Tokens.spacing-md :
         card-padding == CardPadding.md   ? Tokens.spacing-lg :
         /* lg */                           Tokens.spacing-xl;
-    // Resolved gap between header / content / footer in px; outbound.
+    // resolved gap between header / content / footer in px, outbound
     out property <length> gap-l:
         size == CardSize.sm ? Tokens.spacing-md : Tokens.spacing-lg;
 
-    // Hover tracker. Placed before @children so child interactive controls
-    // (Buttons, Inputs) sit z-above and receive their own click events.
+    // hover tracker, placed before @children so child interactive controls
+    // (Buttons, Inputs) sit z-above and receive their own click events
     touch := TouchArea { }
 
     @children
 }
 
-// shadcn-faithful Card composition helpers. Compose inside a Card's
+// shadcn-faithful Card composition helpers, composed inside a Card's
 // VerticalLayout (padding: parent.padding-l; spacing: parent.gap-l):
 //
 //   Card {

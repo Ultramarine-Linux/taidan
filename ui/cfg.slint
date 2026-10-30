@@ -8,4 +8,8 @@ export global Cfg {
     get_image(path, default) => default;
     get_brush(path, default) => default;
     in-out property <string> version: "0.0.0";
+    in-out property <string> distro: "Ultramarine Linux";
+    // welcome page image, decoded off the UI thread and set from Rust
+    in property <image> hero-light: @image-url("../data/icons/background-light.webp");
+    in property <image> hero-dark: @image-url("../data/icons/background-dark.webp");
 }

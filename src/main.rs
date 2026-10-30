@@ -1,5 +1,8 @@
 #![warn(rust_2018_idioms)]
+pub mod account;
+pub mod avatar;
 pub mod cfg;
+pub mod install;
 pub mod l10n;
 pub mod macros;
 pub mod prelude;
@@ -36,6 +39,14 @@ pub static LL: std::sync::LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoad
 
 pub static SETTINGS: LazyLock<RwLock<libtaidan::settings::Settings>> =
     LazyLock::new(Default::default);
+
+/// runtime for `libtaidan`'s async system calls, so they never block the UI thread
+pub static RT: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("cannot create tokio runtime")
+});
 
 #[derive(rust_embed::RustEmbed)]
 #[folder = "po/"]

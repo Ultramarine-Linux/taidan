@@ -1,0 +1,147 @@
+import { TdnPage } from "../page.slint";
+import { Lang, Keymap } from "../lang.slint";
+import { ListView, ScrollView } from "std-widgets.slint";
+import { TdnInput, TdnListRow } from "../components.slint";
+import { Card } from "../slintcn/components/card.slint";
+import { Separator } from "../slintcn/components/separator.slint";
+
+export component KeyboardPage inherits TdnPage {
+    pageid: "keyboard";
+    show-steps: false;
+    forward-focus: search-layout;
+
+    property <length> row-height: 2.25rem;
+    // rows moved to with the arrow keys, -1 until the user does so
+    property <int> layout-cursor: -1;
+    // 0 is the "Default" row, `n` is `Lang.variants[n - 1]`
+    property <int> variant-cursor: -1;
+
+    function select-keymap(keymap: Keymap) {
+        if keymap.id != Lang.current_keymap.id {
+            search-variant.text = "";
+            variant-cursor = -1;
+            variants.content-y = 0;
+        }
+        Lang.select_keymap(keymap);
+    }
+
+    function select-variant(i: int) {
+        variant-cursor = i;
+        Lang.select_variant(i == 0 ? { id: "", name: "" } : Lang.variants[i - 1]);
+    }
+
+    function move-layout-cursor(delta: int) {
+        if Lang.keymaps.length == 0 { return; }
+        layout-cursor = max(0, min(Lang.keymaps.length - 1, layout-cursor + delta));
+        select-keymap(Lang.keymaps[layout-cursor]);
+        let top = layout-cursor * row-height;
+        if top < -layouts.content-y {
+            layouts.content-y = -top;
+        } else if top + row-height > -layouts.content-y + layouts.visible-height {
+            layouts.content-y = layouts.visible-height - top - row-height;
+        }
+    }
+
+    function move-variant-cursor(delta: int) {
+        select-variant(max(0, min(Lang.variants.length, variant-cursor + delta)));
+        let top = variant-cursor * row-height;
+        if top < -variants.content-y {
+            variants.content-y = -top;
+        } else if top + row-height > -variants.content-y + variants.visible-height {
+            variants.content-y = variants.visible-height - top - row-height;
+        }
+    }
+
+    Card {
+        variant: solid;
+        vertical-stretch: 1;
+
+        HorizontalLayout {
+            padding: 1rem;
+            spacing: 1rem;
+
+            VerticalLayout {
+                spacing: 0.75rem;
+                horizontal-stretch: 1;
+
+                search-layout := TdnInput {
+                    placeholder: Lang.t("page-keyboard-search-layout", []);
+                    icon: @image-url("../../data/icons/system-search-symbolic.svg");
+                    edited(text) => {
+                        layout-cursor = -1;
+                        layouts.content-y = 0;
+                        Lang.filter_keymaps(text);
+                    }
+                    accepted => { search-variant.focus(); }
+                    key-pressed(event) => {
+                        if event.text == Key.DownArrow { move-layout-cursor(1); return accept; }
+                        if event.text == Key.UpArrow { move-layout-cursor(-1); return accept; }
+                        if event.text == Key.PageDown { move-layout-cursor(10); return accept; }
+                        if event.text == Key.PageUp { move-layout-cursor(-10); return accept; }
+                        reject
+                    }
+                }
+
+                layouts := ListView {
+                    for keymap[i] in Lang.keymaps: TdnListRow {
+                        height: row-height;
+                        text: keymap.name;
+                        secondary: keymap.id;
+                        selected: keymap.id == Lang.current_keymap.id;
+                        clicked => {
+                            layout-cursor = i;
+                            select-keymap(keymap);
+                        }
+                    }
+                }
+            }
+
+            Separator {
+                orientation: vertical;
+            }
+
+            VerticalLayout {
+                spacing: 0.75rem;
+                horizontal-stretch: 1;
+
+                search-variant := TdnInput {
+                    placeholder: Lang.t("page-keyboard-search-variant", []);
+                    icon: @image-url("../../data/icons/system-search-symbolic.svg");
+                    edited(text) => {
+                        variant-cursor = -1;
+                        variants.content-y = 0;
+                        Lang.filter_variants(text);
+                    }
+                    accepted => { root.try-next(); }
+                    key-pressed(event) => {
+                        if event.text == Key.DownArrow { move-variant-cursor(1); return accept; }
+                        if event.text == Key.UpArrow { move-variant-cursor(-1); return accept; }
+                        if event.text == Key.PageDown { move-variant-cursor(10); return accept; }
+                        if event.text == Key.PageUp { move-variant-cursor(-10); return accept; }
+                        reject
+                    }
+                }
+
+                variants := ScrollView {
+                    VerticalLayout {
+                        alignment: start;
+
+                        TdnListRow {
+                            height: row-height;
+                            text: Lang.t("default", []);
+                            selected: Lang.current_variant.id == "";
+                            clicked => { select-variant(0); }
+                        }
+
+                        for variant[i] in Lang.variants: TdnListRow {
+                            height: row-height;
+                            text: variant.name;
+                            selected: variant.id == Lang.current_variant.id;
+                            clicked => { select-variant(i + 1); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

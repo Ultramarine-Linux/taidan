@@ -10,6 +10,8 @@ mod _08_setup_imf;
 
 use crate::prelude::*;
 
+pub use _07_drivers_codecs::{Hardware, detect_hardware};
+
 use crate::steps::{
     _00_useradd::UserAdd, _01_settheme::SetTheme, _02_dnfdownloadupdate::DnfDownloadUpdate,
     _03_dnfinstallupdate::DnfInstallUpdate, _04_script::Script,

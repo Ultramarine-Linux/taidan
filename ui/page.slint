@@ -1,26 +1,39 @@
-import { TdnText, TdnBtn } from "components.slint";
+import { TdnText, TdnBtn, TdnStyle } from "components.slint";
 import { Cfg } from "cfg.slint";
 import { Lang } from "lang.slint";
-import { Tokens } from "slintcn/theme/tokens.slint";
+import { Tokens, Theme, ThemeMode } from "slintcn/theme/tokens.slint";
 
 export enum Step {
-    language,
     account_creation,
     region_and_connectivity,
-    privacy,
+    additional_software,
+    finishing_up,
 }
 
 export global StepHdl {
     out property <[Step]> steps: [
-        Step.language,
         Step.account_creation,
         Step.region-and-connectivity,
-        Step.privacy
+        Step.additional-software,
+        Step.finishing-up
     ];
+
+    public pure function label(step: Step) -> string {
+        Lang.t(
+            step == Step.account-creation ? "step-account-creation"
+            : step == Step.region-and-connectivity ? "step-region-and-connectivity"
+            : step == Step.additional-software ? "step-additional-software"
+            : "step-finishing-up",
+            [])
+    }
 }
 
 export component TdnBasePg {
     in property <string> pageid;
+    // position of this page, and of the page currently shown
+    in property <int> index;
+    in property <int> current;
+    out property <bool> active: index == current;
     callback next_page;
     callback prev_page;
 
@@ -29,6 +42,9 @@ export component TdnBasePg {
 
     width: 100%;
     height: 100%;
+    x: index < current ? -self.width : (index > current ? self.width : 0);
+    // off-screen pages are hidden, so Tab can't reach their inputs
+    visible: active || (self.x > -self.width && self.x < self.width);
 
     animate x {
         duration: 200ms;
@@ -38,122 +54,161 @@ export component TdnBasePg {
     @children
 }
 
-export component TdnPage inherits TdnBasePg {
-    in property <string> name: Lang.t("page-" + self.pageid, []);
-    // in property <image> icon;
-    in property <int> step_i;
-    property <Step> step: StepHdl.steps[step_i];
+// the welcome image with the distro caption, for the first and last screens
+export component TdnHero inherits Rectangle {
+    clip: true;
 
-    width: 100%;
-    height: 100%;
-
-    top := HorizontalLayout {
-        // FIXME: to compensate right hand side margin
-        x: -0.5rem;
-        y: 0;
-        padding-top: 1rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
-        height: 3rem;
-        spacing: 1rem;
-
-        distro-logo := Image {
-            horizontal-stretch: 0;
-            source: Cfg.distro_icon();
-            accessible-label: "Distribution logo";
-            height: parent.height;
-            width: self.height;
-        }
-
-        VerticalLayout {
-            horizontal-stretch: 1;
-            height: parent.height;
-            HorizontalLayout {
-                spacing: 4px;
-                padding-top: 0.3rem;
-                for step[i] in StepHdl.steps: Rectangle {
-                    width: (root.w - 12rem) / StepHdl.steps.length;
-                    height: 0.75rem;
-                    // x: parent.x + i * (self.width);
-                    border-radius: self.height / 2;
-                    border-color: Cfg.get_brush("accent_color", #00078f);
-                    border-width: 2px;
-                    background: root.step_i == i ? Cfg.get_brush("accent_color", #00078f) : (i < step_i ? black : transparent);
-                }
-            }
-
-            TdnText {
-                color: #444444;
-                // TODO: make this change
-                text: Lang.t("step-account-creation", []);
-                horizontal-alignment: left;
-                vertical-alignment: TextVerticalAlignment.bottom;
-            }
-        }
-
-        a11y-btn := TdnBtn {
-            horizontal-stretch: 0;
-            accessible-label: "accessibility button";
-            accessible-role: button;
-            background_color: black;
-            border-radius: 0.5rem;
-            height: parent.height;
-            width: self.height;
-            Image {
-                source: @image-url("../data/icons/settings-accessibility-symbolic.svg");
-                colorize: white;
-            }
-        }
+    Image {
+        width: 100%;
+        height: 100%;
+        image-fit: cover;
+        source: Theme.mode == ThemeMode.dark ? Cfg.hero-dark : Cfg.hero-light;
+        accessible-role: none;
     }
 
-    title := TdnText {
-        x: 2rem;
-        y: top.height + 2rem;
-        font-size: 2rem;
-        font-weight: 600;
-        text: name;
+    caption := Text {
+        x: 1rem;
+        y: parent.height - self.height - 1rem;
+        text: Cfg.get_string("welcome.t0", "Ultramarine Technical Preview, please edit welcome.t0\nin /etc/taidan.toml");
+        color: Cfg.get_brush("welcome.t0_color", white);
+    }
+
+    // right-aligned on the caption's last line
+    Text {
+        x: caption.x;
+        y: caption.y + caption.height - self.height;
+        width: caption.width;
+        text: "Taidan " + Cfg.version;
+        color: Cfg.get_brush("welcome.t1_color", white);
+        horizontal-alignment: right;
+    }
+}
+
+// logo, step progress and the accessibility button, at the top of most pages
+export component TdnHeader inherits HorizontalLayout {
+    in property <int> step_i;
+    // false for pages before the welcome screen, which aren't part of any step
+    in property <bool> show-steps: true;
+
+    height: 2.25rem;
+    spacing: 1rem;
+
+    Image {
+        source: Cfg.distro_icon();
+        accessible-label: Cfg.distro;
+        width: self.height;
     }
 
     VerticalLayout {
-        y: title.y + title.height + 1rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
-        spacing: 1rem;
-        height: bottom.y - self.y - 1rem;
+        alignment: center;
+        spacing: 0.4rem;
+        visible: root.show-steps;
 
-        @children
-    }
+        HorizontalLayout {
+            spacing: 4 * Tokens.unit;
+            accessible-role: progress-indicator;
+            accessible-label: StepHdl.label(StepHdl.steps[root.step_i]);
+            accessible-value: (root.step_i + 1) + "/" + StepHdl.steps.length;
 
-    bottom := HorizontalLayout {
-        property <length> bot-margin: 1rem;
-        y: root.h - self.height - bot-margin;
-        height: 3rem;
-        width: root.w;
-        padding-left: 3rem;
-        padding-right: 3rem;
-
-        TdnBtn {
-            background_color: black;
-            padding-x: 1rem;
-            TdnText {
-                text: Lang.t("prev", []);
-                color: Tokens.color-background;
+            for step[i] in StepHdl.steps: Rectangle {
+                height: 6 * Tokens.unit;
+                horizontal-stretch: 1;
+                border-radius: self.height / 2;
+                border-width: 1.5px;
+                border-color: TdnStyle.accent;
+                background: i <= root.step_i ? TdnStyle.accent : transparent;
             }
-
-            clicked => root.prev_page();
         }
 
-        Rectangle { }
+        TdnText {
+            color: Tokens.color-muted-foreground;
+            font-size: Tokens.typography-body-sm-size;
+            text: StepHdl.label(StepHdl.steps[root.step_i]);
+            horizontal-alignment: left;
+        }
+    }
 
+    // TODO: open the accessibility page from the designs
+    VerticalLayout {
+        alignment: center;
+        horizontal-stretch: 0;
         TdnBtn {
-            background_color: Cfg.get_brush("accent_color", #00078f);
-            padding-x: 1rem;
-            TdnText {
-                text: Lang.t("next", []);
-                color: Tokens.color-background;
+            width: 1.75rem;
+            max-height: 1.75rem;
+            accessible-label: "Accessibility";
+            icon: @image-url("../data/icons/settings-accessibility-symbolic.svg");
+            min-size: 1.75rem;
+            icon-size: 1rem;
+            padding-x: 0.375rem;
+        }
+    }
+}
+
+export component TdnPage inherits TdnBasePg {
+    in property <string> name: Lang.t("page-" + self.pageid, []);
+    in property <int> step_i;
+    // whether the page's input is complete, which gates the Next button and Enter
+    in property <bool> can-next: true;
+    // false on the first page
+    in property <bool> can-prev: true;
+    // false for pages before the welcome screen, which aren't part of any step
+    in property <bool> show-steps: true;
+    in property <string> next-text: Lang.t("next", []);
+
+    public function try-next() {
+        if can-next { root.next_page(); }
+    }
+
+    // pages with inputs focus those instead
+    forward-focus: next-btn;
+
+    VerticalLayout {
+        padding-left: 2rem;
+        padding-right: 2rem;
+        padding-top: 1rem;
+        padding-bottom: 1.5rem;
+        spacing: 1.5rem;
+
+        TdnHeader {
+            step_i: root.step_i;
+            show-steps: root.show-steps;
+        }
+
+        TdnText {
+            font-size: 1.75rem;
+            font-weight: 500;
+            horizontal-alignment: left;
+            wrap: word-wrap;
+            text: root.name;
+            accessible-role: none;
+        }
+
+        VerticalLayout {
+            vertical-stretch: 1;
+            spacing: 1rem;
+
+            @children
+        }
+
+        HorizontalLayout {
+            alignment: space-between;
+
+            if root.can-prev: TdnBtn {
+                text: Lang.t("prev", []);
+                clicked => { root.prev_page(); }
             }
 
-            clicked => root.next_page();
+            // keeps Next on the right when there is no Back button
+            if !root.can-prev: Rectangle { }
+
+            next-btn := TdnBtn {
+                text: root.next-text;
+                enabled: root.can-next;
+                enter-hint: true;
+                background-color: TdnStyle.accent;
+                foreground-color: TdnStyle.accent-foreground;
+                clicked => { root.next_page(); }
+            }
         }
     }
 }

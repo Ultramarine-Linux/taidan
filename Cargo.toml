@@ -35,7 +35,7 @@ build = "build.rs"
 atomic_float = "1.1.0"
 basic-toml = "0.1.10"
 color-eyre = "0.6.5"
-const_format = "0.2.34"
+const_format = "0.2.36"
 enum_dispatch = "0.3.13"
 fluent = "0.17.0"
 futures = { workspace = true }
@@ -47,6 +47,8 @@ i18n-embed = { version = "0.16.0", features = [
 ] }
 i18n-embed-fl = "0.10.0"
 icu = { version = "2.3.1", features = ["unstable"] }
+# decodes the welcome image off the UI thread, and gives Slint's `@image-url` the `webp` decoder
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 iso3166 = "1.2.1"
 isolang = { version = "2.4.0", features = ["local_names"] }
 itertools = { workspace = true }
@@ -73,13 +75,14 @@ slint = "1.18.1"
 strip-ansi-escapes = "0.2.1"
 taidan_proc_macros = { path = "taidan_proc_macros" }
 tempfile = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
 tracing = { workspace = true }
 tracing-appender = "0.2.3"
 tracing-error = "0.2.1"
 tracing-journald = "0.3.1"
 tracing-subscriber = { workspace = true }
 uzers = "0.12.1"
+v4l = "0.14.0"
 which = { version = "8.0.6", features = ["tracing"] }
 xcb = { version = "1.7.1", features = ["randr"] }
 xcrypt = "0.3.1"

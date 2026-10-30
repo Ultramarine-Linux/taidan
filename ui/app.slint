@@ -1,21 +1,25 @@
-import { Button, VerticalBox } from "std-widgets.slint";
-import { WelcomePage } from "pages/0010_welcome.slint";
+import { WelcomePage } from "pages/0030_welcome.slint";
 import { Lang } from "lang.slint";
 import { Cfg } from "cfg.slint";
+import { Account } from "account.slint";
 import { Step, StepHdl } from "page.slint";
-import { LanguagePage } from "pages/0020_language.slint";
-import { Theme } from "slintcn/theme/tokens.slint";
-import { Dialog } from "slintcn/components/dialog.slint";
-import { WhoAreYouPage } from "pages/0040_whoareyou.slint";
-import { KeyboardPage } from "pages/0030_keyboard.slint";
+import { LanguagePage } from "pages/0010_language.slint";
+import { Theme, Tokens } from "slintcn/theme/tokens.slint";
+import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
+import { Camera } from "camera.slint";
+import { KeyboardPage } from "pages/0020_keyboard.slint";
 import { PasswordPage } from "pages/0050_password.slint";
+import { DriversPage } from "pages/0100_drivers.slint";
+import { SummaryPage } from "pages/0120_summary.slint";
+import { InstallingPage } from "pages/0130_installing.slint";
+import { DonePage } from "pages/0140_done.slint";
+import { ErrorPage } from "pages/0150_error.slint";
+import { Install, InstallState, Drivers } from "install.slint";
 import { TdnText, TdnBtn } from "components.slint";
 import { Actions } from "actions.slint";
-export { Lang, Cfg, Step, StepHdl, Theme, Actions }
-export enum PageType { welcome, language, keyboard, whoareyou, password }
+export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera }
 
 export component AppWindow inherits Window {
-    in-out property <PageType> pagetype: welcome;
     in-out property <int> pagenum: 0;
     // property <float> scale;
     // public function set_scale(scale: float) { self.scale = scale; }
@@ -39,9 +43,42 @@ export component AppWindow inherits Window {
     // no-frame: true;
     // full-screen: true;
     icon: Cfg.distro_icon();
+    background: Tokens.color-background;
+    // from the `vercel-geist-fonts` package, scripts Geist lacks (CJK, …) fall back to system fonts
+    default-font-family: "Geist";
+    // shown as a standalone window in the middle of the kiosk session, the designs are 600×500
+    preferred-width: 600 * Tokens.unit;
+    preferred-height: 500 * Tokens.unit;
+    // the designs use 14px and all `rem` sizes derive from this
+    default-font-size: 14 * Tokens.unit;
 
-    preferred-width: 800px;
-    preferred-height: 800px;
+    // move keyboard focus to the page being shown
+    function focus-page() {
+        if pagenum == 0 { language.focus(); }
+        else if pagenum == 1 { keyboard.focus(); }
+        else if pagenum == 2 { welcome.focus(); }
+        else if pagenum == 3 { whoareyou.focus(); }
+        else if pagenum == 4 { password.focus(); }
+        else if pagenum == 5 { drivers.focus(); }
+        else if pagenum == 6 { summary.focus(); }
+        else if pagenum == 8 { done.focus(); }
+        else if pagenum == 9 { error.focus(); }
+    }
+    changed pagenum => { focus-page(); }
+    init => { focus-page(); }
+
+    // back to the page when the camera dialog closes
+    property <bool> camera-open: Camera.open;
+    changed camera-open => {
+        if !camera-open { focus-page(); }
+    }
+
+    // leave the installing page once the installation ends
+    property <InstallState> install-state: Install.state;
+    changed install-state => {
+        if install-state == InstallState.done { pagenum = 8; }
+        else if install-state == InstallState.failed { pagenum = 9; }
+    }
 
     MenuBar {
         visible: false;
@@ -54,38 +91,91 @@ export component AppWindow inherits Window {
         }
     }
 
-    WelcomePage {
-        x: pagenum > 0 ? -self.width : 0;
-        next_page => { pagenum += 1; parent.pagetype = PageType.language; }
+    language := LanguagePage {
+        index: 0;
+        current: pagenum;
+        next_page => { pagenum += 1; }
     }
 
-    LanguagePage {
-        x: pagenum > 1 ? -self.width : (pagenum < 1 ? +self.width : 0);
-        prev_page => { pagenum -= 1; parent.pagetype = PageType.welcome; }
-        next_page => { pagenum += 1; parent.pagetype = PageType.keyboard; }
+    keyboard := KeyboardPage {
+        index: 1;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => { pagenum += 1; }
     }
 
-    KeyboardPage {
-        x: pagenum > 2 ? -self.width : (pagenum < 2 ? +self.width : 0);
-        prev_page => { pagenum -= 1; parent.pagetype = PageType.language; }
-        next_page => { pagenum += 1; parent.pagetype = PageType.whoareyou; }
+    welcome := WelcomePage {
+        index: 2;
+        current: pagenum;
+        next_page => { pagenum += 1; }
     }
 
-    WhoAreYouPage {
-        x: pagenum > 3 ? -self.width : (pagenum < 3 ? +self.width : 0);
-        prev_page => { pagenum -= 1; parent.pagetype = PageType.keyboard; }
-        next_page => { pagenum += 1; parent.pagetype = PageType.password; }
+    whoareyou := WhoAreYouPage {
+        index: 3;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => {
+            Account.save();
+            pagenum += 1;
+        }
     }
 
-    PasswordPage {
-        x: pagenum > 4 ? -self.width : (pagenum < 4 ? +self.width : 0);
-        prev_page => { pagenum -= 1; parent.pagetype = PageType.whoareyou; }
-        // next_page => { pagenum += 1; parent.pagetype = PageType.whoareyou; }
+    password := PasswordPage {
+        index: 4;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => {
+            Account.save();
+            pagenum += 1;
+        }
+    }
+
+    drivers := DriversPage {
+        index: 5;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => { pagenum += 1; }
+    }
+
+    summary := SummaryPage {
+        index: 6;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => {
+            Install.start();
+            pagenum = 7;
+        }
+    }
+
+    InstallingPage {
+        index: 7;
+        current: pagenum;
+    }
+
+    done := DonePage {
+        index: 8;
+        current: pagenum;
+    }
+
+    if Camera.open: CameraDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    error := ErrorPage {
+        index: 9;
+        current: pagenum;
+        // the retry button
+        next_page => {
+            Install.start();
+            pagenum = 7;
+        }
     }
 }
 
 export component ErrorDialog inherits Window {
     in property <string> body;
+    default-font-family: "Geist";
     no-frame: true;
     background: transparent;
 
@@ -93,53 +183,56 @@ export component ErrorDialog inherits Window {
     min-height: 200px;
 
     Rectangle {
-        border-radius: 10px;
-        background: white;
+        border-radius: Tokens.radius-xl;
+        background: Tokens.color-background;
+        border-width: 1px;
+        border-color: Tokens.color-border-hairline;
 
-        icon := Image {
-            x: 3rem;
-            y: 2rem;
-            height: 5rem;
-            source: @image-url("../data/icons/dialog-error-symbolic.svg");
-        }
+        VerticalLayout {
+            padding: 2rem;
+            padding-left: 3rem;
+            padding-right: 3rem;
+            spacing: 1rem;
 
-        Rectangle {
-            x: icon.x + icon.width + 1rem;
-            y: icon.y;
-            width: parent.width - icon.width - 8rem;
-            height: closebtn.y - self.y - 1rem;
+            HorizontalLayout {
+                spacing: 1rem;
+                vertical-stretch: 1;
 
-            t_title := TdnText {
-                x: 0;
-                y: 0;
-                horizontal-alignment: left;
-                vertical-alignment: center;
-                color: red;
-                font-size: 2rem;
-                text: "Error";
+                Image {
+                    source: @image-url("../data/icons/dialog-error-symbolic.svg");
+                    colorize: Tokens.color-destructive;
+                    width: 4rem;
+                    height: self.width;
+                    accessible-role: none;
+                }
+
+                VerticalLayout {
+                    spacing: 0.2rem;
+                    alignment: start;
+
+                    TdnText {
+                        horizontal-alignment: left;
+                        color: Tokens.color-destructive;
+                        font-size: 2rem;
+                        text: Lang.t("page-error", []);
+                    }
+
+                    TdnText {
+                        horizontal-alignment: left;
+                        wrap: word-wrap;
+                        text: root.body;
+                    }
+                }
             }
 
-            t_body := TdnText {
-                x: 0;
-                y: t_title.height + 0.2rem;
-                horizontal-alignment: left;
-                vertical-alignment: center;
-                text: body;
-            }
-        }
+            HorizontalLayout {
+                alignment: end;
 
-        closebtn := TdnBtn {
-            x: parent.width - self.width - 3rem;
-            y: parent.height - self.height - 2rem;
-            height: 3rem;
-            padding-x: 1rem;
-            background_color: black;
-            TdnText {
-                color: white;
-                text: "Close";
+                TdnBtn {
+                    text: Lang.t("close", []);
+                    clicked => { root.close(); }
+                }
             }
-
-            clicked => root.close();
         }
     }
 }

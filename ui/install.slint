@@ -1,0 +1,28 @@
+export enum InstallState { idle, running, done, failed }
+
+// driven from Rust (`src/install.rs`)
+export global Install {
+    in property <InstallState> state;
+    // translation id describing the running stage, e.g. "steps-script"
+    in property <string> stage-id;
+    // 1-based
+    in property <int> stage-num;
+    in property <int> stage-count: 9;
+    // progress within the stage, 0–1, or negative when unknown
+    in property <float> stage-progress: -1;
+    // details of why the installation failed
+    in property <string> error;
+
+    callback start();
+    // leave the OOBE: mark the system as configured, then reboot or just exit
+    callback finish(reboot: bool);
+}
+
+export global Drivers {
+    // detected hardware that needs extra drivers
+    in property <bool> nvidia;
+    in property <bool> broadcom-wifi;
+    in property <bool> broadcom-bluetooth;
+    // whether to install drivers and codecs
+    in-out property <bool> install: true;
+}

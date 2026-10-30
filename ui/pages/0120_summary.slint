@@ -1,0 +1,140 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { Account } from "../account.slint";
+import { Drivers } from "../install.slint";
+import { TdnText, TdnStyle } from "../components.slint";
+import { DriverList } from "0100_drivers.slint";
+import { UserIcon } from "0040_whoareyou.slint";
+import { Card } from "../slintcn/components/card.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+
+component SectionTitle inherits TdnText {
+    font-size: 1.2rem;
+    font-weight: Tokens.typography-weight-medium;
+    horizontal-alignment: left;
+}
+
+component InfoRow inherits HorizontalLayout {
+    in property <image> icon;
+    in property <string> label;
+    in property <string> value;
+
+    spacing: 0.75rem;
+
+    Image {
+        source: root.icon;
+        colorize: Tokens.color-foreground;
+        width: 1.25rem;
+    }
+
+    VerticalLayout {
+        alignment: center;
+
+        TdnText {
+            text: root.label;
+            font-size: Tokens.typography-label-size;
+            color: Tokens.color-muted-foreground;
+            horizontal-alignment: left;
+        }
+
+        TdnText {
+            text: root.value;
+            horizontal-alignment: left;
+            overflow: elide;
+        }
+    }
+}
+
+export component SummaryPage inherits TdnPage {
+    pageid: "summary";
+    step_i: 3;
+    name: Lang.t("page-summary", [{ key: "name", value: Account.first-name(Account.fullname, Account.username) }]);
+    next-text: Lang.t("page-summary-confirm", []);
+
+    HorizontalLayout {
+        spacing: 2rem;
+
+        VerticalLayout {
+            alignment: start;
+            horizontal-stretch: 1;
+            spacing: 0.75rem;
+
+            SectionTitle {
+                text: Lang.t("page-summary-account", []);
+            }
+
+            HorizontalLayout {
+                spacing: 0.75rem;
+
+                UserIcon {
+                    width: 2.75rem;
+                }
+
+                VerticalLayout {
+                    alignment: center;
+
+                    TdnText {
+                        text: Account.fullname != "" ? Account.fullname : Account.username;
+                        font-weight: Tokens.typography-weight-medium;
+                        horizontal-alignment: left;
+                        overflow: elide;
+                    }
+
+                    TdnText {
+                        text: Account.username;
+                        color: Tokens.color-muted-foreground;
+                        horizontal-alignment: left;
+                        overflow: elide;
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 0.5rem;
+            }
+
+            SectionTitle {
+                text: Lang.t("page-summary-region", []);
+            }
+
+            InfoRow {
+                icon: @image-url("../../data/icons/globe-symbolic.svg");
+                label: Lang.t("page-language", []);
+                value: Lang.name(Lang.current_language);
+            }
+
+            InfoRow {
+                icon: @image-url("../../data/icons/input-keyboard-symbolic.svg");
+                label: Lang.t("page-keyboard", []);
+                value: Lang.current_variant.id == "" ? Lang.current_keymap.name : Lang.current_variant.name;
+            }
+        }
+
+        VerticalLayout {
+            alignment: start;
+            horizontal-stretch: 1;
+            spacing: 0.75rem;
+
+            SectionTitle {
+                text: Lang.t("page-summary-software", []);
+            }
+
+            Card {
+                card-radius: md;
+
+                VerticalLayout {
+                    padding: 0.75rem;
+
+                    if Drivers.install: DriverList { }
+
+                    if !Drivers.install: TdnText {
+                        text: Lang.t("page-summary-software-none", []);
+                        color: Tokens.color-muted-foreground;
+                        horizontal-alignment: left;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+    }
+}

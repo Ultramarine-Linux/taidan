@@ -58,6 +58,25 @@ impl super::Step for DriversCodecs {
     }
 }
 
+/// hardware that needs extra drivers, as installed by [`DriversCodecs`]
+#[derive(Clone, Copy, Debug, Default)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct Hardware {
+    pub nvidia: bool,
+    pub broadcom_wifi: bool,
+    pub broadcom_bluetooth: bool,
+}
+
+/// detect hardware that [`DriversCodecs`] would install drivers for
+pub async fn detect_hardware() -> Hardware {
+    let (nvidia, broadcom_wifi, broadcom_bluetooth) = tokio::join!(
+        Drivers::check_nvidia_gpu(),
+        Drivers::check_boardcom_wifi(),
+        Drivers::check_boardcom_bluetooth(),
+    );
+    Hardware { nvidia, broadcom_wifi, broadcom_bluetooth }
+}
+
 // NOTE: added during `_05_dnfdownloadapps.rs`
 impl Codecs {
     pub const fn codecs() -> &'static [&'static str] {
@@ -167,7 +186,7 @@ impl Drivers {
     async fn check_boardcom_wifi() -> bool {
         Command::new("sh")
             .arg("-c")
-            .arg("lspci | grep -q -i Network | grep -q -i Broadcom")
+            .arg("lspci | grep -i Network | grep -q -i Broadcom")
             .status()
             .await
             .is_ok_and(|s| s.success())
@@ -175,7 +194,7 @@ impl Drivers {
     async fn check_boardcom_bluetooth() -> bool {
         Command::new("sh")
             .arg("-c")
-            .arg("lspci | grep -q -i Bluetooth| grep -q -i Broadcom")
+            .arg("lspci | grep -i Bluetooth | grep -q -i Broadcom")
             .status()
             .await
             .is_ok_and(|s| s.success())

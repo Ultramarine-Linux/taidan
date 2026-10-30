@@ -1,0 +1,66 @@
+import { TdnBasePg, TdnHeader } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { Cfg } from "../cfg.slint";
+import { Install } from "../install.slint";
+import { TdnText, TdnSpinner } from "../components.slint";
+import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
+
+export component InstallingPage inherits TdnBasePg {
+    VerticalLayout {
+        VerticalLayout {
+            padding-left: 2rem;
+            padding-right: 2rem;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+
+            TdnHeader {
+                step_i: 3;
+            }
+        }
+
+        Image {
+            vertical-stretch: 1;
+            image-fit: cover;
+            source: Theme.mode == ThemeMode.dark ? Cfg.hero-dark : Cfg.hero-light;
+            accessible-role: none;
+        }
+
+        HorizontalLayout {
+            padding-left: 1.75rem;
+            padding-right: 1.75rem;
+            padding-top: 1.25rem;
+            padding-bottom: 1.25rem;
+            spacing: 1rem;
+
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 0;
+
+                TdnSpinner {
+                    width: 1.6rem;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 0.2rem;
+
+                TdnText {
+                    text: Lang.t("page-installing-configuring", []);
+                    font-size: 1.5rem;
+                    font-weight: Tokens.typography-weight-medium;
+                    horizontal-alignment: left;
+                    wrap: word-wrap;
+                }
+
+                TdnText {
+                    text: Install.stage-id == "" ? "" : Lang.t(Install.stage-id, []) + "  (" + Install.stage-num + "/" + Install.stage-count + ")";
+                    color: Tokens.color-muted-foreground;
+                    font-size: Tokens.typography-body-sm-size;
+                    horizontal-alignment: left;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}
