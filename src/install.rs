@@ -153,8 +153,18 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
     // detect hardware for the drivers page in the background, as `lspci` can take a moment
     let ui = ui.clone();
     std::thread::spawn(move || {
-        let hw = crate::RT.block_on(libtaidan::steps::detect_hardware());
+        let mut hw = crate::RT.block_on(libtaidan::steps::detect_hardware());
         tracing::debug!(?hw, "Detected hardware");
+        // pretend to have hardware, to see the drivers list: a comma-separated list of
+        // `nvidia`, `broadcom-wifi`, `broadcom-bluetooth`, or `all`
+        if let Some(sim) = std::env::var_os("TAIDAN_SIMULATE_HW") {
+            let sim = sim.to_string_lossy();
+            let has = |name| sim.split(',').any(|s| s.trim() == name || s.trim() == "all");
+            hw.nvidia |= has("nvidia");
+            hw.broadcom_wifi |= has("broadcom-wifi");
+            hw.broadcom_bluetooth |= has("broadcom-bluetooth");
+            tracing::debug!(?hw, "Simulated hardware (TAIDAN_SIMULATE_HW)");
+        }
         let set = ui.upgrade_in_event_loop(move |ui| {
             let drivers = ui.global::<Drivers<'_>>();
             drivers.set_nvidia(hw.nvidia);

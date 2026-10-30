@@ -52,6 +52,10 @@ cargo build --release -p tdnx --no-default-features --features server-oobe
 TAIDAN_LOG=trace cargo r
 ```
 
+- `TAIDAN_SIMULATE_HW=nvidia,broadcom-wifi,broadcom-bluetooth` (or `all`) pretends that
+  hardware is present, to see the drivers list
+- `TAIDAN_SIMULATE_ERROR=1` makes the simulated install fail halfway
+
 ## 📃 License
 
 `GPL-3.0-or-later`

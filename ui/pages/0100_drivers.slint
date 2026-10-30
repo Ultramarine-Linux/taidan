@@ -28,19 +28,25 @@ export component DriverRow inherits HorizontalLayout {
 
 // what gets installed for the detected hardware, also shown on the summary page
 export component DriverList inherits VerticalLayout {
+    // dims the optional drivers, the built-in ones are always installed
+    property <float> optional-opacity: Drivers.install ? 1 : 0.5;
+
     spacing: 0.5rem;
 
     if Drivers.nvidia: DriverRow {
+        opacity: root.optional-opacity;
         icon: @image-url("../../data/icons/application-x-firmware-symbolic.svg");
         text: Lang.t("page-drivers-nvidia", []);
     }
 
     if Drivers.broadcom-wifi: DriverRow {
+        opacity: root.optional-opacity;
         icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
         text: Lang.t("page-drivers-broadcom-wifi", []);
     }
 
     if Drivers.broadcom-bluetooth: DriverRow {
+        opacity: root.optional-opacity;
         icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
         text: Lang.t("page-drivers-broadcom-bluetooth", []);
     }
@@ -95,7 +101,6 @@ export component DriversPage inherits TdnPage {
             horizontal-stretch: 0;
             width: 15rem;
             card-radius: md;
-            opacity: Drivers.install ? 1 : 0.5;
 
             VerticalLayout {
                 alignment: start;
