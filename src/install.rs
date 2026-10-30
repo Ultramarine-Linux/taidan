@@ -35,6 +35,13 @@ fn backend_cfg() -> libtaidan::cfg::Config {
     cfg
 }
 
+/// whether `TAIDAN_SIMULATE_HW` pretends `name` is present, a comma-separated list of `nvidia`,
+/// `broadcom-wifi`, `broadcom-bluetooth`, or `all`
+fn simulated_hw(name: &str) -> bool {
+    std::env::var("TAIDAN_SIMULATE_HW")
+        .is_ok_and(|sim| sim.split(',').any(|s| s.trim() == name || s.trim() == "all"))
+}
+
 /// pretends to install, for [`is_dev_session`], set `TAIDAN_SIMULATE_ERROR` to fail halfway
 async fn simulate_install(
     callback: &(impl libtaidan::Callback + Sync),
@@ -45,6 +52,9 @@ async fn simulate_install(
         if i == 4 && std::env::var_os("TAIDAN_SIMULATE_ERROR").is_some() {
             return Err(libtaidan::prelude::Err::Msg("simulated error (TAIDAN_SIMULATE_ERROR)"));
         }
+    }
+    if simulated_hw("nvidia") {
+        callback.send(InstallMsg::NeedsReboot);
     }
     callback.send(InstallMsg::Finish);
     Ok(())
@@ -61,6 +71,7 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
             }
             #[expect(clippy::cast_possible_truncation, reason = "a fraction, for display")]
             InstallMsg::StageProgress(frac) => install.set_stage_progress(frac as f32),
+            InstallMsg::NeedsReboot => install.set_needs_reboot(true),
             InstallMsg::Finish => {}
         }
     });
@@ -77,6 +88,7 @@ fn start(ui: &slint::Weak<AppWindow>) {
     }
     install.set_state(InstallState::Running);
     install.set_error("".into());
+    install.set_needs_reboot(false);
     install.set_stage_count(i32::try_from(Stage::all().len()).expect("too many stages"));
     crate::SETTINGS.write().install_codecs_drivers = app.global::<Drivers<'_>>().get_install();
     let mut settings = crate::SETTINGS.read().clone();
@@ -155,14 +167,11 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
     std::thread::spawn(move || {
         let mut hw = crate::RT.block_on(libtaidan::steps::detect_hardware());
         tracing::debug!(?hw, "Detected hardware");
-        // pretend to have hardware, to see the drivers list: a comma-separated list of
-        // `nvidia`, `broadcom-wifi`, `broadcom-bluetooth`, or `all`
-        if let Some(sim) = std::env::var_os("TAIDAN_SIMULATE_HW") {
-            let sim = sim.to_string_lossy();
-            let has = |name| sim.split(',').any(|s| s.trim() == name || s.trim() == "all");
-            hw.nvidia |= has("nvidia");
-            hw.broadcom_wifi |= has("broadcom-wifi");
-            hw.broadcom_bluetooth |= has("broadcom-bluetooth");
+        // pretend to have hardware, to see the drivers list
+        if std::env::var_os("TAIDAN_SIMULATE_HW").is_some() {
+            hw.nvidia |= simulated_hw("nvidia");
+            hw.broadcom_wifi |= simulated_hw("broadcom-wifi");
+            hw.broadcom_bluetooth |= simulated_hw("broadcom-bluetooth");
             tracing::debug!(?hw, "Simulated hardware (TAIDAN_SIMULATE_HW)");
         }
         let set = ui.upgrade_in_event_loop(move |ui| {
