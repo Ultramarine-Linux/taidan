@@ -20,7 +20,7 @@ export component DriverRow inherits HorizontalLayout {
 
     TdnText {
         text: root.text;
-        font-size: 1.1rem;
+        font-size: 1.1 * Tokens.text-rem;
         horizontal-alignment: left;
         overflow: elide;
     }
@@ -75,14 +75,14 @@ export component DriversPage inherits TdnPage {
                 text: Lang.t("page-drivers-desc", []);
                 horizontal-alignment: left;
                 wrap: word-wrap;
-                font-size: 1.1rem;
+                font-size: 1.1 * Tokens.text-rem;
             }
 
             TdnText {
                 text: Lang.t("page-drivers-proprietary", []);
                 horizontal-alignment: left;
                 wrap: word-wrap;
-                font-size: 1.1rem;
+                font-size: 1.1 * Tokens.text-rem;
             }
 
             toggle := TdnToggleRow {

@@ -3265,6 +3265,7 @@ checksum = "413099315636c588ee8f011190b329b971a09a8fae9d157e01dcae8379468514"
 dependencies = [
  "displaydoc",
  "icu_locale_core",
+ "log",
  "serde",
  "stable_deref_trait",
  "writeable",
@@ -6615,6 +6616,8 @@ dependencies = [
 name = "taidan_proc_macros"
 version = "0.1.0"
 dependencies = [
+ "icu",
+ "icu_provider",
  "iso3166",
  "itertools 0.14.0",
  "quote",

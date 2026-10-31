@@ -1,3 +1,4 @@
+import { Tokens } from "../slintcn/theme/tokens.slint";
 import { TdnBasePg, TdnHero } from "../page.slint";
 import { Lang } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
@@ -21,7 +22,7 @@ export component DonePage inherits TdnBasePg {
 
             TdnText {
                 text: Lang.t("page-done", []);
-                font-size: 3rem;
+                font-size: 3 * Tokens.text-rem;
                 font-weight: 800;
                 horizontal-alignment: left;
                 horizontal-stretch: 1;

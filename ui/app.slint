@@ -9,7 +9,7 @@ import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
 import { Camera } from "camera.slint";
 import { KeyboardPage } from "pages/0020_keyboard.slint";
 import { PasswordPage } from "pages/0050_password.slint";
-import { NetworkPage, PasswordDialog, EnterpriseDialog, OfflineDialog } from "pages/0060_network.slint";
+import { NetworkPage, PasswordDialog, EnterpriseDialog, OfflineDialog, ProxyDialog, IpDialog } from "pages/0060_network.slint";
 import { Network, NetState } from "network.slint";
 import { DriversPage } from "pages/0100_drivers.slint";
 import { SummaryPage } from "pages/0120_summary.slint";
@@ -147,7 +147,7 @@ export component AppWindow inherits Window {
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => {
-            Network.save(Network.state != NetState.online);
+            Network.save(!Network.online);
             pagenum += 1;
         }
     }
@@ -199,7 +199,17 @@ export component AppWindow inherits Window {
         height: 100%;
     }
 
-    if Network.enterprise-ssid != "": EnterpriseDialog {
+    if Network.enterprise-open: EnterpriseDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.proxy-open: ProxyDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.ip-open: IpDialog {
         width: 100%;
         height: 100%;
     }
@@ -255,7 +265,7 @@ export component ErrorDialog inherits Window {
                     TdnText {
                         horizontal-alignment: left;
                         color: Tokens.color-destructive;
-                        font-size: 2rem;
+                        font-size: 2 * Tokens.text-rem;
                         text: Lang.t("page-error", []);
                     }
 

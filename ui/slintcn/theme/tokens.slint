@@ -26,6 +26,12 @@ export global Tokens {
     in-out property <float> scale: 1.2;
     // one design pixel, sizes below are in these instead of `px`, so they follow `scale`
     out property <length> unit: 1px * scale;
+    // text and buttons are drawn this much smaller than the rest, so the layout keeps its room
+    in-out property <float> text-scale: 0.875;
+    // one design pixel of text
+    out property <length> text-unit: unit * text-scale;
+    // a `rem` for font sizes, use `1.5 * Tokens.text-rem` instead of `1.5rem`
+    out property <length> text-rem: 14 * text-unit;
 
     // surfaces
     out property <color> color-background:
@@ -117,12 +123,12 @@ export global Tokens {
     // typography
     out property <int> typography-weight-medium:     500;
     out property <int> typography-weight-semibold:   600;
-    out property <length> typography-body-sm-size:      13 * unit;  // text-sm-ish
-    out property <length> typography-body-size:         14 * unit;  // text-sm
-    out property <length> typography-label-size:        12 * unit;  // text-xs
-    out property <length> typography-title-size:        18 * unit;  // text-lg (CardTitle, Dialog title)
-    out property <length> typography-h2-size:           20 * unit;  // text-xl
-    out property <length> typography-h1-size:           24 * unit;  // section heading
+    out property <length> typography-body-sm-size:      13 * text-unit;  // text-sm-ish
+    out property <length> typography-body-size:         14 * text-unit;  // text-sm
+    out property <length> typography-label-size:        12 * text-unit;  // text-xs
+    out property <length> typography-title-size:        18 * text-unit;  // text-lg (CardTitle, Dialog title)
+    out property <length> typography-h2-size:           20 * text-unit;  // text-xl
+    out property <length> typography-h1-size:           24 * text-unit;  // section heading
 
     // spacing — Tailwind 4px base, shadcn uses 2/3/4/6/8 most
     out property <length> spacing-xs:  4 * unit;   // 1

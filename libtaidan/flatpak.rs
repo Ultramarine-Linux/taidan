@@ -15,7 +15,7 @@ pub(super) async fn handle_flatpak<C: crate::Callback>(
     f: impl Fn(&mut tokio::process::Command) -> &mut tokio::process::Command + Send,
 ) -> Res<()> {
     let mut cmd = tokio::process::Command::new("pkexec");
-    cmd.args(["--user", "root", "flatpak"]);
+    cmd.args(["--user", "root", "env"]).args(crate::proxy::env()).arg("flatpak");
     f(&mut cmd);
     let (writer, reader) = tokio::net::unix::pipe::pipe().expect("cannot create pipe");
     let writer = (writer.into_blocking_fd()).expect("cannot set blocking mode to pipe writer");

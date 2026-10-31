@@ -1,3 +1,4 @@
+import { Tokens } from "../slintcn/theme/tokens.slint";
 import { TdnBasePg, TdnHero } from "../page.slint";
 import { Lang } from "../lang.slint";
 import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
@@ -20,7 +21,7 @@ export component WelcomePage inherits TdnBasePg {
 
             TdnText {
                 text: Lang.t("page-welcome-hello", []);
-                font-size: 3rem;
+                font-size: 3 * Tokens.text-rem;
                 font-weight: 800;
                 horizontal-alignment: left;
                 horizontal-stretch: 1;

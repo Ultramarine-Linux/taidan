@@ -69,6 +69,7 @@ export component TdnHero inherits Rectangle {
     caption := Text {
         x: 1rem;
         y: parent.height - self.height - 1rem;
+        font-size: Tokens.typography-body-size;
         text: Cfg.get_string("welcome.t0", "Ultramarine Technical Preview, please edit welcome.t0\nin /etc/taidan.toml");
         color: Cfg.get_brush("welcome.t0_color", white);
     }
@@ -78,6 +79,7 @@ export component TdnHero inherits Rectangle {
         x: caption.x;
         y: caption.y + caption.height - self.height;
         width: caption.width;
+        font-size: Tokens.typography-body-size;
         text: "Taidan " + Cfg.version;
         color: Cfg.get_brush("welcome.t1_color", white);
         horizontal-alignment: right;
@@ -133,8 +135,8 @@ export component TdnHeader inherits HorizontalLayout {
         alignment: center;
         horizontal-stretch: 0;
         TdnBtn {
-            width: 1.75rem;
-            max-height: 1.75rem;
+            width: 1.75rem * Tokens.text-scale;
+            max-height: 1.75rem * Tokens.text-scale;
             accessible-label: "Accessibility";
             icon: @image-url("../data/icons/settings-accessibility-symbolic.svg");
             min-size: 1.75rem;
@@ -184,7 +186,7 @@ export component TdnPage inherits TdnBasePg {
         }
 
         TdnText {
-            font-size: 1.75rem;
+            font-size: 1.75 * Tokens.text-rem;
             font-weight: 500;
             horizontal-alignment: left;
             wrap: word-wrap;

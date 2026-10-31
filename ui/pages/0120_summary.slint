@@ -10,7 +10,7 @@ import { Card } from "../slintcn/components/card.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
 component SectionTitle inherits TdnText {
-    font-size: 1.2rem;
+    font-size: 1.2 * Tokens.text-rem;
     font-weight: Tokens.typography-weight-medium;
     horizontal-alignment: left;
 }
@@ -116,7 +116,7 @@ export component SummaryPage inherits TdnPage {
             InfoRow {
                 icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
                 label: Lang.t("page-summary-network", []);
-                value: Network.state != NetState.online ? Lang.t("page-summary-network-none", [])
+                value: !Network.online ? Lang.t("page-summary-network-none", [])
                     : root.connected-ssid != "" ? root.connected-ssid
                     : Lang.t("page-internet-wired", []);
             }

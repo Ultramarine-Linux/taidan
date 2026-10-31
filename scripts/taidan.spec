@@ -18,7 +18,7 @@ Requires:       xhost
 Requires:       kwin
 Requires:       swaybg
 Requires:       nmgui network-manager-applet
-Requires:       capnet-assist
+Requires:       cog
 Requires:       xdg-terminal-exec
 Requires:       vercel-geist-fonts
 # required for running homectl

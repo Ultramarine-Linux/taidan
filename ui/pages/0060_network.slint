@@ -1,11 +1,41 @@
 import { TdnPage } from "../page.slint";
 import { Lang } from "../lang.slint";
-import { Network, NetState, Security, WifiNetwork, EapMethod } from "../network.slint";
-import { TdnText, TdnBtn, TdnInput, TdnField, TdnStyle, TdnSpinner, TdnToggleRow, TdnWifiIcon, TdnConnectedBadge, TdnDialog } from "../components.slint";
+import { Network, NetState, Security, WifiNetwork, EapMethod, IpSettings, CaSource } from "../network.slint";
+import { TdnText, TdnBtn, TdnInput, TdnField, TdnStyle, TdnSpinner, TdnToggleRow, TdnWifiIcon, TdnIconButton, TdnStatusIcon, TdnDialog, TdnSelect, TdnListRow } from "../components.slint";
 import { Card } from "../slintcn/components/card.slint";
 import { Separator } from "../slintcn/components/separator.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
+import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
 import { ScrollView } from "std-widgets.slint";
+
+// opens the IP address and DNS settings of a network
+component IpSettingsButton inherits TdnBtn {
+    // the network's name, for screen readers
+    in property <string> name;
+    outline: true;
+    icon: @image-url("../../data/icons/systemsettings-symbolic.svg");
+    icon-size: 0.95rem;
+    accessible-label: Lang.t("page-internet-ip", [{ key: "name", value: root.name }]);
+    foreground-color: Tokens.color-foreground;
+    min-size: 1.6rem;
+    padding-x: 0.3rem;
+}
+
+// the trailing column of a network row, a fixed width so it lines up between rows
+component StatusCell inherits VerticalLayout {
+    width: 1.6rem * Tokens.text-scale;
+    horizontal-stretch: 0;
+    alignment: center;
+}
+
+// a network's name, cut off with "…" so the buttons after it stay in place
+component NameCell inherits TdnText {
+    horizontal-stretch: 1;
+    min-width: 0;
+    font-size: 1.05 * Tokens.text-rem;
+    horizontal-alignment: left;
+    overflow: elide;
+}
 
 component NetworkRow inherits HorizontalLayout {
     in property <WifiNetwork> net;
@@ -16,6 +46,9 @@ component NetworkRow inherits HorizontalLayout {
             Network.connect(root.net.ssid, "");
         } else if root.net.security == Security.enterprise {
             Network.enterprise-ssid = root.net.ssid;
+            Network.enterprise-wired = false;
+            Network.enterprise-error-id = "";
+            Network.enterprise-open = true;
         } else {
             Network.password-ssid = root.net.ssid;
         }
@@ -35,33 +68,33 @@ component NetworkRow inherits HorizontalLayout {
         }
     }
 
-    TdnText {
+    NameCell {
         text: root.net.ssid;
-        font-size: 1.05rem;
-        horizontal-alignment: left;
-        overflow: elide;
     }
 
     VerticalLayout {
         alignment: center;
         horizontal-stretch: 0;
 
-        if root.net.connected: TdnConnectedBadge {
-            text: Lang.t("page-internet-connected", []);
+        IpSettingsButton {
+            name: root.net.ssid;
+            clicked => { Network.open-ip(root.net.ssid); }
+        }
+    }
+
+    StatusCell {
+        if root.net.connected: TdnStatusIcon {
+            label: Lang.t("page-internet-connected", []);
         }
 
-        if !root.net.connected && Network.connecting-ssid == root.net.ssid: TdnSpinner {
-            width: 1.1rem;
+        if !root.net.connected && Network.connecting-ssid == root.net.ssid: HorizontalLayout {
+            alignment: center;
+            TdnSpinner { width: 1.1rem; }
         }
 
-        if !root.net.connected && Network.connecting-ssid != root.net.ssid: TdnBtn {
-            outline: true;
-            text: Lang.t("page-internet-connect", []);
-            accessible-label: Lang.t("page-internet-connect", []) + " " + root.net.ssid;
-            foreground-color: Tokens.color-foreground;
-            font-size: Tokens.typography-label-size;
-            min-size: 1.6rem;
-            padding-x: 0.5rem;
+        if !root.net.connected && Network.connecting-ssid != root.net.ssid: TdnIconButton {
+            icon: LucidePaths.arrow-right;
+            label: Lang.t("page-internet-connect", []) + " " + root.net.ssid;
             enabled: Network.connecting-ssid == "" && root.net.security != Security.unsupported;
             clicked => { root.connect(); }
         }
@@ -71,54 +104,61 @@ component NetworkRow inherits HorizontalLayout {
 export component NetworkPage inherits TdnPage {
     pageid: "internet";
     step_i: 1;
-    intercept-next: Network.state != NetState.online;
+    intercept-next: !Network.online;
     next-intercepted => { Network.offline-prompt = true; }
     forward-focus: device-name;
 
     HorizontalLayout {
-        spacing: 1rem;
+        spacing: 1.5rem;
 
         VerticalLayout {
             alignment: start;
-            horizontal-stretch: 100;
-            max-width: 15rem;
+            horizontal-stretch: 0;
+            width: 15rem;
             spacing: 1.5rem;
 
             TdnText {
                 text: Lang.t("page-internet-desc", []);
                 horizontal-alignment: left;
                 wrap: word-wrap;
-                font-size: 1.1rem;
+                font-size: 1.1 * Tokens.text-rem;
             }
 
             VerticalLayout {
                 alignment: start;
                 spacing: 0.75rem;
 
-                // only matters once connected to a network that wants a login first
-                if Network.state == NetState.portal || Network.state == NetState.limited: HorizontalLayout {
+                // NetworkManager doesn't catch every portal, so this stays available once connected
+                HorizontalLayout {
                     alignment: start;
                     min-height: 2.25rem;
                     TdnBtn {
-                        text: Lang.t("page-internet-portal", []);
+                        text: Lang.t(Network.portal-open ? "page-internet-portal-close" : "page-internet-portal", []);
+                        enabled: Network.state != NetState.offline && Network.state != NetState.connecting;
                         background-color: #1f6aa5;
                         foreground-color: white;
-                        clicked => { Network.open-portal(); }
+                        clicked => {
+                            if Network.portal-open {
+                                Network.close-portal();
+                            } else {
+                                Network.open-portal();
+                            }
+                        }
                     }
                 }
 
-                if Network.eduroam-nearby: HorizontalLayout {
+                HorizontalLayout {
                     alignment: start;
                     min-height: 2.25rem;
                     TdnBtn {
-                        text: "eduroam";
-                        background-color: #7c4ddb;
+                        text: Network.proxy-url != "" ? Lang.t("page-internet-proxy-on", []) : Lang.t("page-internet-proxy", []);
+                        background-color: #4f46e5;
                         foreground-color: white;
-                        clicked => { Network.enterprise-ssid = "eduroam"; }
+                        clicked => { Network.proxy-open = true; }
                     }
                 }
 
-                if Network.state != NetState.online || Network.persist-offline-btn: HorizontalLayout {
+                if !Network.online || Network.persist-offline-btn: HorizontalLayout {
                     alignment: start;
                     min-height: 2.25rem;
                     TdnBtn {
@@ -131,14 +171,9 @@ export component NetworkPage inherits TdnPage {
             }
         }
 
-        // pushes the list to the right edge on wider windows
-        Rectangle {
-            horizontal-stretch: 1;
-        }
-
+        // the network list takes the rest of the width
         VerticalLayout {
-            horizontal-stretch: 0;
-            width: 18rem;
+            horizontal-stretch: 1;
             spacing: 1rem;
 
             Card {
@@ -149,29 +184,41 @@ export component NetworkPage inherits TdnPage {
                     padding: 0.6rem;
                     spacing: 0.5rem;
 
-                    if Network.wired: HorizontalLayout {
+                    if Network.ethernet: HorizontalLayout {
                         height: 2.6rem;
                         spacing: 0.6rem;
                         padding-left: 0.25rem;
-                        padding-right: 0.25rem;
+                        // the wi-fi rows also leave room for the list's scrollbar
+                        padding-right: 0.25rem + 0.9rem;
 
-                        TdnText {
+                        // where the wi-fi rows have their signal icon
+                        Rectangle {
+                            width: 1.25rem;
+                            horizontal-stretch: 0;
+                        }
+
+                        NameCell {
                             text: Lang.t("page-internet-wired", []);
-                            font-size: 1.05rem;
-                            horizontal-alignment: left;
-                            overflow: elide;
                         }
 
                         VerticalLayout {
                             alignment: center;
                             horizontal-stretch: 0;
-                            TdnConnectedBadge {
-                                text: Lang.t("page-internet-connected", []);
+                            IpSettingsButton {
+                                name: Lang.t("page-internet-wired", []);
+                                clicked => { Network.open-ip(""); }
+                            }
+                        }
+
+                        StatusCell {
+                            TdnStatusIcon {
+                                ok: Network.wired;
+                                label: Lang.t(Network.wired ? "page-internet-connected" : "page-internet-unplugged", []);
                             }
                         }
                     }
 
-                    if Network.wired && Network.networks.length > 0: Separator { }
+                    if Network.ethernet && Network.networks.length > 0: Separator { }
 
                     if !Network.wifi-available: TdnText {
                         vertical-stretch: 1;
@@ -287,124 +334,504 @@ export component PasswordDialog inherits TdnDialog {
     }
 }
 
-// logs in to a WPA-Enterprise network, like eduroam
-export component EnterpriseDialog inherits TdnDialog {
-    property <bool> busy: Network.connecting-ssid == Network.enterprise-ssid;
-    property <bool> advanced;
-    property <EapMethod> method: EapMethod.peap;
-    property <bool> no-verify;
-    // set once the server is edited, so it no longer follows the username
-    property <bool> domain-touched;
-    property <string> domain;
-    property <bool> complete: user.text != "" && pw.text != "" && (root.no-verify || root.domain != "");
+// a certificate or other file for the 802.1X dialog, and buttons to pick or forget it
+component FileRow inherits TdnField {
+    in property <string> path;
+    in property <bool> enabled: true;
+    callback pick();
+    callback clear();
 
-    title: Lang.t("page-internet-connect-to", [{ key: "ssid", value: Network.enterprise-ssid }]);
-    dialog-width: 24rem;
-    dismissed => { Network.enterprise-ssid = ""; }
+    HorizontalLayout {
+        spacing: 0.5rem;
+
+        TdnText {
+            text: root.path == "" ? Lang.t("page-internet-8021x-nofile", []) : Network.file-name(root.path);
+            color: root.path == "" ? Tokens.color-muted-foreground : Tokens.color-foreground;
+            horizontal-alignment: left;
+            overflow: elide;
+        }
+
+        if root.path != "": TdnBtn {
+            in-dialog: true;
+            outline: true;
+            text: "✕";
+            accessible-label: Lang.t("page-internet-8021x-clear", []);
+            foreground-color: Tokens.color-foreground;
+            min-size: 1.8rem;
+            padding-x: 0.5rem;
+            enabled: root.enabled;
+            clicked => { root.clear(); }
+        }
+
+        TdnBtn {
+            in-dialog: true;
+            outline: true;
+            text: Lang.t("page-internet-8021x-choose", []);
+            foreground-color: Tokens.color-foreground;
+            min-size: 1.8rem;
+            padding-x: 0.6rem;
+            enabled: root.enabled;
+            clicked => { root.pick(); }
+        }
+    }
+}
+
+// picks a file, the session may have no file chooser of its own
+component FileBrowser inherits VerticalLayout {
+    // lists PAC files instead of certificates
+    in property <bool> pac;
+    in-out property <bool> show-all;
+    in property <length> list-height: 12rem;
+    callback picked(string);
+    callback cancelled();
+
+    spacing: 0.75rem;
+    init => { Network.browse(Network.browse-dir, root.pac, root.show-all); }
+
+    HorizontalLayout {
+        spacing: 0.4rem;
+        alignment: start;
+
+        for place in Network.browse-places: TdnBtn {
+            in-dialog: true;
+            outline: true;
+            text: Lang.t(place.name, []);
+            foreground-color: Tokens.color-foreground;
+            min-size: 1.8rem;
+            padding-x: 0.6rem;
+            clicked => { Network.browse(place.path, root.pac, root.show-all); }
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 0.5rem;
+
+        TdnBtn {
+            in-dialog: true;
+            outline: true;
+            text: "↑";
+            accessible-label: Lang.t("page-internet-files-up", []);
+            foreground-color: Tokens.color-foreground;
+            min-size: 1.8rem;
+            padding-x: 0.5rem;
+            enabled: Network.browse-parent != "";
+            clicked => { Network.browse(Network.browse-parent, root.pac, root.show-all); }
+        }
+
+        TdnText {
+            text: Network.browse-dir;
+            color: Tokens.color-muted-foreground;
+            horizontal-alignment: left;
+            overflow: elide;
+        }
+    }
+
+    Rectangle {
+        height: root.list-height;
+        border-radius: Tokens.radius-md;
+        border-width: 1px;
+        border-color: Tokens.color-border-hairline-strong;
+        background: Tokens.color-card;
+
+        if Network.browse-entries.length == 0: TdnText {
+            width: parent.width - 2rem;
+            text: Lang.t(root.pac ? "page-internet-files-empty-pac" : "page-internet-files-empty", []);
+            color: Tokens.color-muted-foreground;
+            wrap: word-wrap;
+        }
+
+        if Network.browse-entries.length > 0: ScrollView {
+            VerticalLayout {
+                alignment: start;
+                padding: 0.25rem;
+                padding-right: 0.9rem;
+
+                for entry in Network.browse-entries: TdnListRow {
+                    text: entry.dir ? entry.name + "/" : entry.name;
+                    clicked => {
+                        if entry.dir {
+                            Network.browse(entry.path, root.pac, root.show-all);
+                        } else {
+                            root.picked(entry.path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    TdnToggleRow {
+        in-dialog: true;
+        text: Lang.t("page-internet-files-all", []);
+        checked <=> root.show-all;
+        toggled => { Network.browse(Network.browse-dir, root.pac, root.show-all); }
+    }
+
+    HorizontalLayout {
+        alignment: start;
+
+        TdnBtn {
+            in-dialog: true;
+            text: Lang.t("cancel", []);
+            clicked => { root.cancelled(); }
+        }
+    }
+}
+
+// logs in to an 802.1X network: WPA-Enterprise wi-fi like eduroam, or wired, with the same methods
+// and options as NetworkManager's connection editor
+export component EnterpriseDialog inherits TdnDialog {
+    property <bool> busy: Network.enterprise-busy;
+    property <bool> wired: Network.enterprise-wired;
+
+    property <EapMethod> method: EapMethod.peap;
+    // MD5 is only offered for wired, LEAP only for wi-fi, the same as NetworkManager
+    property <[EapMethod]> methods: root.wired
+        ? [EapMethod.peap, EapMethod.ttls, EapMethod.tls, EapMethod.fast, EapMethod.pwd, EapMethod.md5]
+        : [EapMethod.peap, EapMethod.ttls, EapMethod.tls, EapMethod.fast, EapMethod.pwd, EapMethod.leap];
+    property <[string]> method-names: [
+        Lang.t("page-internet-8021x-peap", []),
+        Lang.t("page-internet-8021x-ttls", []),
+        "TLS",
+        "FAST",
+        "PWD",
+        root.wired ? "MD5" : "LEAP",
+    ];
+    property <int> method-index: root.method == EapMethod.peap ? 0
+        : root.method == EapMethod.ttls ? 1
+        : root.method == EapMethod.tls ? 2
+        : root.method == EapMethod.fast ? 3
+        : root.method == EapMethod.pwd ? 4
+        : 5;
+    property <[string]> inner-ids: root.method == EapMethod.ttls
+        ? ["pap", "mschap", "mschapv2", "mschapv2-plain", "chap", "md5", "gtc"]
+        : root.method == EapMethod.fast ? ["gtc", "mschapv2"]
+        : ["mschapv2", "md5", "gtc"];
+    property <[string]> inner-names: root.method == EapMethod.ttls
+        ? ["PAP", "MSCHAP", "MSCHAPv2", Lang.t("page-internet-8021x-mschapv2-noeap", []), "CHAP", "MD5", "GTC"]
+        : root.method == EapMethod.fast ? ["GTC", "MSCHAPv2"]
+        : ["MSCHAPv2", "MD5", "GTC"];
+    property <int> inner-index;
+    property <bool> tunneled: root.method == EapMethod.peap || root.method == EapMethod.ttls || root.method == EapMethod.fast;
+    property <bool> uses-ca: root.method == EapMethod.peap || root.method == EapMethod.ttls || root.method == EapMethod.tls;
+
+    property <string> username;
+    property <string> password;
+    // follow the username's realm until edited
+    property <string> anonymous-identity;
+    property <bool> anonymous-touched;
+    property <string> domain;
+    property <bool> domain-touched;
+    property <int> ca-index;
+    property <CaSource> ca: root.ca-index == 0 ? CaSource.system : root.ca-index == 1 ? CaSource.file : CaSource.none;
+    property <string> ca-cert;
+    property <int> peap-version;
+    property <string> client-cert;
+    property <string> private-key;
+    property <string> private-key-password;
+    property <bool> fast-provisioning: true;
+    property <int> fast-mode;
+    property <string> pac-file;
+    property <bool> advanced;
+
+    // the file being picked: "ca", "client", "key" or "pac", empty when not picking
+    property <string> picking;
+    property <bool> show-all-files;
+
+    property <bool> complete: root.username != ""
+        && (root.method == EapMethod.tls || root.password != "")
+        && (!root.uses-ca || (root.ca == CaSource.system ? root.domain != "" : root.ca == CaSource.file ? root.ca-cert != "" : true))
+        && (root.method != EapMethod.tls || (root.client-cert != "" && (root.private-key != "" || Network.is-pkcs12(root.client-cert))))
+        && (root.method != EapMethod.fast || root.fast-provisioning || root.pac-file != "");
+
+    title: root.picking != "" ? Lang.t("page-internet-files", [])
+        : root.wired ? Lang.t("page-internet-8021x-wired", [])
+        : Lang.t("page-internet-connect-to", [{ key: "ssid", value: Network.enterprise-ssid }]);
+    dialog-width: 26rem;
+    dismissed => {
+        if root.picking != "" {
+            root.picking = "";
+        } else {
+            Network.enterprise-open = false;
+        }
+    }
+
+    function set-method(i: int) {
+        root.method = root.methods[i];
+        root.inner-index = 0;
+    }
+
+    function picked(path: string) {
+        if root.picking == "ca" { root.ca-cert = path; }
+        if root.picking == "client" { root.client-cert = path; }
+        if root.picking == "key" { root.private-key = path; }
+        if root.picking == "pac" { root.pac-file = path; }
+        root.picking = "";
+    }
 
     function submit() {
         if root.busy || !root.complete { return; }
         Network.connect-enterprise({
-            ssid: Network.enterprise-ssid,
-            username: user.text,
-            password: pw.text,
+            wired: root.wired,
+            ssid: root.wired ? "" : Network.enterprise-ssid,
             method: root.method,
-            domain: root.no-verify ? "" : root.domain,
+            inner: root.tunneled ? root.inner-ids[root.inner-index] : "",
+            username: root.username,
+            password: root.method == EapMethod.tls ? "" : root.password,
+            anonymous-identity: root.tunneled ? root.anonymous-identity : "",
+            ca: root.uses-ca ? root.ca : CaSource.none,
+            ca-cert: root.uses-ca && root.ca == CaSource.file ? root.ca-cert : "",
+            domain: root.uses-ca ? root.domain : "",
+            peap-version: root.method == EapMethod.peap ? root.peap-version : 0,
+            client-cert: root.method == EapMethod.tls ? root.client-cert : "",
+            private-key: root.method == EapMethod.tls ? root.private-key : "",
+            private-key-password: root.method == EapMethod.tls ? root.private-key-password : "",
+            fast-provisioning: root.method == EapMethod.fast && root.fast-provisioning ? root.fast-mode + 1 : 0,
+            pac-file: root.method == EapMethod.fast ? root.pac-file : "",
         });
     }
 
-    TdnField {
-        label: Lang.t("page-internet-username", []);
-        label-clicked => { user.focus(); }
+    if root.picking != "": FileBrowser {
+        pac: root.picking == "pac";
+        show-all <=> root.show-all-files;
+        list-height: min(12rem, root.height - 22rem);
+        picked(path) => { root.picked(path); }
+        cancelled => { root.picking = ""; }
+    }
 
-        user := TdnInput {
-            in-dialog: true;
-            placeholder: Lang.t("page-internet-username-placeholder", []);
-            auto-focus: true;
-            enabled: !root.busy;
-            edited(text) => {
-                if !root.domain-touched { root.domain = Network.realm(text); }
+    if root.picking == "": scroll := ScrollView {
+        // `form.preferred-height` measures wrapped help text as a single line, so it comes out too
+        // short and the end can't be scrolled to, where the end marker lands is the real height
+        preferred-height: form-end.y;
+        content-width: self.visible-width;
+        content-height: form-end.y;
+        // it only scrolls up and down, a horizontal bar would sit on top of the last field
+        horizontal-scrollbar-policy: always-off;
+
+        form := VerticalLayout {
+            width: scroll.visible-width;
+            // laid out at its (too short) preferred height, the fields past it still get placed
+            height: self.preferred-height;
+            alignment: start;
+            spacing: 1rem;
+            // focus rings are drawn outside their field, keep them clear of the scroll area's edges
+            padding-left: Tokens.focus-ring-offset + Tokens.focus-ring-width;
+            padding-top: self.padding-left;
+            padding-right: 0.9rem;
+
+            TdnField {
+                label: Lang.t("page-internet-8021x-method", []);
+
+                TdnSelect {
+                    in-dialog: true;
+                    label: Lang.t("page-internet-8021x-method", []);
+                    options: root.method-names;
+                    index: root.method-index;
+                    enabled: !root.busy;
+                    changed(i) => { root.set-method(i); }
+                }
             }
-            accepted => { pw.focus(); }
+
+            TdnField {
+                label: Lang.t(root.method == EapMethod.tls ? "page-internet-8021x-identity" : "page-internet-username", []);
+
+                TdnInput {
+                    in-dialog: true;
+                    text <=> root.username;
+                    placeholder: Lang.t("page-internet-username-placeholder", []);
+                    auto-focus: true;
+                    enabled: !root.busy;
+                    edited(text) => {
+                        if !root.domain-touched { root.domain = Network.realm(text); }
+                        if !root.anonymous-touched {
+                            root.anonymous-identity = Network.realm(text) == "" ? "" : "anonymous@" + Network.realm(text);
+                        }
+                    }
+                    accepted => { root.submit(); }
+                }
+            }
+
+            if root.method != EapMethod.tls: TdnField {
+                label: Lang.t("page-internet-password", []);
+
+                TdnInput {
+                    in-dialog: true;
+                    text <=> root.password;
+                    password: true;
+                    enabled: !root.busy;
+                    reveal-label: Lang.t("page-password-show", []);
+                    accepted => { root.submit(); }
+                }
+            }
+
+            if root.method == EapMethod.tls: FileRow {
+                label: Lang.t("page-internet-8021x-client-cert", []);
+                path: root.client-cert;
+                enabled: !root.busy;
+                pick => { root.picking = "client"; }
+                clear => { root.client-cert = ""; }
+            }
+
+            // a PKCS#12 file has the key in it already
+            if root.method == EapMethod.tls && !Network.is-pkcs12(root.client-cert): FileRow {
+                label: Lang.t("page-internet-8021x-private-key", []);
+                path: root.private-key;
+                enabled: !root.busy;
+                pick => { root.picking = "key"; }
+                clear => { root.private-key = ""; }
+            }
+
+            if root.method == EapMethod.tls: TdnField {
+                label: Lang.t("page-internet-8021x-key-password", []);
+                help: Lang.t("page-internet-8021x-key-password-desc", []);
+
+                TdnInput {
+                    in-dialog: true;
+                    text <=> root.private-key-password;
+                    password: true;
+                    enabled: !root.busy;
+                    reveal-label: Lang.t("page-password-show", []);
+                    accepted => { root.submit(); }
+                }
+            }
+
+            if root.uses-ca: TdnField {
+                label: Lang.t("page-internet-8021x-ca", []);
+
+                TdnSelect {
+                    in-dialog: true;
+                    label: Lang.t("page-internet-8021x-ca", []);
+                    options: [
+                        Lang.t("page-internet-8021x-ca-system", []),
+                        Lang.t("page-internet-8021x-ca-file", []),
+                        Lang.t("page-internet-8021x-ca-none", []),
+                    ];
+                    index <=> root.ca-index;
+                    enabled: !root.busy;
+                }
+            }
+
+            if root.uses-ca && root.ca == CaSource.file: FileRow {
+                label: Lang.t("page-internet-8021x-ca-cert", []);
+                path: root.ca-cert;
+                enabled: !root.busy;
+                pick => { root.picking = "ca"; }
+                clear => { root.ca-cert = ""; }
+            }
+
+            if root.uses-ca && root.ca != CaSource.none: TdnField {
+                label: Lang.t("page-internet-server", []);
+                help: Lang.t(root.ca == CaSource.system ? "page-internet-server-desc" : "page-internet-server-desc-optional", []);
+
+                TdnInput {
+                    in-dialog: true;
+                    text <=> root.domain;
+                    placeholder: "radius.example.edu";
+                    enabled: !root.busy;
+                    edited => { root.domain-touched = true; }
+                    accepted => { root.submit(); }
+                }
+            }
+
+            if root.uses-ca && root.ca == CaSource.none: TdnText {
+                text: Lang.t("page-internet-8021x-ca-none-warn", []);
+                color: Tokens.color-destructive;
+                horizontal-alignment: left;
+                wrap: word-wrap;
+            }
+
+            if root.method == EapMethod.fast: TdnToggleRow {
+                in-dialog: true;
+                text: Lang.t("page-internet-8021x-fast-provisioning", []);
+                checked <=> root.fast-provisioning;
+            }
+
+            if root.method == EapMethod.fast && root.fast-provisioning: TdnSelect {
+                in-dialog: true;
+                label: Lang.t("page-internet-8021x-fast-provisioning", []);
+                options: [
+                    Lang.t("page-internet-8021x-fast-anonymous", []),
+                    Lang.t("page-internet-8021x-fast-authenticated", []),
+                    Lang.t("page-internet-8021x-fast-both", []),
+                ];
+                index <=> root.fast-mode;
+                enabled: !root.busy;
+            }
+
+            if root.method == EapMethod.fast: FileRow {
+                label: Lang.t("page-internet-8021x-pac", []);
+                help: root.fast-provisioning ? Lang.t("page-internet-8021x-pac-desc", []) : "";
+                path: root.pac-file;
+                enabled: !root.busy;
+                pick => { root.picking = "pac"; }
+                clear => { root.pac-file = ""; }
+            }
+
+            if root.tunneled && !root.advanced: HorizontalLayout {
+                alignment: start;
+
+                TdnBtn {
+                    in-dialog: true;
+                    outline: true;
+                    text: Lang.t("page-internet-advanced", []);
+                    foreground-color: Tokens.color-foreground;
+                    min-size: 1.8rem;
+                    clicked => { root.advanced = true; }
+                }
+            }
+
+            if root.tunneled && root.advanced: TdnField {
+                label: Lang.t("page-internet-8021x-inner", []);
+
+                TdnSelect {
+                    in-dialog: true;
+                    label: Lang.t("page-internet-8021x-inner", []);
+                    options: root.inner-names;
+                    index <=> root.inner-index;
+                    enabled: !root.busy;
+                }
+            }
+
+            if root.method == EapMethod.peap && root.advanced: TdnField {
+                label: Lang.t("page-internet-8021x-peap-version", []);
+
+                TdnSelect {
+                    in-dialog: true;
+                    label: Lang.t("page-internet-8021x-peap-version", []);
+                    options: [Lang.t("page-internet-8021x-automatic", []), Lang.t("page-internet-8021x-version", [{ key: "version", value: "0" }]), Lang.t("page-internet-8021x-version", [{ key: "version", value: "1" }])];
+                    index <=> root.peap-version;
+                    enabled: !root.busy;
+                }
+            }
+
+            if root.tunneled && root.advanced: TdnField {
+                label: Lang.t("page-internet-8021x-anonymous", []);
+                help: Lang.t("page-internet-8021x-anonymous-desc", []);
+
+                TdnInput {
+                    in-dialog: true;
+                    text <=> root.anonymous-identity;
+                    enabled: !root.busy;
+                    edited => { root.anonymous-touched = true; }
+                    accepted => { root.submit(); }
+                }
+            }
+
+            if Network.enterprise-error-id != "": TdnText {
+                text: Lang.t(Network.enterprise-error-id != "page-internet-error-password" ? Network.enterprise-error-id
+                    : root.method == EapMethod.tls ? "page-internet-8021x-error-tls"
+                    : "page-internet-error-login", []);
+                color: Tokens.color-destructive;
+                horizontal-alignment: left;
+                wrap: word-wrap;
+            }
+
+            // marks the end of the form, after the spacing, which leaves a gap at the bottom
+            form-end := Rectangle { height: 0; }
         }
     }
 
-    TdnField {
-        label: Lang.t("page-internet-password", []);
-        error: Network.error-ssid == Network.enterprise-ssid && Network.error-id != ""
-            ? Lang.t(Network.error-id == "page-internet-error-password" ? "page-internet-error-login" : Network.error-id, [])
-            : "";
-        label-clicked => { pw.focus(); }
-
-        pw := TdnInput {
-            in-dialog: true;
-            password: true;
-            enabled: !root.busy;
-            reveal-label: Lang.t("page-password-show", []);
-            accepted => { root.submit(); }
-        }
-    }
-
-    if !root.advanced: HorizontalLayout {
-        alignment: start;
-        TdnBtn {
-            in-dialog: true;
-            outline: true;
-            text: Lang.t("page-internet-advanced", []);
-            foreground-color: Tokens.color-foreground;
-            min-size: 1.8rem;
-            clicked => { root.advanced = true; }
-        }
-    }
-
-    if root.advanced: HorizontalLayout {
-        spacing: 0.5rem;
-
-        TdnText {
-            text: Lang.t("page-internet-method", []);
-            horizontal-alignment: left;
-            font-weight: Tokens.typography-weight-medium;
-        }
-
-        TdnBtn {
-            in-dialog: true;
-            text: "PEAP";
-            min-size: 1.8rem;
-            background-color: root.method == EapMethod.peap ? TdnStyle.accent : Tokens.color-secondary;
-            foreground-color: root.method == EapMethod.peap ? TdnStyle.accent-foreground : Tokens.color-foreground;
-            clicked => { root.method = EapMethod.peap; }
-        }
-
-        TdnBtn {
-            in-dialog: true;
-            text: "TTLS";
-            min-size: 1.8rem;
-            background-color: root.method == EapMethod.ttls ? TdnStyle.accent : Tokens.color-secondary;
-            foreground-color: root.method == EapMethod.ttls ? TdnStyle.accent-foreground : Tokens.color-foreground;
-            clicked => { root.method = EapMethod.ttls; }
-        }
-    }
-
-    if root.advanced: TdnField {
-        label: Lang.t("page-internet-server", []);
-        help: Lang.t("page-internet-server-desc", []);
-
-        TdnInput {
-            in-dialog: true;
-            text <=> root.domain;
-            enabled: !root.no-verify && !root.busy;
-            edited => { root.domain-touched = true; }
-            accepted => { root.submit(); }
-        }
-    }
-
-    if root.advanced: TdnToggleRow {
-        in-dialog: true;
-        text: Lang.t("page-internet-noverify", []);
-        checked <=> root.no-verify;
-    }
-
-    HorizontalLayout {
+    if root.picking == "": HorizontalLayout {
         alignment: space-between;
 
         TdnBtn {
@@ -466,6 +893,222 @@ export component OfflineDialog inherits TdnDialog {
             background-color: Tokens.color-destructive.transparentize(0.8);
             foreground-color: Tokens.color-destructive;
             clicked => { root.skipped(); }
+        }
+    }
+}
+
+// a manual proxy server, for networks that only reach the internet through one
+export component ProxyDialog inherits TdnDialog {
+    title: Lang.t("page-internet-proxy", []);
+    dialog-width: 24rem;
+    dismissed => { Network.proxy-open = false; }
+
+    function submit() {
+        if !Network.proxy-busy && server.text != "" {
+            Network.set-proxy(server.text, bypass.text);
+        }
+    }
+
+    TdnText {
+        text: Lang.t("page-internet-proxy-desc", []);
+        color: Tokens.color-muted-foreground;
+        horizontal-alignment: left;
+        wrap: word-wrap;
+    }
+
+    TdnField {
+        label: Lang.t("page-internet-proxy-server", []);
+        error: Network.proxy-error-id != "" ? Lang.t(Network.proxy-error-id, []) : "";
+        label-clicked => { server.focus(); }
+
+        server := TdnInput {
+            in-dialog: true;
+            text: Network.proxy-url;
+            placeholder: "proxy.example.com:3128";
+            auto-focus: true;
+            enabled: !Network.proxy-busy;
+            accepted => { bypass.focus(); }
+        }
+    }
+
+    TdnField {
+        label: Lang.t("page-internet-proxy-bypass", []);
+        help: Lang.t("page-internet-proxy-bypass-desc", []);
+        label-clicked => { bypass.focus(); }
+
+        bypass := TdnInput {
+            in-dialog: true;
+            text: Network.proxy-bypass;
+            enabled: !Network.proxy-busy;
+            accepted => { root.submit(); }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: space-between;
+
+        HorizontalLayout {
+            spacing: 0.5rem;
+
+            TdnBtn {
+                in-dialog: true;
+                text: Lang.t("cancel", []);
+                clicked => { root.dismissed(); }
+            }
+
+            if Network.proxy-url != "": TdnBtn {
+                in-dialog: true;
+                text: Lang.t("page-internet-proxy-remove", []);
+                enabled: !Network.proxy-busy;
+                background-color: Tokens.color-destructive.transparentize(0.8);
+                foreground-color: Tokens.color-destructive;
+                clicked => { Network.set-proxy("", ""); }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 0.75rem;
+
+            if Network.proxy-busy: VerticalLayout {
+                alignment: center;
+                TdnSpinner { width: 1.1rem; }
+            }
+
+            TdnBtn {
+                in-dialog: true;
+                text: Lang.t("page-internet-save", []);
+                enter-hint: true;
+                enabled: !Network.proxy-busy && server.text != "";
+                background-color: TdnStyle.accent;
+                foreground-color: TdnStyle.accent-foreground;
+                clicked => { root.submit(); }
+            }
+        }
+    }
+}
+
+// the IP address and DNS servers of a wi-fi network, or of the wired connection
+export component IpDialog inherits TdnDialog {
+    property <bool> busy: Network.ip-busy || Network.ip-loading;
+
+    title: Lang.t("page-internet-ip", [{ key: "name", value: Network.ip-ssid != "" ? Network.ip-ssid : Lang.t("page-internet-wired", []) }]);
+    dialog-width: 24rem;
+    dismissed => { Network.ip-open = false; }
+
+    function submit() {
+        if !root.busy {
+            Network.save-ip(Network.ip-ssid, Network.ip);
+        }
+    }
+
+    if Network.ip-loading: HorizontalLayout {
+        alignment: center;
+        TdnSpinner { width: 1.5rem; }
+    }
+
+    if !Network.ip-loading: TdnToggleRow {
+        in-dialog: true;
+        text: Lang.t("page-internet-ip-manual", []);
+        checked: Network.ip.manual;
+        toggled(on) => { Network.ip.manual = on; }
+    }
+
+    if !Network.ip-loading && Network.ip.manual: HorizontalLayout {
+        spacing: 0.75rem;
+
+        TdnField {
+            // equal halves, so a long translated label can't push the other field out
+            min-width: 0;
+            horizontal-stretch: 1;
+            label: Lang.t("page-internet-ip-address", []);
+
+            TdnInput {
+                in-dialog: true;
+                text: Network.ip.address;
+                placeholder: "192.168.1.20/24";
+                enabled: !root.busy;
+                edited(text) => { Network.ip.address = text; }
+                accepted => { root.submit(); }
+            }
+        }
+
+        TdnField {
+            min-width: 0;
+            horizontal-stretch: 1;
+            label: Lang.t("page-internet-ip-gateway", []);
+
+            TdnInput {
+                in-dialog: true;
+                text: Network.ip.gateway;
+                placeholder: "192.168.1.1";
+                enabled: !root.busy;
+                edited(text) => { Network.ip.gateway = text; }
+                accepted => { root.submit(); }
+            }
+        }
+    }
+
+    if !Network.ip-loading: TdnField {
+        label: Lang.t("page-internet-ip-dns", []);
+        help: Lang.t(Network.ip.manual ? "page-internet-ip-dns-desc-manual" : "page-internet-ip-dns-desc", []);
+        error: Network.ip-error-id != "" ? Lang.t(Network.ip-error-id, []) : "";
+
+        TdnInput {
+            in-dialog: true;
+            text: Network.ip.dns;
+            placeholder: "1.1.1.1, 9.9.9.9";
+            enabled: !root.busy;
+            edited(text) => { Network.ip.dns = text; }
+            accepted => { root.submit(); }
+        }
+    }
+
+    // wired networks at work or school can want a login before they let anything through
+    if Network.ip-ssid == "" && !Network.ip-loading: HorizontalLayout {
+        alignment: start;
+
+        TdnBtn {
+            in-dialog: true;
+            outline: true;
+            text: Lang.t("page-internet-8021x-open", []);
+            foreground-color: Tokens.color-foreground;
+            min-size: 1.8rem;
+            clicked => {
+                Network.ip-open = false;
+                Network.enterprise-ssid = "";
+                Network.enterprise-wired = true;
+                Network.enterprise-error-id = "";
+                Network.enterprise-open = true;
+            }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: space-between;
+
+        TdnBtn {
+            in-dialog: true;
+            text: Lang.t("cancel", []);
+            clicked => { root.dismissed(); }
+        }
+
+        HorizontalLayout {
+            spacing: 0.75rem;
+
+            if Network.ip-busy: VerticalLayout {
+                alignment: center;
+                TdnSpinner { width: 1.1rem; }
+            }
+
+            TdnBtn {
+                in-dialog: true;
+                text: Lang.t("page-internet-save", []);
+                enter-hint: true;
+                enabled: !root.busy;
+                background-color: TdnStyle.accent;
+                foreground-color: TdnStyle.accent-foreground;
+                clicked => { root.submit(); }
+            }
         }
     }
 }

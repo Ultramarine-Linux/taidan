@@ -21,6 +21,7 @@ export component TdnText inherits Text {
     vertical-stretch: 0;
     vertical-alignment: center;
     color: Tokens.color-foreground;
+    font-size: Tokens.typography-body-size;
     font-weight: 400;
 }
 
@@ -55,8 +56,9 @@ export component TdnBtn inherits Rectangle {
     accessible-enabled: root.enabled;
     accessible-action-default => { if root.enabled { root.clicked(); } }
 
-    min-height: root.min-size;
-    min-width: root.min-size;
+    // sizes are given in layout units, but buttons are drawn at text size, see `Tokens.text-scale`
+    min-height: root.min-size * Tokens.text-scale;
+    min-width: root.min-size * Tokens.text-scale;
     border-radius: Tokens.radius-md;
     border-width: root.outline ? 1px : 0;
     border-color: Tokens.color-border-hairline-strong;
@@ -81,7 +83,7 @@ export component TdnBtn inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: root.padding-x;
+        padding-left: root.padding-x * Tokens.text-scale;
         padding-right: self.padding-left;
         spacing: 0.5rem;
         alignment: center;
@@ -89,11 +91,12 @@ export component TdnBtn inherits Rectangle {
         if root.icon.width > 0: Image {
             source: root.icon;
             colorize: root.foreground-color;
-            width: root.icon-size;
+            width: root.icon-size * Tokens.text-scale;
         }
 
         if root.text != "": TdnText {
             text: root.text;
+            overflow: elide;
             color: root.enabled ? root.foreground-color : root.foreground-color.transparentize(0.3);
             font-size: root.font-size;
             font-weight: Tokens.typography-weight-medium;
@@ -317,6 +320,131 @@ export component TdnListRow inherits Rectangle {
     }
 }
 
+// picks one of `options`, the list opens below it and Up and Down change the choice while focused
+export component TdnSelect inherits Rectangle {
+    in property <[string]> options;
+    in-out property <int> index;
+    in property <bool> enabled: true;
+    // whether this is part of a dialog, see `Modal`
+    in property <bool> in-dialog;
+    // accessible name, as the visible label is usually a `TdnField`'s
+    in property <string> label;
+    callback changed(int);
+
+    property <bool> open;
+    property <bool> pointer-focus;
+
+    function pick(i: int) {
+        if i >= 0 && i < root.options.length && i != root.index {
+            root.index = i;
+            root.changed(i);
+        }
+    }
+
+    forward-focus: focus;
+    accessible-role: combobox;
+    accessible-label: root.label;
+    accessible-value: root.options[root.index];
+    accessible-enabled: root.enabled;
+    accessible-expandable: true;
+    accessible-expanded: root.open;
+    accessible-action-expand => { root.open = !root.open; }
+
+    VerticalLayout {
+        spacing: 0.25rem;
+
+        header := Rectangle {
+            height: Tokens.density-input;
+            border-radius: Tokens.radius-md;
+            border-width: 1px;
+            border-color: Tokens.color-border-hairline-strong;
+            background: area.has-hover && root.enabled ? Tokens.color-accent : Tokens.color-card;
+            opacity: root.enabled ? 1 : 0.5;
+
+            focus := FocusScope {
+                enabled: root.enabled && Modal.open == root.in-dialog;
+                key-pressed(event) => {
+                    root.pointer-focus = false;
+                    if event.text == " " || event.text == Key.Return {
+                        root.open = !root.open;
+                        return accept;
+                    }
+                    if event.text == Key.DownArrow { root.pick(root.index + 1); return accept; }
+                    if event.text == Key.UpArrow { root.pick(root.index - 1); return accept; }
+                    if event.text == Key.Escape && root.open {
+                        root.open = false;
+                        return accept;
+                    }
+                    reject
+                }
+            }
+
+            HorizontalLayout {
+                padding-left: 0.75rem;
+                padding-right: 0.6rem;
+                spacing: 0.5rem;
+
+                // takes the free space, so the arrow sits at the end
+                TdnText {
+                    text: root.options[root.index];
+                    horizontal-stretch: 1;
+                    min-width: 0;
+                    horizontal-alignment: left;
+                    overflow: elide;
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 0;
+
+                    Icon {
+                        commands: root.open ? LucidePaths.chevron-up : LucidePaths.chevron-down;
+                        size: 1rem;
+                        tint: Tokens.color-muted-foreground;
+                    }
+                }
+            }
+
+            area := TouchArea {
+                enabled: root.enabled;
+                mouse-cursor: pointer;
+                pointer-event(ev) => {
+                    if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
+                }
+                clicked => {
+                    root.open = !root.open;
+                    focus.focus();
+                }
+            }
+
+            if focus.has-focus && !root.pointer-focus: FocusRing {
+                host-width: parent.width;
+                host-height: parent.height;
+            }
+        }
+
+        if root.open: Rectangle {
+            border-radius: Tokens.radius-md;
+            border-width: 1px;
+            border-color: Tokens.color-border-hairline-strong;
+            background: Tokens.color-card;
+
+            VerticalLayout {
+                padding: 0.25rem;
+
+                for option[i] in root.options: TdnListRow {
+                    text: option;
+                    selected: i == root.index;
+                    clicked => {
+                        root.pick(i);
+                        root.open = false;
+                    }
+                }
+            }
+        }
+    }
+}
+
 // a labelled form field, with the input as its child
 export component TdnField inherits VerticalLayout {
     in property <string> label;
@@ -328,10 +456,15 @@ export component TdnField inherits VerticalLayout {
 
     spacing: 0.4rem;
 
-    Label {
-        text: root.label;
-        variant: root.required ? LabelVariant.required : LabelVariant.default;
-        clicked => { root.label-clicked(); }
+    // `Label` sizes itself to its text, which would cap the whole field at that width
+    HorizontalLayout {
+        alignment: start;
+
+        Label {
+            text: root.label;
+            variant: root.required ? LabelVariant.required : LabelVariant.default;
+            clicked => { root.label-clicked(); }
+        }
     }
 
     @children
@@ -515,32 +648,86 @@ export component TdnWifiIcon inherits Rectangle {
 }
 
 // a small green "Connected" badge
-export component TdnConnectedBadge inherits Rectangle {
-    in property <string> text;
+// a small square icon button, the same size as `TdnStatusIcon`, for actions in a list row
+export component TdnIconButton inherits Rectangle {
+    // Lucide path commands, see `LucidePaths`
+    in property <string> icon;
+    // what it does, for screen readers
+    in property <string> label;
+    in property <bool> enabled: true;
+    // whether this is part of a dialog, see `Modal`
+    in property <bool> in-dialog;
+    callback clicked;
 
-    height: 1.6rem;
+    property <bool> pointer-focus;
+
+    forward-focus: focus;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+
+    // drawn at text size, like buttons, see `Tokens.text-scale`
+    width: self.height;
+    height: 1.6rem * Tokens.text-scale;
     border-radius: Tokens.radius-sm;
-    background: Tokens.color-affirm.transparentize(0.75);
+    background: !root.enabled ? TdnStyle.accent.transparentize(0.92)
+        : area.pressed ? TdnStyle.accent.transparentize(0.6)
+        : area.has-hover ? TdnStyle.accent.transparentize(0.75)
+        : TdnStyle.accent.transparentize(0.85);
+    animate background { duration: Tokens.motion-fast; }
 
-    HorizontalLayout {
-        padding-left: 0.4rem;
-        padding-right: 0.5rem;
-        spacing: 0.3rem;
-        alignment: center;
-
-        VerticalLayout {
-            alignment: center;
-            Icon {
-                commands: LucidePaths.check;
-                size: 0.9rem;
-                tint: Tokens.color-foreground;
+    focus := FocusScope {
+        enabled: root.enabled && Modal.open == root.in-dialog;
+        key-pressed(event) => {
+            root.pointer-focus = false;
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
             }
+            reject
         }
+    }
 
-        TdnText {
-            text: root.text;
-            font-size: Tokens.typography-label-size;
+    Icon {
+        commands: root.icon;
+        size: parent.height * 0.6;
+        tint: root.enabled ? TdnStyle.accent : Tokens.color-muted-foreground;
+    }
+
+    area := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
         }
+        clicked => { root.clicked(); }
+    }
+
+    if focus.has-focus && !root.pointer-focus: FocusRing {
+        host-width: parent.width;
+        host-height: parent.height;
+    }
+}
+
+// a small square status icon: a green check when `ok`, a grey cross when not
+export component TdnStatusIcon inherits Rectangle {
+    in property <bool> ok: true;
+    // the status, for screen readers
+    in property <string> label;
+
+    accessible-role: image;
+    accessible-label: root.label;
+
+    width: self.height;
+    height: 1.6rem * Tokens.text-scale;
+    border-radius: Tokens.radius-sm;
+    background: root.ok ? Tokens.color-affirm.transparentize(0.75) : Tokens.color-secondary;
+
+    Icon {
+        commands: root.ok ? LucidePaths.check : LucidePaths.x-mark;
+        size: parent.height * 0.6;
+        tint: root.ok ? Tokens.color-foreground : Tokens.color-muted-foreground;
     }
 }
 
@@ -569,7 +756,8 @@ export component TdnDialog inherits Rectangle {
             x: (root.width - self.width) / 2;
             y: (root.height - self.height) / 2;
             width: min(root.dialog-width, root.width - 2rem);
-            height: content.preferred-height;
+            // never taller than the window, a `ScrollView` inside then gets what's left
+            height: min(content.preferred-height, root.height - 2rem);
             background: Tokens.color-background;
             card-radius: lg;
 
@@ -579,7 +767,7 @@ export component TdnDialog inherits Rectangle {
 
                 TdnText {
                     text: root.title;
-                    font-size: 1.4rem;
+                    font-size: 1.4 * Tokens.text-rem;
                     font-weight: 500;
                     horizontal-alignment: left;
                     wrap: word-wrap;

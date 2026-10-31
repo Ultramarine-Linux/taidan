@@ -22,6 +22,9 @@ pub struct Settings {
 
     pub install_codecs_drivers: bool,
 
+    /// for networks that only reach the internet through a proxy
+    pub proxy: Option<crate::proxy::Proxy>,
+
     pub ims: Vec<String>,
     pub imf: crate::i18n::I18nImf,
 

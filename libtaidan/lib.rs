@@ -6,6 +6,7 @@ pub mod flatpak;
 pub mod i18n;
 pub mod passwd;
 pub mod prelude;
+pub mod proxy;
 pub mod server_setup;
 pub mod settings;
 pub mod steps;
@@ -56,6 +57,12 @@ pub async fn start_install(
     callback: &impl Callback,
 ) -> Res<()> {
     tracing::info!("Starting installation");
+    proxy::set(settings.proxy.clone());
+    if let Some(proxy) = &settings.proxy
+        && let Err(e) = proxy.persist().await
+    {
+        tracing::error!(?e, "cannot save the proxy");
+    }
     for stage in steps::Stage::all() {
         callback.send(InstallMsg::UpdStage(*stage));
         tracing::debug!(?stage, "Running pre()");
@@ -116,6 +123,7 @@ where
     let p = tokio::process::Command::new("pkexec")
         .args(["--user", user, "env"])
         .args(std::env::vars().map(|(k, v)| format!("{k}={v}")))
+        .args(proxy::env())
         .arg(name)
         .args(args)
         .stdout(stdio)
