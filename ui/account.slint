@@ -1,0 +1,34 @@
+export struct Avatar {
+    // path of the image file
+    id: string,
+    image: image,
+}
+
+// the user account being created, written to the backend settings by `save()`
+export global Account {
+    in-out property <string> fullname;
+    in-out property <string> username;
+    in-out property <string> password;
+    in-out property <string> password-repeat;
+    // preset user icons
+    in property <[Avatar]> avatars;
+    // the chosen user icon, `avatar-id` is empty if none
+    in-out property <string> avatar-id;
+    in-out property <image> avatar;
+    // set once the user types a username themselves, so we stop suggesting one from the full name
+    in-out property <bool> username-touched;
+
+    out property <bool> username-valid: valid-username(username);
+    out property <bool> password-valid: password != "" && password == password-repeat;
+
+    pure callback valid-username(username: string) -> bool;
+    // username suggested by the full name, or `current` if none can be derived
+    pure callback suggest-username(fullname: string, current: string) -> string;
+    // what to call the user: their first name, else their username
+    pure callback first-name(fullname: string, username: string) -> string;
+    callback save();
+
+    valid-username(username) => username != "";
+    suggest-username(fullname, current) => current;
+    first-name(fullname, username) => fullname != "" ? fullname : username;
+}

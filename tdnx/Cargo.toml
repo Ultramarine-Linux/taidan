@@ -8,7 +8,7 @@ name = "tdnx"
 path = "./main.rs"
 
 [features]
-default = []
+default = ["desktop-install"]
 # Enables the libtaidan-backed local server OOBE contract. The desktop Taidan
 # build does not enable this feature.
 server-oobe = ["dep:libtaidan"]

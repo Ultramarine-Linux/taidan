@@ -17,8 +17,13 @@ pub struct Settings {
 
     #[serde(skip_serializing)]
     pub passwd: SecretString,
+    /// image to use as the user's icon
+    pub avatar: Option<std::path::PathBuf>,
 
     pub install_codecs_drivers: bool,
+
+    /// for networks that only reach the internet through a proxy
+    pub proxy: Option<crate::proxy::Proxy>,
 
     pub ims: Vec<String>,
     pub imf: crate::i18n::I18nImf,
@@ -30,9 +35,7 @@ pub struct Settings {
 
 impl Settings {
     pub fn new() -> Self {
-        let mut ret = Self::default();
-        ret.tweaks = vec![false; crate::tweaks::TWEAKS.len()];
-        ret
+        Settings { tweaks: vec![false; crate::tweaks::TWEAKS.len()], ..Default::default() }
     }
 }
 

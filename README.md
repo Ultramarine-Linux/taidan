@@ -3,14 +3,16 @@
 > 🎵 _[**チョウチン少女** - Green wisteria](https://www.youtube.com/watch?v=1-wL7bb_l-o)_
 
 Taidan is a GUI Out-Of-Box-Experience (OOBE) and Welcome App for Ultramarine
-Linux, written in Rust and the [Helium] toolkit.
+Linux, written in Rust and the [Slint] toolkit.
 
 ## 📦 Dependencies
 
 For an up-to-date list, see `scripts/taidan.spec`.
 
 ```
-libhelium
+fontconfig
+vercel-geist-fonts
+libxkbcommon, wayland and EGL libraries [loaded at runtime by Slint]
 gsettings or (plasma-apply-colorscheme and kwriteconfig6)
 shadow-utils
 systemd-udev [for systemd-timesyncd.service]
@@ -24,7 +26,13 @@ xkeyboard-config [for /usr/share/X11/xkb/rules/evdev.lst]
 
 ```
 pkgconfig(openssl)
-pkgconfig(libhelium-1)
+pkgconfig(fontconfig)
+pkgconfig(libxcrypt)
+pkgconfig(xcb)
+pkgconfig(icu-i18n)
+clang
+glibc-all-langpacks [for `localedef --list-archive`]
+xkeyboard-config [for /usr/share/X11/xkb/rules/evdev.lst]
 ```
 
 ## tdnx
@@ -43,6 +51,11 @@ cargo build --release -p tdnx --no-default-features --features server-oobe
 ```sh
 TAIDAN_LOG=trace cargo r
 ```
+
+- `TAIDAN_SIMULATE_HW=nvidia,broadcom-wifi,broadcom-bluetooth` (or `all`) pretends that
+  hardware is present, to see the drivers list (with `nvidia`, the simulated install asks for a
+  reboot)
+- `TAIDAN_SIMULATE_ERROR=1` makes the simulated install fail halfway
 
 ## 📃 License
 
@@ -74,4 +87,4 @@ skip_pages = ["theme", "browser"] # maybe you don't want taidan to setup themes 
 org = "Fyra Labs"
 ```
 
-[Helium]: https://developer.fyralabs.com/helium/hig
+[Slint]: https://slint.dev

@@ -6,9 +6,11 @@ pub mod flatpak;
 pub mod i18n;
 pub mod passwd;
 pub mod prelude;
-pub mod settings;
+pub mod proxy;
 pub mod server_setup;
+pub mod settings;
 pub mod steps;
+pub mod time;
 pub mod tweaks;
 
 use crate::prelude::*;
@@ -23,7 +25,8 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 
 #[derive(Debug, Clone)]
 pub enum InstallMsg {
-    UpdStage(crate::steps::Stage),
+    UpdStage(steps::Stage),
+    NeedsReboot,
     Finish,
     StageProgress(f64),
 }
@@ -54,6 +57,12 @@ pub async fn start_install(
     callback: &impl Callback,
 ) -> Res<()> {
     tracing::info!("Starting installation");
+    proxy::set(settings.proxy.clone());
+    if let Some(proxy) = &settings.proxy
+        && let Err(e) = proxy.persist().await
+    {
+        tracing::error!(?e, "cannot save the proxy");
+    }
     for stage in steps::Stage::all() {
         callback.send(InstallMsg::UpdStage(*stage));
         tracing::debug!(?stage, "Running pre()");
@@ -73,7 +82,10 @@ mod parseutil {
     /// - wait for `output` failed…?
     /// - process exited with non-zero error code
     pub async fn wait_for(s: &'static str, output: &mut tokio::process::Child) -> Res<()> {
-        let status = (output.wait().await.map_err(Err::_fail_to_run(s)))
+        let status = output
+            .wait()
+            .await
+            .map_err(Err::_fail_to_run(s))
             .wrap_message(|_| format!("waiting for `{s}` failed"))?;
         if status.success() {
             Ok(())
@@ -97,13 +109,13 @@ mod parseutil {
 /// # Errors
 /// - command failed to run
 /// - command exited with non-zero status code
-pub async fn pkexec<'u, I: IntoIterator + std::fmt::Debug>(
-    user: &'u str,
+pub async fn pkexec<I: IntoIterator + std::fmt::Debug>(
+    user: &str,
     name: &'static str,
     args: I,
 ) -> Res<()>
 where
-    <I as std::iter::IntoIterator>::Item: std::convert::AsRef<std::ffi::OsStr>,
+    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
 {
     tracing::debug!(?name, ?args, "running pkexec");
     // TODO: use logic from anda
@@ -111,6 +123,7 @@ where
     let p = tokio::process::Command::new("pkexec")
         .args(["--user", user, "env"])
         .args(std::env::vars().map(|(k, v)| format!("{k}={v}")))
+        .args(proxy::env())
         .arg(name)
         .args(args)
         .stdout(stdio)
@@ -133,7 +146,7 @@ where
 /// - command exited with non-zero status code
 pub async fn root<I: IntoIterator + std::fmt::Debug>(name: &'static str, args: I) -> Res<()>
 where
-    <I as std::iter::IntoIterator>::Item: std::convert::AsRef<std::ffi::OsStr>,
+    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
 {
     pkexec("root", name, args).await
 }

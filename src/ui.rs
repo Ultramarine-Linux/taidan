@@ -1,89 +1,45 @@
-use crate::prelude::*;
+// Slint's generated code only allows clippy::{all,pedantic,nursery}, not the restriction lints we enable.
+#[allow(clippy::restriction)]
+mod generated {
+    slint::include_modules!();
+}
+pub use generated::*;
 
-// FIXME: labels don't update when language changes
-#[relm4::widget_template(pub)]
-impl WidgetTemplate for PrevNextBtns {
-    view! {
-        gtk::Box {
-            set_valign: gtk::Align::End,
-
-            #[name = "prev"]
-            libhelium::Button {
-                set_is_pill: true,
-                set_color: libhelium::ButtonColor::Surface,
-                #[watch]
-                set_label: &t!("prev"),
-                inline_css: "padding-left: 48px; padding-right: 48px",
-            },
-
-            gtk::Box { set_hexpand: true },
-
-            #[name = "next"]
-            libhelium::Button {
-                set_is_pill: true,
-                #[watch]
-                set_label: &t!("next"),
-                inline_css: "padding-left: 48px; padding-right: 48px",
-                add_css_class: "suggested-action",
-            },
-        },
-    }
+/// # Panics
+/// If the UI cannot be created or the event loop fails.
+pub fn run() {
+    tracing::debug!("Starting Taidan");
+    let ui = AppWindow::new().expect("cannot create app");
+    // Wayland ignores the window `icon`; compositors look up `<app_id>.desktop` instead.
+    // Must be set after the platform exists (AppWindow::new) and before the window is shown.
+    slint::set_xdg_app_id(crate::APPID).expect("cannot set xdg app id");
+    crate::l10n::initialize_ui(&ui.as_weak(), &ui.global::<Lang<'_>>());
+    let cfg: Cfg<'_> = ui.global();
+    crate::cfg::initialize_ui(ui.as_weak(), &cfg);
+    crate::account::initialize_ui(ui.as_weak(), &ui.global());
+    crate::install::initialize_ui(&ui.as_weak(), &ui.global());
+    crate::avatar::initialize_ui(&ui.as_weak(), &ui.global());
+    crate::network::initialize_ui(&ui.as_weak(), &ui.global());
+    init_actions(ui.as_weak(), &ui.global());
+    // autoscale(&ui);
+    ui.run().expect("cannot run ui");
 }
 
-#[relm4::widget_template(pub)]
-impl WidgetTemplate for SwitchBox {
-    view! {
-        libhelium::MiniContentBlock {
-            #[wrap(Some)]
-            #[name(switch)]
-            set_widget = &gtk::Switch {
-                set_halign: gtk::Align::End,
-                set_hexpand: true
+fn init_actions(_ui: slint::Weak<impl slint::ComponentHandle + 'static>, actions: &Actions<'_>) {
+    actions.on_open_terminal(|| {
+        // wait on a separate thread so the UI keeps running while the terminal is open
+        std::thread::spawn(|| {
+            let status = std::process::Command::new("pkexec")
+                .args(["--user", "root", "env"])
+                .args(std::env::vars().map(|(k, v)| format!("{k}={v}")))
+                .args(["xdg-terminal-exec", "--", "sh", "-c"])
+                .arg("echo 'Taidan has detected Alt+Shift+T. A terminal with superuser privilege is opened for debugging purposes. Only proceed if you know what you are doing, OTHERWISE YOU MAY RISK DATA LOSS OR CAUSE DAMAGES TO YOUR DEVICE. To exit the terminal, press Ctrl+D.' && sh")
+                .status();
+            match status {
+                Ok(status) if !status.success() => tracing::warn!(?status, "debug terminal exited"),
+                Ok(_) => {}
+                Err(e) => tracing::error!(?e, "cannot spawn pkexec for debug terminal"),
             }
-        }
-    }
-}
-
-#[relm4::widget_template(pub)]
-impl WidgetTemplate for Category {
-    view! {
-        // libhelium::ViewDual
-        #[name(viewdual)]
-        gtk::Box {
-            set_orientation: gtk::Orientation::Horizontal,
-            set_valign: gtk::Align::Fill,
-            set_halign: gtk::Align::Fill,
-            set_vexpand: true,
-            set_hexpand: true,
-            // set_show_handle: false,
-
-            // #[wrap(Some)]
-            // set_child_start = &gtk::ScrolledWindow {
-            gtk::ScrolledWindow {
-                #[name(browsers)]
-                gtk::ListBox {
-                    add_css_class: "content-list",
-                    set_selection_mode: gtk::SelectionMode::Multiple,
-                    set_vexpand: true,
-                    set_hexpand: true,
-                    set_valign: gtk::Align::Fill,
-                    set_halign: gtk::Align::Fill,
-                }
-            },
-            #[name(optlist)]
-            // #[wrap(Some)]
-            // set_child_end = &gtk::ScrolledWindow {
-            gtk::ScrolledWindow {
-                // #[name(optlist)]
-                // gtk::ListBox {
-                //     add_css_class: "content-list",
-                //     set_selection_mode: gtk::SelectionMode::Single,
-                //     set_vexpand: true,
-                //     set_hexpand: true,
-                //     set_valign: gtk::Align::Center,
-                //     set_halign: gtk::Align::Center,
-                // },
-            }
-        }
-    }
+        });
+    });
 }

@@ -1,0 +1,113 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { Drivers } from "../install.slint";
+import { TdnText, TdnToggleRow } from "../components.slint";
+import { Card } from "../slintcn/components/card.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+
+export component DriverRow inherits HorizontalLayout {
+    in property <image> icon;
+    in property <string> text;
+
+    spacing: 0.75rem;
+    height: 2.25rem;
+
+    Image {
+        source: root.icon;
+        colorize: Tokens.color-foreground;
+        width: 1.5rem;
+    }
+
+    TdnText {
+        text: root.text;
+        font-size: 1.1 * Tokens.text-rem;
+        horizontal-alignment: left;
+        overflow: elide;
+    }
+}
+
+// what gets installed for the detected hardware, also shown on the summary page
+export component DriverList inherits VerticalLayout {
+    // dims the optional drivers, the built-in ones are always installed
+    property <float> optional-opacity: Drivers.install ? 1 : 0.5;
+
+    spacing: 0.5rem;
+
+    if Drivers.nvidia: DriverRow {
+        opacity: root.optional-opacity;
+        icon: @image-url("../../data/icons/application-x-firmware-symbolic.svg");
+        text: Lang.t("page-drivers-nvidia", []);
+    }
+
+    if Drivers.broadcom-wifi: DriverRow {
+        opacity: root.optional-opacity;
+        icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
+        text: Lang.t("page-drivers-broadcom-wifi", []);
+    }
+
+    if Drivers.broadcom-bluetooth: DriverRow {
+        opacity: root.optional-opacity;
+        icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
+        text: Lang.t("page-drivers-broadcom-bluetooth", []);
+    }
+
+    DriverRow {
+        icon: @image-url("../../data/icons/computer-laptop-symbolic.svg");
+        text: Lang.t("page-drivers-builtin", []);
+    }
+}
+
+export component DriversPage inherits TdnPage {
+    pageid: "drivers";
+    step_i: 2;
+    forward-focus: toggle;
+
+    HorizontalLayout {
+        spacing: 1rem;
+
+        VerticalLayout {
+            alignment: start;
+            horizontal-stretch: 100;
+            max-width: 21rem;
+            spacing: 1.25rem;
+
+            TdnText {
+                text: Lang.t("page-drivers-desc", []);
+                horizontal-alignment: left;
+                wrap: word-wrap;
+                font-size: 1.1 * Tokens.text-rem;
+            }
+
+            TdnText {
+                text: Lang.t("page-drivers-proprietary", []);
+                horizontal-alignment: left;
+                wrap: word-wrap;
+                font-size: 1.1 * Tokens.text-rem;
+            }
+
+            toggle := TdnToggleRow {
+                text: Lang.t("page-drivers-install", []);
+                checked <=> Drivers.install;
+                accepted => { root.try-next(); }
+            }
+        }
+
+        // pushes the list to the right edge on wider windows
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        Card {
+            horizontal-stretch: 0;
+            width: 15rem;
+            card-radius: md;
+
+            VerticalLayout {
+                alignment: start;
+                padding: 0.75rem;
+
+                DriverList { }
+            }
+        }
+    }
+}

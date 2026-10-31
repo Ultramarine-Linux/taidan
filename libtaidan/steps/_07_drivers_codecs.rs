@@ -35,18 +35,20 @@ pub struct Drivers;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Codecs;
 impl super::Step for DriversCodecs {
-    #[tracing::instrument]
+    #[tracing::instrument(skip(sender))]
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        _: &C,
+        _cfg: &crate::cfg::Config,
+        sender: &C,
     ) -> Res<()> {
         if !settings.install_codecs_drivers || settings.nointernet {
             return Ok(());
         }
-        if let Err(e) = Drivers::setup_nvidia().await {
-            tracing::warn!(?e, "cannot setup nvidia drivers");
+        match Drivers::setup_nvidia().await {
+            Ok(true) => sender.send(crate::InstallMsg::NeedsReboot),
+            Ok(false) => {}
+            Err(e) => tracing::warn!(?e, "cannot setup nvidia drivers"),
         }
         if let Err(e) = Drivers::setup_broadcom().await {
             tracing::warn!(?e, "cannot setup broadcom drivers");
@@ -56,6 +58,25 @@ impl super::Step for DriversCodecs {
         // Codecs::install_codecs().await?;
         Ok(())
     }
+}
+
+/// hardware that needs extra drivers, as installed by [`DriversCodecs`]
+#[derive(Clone, Copy, Debug, Default)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct Hardware {
+    pub nvidia: bool,
+    pub broadcom_wifi: bool,
+    pub broadcom_bluetooth: bool,
+}
+
+/// detect hardware that [`DriversCodecs`] would install drivers for
+pub async fn detect_hardware() -> Hardware {
+    let (nvidia, broadcom_wifi, broadcom_bluetooth) = tokio::join!(
+        Drivers::check_nvidia_gpu(),
+        Drivers::check_boardcom_wifi(),
+        Drivers::check_boardcom_bluetooth(),
+    );
+    Hardware { nvidia, broadcom_wifi, broadcom_bluetooth }
 }
 
 // NOTE: added during `_05_dnfdownloadapps.rs`
@@ -85,7 +106,7 @@ impl Drivers {
     }
 
     async fn get_nvidia_chipset() -> Res<String> {
-        Ok(String::from_utf8_lossy(&Command::new("sh").arg("-c").arg("lspci | grep -i NVIDIA | head -n 1 | cut -d ':' -f 3 | cut -d '[' -f 1 | sed -e 's/^[[:space:]]*//'").stdout(std::process::Stdio::piped()).output().await.map_err(|e| Err::FailToRunProgram("sh", e)).wrap_msg("cannot detect nvidia chipset")?.stdout.rsplit(|&c| c == b' ').next().expect("malformatted output from shell").to_vec()).to_string())
+        Ok(String::from_utf8_lossy(Command::new("sh").arg("-c").arg("lspci | grep -i NVIDIA | head -n 1 | cut -d ':' -f 3 | cut -d '[' -f 1 | sed -e 's/^[[:space:]]*//'").stdout(std::process::Stdio::piped()).output().await.map_err(|e| Err::FailToRunProgram("sh", e)).wrap_msg("cannot detect nvidia chipset")?.stdout.rsplit(|&c| c == b' ').next().expect("malformatted output from shell")).to_string())
     }
 
     ///    Returns a list of Nvidia packages to install
@@ -132,16 +153,55 @@ impl Drivers {
         Ok(())
     }
 
-    async fn setup_nvidia() -> Res<()> {
+    /// the kernel that boots next, which may be newer than the running one after the updates
+    async fn next_kernel() -> Res<String> {
+        let out = Command::new("grubby").arg("--default-kernel").output().await;
+        if let Ok(out) = &out
+            && out.status.success()
+            && let Some(kver) =
+                String::from_utf8_lossy(&out.stdout).trim().strip_prefix("/boot/vmlinuz-")
+        {
+            return Ok(kver.to_owned());
+        }
+        tracing::warn!(?out, "cannot get the default kernel from grubby, using the running one");
+        let kver = tokio::fs::read_to_string("/proc/sys/kernel/osrelease")
+            .await
+            .map_err(|e| Err::Message(format!("cannot read kernel version: {e}")))?;
+        Ok(kver.trim().to_owned())
+    }
+
+    /// Waits for akmods to build the NVIDIA kernel module, then checks that it's there.
+    ///
+    /// The akmod's `%posttrans` starts a build in the background, a second `akmods` waits on its
+    /// lock and skips kmods that are already up to date, so this also builds it if that didn't.
+    async fn nvidia_kmod_built() -> Res<bool> {
+        let kver = Self::next_kernel().await?;
+        tracing::info!(kver, "Waiting for akmods to build the Nvidia kernel module");
+        if let Err(e) = root("akmods", ["--kernels", &kver]).await {
+            tracing::warn!(?e, "akmods failed");
+        }
+        Ok(Command::new("modinfo")
+            .args(["-k", &kver, "-n", "nvidia"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .await
+            .is_ok_and(|s| s.success()))
+    }
+
+    /// Returns whether the kernel module is ready, so a reboot would load it.
+    async fn setup_nvidia() -> Res<bool> {
         tracing::info!("Setting up Nvidia drivers");
         let primary_gpu = std::env::var("STELLAR_OPTION").is_ok_and(|x| x == "1");
         if !Self::check_nvidia_gpu().await {
             tracing::info!("No Nvidia GPU detected");
-            return Ok(());
+            return Ok(false);
         }
         if Self::is_ostree().await {
             tracing::debug!("ostree detected");
-            return Self::setup_nvidia_ostree().await;
+            // the kmod is built inside the rpm-ostree transaction, which needs a reboot anyway
+            Self::setup_nvidia_ostree().await?;
+            return Ok(true);
         }
 
         let pkgs = Self::list_nvidia_packages().await?;
@@ -161,13 +221,17 @@ impl Drivers {
             .wrap_msg("cannot set nvidia as primary gpu")?;
         }
 
-        Ok(())
+        let built = Self::nvidia_kmod_built().await?;
+        if !built {
+            tracing::warn!("Nvidia kernel module isn't built, not asking for a reboot");
+        }
+        Ok(built)
     }
 
     async fn check_boardcom_wifi() -> bool {
         Command::new("sh")
             .arg("-c")
-            .arg("lspci | grep -q -i Network | grep -q -i Broadcom")
+            .arg("lspci | grep -i Network | grep -q -i Broadcom")
             .status()
             .await
             .is_ok_and(|s| s.success())
@@ -175,7 +239,7 @@ impl Drivers {
     async fn check_boardcom_bluetooth() -> bool {
         Command::new("sh")
             .arg("-c")
-            .arg("lspci | grep -q -i Bluetooth| grep -q -i Broadcom")
+            .arg("lspci | grep -i Bluetooth | grep -q -i Broadcom")
             .status()
             .await
             .is_ok_and(|s| s.success())

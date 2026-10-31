@@ -1,0 +1,290 @@
+import { WelcomePage } from "pages/0030_welcome.slint";
+import { Lang } from "lang.slint";
+import { Cfg } from "cfg.slint";
+import { Account } from "account.slint";
+import { Step, StepHdl } from "page.slint";
+import { LanguagePage } from "pages/0010_language.slint";
+import { Theme, Tokens } from "slintcn/theme/tokens.slint";
+import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
+import { Camera } from "camera.slint";
+import { KeyboardPage } from "pages/0020_keyboard.slint";
+import { PasswordPage } from "pages/0050_password.slint";
+import { NetworkPage, PasswordDialog, EnterpriseDialog, OfflineDialog, ProxyDialog, IpDialog } from "pages/0060_network.slint";
+import { Network, NetState } from "network.slint";
+import { DriversPage } from "pages/0100_drivers.slint";
+import { SummaryPage } from "pages/0120_summary.slint";
+import { InstallingPage } from "pages/0130_installing.slint";
+import { DonePage } from "pages/0140_done.slint";
+import { ErrorPage } from "pages/0150_error.slint";
+import { Install, InstallState, Drivers } from "install.slint";
+import { TdnText, TdnBtn, Modal } from "components.slint";
+import { Actions } from "actions.slint";
+export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network }
+
+export component AppWindow inherits Window {
+    in-out property <int> pagenum: 0;
+    // property <float> scale;
+    // public function set_scale(scale: float) { self.scale = scale; }
+    // inner := VerticalLayout {
+    //     padding: 4rem;
+    //     if scale != 1: Rectangle { }
+    //     HorizontalLayout {
+    //         if scale != 1: Rectangle { }
+    //         if pagetype == PageType.welcome: WelcomePage {
+    //             transform-scale: scale;
+    //             horizontal-stretch: 0;
+    //             vertical-stretch: 0;
+    //         }
+    //         if scale != 1: Rectangle { }
+    //     }
+    //
+    //     if scale != 1: Rectangle { }
+    // }
+
+    title: "Taidan";
+    // no-frame: true;
+    // full-screen: true;
+    icon: Cfg.distro_icon();
+    background: Tokens.color-background;
+    // from the `vercel-geist-fonts` package, scripts Geist lacks (CJK, …) fall back to system fonts
+    default-font-family: "Geist";
+    // shown as a standalone window in the middle of the kiosk session, the designs are 600×500
+    preferred-width: 600 * Tokens.unit;
+    preferred-height: 500 * Tokens.unit;
+    // the designs use 14px and all `rem` sizes derive from this
+    default-font-size: 14 * Tokens.unit;
+
+    // pages that are jumped to, rather than reached with Next and Back
+    property <int> installing-page: 8;
+    property <int> done-page: 9;
+    property <int> error-page: 10;
+
+    // move keyboard focus to the page being shown, unless a dialog has it
+    function focus-page() {
+        if Modal.open { return; }
+        if pagenum == 0 { language.focus(); }
+        else if pagenum == 1 { keyboard.focus(); }
+        else if pagenum == 2 { welcome.focus(); }
+        else if pagenum == 3 { whoareyou.focus(); }
+        else if pagenum == 4 { password.focus(); }
+        else if pagenum == 5 { network.focus(); }
+        else if pagenum == 6 { drivers.focus(); }
+        else if pagenum == 7 { summary.focus(); }
+        else if pagenum == done-page { done.focus(); }
+        else if pagenum == error-page { error.focus(); }
+    }
+    changed pagenum => {
+        focus-page();
+        if pagenum == 5 { Network.refresh(); }
+    }
+    init => { focus-page(); }
+
+    // back to the page when a dialog closes
+    property <bool> dialog-open: Modal.open;
+    changed dialog-open => {
+        if !dialog-open { focus-page(); }
+    }
+
+    // leave the installing page once the installation ends
+    property <InstallState> install-state: Install.state;
+    changed install-state => {
+        if install-state == InstallState.done { pagenum = done-page; }
+        else if install-state == InstallState.failed { pagenum = error-page; }
+    }
+
+    MenuBar {
+        visible: false;
+        Menu {
+            MenuItem {
+                title: "Open Terminal";
+                activated => { Actions.open-terminal(); }
+                shortcut: @keys(Alt + Shift + T);
+            }
+        }
+    }
+
+    language := LanguagePage {
+        index: 0;
+        current: pagenum;
+        next_page => { pagenum += 1; }
+    }
+
+    keyboard := KeyboardPage {
+        index: 1;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => { pagenum += 1; }
+    }
+
+    welcome := WelcomePage {
+        index: 2;
+        current: pagenum;
+        next_page => { pagenum += 1; }
+    }
+
+    whoareyou := WhoAreYouPage {
+        index: 3;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => {
+            Account.save();
+            pagenum += 1;
+        }
+    }
+
+    password := PasswordPage {
+        index: 4;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => {
+            Account.save();
+            pagenum += 1;
+        }
+    }
+
+    network := NetworkPage {
+        index: 5;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => {
+            Network.save(!Network.online);
+            pagenum += 1;
+        }
+    }
+
+    drivers := DriversPage {
+        index: 6;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => { pagenum += 1; }
+    }
+
+    summary := SummaryPage {
+        index: 7;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => {
+            Install.start();
+            pagenum = installing-page;
+        }
+    }
+
+    InstallingPage {
+        index: installing-page;
+        current: pagenum;
+    }
+
+    done := DonePage {
+        index: done-page;
+        current: pagenum;
+    }
+
+    error := ErrorPage {
+        index: error-page;
+        current: pagenum;
+        // the retry button
+        next_page => {
+            Install.start();
+            pagenum = installing-page;
+        }
+    }
+
+    if Camera.open: CameraDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.password-ssid != "": PasswordDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.enterprise-open: EnterpriseDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.proxy-open: ProxyDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.ip-open: IpDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.offline-prompt: OfflineDialog {
+        width: 100%;
+        height: 100%;
+        skipped => {
+            Network.offline-prompt = false;
+            Network.save(true);
+            pagenum += 1;
+        }
+    }
+}
+
+export component ErrorDialog inherits Window {
+    in property <string> body;
+    default-font-family: "Geist";
+    no-frame: true;
+    background: transparent;
+
+    min-width: 600px;
+    min-height: 200px;
+
+    Rectangle {
+        border-radius: Tokens.radius-xl;
+        background: Tokens.color-background;
+        border-width: 1px;
+        border-color: Tokens.color-border-hairline;
+
+        VerticalLayout {
+            padding: 2rem;
+            padding-left: 3rem;
+            padding-right: 3rem;
+            spacing: 1rem;
+
+            HorizontalLayout {
+                spacing: 1rem;
+                vertical-stretch: 1;
+
+                Image {
+                    source: @image-url("../data/icons/dialog-error-symbolic.svg");
+                    colorize: Tokens.color-destructive;
+                    width: 4rem;
+                    height: self.width;
+                    accessible-role: none;
+                }
+
+                VerticalLayout {
+                    spacing: 0.2rem;
+                    alignment: start;
+
+                    TdnText {
+                        horizontal-alignment: left;
+                        color: Tokens.color-destructive;
+                        font-size: 2 * Tokens.text-rem;
+                        text: Lang.t("page-error", []);
+                    }
+
+                    TdnText {
+                        horizontal-alignment: left;
+                        wrap: word-wrap;
+                        text: root.body;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: end;
+
+                TdnBtn {
+                    text: Lang.t("close", []);
+                    clicked => { root.close(); }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,45 @@
+import { Tokens } from "../slintcn/theme/tokens.slint";
+import { TdnBasePg, TdnHero } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
+import { Cfg } from "../cfg.slint";
+
+export component WelcomePage inherits TdnBasePg {
+    forward-focus: go;
+
+    VerticalLayout {
+        TdnHero {
+            vertical-stretch: 1;
+        }
+
+        HorizontalLayout {
+            padding-left: 1.75rem;
+            padding-right: 1.75rem;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+            spacing: 2rem;
+
+            TdnText {
+                text: Lang.t("page-welcome-hello", []);
+                font-size: 3 * Tokens.text-rem;
+                font-weight: 800;
+                horizontal-alignment: left;
+                horizontal-stretch: 1;
+                wrap: word-wrap;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 0;
+
+                go := TdnBtn {
+                    enter-hint: true;
+                    background-color: TdnStyle.accent;
+                    foreground-color: TdnStyle.accent-foreground;
+                    text: Cfg.get_string("welcome.next", Lang.t("page-welcome-go", []));
+                    clicked => root.next_page();
+                }
+            }
+        }
+    }
+}

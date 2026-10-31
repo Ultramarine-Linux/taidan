@@ -1,0 +1,159 @@
+export enum Security { open, password, enterprise, unsupported }
+
+export struct WifiNetwork {
+    ssid: string,
+    // signal strength as the number of lit arcs in the wi-fi icon, 0–3
+    strength: int,
+    security: Security,
+    // whether a connection for it is saved, so connecting needs no password
+    known: bool,
+    connected: bool,
+}
+
+export enum NetState { offline, connecting, limited, portal, online }
+
+// 802.1X methods, as in NetworkManager's connection editor
+export enum EapMethod { peap, ttls, tls, fast, pwd, leap, md5 }
+
+// how the authentication server's certificate is checked
+export enum CaSource { system, file, none }
+
+export struct FileEntry {
+    name: string,
+    path: string,
+    dir: bool,
+}
+
+// IPv4 address and DNS servers of a connection, as typed
+export struct IpSettings {
+    // false to get the address from the network (DHCP)
+    manual: bool,
+    // with the prefix length, e.g. 192.168.1.20/24
+    address: string,
+    gateway: string,
+    // comma-separated, IPv4 or IPv6, empty to use the network's
+    dns: string,
+}
+
+export struct EnterpriseLogin {
+    // the wired connection instead of a wi-fi network
+    wired: bool,
+    ssid: string,
+    method: EapMethod,
+    // inner method for PEAP, TTLS and FAST, as named by NetworkManager, `mschapv2-plain` is
+    // TTLS's "MSCHAPv2 (no EAP)"
+    inner: string,
+    // the identity, for TLS too
+    username: string,
+    password: string,
+    anonymous-identity: string,
+    ca: CaSource,
+    // file paths, copied somewhere permanent before they're used
+    ca-cert: string,
+    // suffix the server's certificate name has to match, empty for any
+    domain: string,
+    // 0 automatic, 1 version 0, 2 version 1
+    peap-version: int,
+    client-cert: string,
+    private-key: string,
+    private-key-password: string,
+    // 0 off, 1 anonymous, 2 authenticated, 3 both
+    fast-provisioning: int,
+    pac-file: string,
+}
+
+// wi-fi and connectivity, driven from Rust (`src/network.rs`)
+export global Network {
+    in property <NetState> state;
+    // whether there is a wi-fi adapter
+    in property <bool> wifi-available: true;
+    // whether there is an ethernet adapter, and whether it's connected
+    in property <bool> ethernet;
+    in property <bool> wired;
+    in property <[WifiNetwork]> networks;
+    // the wi-fi network in use, empty if none
+    in property <string> connected-ssid;
+    in property <bool> scanning;
+    // the network being connected to, if any
+    in property <string> connecting-ssid;
+    // translation id of why the last connection failed, for `error-ssid`
+    in property <string> error-id;
+    in property <string> error-ssid;
+    // shows "I Don't Have Internet" even when online, from `taidan0.persist_no_internet_btn`
+    in property <bool> persist-offline-btn;
+
+    // network the password dialog is open for, empty if closed
+    in-out property <string> password-ssid;
+    // whether the 802.1X login dialog is open, for the WPA-Enterprise network `enterprise-ssid`,
+    // or the wired connection when `enterprise-wired`
+    in-out property <bool> enterprise-open;
+    in-out property <string> enterprise-ssid;
+    in-out property <bool> enterprise-wired;
+    in property <bool> enterprise-busy;
+    // translation id of why the login failed
+    in-out property <string> enterprise-error-id;
+    // whether the "No Network Selected" dialog is open
+    in-out property <bool> offline-prompt;
+
+    // whether the proxy dialog is open
+    in-out property <bool> proxy-open;
+    // the proxy in use, empty if none
+    in property <string> proxy-url;
+    in property <string> proxy-bypass: "localhost, 127.0.0.1, ::1";
+    // checking the proxy reaches the internet
+    in property <bool> proxy-busy;
+    // translation id of why the proxy can't be used
+    in property <string> proxy-error-id;
+
+    // whether the IP settings dialog is open, for `ip-ssid`, or the wired connection if empty
+    in-out property <bool> ip-open;
+    in-out property <string> ip-ssid;
+    // the settings in the dialog, loaded by `load-ip()`
+    in-out property <IpSettings> ip;
+    in property <bool> ip-loading;
+    in property <bool> ip-busy;
+    // translation id of why the settings can't be saved
+    in property <string> ip-error-id;
+
+    // reaching the internet, directly or through the proxy, which NetworkManager can't check
+    out property <bool> online: state == NetState.online || (proxy-url != "" && state != NetState.offline && state != NetState.connecting);
+
+    // pretty name for this device, and the hostname derived from it
+    in-out property <string> device-name;
+    out property <string> hostname: derive-hostname(device-name);
+    pure callback derive-hostname(name: string) -> string;
+    derive-hostname(name) => name;
+    // the part of a username after the `@`
+    pure callback realm(username: string) -> string;
+    realm(username) => "";
+    // whether a certificate file holds its private key too (PKCS#12)
+    pure callback is-pkcs12(path: string) -> bool;
+    is-pkcs12(path) => false;
+    pure callback file-name(path: string) -> string;
+    file-name(path) => path;
+
+    // the file browser for picking certificates: the folder shown, its parent, and what's in it
+    in property <string> browse-dir;
+    in property <string> browse-parent;
+    in property <[FileEntry]> browse-entries;
+    // places to start from, like removable drives
+    in property <[FileEntry]> browse-places;
+    // lists `dir`, only certificates (or PAC files when `pac`) unless `all`
+    callback browse(dir: string, pac: bool, all: bool);
+
+    callback refresh();
+    // `password` is empty for open or saved networks
+    callback connect(ssid: string, password: string);
+    callback connect-enterprise(login: EnterpriseLogin);
+    // whether the captive portal browser is open, opening it again closes it
+    in property <bool> portal-open;
+    callback open-portal();
+    callback close-portal();
+    // checks the proxy works and uses it, an empty `url` stops using one
+    callback set-proxy(url: string, bypass: string);
+    // opens the IP settings dialog for a wi-fi network, or the wired connection if `ssid` is empty
+    callback open-ip(ssid: string);
+    callback save-ip(ssid: string, ip: IpSettings);
+    // writes the device name and whether setup should go without internet to the settings
+    callback save(offline: bool);
+}

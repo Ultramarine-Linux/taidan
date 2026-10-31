@@ -220,7 +220,7 @@ pub async fn set_keymap(user: Option<&str>, layout: &str, variant: Option<&str>)
     }
 }
 
-#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
 pub struct I18nCfg {
     pub imf: I18nImf,
 }

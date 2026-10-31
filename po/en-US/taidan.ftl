@@ -1,17 +1,25 @@
 # shown on places like "keyboard layout variant: Default"
 default = Default
 # btn (previous page)
-prev = Previous
+prev = Back
 # btn (next page)
 next = Next
+# btn (close a dialog)
+close = Close
+# btn (dismiss a dialog without doing anything)
+cancel = Cancel
 # btn (skip anything)
 skip = Skip
+steps-useradd = Creating Your Account…
+steps-sethostname = Naming Your Device…
+steps-settheme = Applying Your Theme…
 steps-dnfdownloadupdate = Downloading System Update…
 steps-dnfinstallupdate = Installing System Update…
 steps-script = Running Scriptlet…
 steps-dnfdownloadapps = Downloading Apps…
 steps-dnfinstallapps = Installing Apps…
 steps-driverscodecs = Installing Drivers and Codecs…
+steps-setupimf = Setting Up Input Methods…
 imelangs-ch = Chinese
 imelangs-ja = Japanese
 imelangs-ko = Korean
@@ -33,6 +41,12 @@ imelangs-th = Thai
 # use different brackets, etc.
 imelangs-display = { $lang_name } ({ $native_lang_name })
 
+# step-*: name of the current setup stage, shown above every page
+step-account-creation = Account Creation
+step-region-and-connectivity = Region and Connectivity
+step-additional-software = Additional Software
+step-finishing-up = Finishing Up
+
 ## [Language]
 
 page-language = Language
@@ -44,6 +58,8 @@ page-welcome = Welcome to { $distro }
 # page title
 page-welcome-ready = Let's get your device ready.
 page-welcome-go = Let's Go
+# big heading on the first page
+page-welcome-hello = Welcome!
 # .skipcfg: also a "Next" btn, but skips some pages
 page-welcome-skipcfg = Skip Configuration
 
@@ -67,9 +83,21 @@ page-devicename-error = Hostname must start with a letter, and may only contain 
 # remember, if you can't translate things literally, think of what makes sense here as a page heading
 page-whoareyou = Who are You?
 # .fullname: text field placeholder
-page-whoareyou-fullname = Full Name
+page-whoareyou-fullname = Name
 # .username: text field placeholder
 page-whoareyou-username = Username
+# .*-desc: help text below the field
+page-whoareyou-fullname-desc = Your name, shown on the login screen.
+page-whoareyou-username-desc = The name of your home folder.
+# .icon: the picture shown for the user, e.g. on the login screen
+page-whoareyou-icon = User Icon
+page-whoareyou-icon-desc = Pick one, or take a photo.
+# .camera: title of the dialog for taking the user icon with the webcam (also its button)
+page-whoareyou-camera = Take a Photo
+# btn
+page-whoareyou-camera-take = Take Photo
+# followed by the technical reason on the next line
+page-whoareyou-camera-error = Can't use the camera:
 # .error: multiline, explanation pops out if invalid username
 page-whoareyou-error = Username must start with lowercase letters and must only contain lowercase letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
 
@@ -82,17 +110,143 @@ page-password-pw = Password
 # yet another text field placeholder for repeating the password.
 # depending on the language you can just put the word equivalent to "repeat" here
 page-password-rp = Repeat Password
+# shown when the repeated password differs
+page-password-mismatch = Passwords don't match.
+# accessible name of the button that shows/hides the password
+page-password-show = Show password
+# .tip*: advice shown next to the password fields
+page-password-tip-title = Longer is Stronger
+page-password-tip = A phrase is much better than number spaghetti.
+# an example of a good password, keep it a short, memorable phrase joined by hyphens
+page-password-tip-good = if-it-fits-i-sits
+page-password-tip-good-desc = This takes centuries to crack, and you can remember it!
+# an example of a bad password, keep it as is
+page-password-tip-bad = Ds9Csga*XB
+page-password-tip-bad-desc = Much harder to remember, and cracks in 12 days!
 
 ## [Internet]
 
 # page title
-page-internet = Let's Get Online
-page-internet-desc = Connect to the Internet to get the latest and greatest.
-page-internet-skip = I don't have Internet
+page-internet = Get Online
+page-internet-desc = Connect to the internet to install codecs, drivers, and apps.
+page-internet-skip = I Don't Have Internet
 page-internet-warn = Codecs, drivers and some apps won't be installed without internet.
 page-internet-open = Connect to a WiFi Network
 page-internet-ok = You're connected! Press next to continue.
-page-internet-portal = Login with Web Browser
+# btn, opens a browser to log in to networks like hotel or airport wi-fi
+page-internet-portal = Captive Portal
+# btn, closes the browser opened by page-internet-portal
+page-internet-portal-close = Close Portal
+# btn, next to each wi-fi network
+page-internet-connect = Connect
+# shown next to the network in use
+page-internet-connected = Connected
+# btn, scans for wi-fi networks again
+page-internet-refresh = Refresh
+page-internet-scanning = Searching…
+page-internet-no-wifi = No Wi-Fi adapter was found. You can still connect with a cable.
+page-internet-no-networks = No Wi-Fi networks found.
+page-internet-wired = Wired Connection
+# shown next to the wired connection when no cable is plugged in
+page-internet-unplugged = Not Connected
+# btn in the wired connection's settings, opens the 802.1X login
+page-internet-8021x-open = 802.1X Security…
+# dialog title, for wired networks with a login, like at work or school
+page-internet-8021x-wired = Wired 802.1X Security
+# btn, for networks that only reach the internet through a proxy server
+page-internet-proxy = Proxy
+# btn, the same as page-internet-proxy once one is set up
+page-internet-proxy-on = Proxy ✓
+page-internet-proxy-desc = Some networks, like at work or school, only reach the internet through a proxy server.
+page-internet-proxy-server = Proxy Server
+page-internet-proxy-bypass = Don't Use the Proxy For
+page-internet-proxy-bypass-desc = Addresses and domains, separated by commas.
+page-internet-proxy-invalid = Enter the proxy server like proxy.example.com:3128.
+page-internet-proxy-error = Couldn't reach the internet through this proxy.
+# btn, stops using the proxy
+page-internet-proxy-remove = Remove
+# btn, in the proxy and IP settings dialogs
+page-internet-save = Save
+# dialog title, and the label of the settings button next to each network; $name is the network
+page-internet-ip = { $name } Settings
+page-internet-ip-manual = Set the IP Address Manually
+page-internet-ip-address = IP Address
+page-internet-ip-gateway = Gateway
+page-internet-ip-dns = DNS Servers
+page-internet-ip-dns-desc = Separated by commas. Leave empty to use the network's.
+page-internet-ip-dns-desc-manual = Separated by commas.
+page-internet-ip-error-address = Enter the IP address like 192.168.1.20/24.
+page-internet-ip-error-gateway = Enter the gateway like 192.168.1.1.
+page-internet-ip-error-dns = Enter DNS servers like 1.1.1.1, 9.9.9.9.
+page-internet-ip-error-dns-needed = Enter at least one DNS server.
+page-internet-ip-error = Couldn't apply these settings.
+page-internet-devicename = Device Name
+page-internet-devicename-desc = How this device shows up to others on the network.
+# $hostname: the name derived from the device name, e.g. janes-laptop
+page-internet-hostname = Hostname: { $hostname }
+# dialog title; $ssid is the name of the wi-fi network
+page-internet-connect-to = Connect to { $ssid }
+page-internet-password = Password
+page-internet-error = Couldn't connect to this network.
+page-internet-error-password = Couldn't connect. Check the password and try again.
+page-internet-error-timeout = Connecting took too long. Try moving closer to the router.
+# for 802.1X networks like eduroam, which take a username and password
+page-internet-error-login = Couldn't connect. Check your username and password, or the server under Advanced.
+page-internet-username = Username
+page-internet-username-placeholder = name@university.edu
+# btn, shows more settings for the network login
+page-internet-advanced = Advanced
+# label for picking how to log in to the network, e.g. PEAP or TTLS
+page-internet-method = Authentication
+page-internet-server = Authentication Server
+page-internet-server-desc = Your password is only sent to a server with a valid certificate for this domain.
+page-internet-server-desc-optional = Optional. Only connect to a server with a certificate for this domain.
+# 802.1X login options, mirroring NetworkManager's connection editor
+page-internet-8021x-method = Authentication
+page-internet-8021x-peap = Protected EAP (PEAP)
+page-internet-8021x-ttls = Tunneled TLS
+page-internet-8021x-mschapv2-noeap = MSCHAPv2 (no EAP)
+page-internet-8021x-identity = Identity
+page-internet-8021x-inner = Inner Authentication
+page-internet-8021x-peap-version = PEAP Version
+page-internet-8021x-automatic = Automatic
+page-internet-8021x-version = Version { $version }
+page-internet-8021x-anonymous = Anonymous Identity
+page-internet-8021x-anonymous-desc = Sent before the secure connection is set up, instead of your username.
+page-internet-8021x-ca = Server Certificate
+page-internet-8021x-ca-system = Check with the System's Certificates
+page-internet-8021x-ca-file = Check with a CA Certificate File
+page-internet-8021x-ca-none = Don't Check (Less Secure)
+page-internet-8021x-ca-none-warn = Without checking the server, anyone pretending to be this network can see your login.
+page-internet-8021x-ca-cert = CA Certificate
+page-internet-8021x-client-cert = User Certificate
+page-internet-8021x-private-key = Private Key
+page-internet-8021x-key-password = Private Key Password
+page-internet-8021x-key-password-desc = Leave empty if the key isn't protected with a password.
+page-internet-8021x-fast-provisioning = Allow Automatic PAC Provisioning
+page-internet-8021x-fast-anonymous = Anonymous
+page-internet-8021x-fast-authenticated = Authenticated
+page-internet-8021x-fast-both = Both
+page-internet-8021x-pac = PAC File
+page-internet-8021x-pac-desc = Optional when provisioning is allowed.
+# btn, picks a file
+page-internet-8021x-choose = Choose…
+page-internet-8021x-clear = Remove File
+page-internet-8021x-nofile = No file chosen
+page-internet-8021x-error-tls = Couldn't connect. Check your identity, certificate and private key password.
+page-internet-8021x-error-file = Couldn't copy the certificate files.
+# file browser for certificates
+page-internet-files = Choose a File
+page-internet-files-drives = USB Drives
+page-internet-files-home = Home
+page-internet-files-root = Computer
+page-internet-files-up = Parent Folder
+page-internet-files-all = Show All Files
+page-internet-files-empty = No certificates in this folder.
+page-internet-files-empty-pac = No PAC files in this folder.
+# dialog when continuing without internet
+page-internet-offline = No Network Selected
+page-internet-offline-desc = If you don't connect to the internet, drivers and codecs won't be installed.
 
 ## [Analytics and Crash Reporting]
 ## this page is currently not in use, we recommend skipping
@@ -166,11 +320,45 @@ categories = { $cat }
 ## [Installing]
 
 page-installing = Installing Your Apps
+page-installing-configuring = Configuring your Device
 page-installing-desc = This won't take long!
 page-installing-loading = Loading…
 page-installing-flatpak = Installing {$n} Flatpaks…
 
 ## [Finish]
+
+## [Drivers]
+
+page-drivers = Drivers
+page-drivers-desc = Install additional drivers, codecs, and tools to support hardware detected in this device.
+page-drivers-proprietary = Some drivers may be proprietary.
+# toggle
+page-drivers-install = Install Drivers
+# .nvidia, .broadcom-*, .builtin: items in the list of drivers to install
+page-drivers-nvidia = NVIDIA Graphics
+page-drivers-broadcom-wifi = Broadcom WiFi
+page-drivers-broadcom-bluetooth = Broadcom Bluetooth
+page-drivers-builtin = Built-in Drivers
+
+## [Summary]
+
+# page title, $name is the user's first name
+page-summary = Everything Look Right, { $name }?
+page-summary-account = Your Account
+page-summary-region = Region and Connectivity
+page-summary-network = Network
+page-summary-network-none = Not Connected
+page-summary-software = Additional Software
+page-summary-software-none = No additional software will be installed.
+# btn (next page), starts setting up the system
+page-summary-confirm = Looks Good!
+
+## [Done]
+
+page-done = All Done
+page-done-reboot = Reboot
+# btn, ends the setup and shows the login screen, when no reboot is needed
+page-done-login = Log In
 
 page-finish = Ready to Do Your Thing?
 page-finish-desc = We hope you enjoy Ultramarine!

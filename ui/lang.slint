@@ -1,0 +1,54 @@
+export struct FluentArg {
+    key: string,
+    value: string,
+}
+
+export struct Language {
+    locale: string,
+    native_name: string,
+}
+
+export struct KeymapVariant { id: string, name: string }
+
+export struct Keymap {
+    id: string,
+    name: string,
+    variants: [KeymapVariant],
+}
+
+export global Lang {
+    in-out property <Language> current_language;
+    // filtered by `filter_languages`
+    in property <[Language]> languages;
+    callback filter_languages(query: string);
+    // load the translations *before* changing `current_language`, so bindings that
+    // re-evaluate on the change (e.g. during layout) already see the new language
+    public function select(lang: Language) {
+        set_lang(lang);
+        current_language = lang;
+    }
+    public pure function t(id: string, args: [FluentArg]) -> string {
+        _t(id, args, current_language);
+    }
+    pure callback _t(id: string, args: [FluentArg], current_language: Language) -> string;
+    _t(id, args, current_language) => "t(" + id + ")";
+    callback set_lang(lang: Language);
+    public pure function name(lang: Language) -> string {
+        _name(lang, current_language);
+    }
+    pure callback _name(lang: Language, current_language: Language) -> string;
+    _name(lang, current_language) => "Lang.name(" + lang.locale + ")";
+
+    // filtered by `filter_keymaps`
+    in property <[Keymap]> keymaps;
+    callback filter_keymaps(query: string);
+    // variants of `current_keymap`, filtered by `filter_variants`
+    in property <[KeymapVariant]> variants;
+    callback filter_variants(query: string);
+    in property <Keymap> current_keymap;
+    // `id` is empty for the layout's default variant
+    in property <KeymapVariant> current_variant;
+    // selecting also applies the keymap to the system
+    callback select_keymap(keymap: Keymap);
+    callback select_variant(variant: KeymapVariant);
+}

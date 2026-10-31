@@ -7,14 +7,17 @@ mod _05_dnfdownloadapps;
 mod _06_dnfinstallapps;
 mod _07_drivers_codecs;
 mod _08_setup_imf;
+mod _09_sethostname;
 
 use crate::prelude::*;
+
+pub use _07_drivers_codecs::{Hardware, detect_hardware};
 
 use crate::steps::{
     _00_useradd::UserAdd, _01_settheme::SetTheme, _02_dnfdownloadupdate::DnfDownloadUpdate,
     _03_dnfinstallupdate::DnfInstallUpdate, _04_script::Script,
     _05_dnfdownloadapps::DnfDownloadApps, _06_dnfinstallapps::DnfInstallApps,
-    _07_drivers_codecs::DriversCodecs, _08_setup_imf::SetupImf,
+    _07_drivers_codecs::DriversCodecs, _08_setup_imf::SetupImf, _09_sethostname::SetHostname,
 };
 
 #[allow(async_fn_in_trait, clippy::unused_async)]
@@ -37,12 +40,13 @@ pub trait Step {
     }
 }
 
-pub const NUM_STAGES: usize = 9;
+pub const NUM_STAGES: usize = 10;
 
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone, Copy, Debug)]
 pub enum Stage {
     UserAdd,
+    SetHostname,
     SetTheme,
     DnfDownloadUpdate,
     DnfInstallUpdate,
@@ -68,6 +72,7 @@ impl Stage {
     pub const fn all() -> &'static [Self] {
         &[
             Self::UserAdd(UserAdd),
+            Self::SetHostname(SetHostname),
             Self::SetTheme(SetTheme),
             Self::DnfDownloadUpdate(DnfDownloadUpdate),
             Self::DnfInstallUpdate(DnfInstallUpdate),
@@ -90,14 +95,15 @@ impl From<Stage> for u8 {
     fn from(value: Stage) -> Self {
         match value {
             Stage::UserAdd(_) => 0,
-            Stage::SetTheme(_) => 1,
-            Stage::DnfDownloadUpdate(_) => 2,
-            Stage::DnfInstallUpdate(_) => 3,
-            Stage::Script(_) => 4,
-            Stage::DnfDownloadApps(_) => 5,
-            Stage::DnfInstallApps(_) => 6,
-            Stage::DriversCodecs(_) => 7,
-            Stage::SetupImf(_) => 8,
+            Stage::SetHostname(_) => 1,
+            Stage::SetTheme(_) => 2,
+            Stage::DnfDownloadUpdate(_) => 3,
+            Stage::DnfInstallUpdate(_) => 4,
+            Stage::Script(_) => 5,
+            Stage::DnfDownloadApps(_) => 6,
+            Stage::DnfInstallApps(_) => 7,
+            Stage::DriversCodecs(_) => 8,
+            Stage::SetupImf(_) => 9,
         }
     }
 }
