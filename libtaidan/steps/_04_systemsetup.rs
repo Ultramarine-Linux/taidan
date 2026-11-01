@@ -46,6 +46,13 @@ impl super::Step for SystemSetup {
         if let Err(e) = crate::root("systemctl", ["preset-all"]).await {
             tracing::warn!(?e, "cannot apply systemd presets");
         }
+        // after the presets, which could bring it back. GeoClue is D-Bus activated, so only a
+        // mask keeps apps from starting it
+        if !settings.location
+            && let Err(e) = crate::root("systemctl", ["mask", "geoclue.service"]).await
+        {
+            tracing::warn!(?e, "cannot turn off location services");
+        }
         // for cameras and brightness controls on systems where these aren't given to the seat
         let has_video = tokio::fs::read_to_string("/etc/group")
             .await

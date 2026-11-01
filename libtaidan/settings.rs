@@ -26,6 +26,8 @@ pub struct Settings {
     pub avatar: Option<std::path::PathBuf>,
 
     pub install_codecs_drivers: bool,
+    /// whether apps may ask GeoClue for the device's location
+    pub location: bool,
 
     /// for networks that only reach the internet through a proxy
     pub proxy: Option<crate::proxy::Proxy>,

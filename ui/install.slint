@@ -20,6 +20,11 @@ export global Install {
     callback finish(reboot: bool);
 }
 
+export global Location {
+    // whether apps may ask GeoClue for the device's location
+    in-out property <bool> enabled: true;
+}
+
 export global Drivers {
     // detected hardware that needs extra drivers
     in property <bool> nvidia;

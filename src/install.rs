@@ -2,7 +2,7 @@
 use libtaidan::{InstallMsg, steps::Stage};
 use slint::ComponentHandle;
 
-use crate::ui::{AppWindow, Drivers, Install, InstallState};
+use crate::ui::{AppWindow, Drivers, Install, InstallState, Location};
 
 /// whether this is a developer running Taidan on their own machine, where installing (creating a
 /// user, running dnf, …) or rebooting would be destructive, the same rule as libtaidan's `set_keymap`
@@ -94,6 +94,7 @@ fn start(ui: &slint::Weak<AppWindow>) {
     install.set_needs_reboot(false);
     install.set_stage_count(i32::try_from(Stage::all().len()).expect("too many stages"));
     crate::SETTINGS.write().install_codecs_drivers = app.global::<Drivers<'_>>().get_install();
+    crate::SETTINGS.write().location = app.global::<Location<'_>>().get_enabled();
     let mut settings = crate::SETTINGS.read().clone();
     // the password is in `SETTINGS` now and there's no way back to its page, so drop the
     // plaintext copies in the UI instead of keeping them around for the rest of the session

@@ -13,6 +13,7 @@ import { NetworkPage, PasswordDialog, EnterpriseDialog, OfflineDialog, ProxyDial
 import { Network, NetState } from "network.slint";
 import { TimezonePage } from "pages/0055_timezone.slint";
 import { Tz } from "timezone.slint";
+import { LocationPage } from "pages/0070_location.slint";
 import { DriversPage } from "pages/0100_drivers.slint";
 import { TweaksDialog } from "pages/0110_tweaks.slint";
 import { Tweaks } from "tweaks.slint";
@@ -20,10 +21,10 @@ import { SummaryPage } from "pages/0120_summary.slint";
 import { InstallingPage } from "pages/0130_installing.slint";
 import { DonePage } from "pages/0140_done.slint";
 import { ErrorPage } from "pages/0150_error.slint";
-import { Install, InstallState, Drivers } from "install.slint";
+import { Install, InstallState, Drivers, Location } from "install.slint";
 import { TdnText, TdnBtn, Modal } from "components.slint";
 import { Actions } from "actions.slint";
-export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks }
+export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location }
 
 export component AppWindow inherits Window {
     in-out property <int> pagenum: 0;
@@ -48,9 +49,9 @@ export component AppWindow inherits Window {
     default-font-size: 14 * Tokens.unit;
 
     // pages that are jumped to, rather than reached with Next and Back
-    property <int> installing-page: 9;
-    property <int> done-page: 10;
-    property <int> error-page: 11;
+    property <int> installing-page: 10;
+    property <int> done-page: 11;
+    property <int> error-page: 12;
 
     // move keyboard focus to the page being shown, unless a dialog has it
     function focus-page() {
@@ -62,8 +63,9 @@ export component AppWindow inherits Window {
         else if pagenum == 4 { password.focus(); }
         else if pagenum == 5 { timezone.focus(); }
         else if pagenum == 6 { network.focus(); }
-        else if pagenum == 7 { drivers.focus(); }
-        else if pagenum == 8 { summary.focus(); }
+        else if pagenum == 7 { location.focus(); }
+        else if pagenum == 8 { drivers.focus(); }
+        else if pagenum == 9 { summary.focus(); }
         else if pagenum == done-page { done.focus(); }
         else if pagenum == error-page { error.focus(); }
     }
@@ -157,15 +159,22 @@ export component AppWindow inherits Window {
         }
     }
 
-    drivers := DriversPage {
+    location := LocationPage {
         index: 7;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => { pagenum += 1; }
     }
 
-    summary := SummaryPage {
+    drivers := DriversPage {
         index: 8;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => { pagenum += 1; }
+    }
+
+    summary := SummaryPage {
+        index: 9;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => {

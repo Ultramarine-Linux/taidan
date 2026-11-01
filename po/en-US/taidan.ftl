@@ -338,6 +338,15 @@ page-installing-flatpak = Installing {$n} Flatpaks…
 
 ## [Finish]
 
+## [Location]
+
+# also the toggle
+page-location = Location Services
+page-location-desc = Allow apps to request your approximate location with beaconDB.
+page-location-tip-title = Where are you?
+page-location-tip = We don't know. Location information from this feature is never shared with Fyra Labs, only with applications requesting it, like the weather widget, or a website you visit.
+page-location-tip-control = You're in control, disable anytime in settings.
+
 ## [Drivers]
 
 page-drivers = Drivers

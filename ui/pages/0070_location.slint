@@ -1,0 +1,91 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { Location } from "../install.slint";
+import { TdnText, TdnToggleRow } from "../components.slint";
+import { Card } from "../slintcn/components/card.slint";
+import { Icon } from "../slintcn/components/icon.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+
+export component LocationPage inherits TdnPage {
+    pageid: "location";
+    step_i: 1;
+    forward-focus: toggle;
+
+    HorizontalLayout {
+        spacing: 1rem;
+
+        VerticalLayout {
+            alignment: start;
+            horizontal-stretch: 100;
+            max-width: 21rem;
+            padding-top: 1rem;
+            spacing: 2rem;
+
+            TdnText {
+                text: Lang.t("page-location-desc", []);
+                horizontal-alignment: left;
+                wrap: word-wrap;
+                font-size: 1.1 * Tokens.text-rem;
+            }
+
+            toggle := TdnToggleRow {
+                text: Lang.t("page-location", []);
+                checked <=> Location.enabled;
+                accepted => { root.try-next(); }
+            }
+        }
+
+        // pushes the privacy card to the right edge on wider windows
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        VerticalLayout {
+            alignment: start;
+            horizontal-stretch: 0;
+            width: 12.5rem;
+
+            Card {
+                card-radius: md;
+
+                VerticalLayout {
+                    padding: 0.6rem;
+                    spacing: 0.5rem;
+
+                    HorizontalLayout {
+                        spacing: 0.5rem;
+
+                        Icon {
+                            // "hat-glasses" from Lucide (https://lucide.dev), ISC license
+                            commands: "M14 18a2 2 0 0 0-4 0 M19 11l-2.11-6.657a2 2 0 0 0-2.752-1.148l-1.276.61A2 2 0 0 1 12 4H8.5a2 2 0 0 0-1.925 1.456L5 11 M2 11h20 M14 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0 M4 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0";
+                            size: 1.4rem;
+                            width: self.size;
+                            height: self.size;
+                            stroke-width: 1.75px;
+                        }
+
+                        TdnText {
+                            text: Lang.t("page-location-tip-title", []);
+                            font-size: Tokens.typography-title-size;
+                            font-weight: Tokens.typography-weight-medium;
+                            horizontal-alignment: left;
+                            wrap: word-wrap;
+                        }
+                    }
+
+                    TdnText {
+                        text: Lang.t("page-location-tip", []);
+                        horizontal-alignment: left;
+                        wrap: word-wrap;
+                    }
+
+                    TdnText {
+                        text: Lang.t("page-location-tip-control", []);
+                        horizontal-alignment: left;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+    }
+}
