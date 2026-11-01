@@ -2,13 +2,14 @@ mod _00_useradd;
 mod _01_settheme;
 mod _02_dnfdownloadupdate;
 mod _03_dnfinstallupdate;
-mod _04_script;
+mod _04_systemsetup;
 mod _05_dnfdownloadapps;
 mod _06_dnfinstallapps;
 mod _07_drivers_codecs;
 mod _08_setup_imf;
 mod _09_sethostname;
 mod _10_settimezone;
+mod _11_setlocale;
 
 use crate::prelude::*;
 
@@ -16,10 +17,10 @@ pub use _07_drivers_codecs::{Hardware, detect_hardware};
 
 use crate::steps::{
     _00_useradd::UserAdd, _01_settheme::SetTheme, _02_dnfdownloadupdate::DnfDownloadUpdate,
-    _03_dnfinstallupdate::DnfInstallUpdate, _04_script::Script,
+    _03_dnfinstallupdate::DnfInstallUpdate, _04_systemsetup::SystemSetup,
     _05_dnfdownloadapps::DnfDownloadApps, _06_dnfinstallapps::DnfInstallApps,
     _07_drivers_codecs::DriversCodecs, _08_setup_imf::SetupImf, _09_sethostname::SetHostname,
-    _10_settimezone::SetTimezone,
+    _10_settimezone::SetTimezone, _11_setlocale::SetLocale,
 };
 
 #[allow(async_fn_in_trait, clippy::unused_async)]
@@ -42,7 +43,7 @@ pub trait Step {
     }
 }
 
-pub const NUM_STAGES: usize = 11;
+pub const NUM_STAGES: usize = 12;
 
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone, Copy, Debug)]
@@ -53,11 +54,12 @@ pub enum Stage {
     SetTheme,
     DnfDownloadUpdate,
     DnfInstallUpdate,
-    Script,
+    SystemSetup,
     DnfDownloadApps,
     DnfInstallApps,
     DriversCodecs,
     SetupImf,
+    SetLocale,
 }
 
 impl Stage {
@@ -80,11 +82,12 @@ impl Stage {
             Self::SetTheme(SetTheme),
             Self::DnfDownloadUpdate(DnfDownloadUpdate),
             Self::DnfInstallUpdate(DnfInstallUpdate),
-            Self::Script(Script),
+            Self::SystemSetup(SystemSetup),
             Self::DnfDownloadApps(DnfDownloadApps),
             Self::DnfInstallApps(DnfInstallApps),
             Self::DriversCodecs(DriversCodecs),
             Self::SetupImf(SetupImf),
+            Self::SetLocale(SetLocale),
         ]
     }
 }
@@ -104,11 +107,12 @@ impl From<Stage> for u8 {
             Stage::SetTheme(_) => 3,
             Stage::DnfDownloadUpdate(_) => 4,
             Stage::DnfInstallUpdate(_) => 5,
-            Stage::Script(_) => 6,
+            Stage::SystemSetup(_) => 6,
             Stage::DnfDownloadApps(_) => 7,
             Stage::DnfInstallApps(_) => 8,
             Stage::DriversCodecs(_) => 9,
             Stage::SetupImf(_) => 10,
+            Stage::SetLocale(_) => 11,
         }
     }
 }

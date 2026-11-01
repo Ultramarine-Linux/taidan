@@ -20,11 +20,12 @@ const fn stage_l10n_id(stage: Stage) -> &'static str {
         Stage::SetTheme(_) => "steps-settheme",
         Stage::DnfDownloadUpdate(_) => "steps-dnfdownloadupdate",
         Stage::DnfInstallUpdate(_) => "steps-dnfinstallupdate",
-        Stage::Script(_) => "steps-script",
+        Stage::SystemSetup(_) => "steps-systemsetup",
         Stage::DnfDownloadApps(_) => "steps-dnfdownloadapps",
         Stage::DnfInstallApps(_) => "steps-dnfinstallapps",
         Stage::DriversCodecs(_) => "steps-driverscodecs",
         Stage::SetupImf(_) => "steps-setupimf",
+        Stage::SetLocale(_) => "steps-setlocale",
     }
 }
 

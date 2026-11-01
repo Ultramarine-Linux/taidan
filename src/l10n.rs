@@ -114,6 +114,21 @@ macro_rules! t {
 ///
 /// # Panics
 /// If the fluent translations cannot be loaded.
+/// the system locale for a language tag from [`LANGS`], `pt-BR` → `pt_BR.UTF-8`, `None` for ones
+/// that are only for the UI
+fn posix_locale(lang: &str) -> Option<String> {
+    let tag = lang.split_once('.').map_or(lang, |(left, _)| left);
+    // en-Xowo, the OwO translation
+    if tag.is_empty() || tag.split('-').any(|part| part.starts_with('X')) {
+        return None;
+    }
+    Some(format!("{}.UTF-8", tag.replace('-', "_")))
+}
+
+/// switches the UI to `lang`, a BCP 47 tag, and keeps it for the installed system
+///
+/// # Panics
+/// If the bundled translations can't be loaded.
 pub fn set_lang(lang: &str) {
     if let Ok(locale) = lang
         .split_once('.')
@@ -135,8 +150,9 @@ pub fn set_lang(lang: &str) {
         loader.load_languages(&crate::Localizations, &locales).expect("fail to load languages");
         *crate::LL.write() = loader;
         *PO_LOADER.write() = new_loader(locales);
-        // TODO: localectl set locale
     }
+    // applied to the system by the installation's `SetLocale` step
+    crate::SETTINGS.write().locale = posix_locale(lang).unwrap_or_default();
 }
 
 thread_local! {
@@ -398,4 +414,16 @@ fn display_name(
         return lang.native_name.clone();
     };
     display_hdl(current_language, |hdl| hdl.of(&locale).to_shared_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn posix_locales() {
+        assert_eq!(posix_locale("pt-BR").as_deref(), Some("pt_BR.UTF-8"));
+        assert_eq!(posix_locale("eo").as_deref(), Some("eo.UTF-8"));
+        assert_eq!(posix_locale("en-Xowo"), None);
+    }
 }

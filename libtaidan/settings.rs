@@ -14,6 +14,8 @@ pub struct Settings {
 
     /// IANA time zone like `America/Denver`, empty to keep the system's
     pub timezone: String,
+    /// POSIX locale like `pt_BR.UTF-8`, empty to keep the system's
+    pub locale: String,
 
     pub fullname: String,
     pub username: String,
