@@ -26,6 +26,7 @@ pub fn run() {
     crate::avatar::initialize_ui(&ui.as_weak(), &ui.global());
     crate::network::initialize_ui(&ui.as_weak(), &ui.global());
     crate::timezone::initialize_ui(&ui.as_weak(), &ui.global());
+    crate::tweaks::initialize_ui(&ui.as_weak(), &ui.global());
     init_actions(ui.as_weak(), &ui.global());
     ui.run().expect("cannot run ui");
 }

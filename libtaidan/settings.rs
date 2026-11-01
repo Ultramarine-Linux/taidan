@@ -35,13 +35,8 @@ pub struct Settings {
 
     pub actions: [Vec<String>; crate::cfg::ACTION_TYPES],
 
-    pub tweaks: Vec<bool>,
-}
-
-impl Settings {
-    pub fn new() -> Self {
-        Settings { tweaks: vec![false; crate::tweaks::TWEAKS.len()], ..Default::default() }
-    }
+    /// ids of the tweaks to turn on, see [`crate::tweaks::Tweak::id()`], the rest are turned off
+    pub tweaks: Vec<String>,
 }
 
 #[cfg(test)]

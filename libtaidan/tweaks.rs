@@ -130,15 +130,23 @@ impl Tweak {
     /// See [`Self::from_dir()`].
     #[tracing::instrument]
     pub fn list() -> std::io::Result<Box<[Self]>> {
-        std::fs::read_dir(TWEAKS_DIR)?
+        let mut tweaks = std::fs::read_dir(TWEAKS_DIR)?
             .filter_map(|dir_entry| {
                 dir_entry
                     .inspect_err(|err| tracing::error!(?err, "cannot read file in {TWEAKS_DIR}"))
                     .ok()
                     .filter(|entry| entry.path().is_dir())
             })
-            .map(|dir_entry| Self::from_dir(dir_entry.path()))
-            .collect()
+            // a broken tweak is left out, rather than taking the others with it
+            .filter_map(|dir_entry| {
+                Self::from_dir(dir_entry.path())
+                    .inspect_err(|err| tracing::error!(?err, "skipping invalid tweak"))
+                    .ok()
+            })
+            .collect::<Vec<_>>();
+        // the order directories are read in isn't stable
+        tweaks.sort_by(|a, b| a.id().cmp(b.id()));
+        Ok(tweaks.into_boxed_slice())
     }
 
     /// Return the tweak's ID, which is the directory name.
@@ -151,23 +159,27 @@ impl Tweak {
         self.path.file_name().unwrap()
     }
 
-    /// Run `up` with the serialized `settings`
-    ///
-    /// # Panics
+    /// Run `up` with the serialized `settings`, failures are logged
     ///
     /// Expects `pkexec` to be available.
     #[tracing::instrument]
     pub async fn run(&self, settings: &[u8], on: bool) {
-        let mut cmd = tokio::process::Command::new("pkexec")
+        let cmd = tokio::process::Command::new("pkexec")
             .args(["--user", "root"])
             .arg(self.path.join("up"))
             .arg(if on { "1" } else { "0" })
             .stdin(std::process::Stdio::piped())
-            .spawn()
-            .expect("fail to run pkexec");
-        let stdin = cmd.stdin.as_mut().unwrap();
-        stdin.write_all(settings).await.unwrap();
-        stdin.flush().await.unwrap();
+            .spawn();
+        let mut cmd = match cmd {
+            Ok(cmd) => cmd,
+            Err(err) => return tracing::error!(?err, "cannot run pkexec"),
+        };
+        if let Some(mut stdin) = cmd.stdin.take()
+            && let Err(err) = stdin.write_all(settings).await
+        {
+            // `up` may not read the settings at all, and exit before they're written
+            tracing::debug!(?err, "cannot pass the settings to `up`");
+        }
         match cmd.wait().await {
             Ok(x) if x.success() => {}
             Ok(x) => tracing::error!(rc=?x.code(), "process failed with non-zero exit code"),

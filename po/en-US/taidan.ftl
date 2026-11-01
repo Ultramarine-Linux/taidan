@@ -269,6 +269,9 @@ switch-crashreport-desc = Press next to keep off
 
 ## [Tweaks]
 page-tweaks = System Tweaks
+page-tweaks-desc = Optional changes from your distribution. You can change them again later.
+# btn, closes the tweaks dialog
+page-tweaks-done = Done
 page-tweaks-more = Show advanced configurations
 
 ## [Codecs and Drivers]
@@ -358,6 +361,8 @@ page-summary-network = Network
 page-summary-network-none = Not Connected
 page-summary-software = Additional Software
 page-summary-software-none = No additional software will be installed.
+# btn, opens the distribution's optional tweaks
+page-summary-tweaks = Advanced Tweaks
 # btn (next page), starts setting up the system
 page-summary-confirm = Looks Good!
 

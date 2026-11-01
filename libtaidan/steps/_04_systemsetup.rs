@@ -38,7 +38,8 @@ impl super::Step for SystemSetup {
         _: &C,
     ) -> Res<()> {
         let sett = serde_json::to_vec(settings)?;
-        for (&on, tweak) in settings.tweaks.iter().zip(&*crate::tweaks::TWEAKS) {
+        for tweak in &*crate::tweaks::TWEAKS {
+            let on = settings.tweaks.iter().any(|id| tweak.id() == id.as_str());
             tweak.run(&sett, on).await;
         }
         // services as the distro's presets want them, the image may have been built otherwise

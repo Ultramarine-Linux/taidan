@@ -1,6 +1,6 @@
 #!/bin/sh
-# vi: ft=sh noet ci pi sts=0 sw=2 ts=2
+# $1 is 1 to turn the tweak on and 0 to leave it off, the settings are on stdin as JSON
 
-if [[ $1 -eq 1 ]]; then 
+if [ "$1" = 1 ]; then
 	um tweaks enable mtu-probing
 fi

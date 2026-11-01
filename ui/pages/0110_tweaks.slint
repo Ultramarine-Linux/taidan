@@ -1,0 +1,75 @@
+import { Lang } from "../lang.slint";
+import { Tweaks } from "../tweaks.slint";
+import { TdnText, TdnBtn, TdnToggleRow, TdnDialog, TdnStyle } from "../components.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+import { ScrollView } from "std-widgets.slint";
+
+// optional distro tweaks, opened from the summary page
+export component TweaksDialog inherits TdnDialog {
+    title: Lang.t("page-tweaks", []);
+    dialog-width: 26rem;
+    dismissed => { Tweaks.open = false; }
+
+    TdnText {
+        text: Lang.t("page-tweaks-desc", []);
+        color: Tokens.color-muted-foreground;
+        horizontal-alignment: left;
+        wrap: word-wrap;
+    }
+
+    scroll := ScrollView {
+        // as tall as the list, the dialog shrinks it to fit the window and it scrolls
+        preferred-height: list-end.y;
+        content-width: self.visible-width;
+        content-height: list-end.y;
+        horizontal-scrollbar-policy: always-off;
+
+        list := VerticalLayout {
+            width: scroll.visible-width;
+            height: self.preferred-height;
+            alignment: start;
+            spacing: 1rem;
+            // room for the focus rings and the scrollbar
+            padding-left: Tokens.focus-ring-offset + Tokens.focus-ring-width;
+            padding-top: self.padding-left;
+            padding-right: 0.9rem;
+
+            for tweak[i] in Tweaks.items: VerticalLayout {
+                spacing: 0.4rem;
+
+                TdnToggleRow {
+                    in-dialog: true;
+                    text: Lang.t(tweak.name, []);
+                    checked: tweak.on;
+                    toggled(on) => { Tweaks.set(i, on); }
+                }
+
+                TdnText {
+                    text: Lang.t(tweak.desc, []);
+                    color: Tokens.color-muted-foreground;
+                    font-size: Tokens.typography-body-sm-size;
+                    horizontal-alignment: left;
+                    wrap: word-wrap;
+                }
+            }
+
+            // wrapped descriptions make the list's preferred height too short, see the 802.1X dialog
+            list-end := Rectangle { height: 0; }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: end;
+
+        done := TdnBtn {
+            in-dialog: true;
+            text: Lang.t("page-tweaks-done", []);
+            enter-hint: true;
+            background-color: TdnStyle.accent;
+            foreground-color: TdnStyle.accent-foreground;
+            clicked => { root.dismissed(); }
+        }
+    }
+
+    init => { done.focus(); }
+}

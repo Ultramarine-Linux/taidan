@@ -9,6 +9,7 @@ pub mod network;
 pub mod prelude;
 pub mod screen;
 pub mod timezone;
+pub mod tweaks;
 pub mod ui;
 
 use std::sync::LazyLock;
