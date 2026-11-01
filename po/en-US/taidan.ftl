@@ -12,6 +12,7 @@ cancel = Cancel
 skip = Skip
 steps-useradd = Creating Your Account…
 steps-sethostname = Naming Your Device…
+steps-settimezone = Setting Your Time Zone and Clock…
 steps-settheme = Applying Your Theme…
 steps-dnfdownloadupdate = Downloading System Update…
 steps-dnfinstallupdate = Installing System Update…
@@ -123,6 +124,12 @@ page-password-tip-good-desc = This takes centuries to crack, and you can remembe
 # an example of a bad password, keep it as is
 page-password-tip-bad = Ds9Csga*XB
 page-password-tip-bad-desc = Much harder to remember, and cracks in 12 days!
+
+## [Time Zone]
+
+page-timezone = Time Zone
+page-timezone-search = Search for a city or time zone
+page-timezone-none = No matching time zones.
 
 ## [Internet]
 

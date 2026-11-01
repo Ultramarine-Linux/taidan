@@ -211,7 +211,11 @@ pub async fn set_keymap(user: Option<&str>, layout: &str, variant: Option<&str>)
         set_localectl_keymap(layout, variant).await?;
     }
 
-    crate::xhost_local().await?;
+    // the OOBE's KWin has no Xwayland, so there's no X server to let the user into, and none of
+    // the ways the keymap is set below need one
+    if let Err(e) = crate::xhost_local().await {
+        tracing::debug!(?e, "cannot run xhost, there's probably no X server");
+    }
     let user = user.unwrap_or_else(|| current_user.to_str().unwrap());
     if let Ok(true) = tokio::fs::try_exists("/usr/bin/kwriteconfig6").await {
         set_kde_keymap(user, layout, variant).await

@@ -1,13 +1,9 @@
-/// Setting date & time.
-pub fn set_datetime() -> crate::Res<()> {
-    crate::steps::cmd(
-        "not_found",
-        &[
-            "-q",
-            "server 162.159.200.1 iburst",
-            "server 162.159.200.123 iburst",
-            "server time.cloudflare.com iburst",
-            "server pool.ntp.org iburst",
-        ],
-    )
+//! date & time
+
+/// Keeps the clock in sync over the network (chronyd on Fedora), it catches up once online.
+///
+/// # Errors
+/// `timedatectl` failed, e.g. no NTP service is installed.
+pub async fn enable_ntp() -> crate::Res<()> {
+    crate::root("timedatectl", ["set-ntp", "true"]).await
 }

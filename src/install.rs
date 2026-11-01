@@ -16,6 +16,7 @@ const fn stage_l10n_id(stage: Stage) -> &'static str {
     match stage {
         Stage::UserAdd(_) => "steps-useradd",
         Stage::SetHostname(_) => "steps-sethostname",
+        Stage::SetTimezone(_) => "steps-settimezone",
         Stage::SetTheme(_) => "steps-settheme",
         Stage::DnfDownloadUpdate(_) => "steps-dnfdownloadupdate",
         Stage::DnfInstallUpdate(_) => "steps-dnfinstallupdate",

@@ -1,0 +1,146 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { Tz, TimeZone } from "../timezone.slint";
+import { TdnText, TdnInput, TdnListRow, TdnStyle } from "../components.slint";
+import { Card } from "../slintcn/components/card.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+import { ListView } from "std-widgets.slint";
+
+// the world map, clicking it picks the nearest zone
+component WorldMap inherits Rectangle {
+    // width over height of `world-map.svg`, 360° by 142° of latitude
+    property <float> aspect: 360 / 142;
+
+    accessible-role: none;
+
+    map := Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(parent.width, parent.height * root.aspect);
+        height: self.width / root.aspect;
+
+        Image {
+            width: 100%;
+            height: 100%;
+            source: @image-url("../../data/icons/world-map.svg");
+            colorize: Tokens.color-border-hairline-strong;
+        }
+
+        // time zone boundaries, drawn faintly over the land
+        Image {
+            width: 100%;
+            height: 100%;
+            source: @image-url("../../data/icons/world-map-zones.svg");
+            colorize: Tokens.color-muted-foreground.transparentize(0.6);
+        }
+
+        for zone in Tz.zones: Rectangle {
+            visible: zone.x >= 0;
+            x: zone.x * map.width - self.width / 2;
+            y: zone.y * map.height - self.height / 2;
+            width: 3px;
+            height: self.width;
+            border-radius: self.width / 2;
+            background: Tokens.color-muted-foreground.transparentize(0.4);
+        }
+
+        // the chosen zone, UTC isn't anywhere on the map
+        if Tz.current.x >= 0: Rectangle {
+            x: Tz.current.x * map.width - self.width / 2;
+            y: Tz.current.y * map.height - self.height / 2;
+            width: 0.9rem;
+            height: self.width;
+            border-radius: self.width / 2;
+            border-width: 2px;
+            border-color: Tokens.color-background;
+            background: TdnStyle.accent;
+        }
+
+        TouchArea {
+            mouse-cursor: pointer;
+            clicked => { Tz.pick-at(self.mouse-x / self.width, self.mouse-y / self.height); }
+        }
+    }
+}
+
+export component TimezonePage inherits TdnPage {
+    pageid: "timezone";
+    step_i: 1;
+    forward-focus: search;
+
+    property <bool> searching: search.text != "";
+
+    function pick(zone: TimeZone) {
+        Tz.pick(zone.id);
+        search.text = "";
+        Tz.search("");
+    }
+
+    VerticalLayout {
+        spacing: 0.75rem;
+
+        search := TdnInput {
+            icon: @image-url("../../data/icons/system-search-symbolic.svg");
+            placeholder: Lang.t("page-timezone-search", []);
+            edited(text) => { Tz.search(text); }
+            // Enter takes the first match
+            accepted => {
+                if root.searching && Tz.results.length > 0 { root.pick(Tz.results[0]); }
+                else if !root.searching { root.try-next(); }
+            }
+        }
+
+        Card {
+            vertical-stretch: 1;
+            card-radius: md;
+
+            if !root.searching: WorldMap {
+                x: 0.75rem;
+                y: 0.75rem;
+                width: parent.width - 1.5rem;
+                height: parent.height - 1.5rem;
+            }
+
+            if root.searching && Tz.results.length == 0: TdnText {
+                text: Lang.t("page-timezone-none", []);
+                color: Tokens.color-muted-foreground;
+            }
+
+            if root.searching && Tz.results.length > 0: ListView {
+                x: 0.25rem;
+                y: 0.25rem;
+                width: parent.width - 0.5rem;
+                height: parent.height - 0.5rem;
+                horizontal-scrollbar-policy: always-off;
+
+                for zone in Tz.results: TdnListRow {
+                    text: zone.region == "" ? zone.city : zone.city + ", " + zone.region;
+                    secondary: zone.offset;
+                    selected: zone.id == Tz.current.id;
+                    clicked => { root.pick(zone); }
+                }
+            }
+        }
+
+        // the chosen zone and its time right now
+        HorizontalLayout {
+            spacing: 0.5rem;
+            property <string> zone-name: Tz.current.region == "" ? Tz.current.city : Tz.current.city + ", " + Tz.current.region;
+
+            TdnText {
+                text: parent.zone-name;
+                font-weight: Tokens.typography-weight-medium;
+                horizontal-alignment: left;
+                horizontal-stretch: 1;
+                min-width: 0;
+                overflow: elide;
+            }
+
+            TdnText {
+                text: Tz.current.offset + " · " + Tz.current-time;
+                color: Tokens.color-muted-foreground;
+                horizontal-stretch: 0;
+            }
+        }
+    }
+}

@@ -3,6 +3,7 @@ import { Lang } from "../lang.slint";
 import { Account } from "../account.slint";
 import { Drivers } from "../install.slint";
 import { Network, NetState } from "../network.slint";
+import { Tz } from "../timezone.slint";
 import { TdnText, TdnStyle } from "../components.slint";
 import { DriverList } from "0100_drivers.slint";
 import { UserIcon } from "0040_whoareyou.slint";
@@ -111,6 +112,12 @@ export component SummaryPage inherits TdnPage {
                 icon: @image-url("../../data/icons/input-keyboard-symbolic.svg");
                 label: Lang.t("page-keyboard", []);
                 value: Lang.current_variant.id == "" ? Lang.current_keymap.name : Lang.current_variant.name;
+            }
+
+            InfoRow {
+                icon: @image-url("../../data/icons/location-active-symbolic.svg");
+                label: Lang.t("page-timezone", []);
+                value: (Tz.current.region == "" ? Tz.current.city : Tz.current.city + ", " + Tz.current.region) + " (" + Tz.current.offset + ")";
             }
 
             InfoRow {

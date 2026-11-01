@@ -53,6 +53,7 @@ mod nm {
         fn connectivity(&self) -> zbus::Result<u32>;
         #[zbus(property)]
         fn connectivity_check_uri(&self) -> zbus::Result<String>;
+        fn check_connectivity(&self) -> zbus::Result<u32>;
     }
 
     #[zbus::proxy(
@@ -152,6 +153,8 @@ mod nm {
 }
 
 // values from NetworkManager's D-Bus API docs
+const STATE_CONNECTED_GLOBAL: u32 = 70;
+const CONNECTIVITY_FULL: u32 = 4;
 const DEVICE_TYPE_ETHERNET: u32 = 1;
 const DEVICE_TYPE_WIFI: u32 = 2;
 /// has a carrier (a cable is plugged in), so a connection can be activated on it
@@ -947,25 +950,51 @@ impl Nm {
         }
     }
 
+    /// asks the browser to quit, so it can shut down its web process too, and kills it if it hasn't
+    /// within a couple of seconds
     fn close_portal(&mut self) {
-        if let Some(mut child) = self.portal.take() {
-            if let Err(e) = child.kill() {
-                tracing::debug!(?e, "captive portal browser already gone");
+        let Some(mut child) = self.portal.take() else { return };
+        let Ok(pid) = libc::pid_t::try_from(child.id()) else { return };
+        // SAFETY: `pid` is our own child, which isn't reaped until `wait()` below, so the id can't
+        // have been reused by another process
+        if unsafe { libc::kill(pid, libc::SIGTERM) } == 0 {
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while Instant::now() < deadline {
+                if !matches!(child.try_wait(), Ok(None)) {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(50));
             }
-            if let Err(e) = child.wait() {
-                tracing::debug!(?e, "cannot reap the captive portal browser");
-            }
+            tracing::warn!("captive portal browser didn't quit, killing it");
+        }
+        if let Err(e) = child.kill() {
+            tracing::debug!(?e, "captive portal browser already gone");
+        }
+        if let Err(e) = child.wait() {
+            tracing::debug!(?e, "cannot reap the captive portal browser");
         }
     }
 
     /// whether the portal browser is still open, it's closed once the internet works
-    fn check_portal(&mut self, state: NetState) -> bool {
+    fn check_portal(&mut self) -> bool {
         if let Some(child) = &mut self.portal
             && !matches!(child.try_wait(), Ok(None))
         {
             self.portal = None;
         }
-        if self.portal.is_some() && state == NetState::Online {
+        if self.portal.is_none() {
+            return false;
+        }
+        // NetworkManager only rechecks every few minutes on its own, which is far too slow to notice
+        // the login going through
+        let online = match self.manager.check_connectivity() {
+            Ok(connectivity) => connectivity == CONNECTIVITY_FULL,
+            Err(e) => {
+                tracing::debug!(?e, "cannot ask NetworkManager to check connectivity");
+                self.manager.state().is_ok_and(|s| s == STATE_CONNECTED_GLOBAL)
+            }
+        };
+        if online {
             tracing::info!("Online, closing the captive portal browser");
             self.close_portal();
         }
@@ -1290,8 +1319,8 @@ fn worker(ui: &slint::Weak<AppWindow>, rx: &mpsc::Receiver<Cmd>) {
                 return;
             }
         }
+        let open = nm.check_portal();
         let snap = nm.snapshot();
-        let open = nm.check_portal(snap.state);
         if open != portal_open {
             portal_open = open;
             push(ui, move |net| net.set_portal_open(open));

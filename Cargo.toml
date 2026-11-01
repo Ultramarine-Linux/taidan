@@ -48,6 +48,8 @@ i18n-embed = { version = "0.16.0", features = [
 ] }
 i18n-embed-fl = "0.10.1"
 icu = { version = "2.4.0", features = ["unstable"] }
+# time zone offsets and local times, from the system tzdata
+jiff = { version = "0.2.38", features = ["tzdb-zoneinfo"] }
 # decodes the welcome image off the UI thread, and gives Slint's `@image-url` the `webp` decoder
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 iso3166 = "1.2.1"
@@ -70,7 +72,8 @@ secrecy = { workspace = true }
 sentry = { version = "0.49.5", features = ["logs", "tracing"] }
 serde = "1.0.229"
 serde_json = "1.0.154"
-slint = "1.18.1"
+# `unstable-winit-030` for the monitor size, to scale the window to the screen
+slint = { version = "1.18.1", features = ["unstable-winit-030"] }
 strip-ansi-escapes = "0.2.1"
 taidan_proc_macros = { path = "taidan_proc_macros" }
 tempfile = { workspace = true }

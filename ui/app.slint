@@ -11,6 +11,8 @@ import { KeyboardPage } from "pages/0020_keyboard.slint";
 import { PasswordPage } from "pages/0050_password.slint";
 import { NetworkPage, PasswordDialog, EnterpriseDialog, OfflineDialog, ProxyDialog, IpDialog } from "pages/0060_network.slint";
 import { Network, NetState } from "network.slint";
+import { TimezonePage } from "pages/0055_timezone.slint";
+import { Tz } from "timezone.slint";
 import { DriversPage } from "pages/0100_drivers.slint";
 import { SummaryPage } from "pages/0120_summary.slint";
 import { InstallingPage } from "pages/0130_installing.slint";
@@ -19,7 +21,7 @@ import { ErrorPage } from "pages/0150_error.slint";
 import { Install, InstallState, Drivers } from "install.slint";
 import { TdnText, TdnBtn, Modal } from "components.slint";
 import { Actions } from "actions.slint";
-export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network }
+export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz }
 
 export component AppWindow inherits Window {
     in-out property <int> pagenum: 0;
@@ -48,16 +50,23 @@ export component AppWindow inherits Window {
     background: Tokens.color-background;
     // from the `vercel-geist-fonts` package, scripts Geist lacks (CJK, …) fall back to system fonts
     default-font-family: "Geist";
-    // shown as a standalone window in the middle of the kiosk session, the designs are 600×500
+    // shown as a standalone window in the middle of the kiosk session, the designs are 600×500 and
+    // `Tokens.scale` fits that to the screen (`src/screen.rs`), the size is locked to keep it 6:5
     preferred-width: 600 * Tokens.unit;
     preferred-height: 500 * Tokens.unit;
+    // set from Rust, `Tokens` itself isn't exported as its easings can't be
+    in-out property <float> ui-scale <=> Tokens.scale;
+    min-width: self.preferred-width;
+    max-width: self.preferred-width;
+    min-height: self.preferred-height;
+    max-height: self.preferred-height;
     // the designs use 14px and all `rem` sizes derive from this
     default-font-size: 14 * Tokens.unit;
 
     // pages that are jumped to, rather than reached with Next and Back
-    property <int> installing-page: 8;
-    property <int> done-page: 9;
-    property <int> error-page: 10;
+    property <int> installing-page: 9;
+    property <int> done-page: 10;
+    property <int> error-page: 11;
 
     // move keyboard focus to the page being shown, unless a dialog has it
     function focus-page() {
@@ -67,15 +76,17 @@ export component AppWindow inherits Window {
         else if pagenum == 2 { welcome.focus(); }
         else if pagenum == 3 { whoareyou.focus(); }
         else if pagenum == 4 { password.focus(); }
-        else if pagenum == 5 { network.focus(); }
-        else if pagenum == 6 { drivers.focus(); }
-        else if pagenum == 7 { summary.focus(); }
+        else if pagenum == 5 { timezone.focus(); }
+        else if pagenum == 6 { network.focus(); }
+        else if pagenum == 7 { drivers.focus(); }
+        else if pagenum == 8 { summary.focus(); }
         else if pagenum == done-page { done.focus(); }
         else if pagenum == error-page { error.focus(); }
     }
     changed pagenum => {
         focus-page();
-        if pagenum == 5 { Network.refresh(); }
+        if pagenum == 5 { Tz.refresh(); }
+        if pagenum == 6 { Network.refresh(); }
     }
     init => { focus-page(); }
 
@@ -142,8 +153,18 @@ export component AppWindow inherits Window {
         }
     }
 
-    network := NetworkPage {
+    timezone := TimezonePage {
         index: 5;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => {
+            Tz.save();
+            pagenum += 1;
+        }
+    }
+
+    network := NetworkPage {
+        index: 6;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => {
@@ -153,14 +174,14 @@ export component AppWindow inherits Window {
     }
 
     drivers := DriversPage {
-        index: 6;
+        index: 7;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => { pagenum += 1; }
     }
 
     summary := SummaryPage {
-        index: 7;
+        index: 8;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => {

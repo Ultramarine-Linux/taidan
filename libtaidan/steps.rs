@@ -8,6 +8,7 @@ mod _06_dnfinstallapps;
 mod _07_drivers_codecs;
 mod _08_setup_imf;
 mod _09_sethostname;
+mod _10_settimezone;
 
 use crate::prelude::*;
 
@@ -18,6 +19,7 @@ use crate::steps::{
     _03_dnfinstallupdate::DnfInstallUpdate, _04_script::Script,
     _05_dnfdownloadapps::DnfDownloadApps, _06_dnfinstallapps::DnfInstallApps,
     _07_drivers_codecs::DriversCodecs, _08_setup_imf::SetupImf, _09_sethostname::SetHostname,
+    _10_settimezone::SetTimezone,
 };
 
 #[allow(async_fn_in_trait, clippy::unused_async)]
@@ -40,13 +42,14 @@ pub trait Step {
     }
 }
 
-pub const NUM_STAGES: usize = 10;
+pub const NUM_STAGES: usize = 11;
 
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone, Copy, Debug)]
 pub enum Stage {
     UserAdd,
     SetHostname,
+    SetTimezone,
     SetTheme,
     DnfDownloadUpdate,
     DnfInstallUpdate,
@@ -73,6 +76,7 @@ impl Stage {
         &[
             Self::UserAdd(UserAdd),
             Self::SetHostname(SetHostname),
+            Self::SetTimezone(SetTimezone),
             Self::SetTheme(SetTheme),
             Self::DnfDownloadUpdate(DnfDownloadUpdate),
             Self::DnfInstallUpdate(DnfInstallUpdate),
@@ -96,14 +100,15 @@ impl From<Stage> for u8 {
         match value {
             Stage::UserAdd(_) => 0,
             Stage::SetHostname(_) => 1,
-            Stage::SetTheme(_) => 2,
-            Stage::DnfDownloadUpdate(_) => 3,
-            Stage::DnfInstallUpdate(_) => 4,
-            Stage::Script(_) => 5,
-            Stage::DnfDownloadApps(_) => 6,
-            Stage::DnfInstallApps(_) => 7,
-            Stage::DriversCodecs(_) => 8,
-            Stage::SetupImf(_) => 9,
+            Stage::SetTimezone(_) => 2,
+            Stage::SetTheme(_) => 3,
+            Stage::DnfDownloadUpdate(_) => 4,
+            Stage::DnfInstallUpdate(_) => 5,
+            Stage::Script(_) => 6,
+            Stage::DnfDownloadApps(_) => 7,
+            Stage::DnfInstallApps(_) => 8,
+            Stage::DriversCodecs(_) => 9,
+            Stage::SetupImf(_) => 10,
         }
     }
 }

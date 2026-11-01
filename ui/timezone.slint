@@ -1,0 +1,35 @@
+export struct TimeZone {
+    // IANA name, e.g. America/Denver
+    id: string,
+    // the zone's main city, e.g. Denver
+    city: string,
+    // the country it's in, in the current language
+    region: string,
+    // e.g. UTC−7, at the current date
+    offset: string,
+    // where it is on the world map, as fractions of its width and height, negative if nowhere
+    x: float,
+    y: float,
+}
+
+// the system time zone, driven from Rust (`src/timezone.rs`)
+export global Tz {
+    // the zones with a dot on the map, one per country and way of keeping clocks
+    in property <[TimeZone]> zones;
+    // every zone, including those only found by searching
+    in property <[TimeZone]> all-zones;
+    // the zones matching `search()`
+    in property <[TimeZone]> results;
+    in property <TimeZone> current;
+    // the time right now in `current`
+    in property <string> current-time;
+
+    // fills in the zones in the current language, and picks one if the user hasn't yet
+    callback refresh();
+    callback search(query: string);
+    callback pick(id: string);
+    // picks the zone nearest a spot on the map, given as fractions of its width and height
+    callback pick-at(x: float, y: float);
+    // writes the zone to the settings
+    callback save();
+}

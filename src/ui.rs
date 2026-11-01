@@ -9,7 +9,12 @@ pub use generated::*;
 /// If the UI cannot be created or the event loop fails.
 pub fn run() {
     tracing::debug!("Starting Taidan");
+    let screen = crate::screen::init();
     let ui = AppWindow::new().expect("cannot create app");
+    // set before the event loop starts, which is when the screens are known
+    if screen.set(ui.as_weak()).is_err() {
+        tracing::warn!("window already given to the screen scaling");
+    }
     // Wayland ignores the window `icon`; compositors look up `<app_id>.desktop` instead.
     // Must be set after the platform exists (AppWindow::new) and before the window is shown.
     slint::set_xdg_app_id(crate::APPID).expect("cannot set xdg app id");
@@ -20,6 +25,7 @@ pub fn run() {
     crate::install::initialize_ui(&ui.as_weak(), &ui.global());
     crate::avatar::initialize_ui(&ui.as_weak(), &ui.global());
     crate::network::initialize_ui(&ui.as_weak(), &ui.global());
+    crate::timezone::initialize_ui(&ui.as_weak(), &ui.global());
     init_actions(ui.as_weak(), &ui.global());
     // autoscale(&ui);
     ui.run().expect("cannot run ui");

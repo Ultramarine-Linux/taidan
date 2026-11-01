@@ -12,6 +12,9 @@ pub struct Settings {
     pub device_name: String,
     pub hostname: String,
 
+    /// IANA time zone like `America/Denver`, empty to keep the system's
+    pub timezone: String,
+
     pub fullname: String,
     pub username: String,
 
