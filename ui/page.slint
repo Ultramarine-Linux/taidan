@@ -1,6 +1,7 @@
 import { TdnText, TdnBtn, TdnStyle } from "components.slint";
 import { Cfg } from "cfg.slint";
 import { Lang } from "lang.slint";
+import { A11y } from "a11y.slint";
 import { Tokens, Theme, ThemeMode } from "slintcn/theme/tokens.slint";
 
 export enum Step {
@@ -47,7 +48,7 @@ export component TdnBasePg {
     visible: active || (self.x > -self.width && self.x < self.width);
 
     animate x {
-        duration: 200ms;
+        duration: Tokens.motion-base;
         easing: ease-out-quad;
     }
 
@@ -130,14 +131,14 @@ export component TdnHeader inherits HorizontalLayout {
         }
     }
 
-    // TODO: open the accessibility page from the designs
     VerticalLayout {
         alignment: center;
         horizontal-stretch: 0;
         TdnBtn {
             width: 1.75rem * Tokens.text-scale;
             max-height: 1.75rem * Tokens.text-scale;
-            accessible-label: "Accessibility";
+            accessible-label: Lang.t("page-accessibility", []);
+            clicked => { A11y.open = true; }
             icon: @image-url("../data/icons/settings-accessibility-symbolic.svg");
             min-size: 1.75rem;
             icon-size: 1rem;

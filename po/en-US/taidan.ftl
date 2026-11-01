@@ -43,6 +43,44 @@ imelangs-th = Thai
 # use different brackets, etc.
 imelangs-display = { $lang_name } ({ $native_lang_name })
 
+## [Accessibility]
+
+# also the name of the button that opens it, in the header of every page
+page-accessibility = Accessibility
+page-accessibility-desc = Press the Feature to Enable
+# tiles
+page-accessibility-screen-reader = Screen Reader
+page-accessibility-zoom = Zoom
+page-accessibility-sticky-keys = Sticky Keys
+# .hint-before, .hint-after: the text before and after a picture of the accessibility button,
+# "You can access this page with the [button] button any time". Leave one empty if your
+# language puts the button at the start or the end
+page-accessibility-hint-before = You can access this page with the
+page-accessibility-hint-after = button any time
+# btn, opens the dialog with the rest of the options
+page-accessibility-more = More Options
+# btn, closes the page when it was opened with the accessibility button
+page-accessibility-done = Done
+page-accessibility-larger-text = Larger Text
+page-accessibility-larger-text-desc = Make text and buttons bigger.
+page-accessibility-legible-font = Legible Font
+page-accessibility-legible-font-desc = Use Atkinson Hyperlegible, a typeface designed to tell letters apart for readers with low vision.
+page-accessibility-reduce-motion = Reduce Motion
+page-accessibility-reduce-motion-desc = Turn off animations.
+page-accessibility-slow-keys = Slow Keys
+page-accessibility-slow-keys-desc = Only accept a key if it's held down for a moment, so accidental presses are ignored.
+page-accessibility-bounce-keys = Bounce Keys
+page-accessibility-bounce-keys-desc = Ignore a key pressed again right after itself.
+page-accessibility-dwell-click = Dwell Click
+page-accessibility-dwell-click-desc = Click by holding the pointer still for a moment.
+page-accessibility-color-filter = Color Filter
+# .color-filter-*: options for the color filter, named like in Plasma's settings
+page-accessibility-color-filter-none = None
+page-accessibility-color-filter-protanopia = Protanopia (red weak)
+page-accessibility-color-filter-deuteranopia = Deuteranopia (green weak)
+page-accessibility-color-filter-tritanopia = Tritanopia (blue-yellow)
+page-accessibility-color-filter-monochrome = Grayscale
+
 # step-*: name of the current setup stage, shown above every page
 step-account-creation = Account Creation
 step-region-and-connectivity = Region and Connectivity

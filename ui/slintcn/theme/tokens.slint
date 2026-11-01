@@ -99,8 +99,10 @@ export global Tokens {
     out property <length> radius-xl: 16 * unit;  // radius + 6
 
     // motion
-    out property <duration> motion-fast: 150ms;
-    out property <duration> motion-base: 200ms;
+    // turns animations off, for people who get motion sick or distracted by them
+    in-out property <bool> reduce-motion;
+    out property <duration> motion-fast: reduce-motion ? 0ms : 150ms;
+    out property <duration> motion-base: reduce-motion ? 0ms : 200ms;
     out property <easing> motion-easing-standard:    cubic-bezier(0.4, 0.0, 0.2, 1.0);
     out property <easing> motion-easing-emphasized:  cubic-bezier(0.05, 0.7, 0.1, 1.0);
 

@@ -1,3 +1,5 @@
+import { AccessibilityPage, AccessibilityDialog, A11yMoreDialog } from "pages/0005_accessibility.slint";
+import { A11y } from "a11y.slint";
 import { WelcomePage } from "pages/0030_welcome.slint";
 import { Lang } from "lang.slint";
 import { Cfg } from "cfg.slint";
@@ -24,7 +26,7 @@ import { ErrorPage } from "pages/0150_error.slint";
 import { Install, InstallState, Drivers, Location } from "install.slint";
 import { TdnText, TdnBtn, Modal } from "components.slint";
 import { Actions } from "actions.slint";
-export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location }
+export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y }
 
 export component AppWindow inherits Window {
     in-out property <int> pagenum: 0;
@@ -33,8 +35,9 @@ export component AppWindow inherits Window {
     // full-screen: true;
     icon: Cfg.distro_icon();
     background: Tokens.color-background;
-    // from the `vercel-geist-fonts` package, scripts Geist lacks (CJK, …) fall back to system fonts
-    default-font-family: "Geist";
+    // from the `vercel-geist-fonts` package, scripts Geist lacks (CJK, …) fall back to system fonts.
+    // Atkinson Hyperlegible Next is from `atkinson-hyperlegible-next-fonts`
+    default-font-family: A11y.legible-font ? "Atkinson Hyperlegible Next" : "Geist";
     // shown as a standalone window in the middle of the kiosk session, the designs are 600×500 and
     // `Tokens.scale` fits that to the screen (`src/screen.rs`), the size is locked to keep it 6:5
     preferred-width: 600 * Tokens.unit;
@@ -49,32 +52,39 @@ export component AppWindow inherits Window {
     default-font-size: 14 * Tokens.unit;
 
     // pages that are jumped to, rather than reached with Next and Back
-    property <int> installing-page: 10;
-    property <int> done-page: 11;
-    property <int> error-page: 12;
+    property <int> installing-page: 11;
+    property <int> done-page: 12;
+    property <int> error-page: 13;
 
     // move keyboard focus to the page being shown, unless a dialog has it
     function focus-page() {
         if Modal.open { return; }
-        if pagenum == 0 { language.focus(); }
-        else if pagenum == 1 { keyboard.focus(); }
-        else if pagenum == 2 { welcome.focus(); }
-        else if pagenum == 3 { whoareyou.focus(); }
-        else if pagenum == 4 { password.focus(); }
-        else if pagenum == 5 { timezone.focus(); }
-        else if pagenum == 6 { network.focus(); }
-        else if pagenum == 7 { location.focus(); }
-        else if pagenum == 8 { drivers.focus(); }
-        else if pagenum == 9 { summary.focus(); }
+        if pagenum == 0 { accessibility.focus(); }
+        else if pagenum == 1 { language.focus(); }
+        else if pagenum == 2 { keyboard.focus(); }
+        else if pagenum == 3 { welcome.focus(); }
+        else if pagenum == 4 { whoareyou.focus(); }
+        else if pagenum == 5 { password.focus(); }
+        else if pagenum == 6 { timezone.focus(); }
+        else if pagenum == 7 { network.focus(); }
+        else if pagenum == 8 { location.focus(); }
+        else if pagenum == 9 { drivers.focus(); }
+        else if pagenum == 10 { summary.focus(); }
         else if pagenum == done-page { done.focus(); }
         else if pagenum == error-page { error.focus(); }
     }
     changed pagenum => {
         focus-page();
-        if pagenum == 5 { Tz.refresh(); }
-        if pagenum == 6 { Network.refresh(); }
+        if pagenum == 6 { Tz.refresh(); }
+        if pagenum == 7 { Network.refresh(); }
     }
     init => { focus-page(); }
+
+    // apply the text options here, `Tokens` can't be set from the global
+    property <bool> larger-text: A11y.larger-text;
+    changed larger-text => { Tokens.text-scale = larger-text ? 1.0 : 0.875; }
+    property <bool> reduce-motion: A11y.reduce-motion;
+    changed reduce-motion => { Tokens.reduce-motion = reduce-motion; }
 
     // back to the page when a dialog closes
     property <bool> dialog-open: Modal.open;
@@ -97,39 +107,44 @@ export component AppWindow inherits Window {
                 activated => { Actions.open-terminal(); }
                 shortcut: @keys(Alt + Shift + T);
             }
+            // the same as Plasma's, for anyone who can't find the screen reader tile
+            MenuItem {
+                title: "Toggle Screen Reader";
+                activated => {
+                    A11y.screen-reader = !A11y.screen-reader;
+                    A11y.changed();
+                }
+                shortcut: @keys(Meta + Alt + S);
+            }
         }
     }
 
-    language := LanguagePage {
+    accessibility := AccessibilityPage {
         index: 0;
         current: pagenum;
         next_page => { pagenum += 1; }
     }
 
-    keyboard := KeyboardPage {
+    language := LanguagePage {
         index: 1;
+        current: pagenum;
+        next_page => { pagenum += 1; }
+    }
+
+    keyboard := KeyboardPage {
+        index: 2;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => { pagenum += 1; }
     }
 
     welcome := WelcomePage {
-        index: 2;
+        index: 3;
         current: pagenum;
         next_page => { pagenum += 1; }
     }
 
     whoareyou := WhoAreYouPage {
-        index: 3;
-        current: pagenum;
-        prev_page => { pagenum -= 1; }
-        next_page => {
-            Account.save();
-            pagenum += 1;
-        }
-    }
-
-    password := PasswordPage {
         index: 4;
         current: pagenum;
         prev_page => { pagenum -= 1; }
@@ -139,8 +154,18 @@ export component AppWindow inherits Window {
         }
     }
 
-    timezone := TimezonePage {
+    password := PasswordPage {
         index: 5;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => {
+            Account.save();
+            pagenum += 1;
+        }
+    }
+
+    timezone := TimezonePage {
+        index: 6;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => {
@@ -150,7 +175,7 @@ export component AppWindow inherits Window {
     }
 
     network := NetworkPage {
-        index: 6;
+        index: 7;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => {
@@ -160,21 +185,21 @@ export component AppWindow inherits Window {
     }
 
     location := LocationPage {
-        index: 7;
-        current: pagenum;
-        prev_page => { pagenum -= 1; }
-        next_page => { pagenum += 1; }
-    }
-
-    drivers := DriversPage {
         index: 8;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => { pagenum += 1; }
     }
 
-    summary := SummaryPage {
+    drivers := DriversPage {
         index: 9;
+        current: pagenum;
+        prev_page => { pagenum -= 1; }
+        next_page => { pagenum += 1; }
+    }
+
+    summary := SummaryPage {
+        index: 10;
         current: pagenum;
         prev_page => { pagenum -= 1; }
         next_page => {
@@ -241,6 +266,16 @@ export component AppWindow inherits Window {
             Network.save(true);
             pagenum += 1;
         }
+    }
+
+    if A11y.open: AccessibilityDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if A11y.more-open: A11yMoreDialog {
+        width: 100%;
+        height: 100%;
     }
 }
 

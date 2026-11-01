@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+pub mod a11y;
 pub mod account;
 pub mod avatar;
 pub mod cfg;

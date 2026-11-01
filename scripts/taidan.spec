@@ -37,6 +37,11 @@ Recommends:     chrony
 Recommends:     grubby
 Requires:       xdg-terminal-exec
 Requires:       vercel-geist-fonts
+# accessibility: the legible font option, the screen reader, and applying the rest to KWin
+Requires:       atkinson-hyperlegible-next-fonts
+Requires:       atkinson-hyperlegible-mono-fonts
+Requires:       orca
+Requires:       /usr/bin/kwriteconfig6
 # dlopen()ed by Slint, so not picked up as automatic dependencies
 Requires:       libxkbcommon
 Requires:       libwayland-client

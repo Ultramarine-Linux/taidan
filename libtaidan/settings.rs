@@ -28,6 +28,8 @@ pub struct Settings {
     pub install_codecs_drivers: bool,
     /// whether apps may ask GeoClue for the device's location
     pub location: bool,
+    /// accessibility options, carried over to the new user
+    pub a11y: crate::a11y::A11y,
 
     /// for networks that only reach the internet through a proxy
     pub proxy: Option<crate::proxy::Proxy>,

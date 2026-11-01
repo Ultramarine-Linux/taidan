@@ -53,6 +53,9 @@ impl super::Step for SystemSetup {
         {
             tracing::warn!(?e, "cannot turn off location services");
         }
+        if let Err(e) = crate::a11y::apply_to_user(settings).await {
+            tracing::warn!(?e, "cannot carry over the accessibility settings");
+        }
         // for cameras and brightness controls on systems where these aren't given to the seat
         let has_video = tokio::fs::read_to_string("/etc/group")
             .await
