@@ -27,7 +27,6 @@ pub fn run() {
     crate::network::initialize_ui(&ui.as_weak(), &ui.global());
     crate::timezone::initialize_ui(&ui.as_weak(), &ui.global());
     init_actions(ui.as_weak(), &ui.global());
-    // autoscale(&ui);
     ui.run().expect("cannot run ui");
 }
 

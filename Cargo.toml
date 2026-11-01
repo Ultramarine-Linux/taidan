@@ -33,13 +33,9 @@ keywords = ["oobe", "ultramarine", "linux"]
 build = "build.rs"
 
 [dependencies]
-atomic_float = "1.1.0"
 basic-toml = "0.1.10"
 color-eyre = "0.6.5"
-const_format = "0.2.37"
-enum_dispatch = "0.3.13"
 fluent = "0.17.0"
-futures = { workspace = true }
 hex = "0.4.3"
 i18n-embed = { version = "0.16.0", features = [
     "desktop-requester",
@@ -52,23 +48,13 @@ icu = { version = "2.4.0", features = ["unstable"] }
 jiff = { version = "0.2.38", features = ["tzdb-zoneinfo"] }
 # decodes the welcome image off the UI thread, and gives Slint's `@image-url` the `webp` decoder
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
-iso3166 = "1.2.1"
-isolang = { version = "2.4.0", features = ["local_names"] }
 itertools = { workspace = true }
 libc = "0.2.191"
 libtaidan = { version = "0.3.0", path = "libtaidan" }
-memchr = "2.8.3"
 parking_lot = "0.13.0"
-paste = "1.0.15"
-phf = { version = "0.14.0", features = ["macros"] }
 poly_l10n = "0.0.7"
 regex = { workspace = true }
-reqwest = { version = "0.13.5", features = [
-    "http2",
-    "default-tls",
-], default-features = false }
 rust-embed = { version = "8.13.0", features = ["include-exclude"] }
-secrecy = { workspace = true }
 sentry = { version = "0.49.5", features = ["logs", "tracing"] }
 serde = "1.0.229"
 serde_json = "1.0.154"
@@ -80,14 +66,10 @@ tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
 tracing = { workspace = true }
 tracing-appender = "0.2.5"
-tracing-error = "0.2.1"
 tracing-journald = "0.3.2"
 tracing-subscriber = { workspace = true }
 uzers = "0.12.2"
 v4l = "0.14.0"
-which = { version = "8.0.6", features = ["tracing"] }
-xcb = { version = "1.7.1", features = ["randr"] }
-xcrypt = "0.3.2"
 zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking-api"] }
 
 [build-dependencies]

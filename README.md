@@ -10,16 +10,20 @@ Linux, written in Rust and the [Slint] toolkit.
 For an up-to-date list, see `scripts/taidan.spec`.
 
 ```
+kwin, dbus-daemon, swaybg [the OOBE session]
 fontconfig
 vercel-geist-fonts
 libxkbcommon, wayland and EGL libraries [loaded at runtime by Slint]
+NetworkManager
+cog [browser for captive portals]
+tzdata [time zones]
 gsettings or (plasma-apply-colorscheme and kwriteconfig6)
 shadow-utils
-systemd-udev [for systemd-timesyncd.service]
+systemd
 sh
 dnf5 and dnf5-command(copr)
 flatpak
-xkeyboard-config [for /usr/share/X11/xkb/rules/evdev.lst]
+chrony [recommended, keeps the clock right]
 ```
 
 ### 🛠️ Build Dependencies
@@ -28,7 +32,6 @@ xkeyboard-config [for /usr/share/X11/xkb/rules/evdev.lst]
 pkgconfig(openssl)
 pkgconfig(fontconfig)
 pkgconfig(libxcrypt)
-pkgconfig(xcb)
 pkgconfig(icu-i18n)
 clang
 glibc-all-langpacks [for `localedef --list-archive`]

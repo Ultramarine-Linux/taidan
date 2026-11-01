@@ -17,7 +17,6 @@ enum_dispatch = "0.3.13"
 futures = { workspace = true }
 itertools = { workspace = true }
 memchr = "2.8.3"
-paste = "1.0.15"
 phf = { version = "0.14.0", features = ["macros", "phf_macros"] }
 regex = { workspace = true }
 reqwest = { version = "0.13.5", features = [

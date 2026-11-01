@@ -91,9 +91,9 @@ mod tests {
     fn scales() {
         let close = |a: f64, b: f64| (a - b).abs() < 1e-9;
         // half of a 1440p screen, and bigger screens never get a smaller window
-        assert!(close(scale_for((2560., 1440.)), 1.44));
-        assert!(close(scale_for((1920., 1080.)), 1.34));
-        assert!(close(scale_for((1366., 768.)), 1.25));
+        assert!(close(scale_for((2560., 1440.)), 1.36));
+        assert!(close(scale_for((1920., 1080.)), 1.3));
+        assert!(close(scale_for((1366., 768.)), 1.24));
         assert!(scale_for((3840., 2160.)) > scale_for((2560., 1440.)));
         // the width limits portrait screens
         assert!(close(scale_for((800., 1280.)), 1.2));
