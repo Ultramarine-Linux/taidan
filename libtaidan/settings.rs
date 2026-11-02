@@ -28,7 +28,8 @@ pub struct Settings {
     pub avatar: Option<std::path::PathBuf>,
 
     pub install_codecs_drivers: bool,
-    /// whether apps may ask GeoClue for the device's location
+    /// whether apps may ask GeoClue for the device's location, on unless turned off
+    #[serde(default = "yes")]
     pub location: bool,
     /// accessibility options, carried over to the new user
     pub a11y: crate::a11y::A11y,
@@ -44,24 +45,55 @@ pub struct Settings {
 
     pub actions: [Vec<String>; crate::cfg::ACTION_TYPES],
 
-    /// ids of the tweaks to turn on, see [`crate::tweaks::Tweak::id()`], the rest are turned off
-    #[serde(deserialize_with = "tweak_ids")]
-    pub tweaks: Vec<String>,
+    /// the tweaks to turn on, see [`TweakIds`]
+    pub tweaks: TweakIds,
 }
 
-/// tweak ids, or nothing for the old format: a `bool` per tweak in an order that wasn't stable,
-/// so there's no telling which ones they were
-fn tweak_ids<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Vec<String>, D::Error> {
-    #[derive(serde::Deserialize)]
-    #[serde(untagged)]
-    enum Tweaks {
-        Ids(Vec<String>),
-        Old(#[allow(dead_code)] Vec<bool>),
+const fn yes() -> bool {
+    true
+}
+
+/// ids of the tweaks to turn on, see [`crate::tweaks::Tweak::id()`], the rest are turned off.
+/// Unknown for settings in the old format, a `bool` per tweak in an order that wasn't stable, so
+/// there's no telling which ones they were, then no tweak is run at all
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(transparent)]
+pub struct TweakIds(Option<Vec<String>>);
+
+impl TweakIds {
+    /// the ids, [`None`] if they're unknown
+    #[must_use]
+    pub fn ids(&self) -> Option<&[String]> {
+        self.0.as_deref()
     }
-    Ok(match serde::Deserialize::deserialize(de)? {
-        Tweaks::Ids(ids) => ids,
-        Tweaks::Old(_) => vec![],
-    })
+}
+
+impl Default for TweakIds {
+    fn default() -> Self {
+        Self(Some(vec![]))
+    }
+}
+
+impl FromIterator<String> for TweakIds {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
+        Self(Some(iter.into_iter().collect()))
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TweakIds {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        #[serde(untagged)]
+        enum Tweaks {
+            Ids(Vec<String>),
+            Old(#[allow(dead_code)] Vec<bool>),
+            Unknown(()),
+        }
+        Ok(Self(match serde::Deserialize::deserialize(de)? {
+            Tweaks::Ids(ids) => Some(ids),
+            Tweaks::Old(_) | Tweaks::Unknown(()) => None,
+        }))
+    }
 }
 
 #[cfg(test)]
@@ -120,9 +152,9 @@ mod tests {
         assert!(restored.nointernet);
         assert!(restored.timezone.is_empty());
         assert!(restored.locale.is_empty());
-        assert!(!restored.location);
+        assert!(restored.location);
         assert_eq!(restored.a11y, crate::a11y::A11y::default());
-        assert!(restored.tweaks.is_empty());
+        assert_eq!(restored.tweaks.ids(), None);
         assert!(restored.passwd.expose_secret().is_empty());
     }
 
@@ -130,6 +162,12 @@ mod tests {
     fn tweak_ids_deserialize() {
         let json = serde_json::json!({ "tweaks": ["rpmfusion", "flathub"] });
         let restored: Settings = serde_json::from_value(json).unwrap();
-        assert_eq!(restored.tweaks, ["rpmfusion", "flathub"]);
+        assert_eq!(restored.tweaks.ids().unwrap(), ["rpmfusion", "flathub"]);
+        let json = serde_json::to_value(&restored).unwrap();
+        assert_eq!(json["tweaks"], serde_json::json!(["rpmfusion", "flathub"]));
+        // ones that never picked any turn them all off
+        let restored: Settings = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert_eq!(restored.tweaks.ids(), Some(&[][..]));
+        assert!(restored.location);
     }
 }

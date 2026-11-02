@@ -15,10 +15,13 @@ Suggests:       %{name}-default-configs
 Requires:       kwin
 Requires:       dbus-daemon
 Requires:       swaybg
-Requires:       polkit
+# /run/polkit-1/rules.d, where taidan-initial-setup.service puts its rules, is read since 126
+Requires:       polkit >= 126
 # installation steps
 Requires:       (glib2 or (/usr/bin/plasma-apply-colorscheme and kf6-kconfig))
 Requires:       shadow-utils
+# runuser
+Requires:       util-linux
 Requires:       systemd
 Requires:       systemd-udev
 # chvt for the unit, pkill for start-taidan
@@ -27,8 +30,12 @@ Requires:       procps-ng
 Requires:       bash
 Requires:       (dnf5 and dnf5-command(copr))
 Requires:       flatpak
-# required for running homectl
-Requires:       util-linux-script
+# homectl needs systemd-homed running when the distro config sets systemd_homed
+Recommends:     systemd-homed
+# lspci, to find GPUs and Broadcom chips that need drivers
+Requires:       pciutils
+# dbus-send, to tell KWin to reload the keyboard layout
+Requires:       dbus-tools
 # network page, over its D-Bus API, and the browser for captive portals
 Requires:       NetworkManager
 Requires:       cog
@@ -38,7 +45,8 @@ Requires:       tzdata
 Recommends:     chrony
 # finds the kernel the NVIDIA driver is built for
 Recommends:     grubby
-Requires:       xdg-terminal-exec
+# the opt-in debug shell
+Recommends:     xdg-terminal-exec
 Requires:       vercel-geist-fonts
 # accessibility: the legible font option, the screen reader, and applying the rest to KWin
 Requires:       atkinson-hyperlegible-next-fonts
@@ -88,12 +96,22 @@ This package contains the default configuration files for Taidan.
 %cargo_install
 DESTDIR=%buildroot ./scripts/install.sh
 
+%post
+%systemd_post taidan-initial-setup.service taidan-initial-setup-reconfiguration.service
+
+%preun
+%systemd_preun taidan-initial-setup.service taidan-initial-setup-reconfiguration.service
+
+%postun
+# no restart on upgrade, that would kill or rerun the OOBE
+%systemd_postun taidan-initial-setup.service taidan-initial-setup-reconfiguration.service
+
 %files
 %doc README.md
 %license LICENSE.md LICENSE.dependencies
 %{_bindir}/taidan
 %{_libexecdir}/start-taidan
-%{_datadir}/polkit-1/rules.d/100-taidan.rules
+%{_datadir}/taidan/polkit/
 %{_presetdir}/95-taidan.preset
 %{_sysconfdir}/pam.d/taidan
 %{_sysusersdir}/taidan.conf

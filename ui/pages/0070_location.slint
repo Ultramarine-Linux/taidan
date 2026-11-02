@@ -1,5 +1,5 @@
 import { TdnPage } from "../page.slint";
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { Location } from "../install.slint";
 import { TdnText, TdnToggleRow } from "../components.slint";
 import { Card } from "../slintcn/components/card.slint";
@@ -23,7 +23,7 @@ export component LocationPage inherits TdnPage {
 
             TdnText {
                 text: Lang.t("page-location-desc", []);
-                horizontal-alignment: left;
+                horizontal-alignment: Dir.text-start;
                 wrap: word-wrap;
                 font-size: 1.1 * Tokens.text-rem;
             }
@@ -36,12 +36,14 @@ export component LocationPage inherits TdnPage {
             }
         }
 
-        // pushes the privacy card to the right edge on wider windows
+        // pushes the privacy card to the end edge on wider windows
         Rectangle {
+            layout-order: Dir.order(1);
             horizontal-stretch: 1;
         }
 
         VerticalLayout {
+            layout-order: Dir.order(2);
             alignment: start;
             horizontal-stretch: 0;
             width: 12.5rem;
@@ -66,23 +68,24 @@ export component LocationPage inherits TdnPage {
                         }
 
                         TdnText {
+                            layout-order: Dir.order(1);
                             text: Lang.t("page-location-tip-title", []);
                             font-size: Tokens.typography-title-size;
                             font-weight: Tokens.typography-weight-medium;
-                            horizontal-alignment: left;
+                            horizontal-alignment: Dir.text-start;
                             wrap: word-wrap;
                         }
                     }
 
                     TdnText {
                         text: Lang.t("page-location-tip", []);
-                        horizontal-alignment: left;
+                        horizontal-alignment: Dir.text-start;
                         wrap: word-wrap;
                     }
 
                     TdnText {
                         text: Lang.t("page-location-tip-control", []);
-                        horizontal-alignment: left;
+                        horizontal-alignment: Dir.text-start;
                         wrap: word-wrap;
                     }
                 }

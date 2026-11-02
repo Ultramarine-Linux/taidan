@@ -1,5 +1,5 @@
 import { TdnPage } from "../page.slint";
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { Tz, TimeZone } from "../timezone.slint";
 import { TdnText, TdnInput, TdnListRow, TdnStyle } from "../components.slint";
 import { Card } from "../slintcn/components/card.slint";
@@ -109,8 +109,7 @@ export component TimezonePage inherits TdnPage {
             // readers hear the one Enter would pick from the description changing
             description: !root.searching ? ""
                 : Tz.results.length == 0 ? Lang.t("page-timezone-none", [])
-                : Tz.results[root.active-row].region == "" ? Tz.results[root.active-row].city
-                : Tz.results[root.active-row].city + ", " + Tz.results[root.active-row].region;
+                : Lang.place(Tz.results[root.active-row].city, Tz.results[root.active-row].region);
             edited(text) => {
                 cursor = -1;
                 list.content-y = 0;
@@ -171,7 +170,7 @@ export component TimezonePage inherits TdnPage {
 
                 for zone[i] in Tz.results: TdnListRow {
                     height: root.row-height;
-                    text: zone.region == "" ? zone.city : zone.city + ", " + zone.region;
+                    text: Lang.place(zone.city, zone.region);
                     secondary: zone.offset;
                     selected: zone.id == Tz.current.id;
                     highlighted: i == root.active-row;
@@ -183,18 +182,19 @@ export component TimezonePage inherits TdnPage {
         // the chosen zone and its time right now
         HorizontalLayout {
             spacing: 0.5rem;
-            property <string> zone-name: Tz.current.region == "" ? Tz.current.city : Tz.current.city + ", " + Tz.current.region;
+            property <string> zone-name: Lang.place(Tz.current.city, Tz.current.region);
 
             TdnText {
                 text: parent.zone-name;
                 font-weight: Tokens.typography-weight-medium;
-                horizontal-alignment: left;
+                horizontal-alignment: Dir.text-start;
                 horizontal-stretch: 1;
                 min-width: 0;
                 overflow: elide;
             }
 
             TdnText {
+                layout-order: Dir.order(1);
                 text: Tz.current.offset + " · " + Tz.current-time;
                 color: Tokens.color-muted-foreground;
                 horizontal-stretch: 0;

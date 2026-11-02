@@ -157,7 +157,7 @@ impl A11y {
 }
 
 /// whether `kwriteconfig6` is there, which it is on Plasma
-fn has_kwriteconfig() -> bool {
+pub(crate) fn has_kwriteconfig() -> bool {
     std::path::Path::new("/usr/bin/kwriteconfig6").exists()
 }
 

@@ -116,6 +116,15 @@ pub fn set_lang(lang: &str) {
     crate::SETTINGS.write().locale = posix_locale(lang).unwrap_or_default();
 }
 
+/// whether `lang`, a BCP 47 tag, is written right to left, from the likely script of the language
+/// (`ar` → Arabic, `uz-Arab`, …)
+fn is_rtl(lang: &str) -> bool {
+    let tag = lang.split_once('.').map_or(lang, |(left, _)| left);
+    icu::locale::LanguageIdentifier::try_from_str(tag)
+        .inspect_err(|e| tracing::error!(?e, lang, "cannot parse locale for its direction"))
+        .is_ok_and(|li| icu::locale::LocaleDirectionality::new_extended().is_right_to_left(&li))
+}
+
 thread_local! {
     static LANG_DISPLAY_HDL: RefCell<
         Option<(String, dn::multi::LocaleDisplayNamesFormatter)>,
@@ -253,6 +262,7 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
         .or_else(|| LANGS.iter().find(|lang| lang.locale == "en-US"))
         .expect("no english");
     set_lang(&initial.bcp47());
+    lang.set_rtl(is_rtl(&initial.bcp47()));
     lang.set_current_language(Language {
         locale: initial.bcp47(),
         native_name: initial.native_name.to_shared_string(),
@@ -265,6 +275,10 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
                 set_lang("en-Xowo");
             } else {
                 set_lang(&lang.locale);
+            }
+            // before `current_language` changes, like the translations, see `Lang.select`
+            if let Some(ui) = ui.upgrade() {
+                ui.global::<crate::ui::Lang<'_>>().set_rtl(is_rtl(&lang.locale));
             }
             ui.upgrade_in_event_loop(|ui| ui.window().request_redraw()).expect("event loop err");
         }
@@ -439,6 +453,17 @@ mod tests {
         );
         assert_eq!(parse_localectl_keymap("      X11 Layout: us\n"), Some(("us".to_owned(), None)));
         assert_eq!(parse_localectl_keymap("       VC Keymap: n/a\n      X11 Layout: n/a\n"), None);
+    }
+
+    #[test]
+    fn rtl_languages() {
+        for lang in ["ar", "ar-EG", "fa-IR", "he-IL", "ur-PK", "ps", "yi", "ckb-IQ", "ug-CN", "dv"]
+        {
+            assert!(is_rtl(lang), "{lang} is right to left");
+        }
+        for lang in ["en-US", "de-DE", "ja-JP", "zh-TW", "en-owo", "uz-UZ"] {
+            assert!(!is_rtl(lang), "{lang} is left to right");
+        }
     }
 
     #[test]

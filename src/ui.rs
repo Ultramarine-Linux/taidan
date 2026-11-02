@@ -41,6 +41,9 @@ pub fn run() {
         }
     });
     ui.run().expect("cannot run ui");
+    // closing the window in a dev session skips finish(), so stop the helpers here too
+    crate::network::shutdown();
+    crate::a11y::shutdown();
 }
 
 /// whether `taidan.debug_shell` is on the kernel command line, either bare or set to a true value

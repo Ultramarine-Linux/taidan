@@ -1,6 +1,6 @@
 import { TdnText, TdnBtn, TdnStyle } from "components.slint";
 import { Cfg } from "cfg.slint";
-import { Lang } from "lang.slint";
+import { Lang, Dir } from "lang.slint";
 import { A11y } from "a11y.slint";
 import { Tokens, Theme, ThemeMode } from "slintcn/theme/tokens.slint";
 
@@ -67,6 +67,7 @@ export component TdnHero inherits Rectangle {
         accessible-role: none;
     }
 
+    // distro branding on the wallpaper, kept where the artwork expects it in every language
     caption := Text {
         x: 1rem;
         y: parent.height - self.height - 1rem;
@@ -104,6 +105,7 @@ export component TdnHeader inherits HorizontalLayout {
     }
 
     VerticalLayout {
+        layout-order: Dir.order(1);
         alignment: center;
         spacing: 0.4rem;
         visible: root.show-steps;
@@ -114,7 +116,9 @@ export component TdnHeader inherits HorizontalLayout {
             accessible-label: StepHdl.label(StepHdl.steps[root.step_i]);
             accessible-value: (root.step_i + 1) + "/" + StepHdl.steps.length;
 
+            // filled from the start edge, the right one for right-to-left languages
             for step[i] in StepHdl.steps: Rectangle {
+                layout-order: Dir.order(i);
                 height: 6 * Tokens.unit;
                 horizontal-stretch: 1;
                 border-radius: self.height / 2;
@@ -128,11 +132,12 @@ export component TdnHeader inherits HorizontalLayout {
             color: Tokens.color-muted-foreground;
             font-size: Tokens.typography-body-sm-size;
             text: StepHdl.label(StepHdl.steps[root.step_i]);
-            horizontal-alignment: left;
+            horizontal-alignment: Dir.text-start;
         }
     }
 
     VerticalLayout {
+        layout-order: Dir.order(2);
         alignment: center;
         horizontal-stretch: 0;
         TdnBtn {
@@ -194,7 +199,7 @@ export component TdnPage inherits TdnBasePg {
         TdnText {
             font-size: 1.75 * Tokens.text-rem;
             font-weight: 500;
-            horizontal-alignment: left;
+            horizontal-alignment: Dir.text-start;
             wrap: word-wrap;
             // readable text when reviewing the screen, the group above announces it on focus
             text: root.name;
@@ -215,10 +220,11 @@ export component TdnPage inherits TdnBasePg {
                 clicked => { root.prev_page(); }
             }
 
-            // keeps Next on the right when there is no Back button
+            // keeps Next at the end when there is no Back button
             if !root.can-prev: Rectangle { }
 
             next-btn := TdnBtn {
+                layout-order: Dir.order(1);
                 text: root.next-text;
                 enabled: root.can-next;
                 enter-hint: true;

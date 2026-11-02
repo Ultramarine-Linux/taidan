@@ -19,11 +19,19 @@ _launch=none
 [services][org.kde.konsole.desktop]
 _launch=none
 
+# Meta+P, the display switcher could turn off the only screen showing the OOBE
+[services][org.kde.kscreen.desktop]
+_launch=none
+ShowOSD=none
+
 [services][org.kde.krunner.desktop]
 _launch=none
 RunClipboard=none
 
 [services][org.kde.plasma-systemmonitor.desktop]
+_launch=none
+
+[services][org.kde.plasma.emojier.desktop]
 _launch=none
 
 [services][org.kde.spectacle.desktop]

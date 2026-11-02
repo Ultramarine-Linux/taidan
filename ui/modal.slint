@@ -8,5 +8,5 @@ import { A11y } from "a11y.slint";
 // Options" over the accessibility page) has the one underneath give up the keyboard itself, see
 // `A11yContent`
 export global Modal {
-    out property <bool> open: Camera.open || Network.password-ssid != "" || Network.enterprise-open || Network.offline-prompt || Network.proxy-open || Network.ip-open || Tweaks.open || A11y.open || A11y.more-open;
+    out property <bool> open: Camera.open || Network.password-ssid != "" || Network.hidden-open || Network.enterprise-open || Network.offline-prompt || Network.proxy-open || Network.ip-open || Tweaks.open || A11y.open || A11y.more-open;
 }

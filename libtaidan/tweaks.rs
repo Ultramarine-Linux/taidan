@@ -162,7 +162,8 @@ impl Tweak {
     /// Run `up` with the serialized `settings`, failures are logged
     ///
     /// Expects `pkexec` to be available.
-    #[tracing::instrument]
+    // not the settings, which have the proxy in them, and its password
+    #[tracing::instrument(skip(settings))]
     pub async fn run(&self, settings: &[u8], on: bool) {
         // `pkexec` clears the environment, and tweaks may download things too
         let cmd = tokio::process::Command::new("pkexec")

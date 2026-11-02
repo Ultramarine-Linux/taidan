@@ -1,5 +1,5 @@
 import { TdnPage } from "../page.slint";
-import { Lang, Keymap } from "../lang.slint";
+import { Lang, Dir, Keymap } from "../lang.slint";
 import { ListView, ScrollView } from "std-widgets.slint";
 import { TdnInput, TdnListRow } from "../components.slint";
 import { Card } from "../slintcn/components/card.slint";
@@ -148,11 +148,14 @@ export component KeyboardPage inherits TdnPage {
                 }
             }
 
+            // layouts first, at the start edge
             Separator {
+                layout-order: Dir.order(1);
                 orientation: vertical;
             }
 
             VerticalLayout {
+                layout-order: Dir.order(2);
                 spacing: 0.75rem;
                 horizontal-stretch: 1;
 

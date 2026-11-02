@@ -18,6 +18,11 @@ use crate::ui::{
 const POLL: Duration = Duration::from_secs(3);
 /// how long a connection may take to come up
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(45);
+/// how long scan results take to come in after asking for them
+const SCAN_TIME: Duration = Duration::from_secs(3);
+/// how often `NetworkManager` is asked to check connectivity while the portal browser is open,
+/// each check is a request to the internet that can take a while
+const PORTAL_CHECK: Duration = Duration::from_secs(10);
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 mod nm {
@@ -215,7 +220,10 @@ impl KeyMgmt {
 
 #[derive(Clone, Debug)]
 struct Ap {
-    ssid: String,
+    /// as broadcast, which needn't be UTF-8
+    ssid: Vec<u8>,
+    /// the SSID as shown, and as the UI names the network
+    name: String,
     strength: u8,
     key_mgmt: KeyMgmt,
 }
@@ -276,24 +284,80 @@ const fn bars(strength: u8) -> i32 {
     }
 }
 
+/// the browser opened for logging in to a captive portal, here rather than in [`Nm`] so
+/// [`shutdown`] can close it
+static PORTAL: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
+
+fn portal() -> std::sync::MutexGuard<'static, Option<std::process::Child>> {
+    PORTAL.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// closes the captive portal browser, which would outlive taidan otherwise
+pub fn shutdown() {
+    close_portal();
+}
+
 struct Nm {
     conn: Connection,
     manager: nm::NetworkManager<'static>,
+    ui: slint::Weak<AppWindow>,
     /// access points from the last refresh, strongest per network
     aps: Vec<Ap>,
-    /// IP settings for wi-fi networks without a saved connection yet, used once connecting
-    pending_ip: HashMap<String, IpConfig>,
-    /// the browser opened for logging in to a captive portal
-    portal: Option<std::process::Child>,
+    /// IP settings for wi-fi networks without a saved connection yet by SSID, used once connecting
+    pending_ip: HashMap<Vec<u8>, IpConfig>,
+    /// the last snapshot shown
+    last: Option<Snapshot>,
+    portal_open: bool,
+    /// when `NetworkManager` last checked connectivity for the portal browser
+    portal_checked: Option<Instant>,
+    /// when the scan the user asked for should be done
+    scanning_until: Option<Instant>,
 }
 
 impl Nm {
-    fn new() -> zbus::Result<Self> {
+    fn new(ui: slint::Weak<AppWindow>) -> zbus::Result<Self> {
         let conn = Connection::system()?;
         let nm = zbus::blocking::proxy::Builder::new(&conn)
             .cache_properties(CacheProperties::No)
             .build()?;
-        Ok(Self { conn, manager: nm, aps: vec![], pending_ip: HashMap::new(), portal: None })
+        Ok(Self {
+            conn,
+            manager: nm,
+            ui,
+            aps: vec![],
+            pending_ip: HashMap::new(),
+            last: None,
+            portal_open: false,
+            portal_checked: None,
+            scanning_until: None,
+        })
+    }
+
+    /// the SSID of the network the UI calls `name`, which is lossy for SSIDs that aren't UTF-8
+    fn ssid_of(&self, name: &str) -> Vec<u8> {
+        self.aps
+            .iter()
+            .find(|ap| ap.name == name)
+            .map_or_else(|| name.as_bytes().to_vec(), |ap| ap.ssid.clone())
+    }
+
+    /// shows what changed: the portal browser closing, the end of a scan, and the network state
+    fn publish(&mut self) {
+        if self.scanning_until.is_some_and(|until| Instant::now() >= until) {
+            self.scanning_until = None;
+            push(&self.ui, |net| net.set_scanning(false));
+        }
+        let open = self.check_portal();
+        if open != self.portal_open {
+            self.portal_open = open;
+            push(&self.ui, move |net| net.set_portal_open(open));
+        }
+        let snap = self.snapshot();
+        // replacing the model rebuilds every row, so only do it when something changed
+        if self.last.as_ref() != Some(&snap) {
+            self.last = Some(snap.clone());
+            push_snapshot(&self.ui, snap);
+        }
     }
 
     /// a proxy for the object at `path`, reading properties fresh each time
@@ -349,12 +413,14 @@ impl Nm {
             .collect()
     }
 
-    fn access_points(&self, dev: &ObjectPath<'_>) -> (Vec<Ap>, Option<String>) {
+    fn access_points(&self, dev: &ObjectPath<'_>) -> (Vec<Ap>, Option<Vec<u8>>) {
         let Ok(wireless) = self.at::<nm::Wireless<'_>>(dev) else { return (vec![], None) };
         let read = |path: &ObjectPath<'_>| -> zbus::Result<Ap> {
             let ap = self.at::<nm::AccessPoint<'_>>(path)?;
+            let ssid = ap.ssid()?;
             Ok(Ap {
-                ssid: String::from_utf8_lossy(&ap.ssid()?).into_owned(),
+                name: String::from_utf8_lossy(&ssid).into_owned(),
+                ssid,
                 strength: ap.strength()?,
                 key_mgmt: KeyMgmt::from_flags(ap.flags()?, ap.wpa_flags()?, ap.rsn_flags()?),
             })
@@ -407,11 +473,11 @@ impl Nm {
         let mut networks = aps
             .iter()
             .map(|ap| WifiNetwork {
-                ssid: ap.ssid.as_str().into(),
+                ssid: ap.name.as_str().into(),
                 strength: bars(ap.strength),
                 security: ap.key_mgmt.security(),
-                known: known.contains_key(ap.ssid.as_bytes()),
-                connected: active.as_deref() == Some(ap.ssid.as_str()),
+                known: known.contains_key(&ap.ssid),
+                connected: active.as_deref() == Some(ap.ssid.as_slice()),
             })
             .collect::<Vec<_>>();
         // bucketed strength keeps the list from reshuffling on every small change
@@ -428,12 +494,13 @@ impl Nm {
         }
     }
 
-    /// waits for `active` to come up on `dev`
-    fn wait(&self, active: &ObjectPath<'_>, dev: &ObjectPath<'_>) -> Result<(), Failure> {
+    /// waits for `active` to come up on `dev`, showing the state meanwhile
+    fn wait(&mut self, active: &ObjectPath<'_>, dev: &ObjectPath<'_>) -> Result<(), Failure> {
         let deadline = Instant::now() + CONNECT_TIMEOUT;
         let (active, dev) =
             (self.at::<nm::ActiveConnection<'_>>(active), self.at::<nm::Device<'_>>(dev));
         let mut reason = 0;
+        let mut published = Instant::now();
         loop {
             if let Ok(dev) = &dev
                 && dev.state().is_ok_and(|s| s == DEVICE_STATE_FAILED)
@@ -450,6 +517,11 @@ impl Nm {
             if Instant::now() > deadline {
                 return Err(FAILED_TIMEOUT);
             }
+            // the network list and the end of a scan, which would wait for this otherwise
+            if published.elapsed() >= POLL {
+                published = Instant::now();
+                self.publish();
+            }
             std::thread::sleep(Duration::from_millis(300));
         }
         if reason == 0
@@ -461,26 +533,40 @@ impl Nm {
         Err(if REASONS_BAD_SECRETS.contains(&reason) { FAILED_SECRETS } else { FAILED })
     }
 
-    /// connects with new `settings`, replacing any saved connection for `ssid`, and doesn't keep
-    /// them if connecting fails, so a wrong password isn't saved
-    fn add_and_connect(
+    /// the settings of the saved connection at `path`
+    fn settings_of(
         &self,
-        ssid: &str,
+        path: &ObjectPath<'_>,
+    ) -> Option<HashMap<String, HashMap<String, OwnedValue>>> {
+        self.at::<nm::SettingsConnection<'_>>(path).ok()?.get_settings().ok()
+    }
+
+    /// connects with new `settings`, replacing any saved connection for `ssid` but keeping its IP
+    /// settings, and doesn't keep them if connecting fails, so a wrong password isn't saved
+    fn add_and_connect(
+        &mut self,
+        ssid: &[u8],
         mut settings: nm::ConnSettings<'_>,
     ) -> Result<(), Failure> {
         let dev = self.wifi_device().ok_or(FAILED)?;
-        if let Some(ip) = self.pending_ip.get(ssid) {
+        let old = self.known().remove(ssid);
+        let ip = self.pending_ip.get(ssid).cloned().or_else(|| {
+            let old = self.settings_of(old.as_ref()?)?;
+            Some(IpConfig::from_settings(&old)).filter(|ip| *ip != IpConfig::default())
+        });
+        if let Some(ip) = ip {
             for (name, values) in ip.sections() {
                 settings.entry(name).or_default().extend(values);
             }
         }
-        if let Some(old) = self.known().get(ssid.as_bytes()) {
-            self.delete(old);
+        if let Some(old) = old {
+            self.delete(&old);
         }
         let root = ObjectPath::from_static_str_unchecked("/");
         let (conn, active) =
             self.manager.add_and_activate_connection(settings, &dev, &root).map_err(|e| {
-                tracing::error!(?e, ssid, "cannot add connection");
+                let ssid = String::from_utf8_lossy(ssid);
+                tracing::error!(?e, %ssid, "cannot add connection");
                 FAILED
             })?;
         let res = self.wait(&active, &dev);
@@ -490,35 +576,81 @@ impl Nm {
         res
     }
 
-    fn connect(&self, ssid: &str, password: &str) -> Result<(), Failure> {
+    /// connects to a network from the list, `name` as the UI shows it
+    fn connect(&mut self, name: &str, password: &str) -> Result<(), Failure> {
         let dev = self.wifi_device().ok_or(FAILED)?;
+        let ssid = self.ssid_of(name);
+        let saved = self.known().remove(&ssid);
         if password.is_empty()
-            && let Some(saved) = self.known().get(ssid.as_bytes())
+            && let Some(saved) = &saved
         {
             let root = ObjectPath::from_static_str_unchecked("/");
             let active = self.manager.activate_connection(saved, &dev, &root).map_err(|e| {
-                tracing::error!(?e, ssid, "cannot activate connection");
+                tracing::error!(?e, name, "cannot activate connection");
                 FAILED
             })?;
             return self.wait(&active, &dev);
         }
-        // not in the scan, so it's a hidden one, like when the password dialog retries it
-        let Some(ap) = self.aps.iter().find(|ap| ap.ssid == ssid) else {
-            return self.connect_hidden(ssid, KeyMgmt::Psk, password);
+        let (key_mgmt, hidden) = match self.aps.iter().find(|ap| ap.ssid == ssid) {
+            Some(ap) => (ap.key_mgmt, false),
+            // gone from the scan since it was picked, or a hidden network that only showed while
+            // connected, so go by how it was saved
+            None => saved.and_then(|path| saved_security(&self.settings_of(&path)?)).ok_or_else(
+                || {
+                    tracing::warn!(name, "network is gone");
+                    FAILED
+                },
+            )?,
         };
-        self.add_and_connect(ssid, wifi_settings(ssid, ap.key_mgmt, password))
+        let mut settings = wifi_settings(&ssid, name, key_mgmt, password);
+        if hidden {
+            mark_hidden(&mut settings);
+        }
+        self.add_and_connect(&ssid, settings)
     }
 
     /// connects to a network that doesn't announce its name, which `NetworkManager` then probes for
-    fn connect_hidden(&self, ssid: &str, key_mgmt: KeyMgmt, password: &str) -> Result<(), Failure> {
-        let mut settings = wifi_settings(ssid, key_mgmt, password);
+    fn connect_hidden(
+        &mut self,
+        ssid: &str,
+        key_mgmt: KeyMgmt,
+        password: &str,
+    ) -> Result<(), Failure> {
+        let mut settings = wifi_settings(ssid.as_bytes(), ssid, key_mgmt, password);
         mark_hidden(&mut settings);
-        self.add_and_connect(ssid, settings)
+        self.add_and_connect(ssid.as_bytes(), settings)
     }
 }
 
-fn wifi_settings<'a>(ssid: &'a str, key_mgmt: KeyMgmt, password: &'a str) -> nm::ConnSettings<'a> {
-    let mut settings = base_settings(ssid);
+/// how a saved wi-fi connection with a password (or none) is secured, and whether it's for a
+/// hidden network
+fn saved_security(
+    settings: &HashMap<String, HashMap<String, OwnedValue>>,
+) -> Option<(KeyMgmt, bool)> {
+    let get = |section: &str, key: &str| settings.get(section)?.get(key);
+    let key_mgmt = match get("802-11-wireless-security", "key-mgmt") {
+        None => KeyMgmt::Open,
+        Some(v) => match v.downcast_ref::<&str>().ok()? {
+            "wpa-psk" => KeyMgmt::Psk,
+            "sae" => KeyMgmt::Sae,
+            "owe" => KeyMgmt::Owe,
+            // 802.1X logins go through their own dialog, and WEP isn't supported
+            _ => return None,
+        },
+    };
+    let hidden =
+        get("802-11-wireless", "hidden").is_some_and(|h| h.downcast_ref::<bool>() == Ok(true));
+    Some((key_mgmt, hidden))
+}
+
+/// settings for the wi-fi network `ssid`, named `name`
+fn wifi_settings<'a>(
+    ssid: &[u8],
+    name: &'a str,
+    key_mgmt: KeyMgmt,
+    password: &'a str,
+) -> nm::ConnSettings<'a> {
+    let mut settings = base_settings(ssid, name);
     let security: &[(&str, Value<'_>)] = match key_mgmt {
         KeyMgmt::Psk => &[("key-mgmt", "wpa-psk".into()), ("psk", password.into())],
         KeyMgmt::Sae => &[("key-mgmt", "sae".into()), ("psk", password.into())],
@@ -531,13 +663,13 @@ fn wifi_settings<'a>(ssid: &'a str, key_mgmt: KeyMgmt, password: &'a str) -> nm:
     settings
 }
 
-fn base_settings(ssid: &str) -> nm::ConnSettings<'_> {
+fn base_settings<'a>(ssid: &[u8], name: &'a str) -> nm::ConnSettings<'a> {
     HashMap::from([
-        ("connection", HashMap::from([("id", ssid.into()), ("type", "802-11-wireless".into())])),
+        ("connection", HashMap::from([("id", name.into()), ("type", "802-11-wireless".into())])),
         (
             "802-11-wireless",
             HashMap::from([
-                ("ssid", Value::from(ssid.as_bytes().to_vec())),
+                ("ssid", Value::from(ssid.to_vec())),
                 ("mode", "infrastructure".into()),
             ]),
         ),
@@ -559,8 +691,13 @@ fn realm(username: &str) -> &str {
     username.rsplit_once('@').map_or("", |(_, realm)| realm.trim())
 }
 
-/// settings for an 802.1X login, `hidden` for a wi-fi network that doesn't announce its name
-fn enterprise_settings(login: &EnterpriseLogin, hidden: bool) -> nm::ConnSettings<'_> {
+/// settings for an 802.1X login, on the wi-fi network `ssid` unless it's wired, `hidden` for one
+/// that doesn't announce its name
+fn enterprise_settings<'a>(
+    login: &'a EnterpriseLogin,
+    ssid: &[u8],
+    hidden: bool,
+) -> nm::ConnSettings<'a> {
     let mut settings = if login.wired {
         HashMap::from([
             (
@@ -575,7 +712,7 @@ fn enterprise_settings(login: &EnterpriseLogin, hidden: bool) -> nm::ConnSetting
             ("802-3-ethernet", HashMap::new()),
         ])
     } else {
-        let mut settings = base_settings(&login.ssid);
+        let mut settings = base_settings(ssid, &login.ssid);
         if hidden {
             mark_hidden(&mut settings);
         }
@@ -942,7 +1079,7 @@ impl Nm {
     /// opens a browser at the connectivity check page, which a captive portal redirects to its
     /// login, returns whether it's open
     fn open_portal(&mut self, proxy: Option<(String, String)>) -> bool {
-        if self.portal.is_some() {
+        if portal().is_some() {
             return true;
         }
         let uri = (self.manager.connectivity_check_uri().ok())
@@ -962,7 +1099,8 @@ impl Nm {
         match cmd.arg(&uri).spawn() {
             Ok(child) => {
                 tracing::info!(uri, "Opened the captive portal browser");
-                self.portal = Some(child);
+                *portal() = Some(child);
+                self.portal_checked = None;
                 true
             }
             Err(e) => {
@@ -972,41 +1110,23 @@ impl Nm {
         }
     }
 
-    /// asks the browser to quit, so it can shut down its web process too, and kills it if it hasn't
-    /// within a couple of seconds
-    fn close_portal(&mut self) {
-        let Some(mut child) = self.portal.take() else { return };
-        let Ok(pid) = libc::pid_t::try_from(child.id()) else { return };
-        // SAFETY: `pid` is our own child, which isn't reaped until `wait()` below, so the id can't
-        // have been reused by another process
-        if unsafe { libc::kill(pid, libc::SIGTERM) } == 0 {
-            let deadline = Instant::now() + Duration::from_secs(2);
-            while Instant::now() < deadline {
-                if !matches!(child.try_wait(), Ok(None)) {
-                    return;
-                }
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            tracing::warn!("captive portal browser didn't quit, killing it");
-        }
-        if let Err(e) = child.kill() {
-            tracing::debug!(?e, "captive portal browser already gone");
-        }
-        if let Err(e) = child.wait() {
-            tracing::debug!(?e, "cannot reap the captive portal browser");
-        }
-    }
-
     /// whether the portal browser is still open, it's closed once the internet works
     fn check_portal(&mut self) -> bool {
-        if let Some(child) = &mut self.portal
-            && !matches!(child.try_wait(), Ok(None))
         {
-            self.portal = None;
+            let mut portal = portal();
+            if let Some(child) = &mut *portal
+                && !matches!(child.try_wait(), Ok(None))
+            {
+                *portal = None;
+            }
+            if portal.is_none() {
+                return false;
+            }
         }
-        if self.portal.is_none() {
-            return false;
+        if self.portal_checked.is_some_and(|at| at.elapsed() < PORTAL_CHECK) {
+            return true;
         }
+        self.portal_checked = Some(Instant::now());
         // NetworkManager only rechecks every few minutes on its own, which is far too slow to notice
         // the login going through
         let online = match self.manager.check_connectivity() {
@@ -1018,14 +1138,14 @@ impl Nm {
         };
         if online {
             tracing::info!("Online, closing the captive portal browser");
-            self.close_portal();
+            close_portal();
         }
-        self.portal.is_some()
+        portal().is_some()
     }
 
     /// logs in to the wired network with 802.1X, replacing an earlier attempt, and doesn't keep
     /// the connection if it fails, so a wrong password isn't saved
-    fn connect_wired_8021x(&self, login: &EnterpriseLogin) -> Result<(), Failure> {
+    fn connect_wired_8021x(&mut self, login: &EnterpriseLogin) -> Result<(), Failure> {
         let dev = self.ethernet_device().ok_or(FAILED)?;
         let settings: zbus::Result<nm::Settings<'_>> =
             zbus::blocking::proxy::Builder::new(&self.conn).build();
@@ -1043,7 +1163,7 @@ impl Nm {
         let root = ObjectPath::from_static_str_unchecked("/");
         let (conn, active) = self
             .manager
-            .add_and_activate_connection(enterprise_settings(login, false), &dev, &root)
+            .add_and_activate_connection(enterprise_settings(login, &[], false), &dev, &root)
             .map_err(|e| {
                 tracing::error!(?e, "cannot add wired 802.1X connection");
                 FAILED
@@ -1082,7 +1202,7 @@ impl Nm {
             let dev = self.ethernet_device()?;
             self.ethernet_connection(&dev)
         } else {
-            self.known().remove(ssid.as_bytes())
+            self.known().remove(&self.ssid_of(ssid))
         }
     }
 
@@ -1091,7 +1211,7 @@ impl Nm {
             self.at::<nm::SettingsConnection<'_>>(&path).ok()?.get_settings().ok()
         });
         settings.map_or_else(
-            || self.pending_ip.get(ssid).cloned().unwrap_or_default(),
+            || self.pending_ip.get(&self.ssid_of(ssid)).cloned().unwrap_or_default(),
             |settings| IpConfig::from_settings(&settings),
         )
     }
@@ -1124,7 +1244,7 @@ impl Nm {
     }
 
     /// (re)connects `conn` on `dev`, so new settings take effect
-    fn activate(&self, conn: &ObjectPath<'_>, dev: &ObjectPath<'_>) -> Result<(), Failure> {
+    fn activate(&mut self, conn: &ObjectPath<'_>, dev: &ObjectPath<'_>) -> Result<(), Failure> {
         let root = ObjectPath::from_static_str_unchecked("/");
         let active = self.manager.activate_connection(conn, dev, &root).map_err(|e| {
             tracing::error!(?e, "cannot activate connection");
@@ -1139,9 +1259,10 @@ impl Nm {
             FAILED_IP
         };
         if !ssid.is_empty() {
-            let Some(conn) = self.known().remove(ssid.as_bytes()) else {
+            let bytes = self.ssid_of(ssid);
+            let Some(conn) = self.known().remove(&bytes) else {
                 // applied once connecting creates the connection
-                self.pending_ip.insert(ssid.to_owned(), ip);
+                self.pending_ip.insert(bytes, ip);
                 return Ok(());
             };
             self.update_ip(&conn, &ip).map_err(failed)?;
@@ -1177,6 +1298,31 @@ impl Nm {
             .and_then(|d| d.state())
             .is_ok_and(|s| s >= DEVICE_STATE_DISCONNECTED);
         if plugged { self.activate(&conn, &dev) } else { Ok(()) }
+    }
+}
+
+/// asks the portal browser to quit, so it can shut down its web process too, and kills it if it
+/// hasn't within a couple of seconds
+fn close_portal() {
+    let Some(mut child) = portal().take() else { return };
+    let Ok(pid) = libc::pid_t::try_from(child.id()) else { return };
+    // SAFETY: `pid` is our own child, which isn't reaped until `wait()` below, so the id can't
+    // have been reused by another process
+    if unsafe { libc::kill(pid, libc::SIGTERM) } == 0 {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Instant::now() < deadline {
+            if !matches!(child.try_wait(), Ok(None)) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        tracing::warn!("captive portal browser didn't quit, killing it");
+    }
+    if let Err(e) = child.kill() {
+        tracing::debug!(?e, "captive portal browser already gone");
+    }
+    if let Err(e) = child.wait() {
+        tracing::debug!(?e, "cannot reap the captive portal browser");
     }
 }
 
@@ -1246,16 +1392,15 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
         Cmd::Refresh => {
             push(ui, |net| net.set_scanning(true));
             nm.scan();
-            // results come in over the next few seconds
-            std::thread::sleep(Duration::from_secs(3));
-            push(ui, |net| net.set_scanning(false));
+            // results come in over the next few seconds, `Nm::publish` says when it's done
+            nm.scanning_until = Some(Instant::now() + SCAN_TIME);
             return;
         }
         Cmd::Connect { ssid, password } => {
             start_connecting(ui, &ssid);
             let res = nm.connect(&ssid, &password);
             let enterprise =
-                nm.aps.iter().any(|ap| ap.ssid == ssid && ap.key_mgmt == KeyMgmt::Enterprise);
+                nm.aps.iter().any(|ap| ap.name == ssid && ap.key_mgmt == KeyMgmt::Enterprise);
             (ssid, res, enterprise)
         }
         Cmd::ConnectHidden { ssid, key_mgmt, password } => {
@@ -1263,10 +1408,6 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
         }
         Cmd::ConnectEnterprise(mut login) => {
             login.ssid = login.ssid.trim().into();
-            push(ui, |net| {
-                net.set_enterprise_busy(true);
-                net.set_enterprise_error_id("".into());
-            });
             if !login.wired {
                 start_connecting(ui, &login.ssid);
             }
@@ -1275,8 +1416,9 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
             } else if login.wired {
                 nm.connect_wired_8021x(&login)
             } else {
-                let hidden = !nm.aps.iter().any(|ap| ap.ssid == login.ssid.as_str());
-                nm.add_and_connect(&login.ssid, enterprise_settings(&login, hidden))
+                let hidden = !nm.aps.iter().any(|ap| ap.name == login.ssid.as_str());
+                let ssid = nm.ssid_of(&login.ssid);
+                nm.add_and_connect(&ssid, enterprise_settings(&login, &ssid, hidden))
             };
             push(ui, move |net| {
                 net.set_connecting_ssid("".into());
@@ -1295,7 +1437,7 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
             return;
         }
         Cmd::ClosePortal => {
-            nm.close_portal();
+            close_portal();
             push(ui, |net| net.set_portal_open(false));
             return;
         }
@@ -1344,7 +1486,7 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
 
 /// [`Cmd::ConnectHidden`], the dialog closes once it's connected and shows why if it can't
 fn connect_hidden(
-    nm: &Nm,
+    nm: &mut Nm,
     ui: &slint::Weak<AppWindow>,
     ssid: String,
     key_mgmt: KeyMgmt,
@@ -1374,7 +1516,7 @@ fn start_connecting(ui: &slint::Weak<AppWindow>, ssid: &str) {
 }
 
 fn worker(ui: &slint::Weak<AppWindow>, rx: &mpsc::Receiver<Cmd>) {
-    let mut nm = match Nm::new() {
+    let mut nm = match Nm::new(ui.clone()) {
         Ok(nm) => nm,
         Err(e) => {
             tracing::error!(?e, "cannot talk to NetworkManager");
@@ -1383,45 +1525,49 @@ fn worker(ui: &slint::Weak<AppWindow>, rx: &mpsc::Receiver<Cmd>) {
         }
     };
     nm.scan();
-    let mut last = None;
-    let mut portal_open = false;
     loop {
-        match rx.recv_timeout(POLL) {
+        // sooner if a scan is due to end
+        let timeout = (nm.scanning_until)
+            .map_or(POLL, |until| until.saturating_duration_since(Instant::now()).min(POLL));
+        match rx.recv_timeout(timeout) {
             Ok(cmd) => handle(&mut nm, ui, cmd),
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => {
-                nm.close_portal();
+                close_portal();
                 return;
             }
         }
-        let open = nm.check_portal();
-        let snap = nm.snapshot();
-        if open != portal_open {
-            portal_open = open;
-            push(ui, move |net| net.set_portal_open(open));
-        }
-        // replacing the model rebuilds every row, so only do it when something changed
-        if last.as_ref() != Some(&snap) {
-            last = Some(snap.clone());
-            push_snapshot(ui, snap);
-        }
+        nm.publish();
     }
 }
 
-/// shows `dir` in the file browser, or the first place if it's empty
-fn browse(net: &Network<'_>, dir: slint::SharedString, pac: bool, all: bool) {
-    let places = browse_places();
-    let dir = if dir.is_empty() {
-        places.first().map_or_else(|| "/".into(), |p| p.path.clone())
-    } else {
-        dir
-    };
-    let path = std::path::Path::new(dir.as_str());
-    let parent = path.parent().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
-    net.set_browse_entries(slint::ModelRc::new(slint::VecModel::from(list_dir(path, pac, all))));
-    net.set_browse_places(slint::ModelRc::new(slint::VecModel::from(places)));
-    net.set_browse_parent(parent.into());
-    net.set_browse_dir(dir);
+/// shows `dir` in the file browser, or the first place if it's empty. Listed on another thread,
+/// as a slow drive or network mount would freeze the UI
+fn browse(ui: &slint::Weak<AppWindow>, dir: &str, pac: bool, all: bool) {
+    /// counts the folders asked for, so a slow listing doesn't replace a newer one
+    static LATEST: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let this = LATEST.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+    let (ui, dir) = (ui.clone(), dir.to_owned());
+    std::thread::spawn(move || {
+        let places = browse_places();
+        let dir = if dir.is_empty() {
+            places.first().map_or_else(|| "/".to_owned(), |p| p.path.to_string())
+        } else {
+            dir
+        };
+        let path = std::path::Path::new(&dir);
+        let parent = path.parent().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+        let entries = list_dir(path, pac, all);
+        push(&ui, move |net| {
+            if LATEST.load(std::sync::atomic::Ordering::SeqCst) != this {
+                return;
+            }
+            net.set_browse_entries(slint::ModelRc::new(slint::VecModel::from(entries)));
+            net.set_browse_places(slint::ModelRc::new(slint::VecModel::from(places)));
+            net.set_browse_parent(parent.into());
+            net.set_browse_dir(dir.into());
+        });
+    });
 }
 
 /// connecting to a network from the list or the password dialog
@@ -1506,11 +1652,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
     });
     net.on_browse({
         let ui = ui.clone();
-        move |dir, pac, all| {
-            if let Some(ui) = ui.upgrade() {
-                browse(&ui.global::<Network<'_>>(), dir, pac, all);
-            }
-        }
+        move |dir, pac, all| browse(&ui, &dir, pac, all)
     });
     let send = move |cmd| {
         if let Err(e) = tx.send(cmd) {
@@ -1523,8 +1665,19 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
     });
     init_connect(ui, net, send.clone());
     net.on_connect_enterprise({
-        let send = send.clone();
-        move |login| send(Cmd::ConnectEnterprise(login))
+        let (send, ui) = (send.clone(), ui.clone());
+        move |login| {
+            // right away, so a second click doesn't queue another login
+            if let Some(ui) = ui.upgrade() {
+                let net = ui.global::<Network<'_>>();
+                if net.get_enterprise_busy() {
+                    return;
+                }
+                net.set_enterprise_busy(true);
+                net.set_enterprise_error_id("".into());
+            }
+            send(Cmd::ConnectEnterprise(login));
+        }
     });
     net.on_set_proxy({
         let (send, ui) = (send.clone(), ui.clone());
@@ -1596,14 +1749,45 @@ mod tests {
 
     #[test]
     fn hidden_wifi_settings() {
-        let mut s = wifi_settings("Home", KeyMgmt::Sae, "hunter22");
+        let mut s = wifi_settings(b"Home", "Home", KeyMgmt::Sae, "hunter22");
         assert!(!s["802-11-wireless"].contains_key("hidden"));
         mark_hidden(&mut s);
         assert_eq!(s["802-11-wireless"]["hidden"], Value::from(true));
         assert_eq!(s["802-11-wireless-security"]["key-mgmt"], Value::from("sae"));
-        let mut s = wifi_settings("Cafe", KeyMgmt::Open, "");
+        let mut s = wifi_settings(b"Cafe", "Cafe", KeyMgmt::Open, "");
         mark_hidden(&mut s);
         assert!(!s.contains_key("802-11-wireless-security"));
+    }
+
+    #[test]
+    fn non_utf8_ssid_kept_as_bytes() {
+        let ssid = b"Caf\xe9";
+        let name = String::from_utf8_lossy(ssid).into_owned();
+        let s = wifi_settings(ssid, &name, KeyMgmt::Psk, "hunter22");
+        assert_eq!(s["802-11-wireless"]["ssid"], Value::from(ssid.to_vec()));
+        assert_eq!(s["connection"]["id"], Value::from("Caf\u{fffd}"));
+    }
+
+    fn owned(settings: nm::ConnSettings<'_>) -> HashMap<String, HashMap<String, OwnedValue>> {
+        settings
+            .into_iter()
+            .map(|(name, values)| {
+                let values = values
+                    .into_iter()
+                    .map(|(k, v)| (k.to_owned(), OwnedValue::try_from(v).unwrap()))
+                    .collect();
+                (name.to_owned(), values)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn security_of_saved_connections() {
+        let mut s = wifi_settings(b"Home", "Home", KeyMgmt::Sae, "hunter22");
+        mark_hidden(&mut s);
+        assert_eq!(saved_security(&owned(s)), Some((KeyMgmt::Sae, true)));
+        let s = wifi_settings(b"Cafe", "Cafe", KeyMgmt::Open, "");
+        assert_eq!(saved_security(&owned(s)), Some((KeyMgmt::Open, false)));
     }
 
     #[test]
@@ -1698,7 +1882,7 @@ mod tests {
     #[test]
     fn enterprise_settings_verify_server() {
         let login = login(EapMethod::Peap, "mschapv2");
-        let s = enterprise_settings(&login, false);
+        let s = enterprise_settings(&login, b"eduroam", false);
         let x = &s["802-1x"];
         assert_eq!(x["eap"], Value::from(vec!["peap"]));
         assert_eq!(x["phase2-auth"], Value::from("mschapv2"));
@@ -1708,11 +1892,11 @@ mod tests {
         assert!(!x.contains_key("phase1-peapver"));
         assert!(!s["802-11-wireless"].contains_key("hidden"));
         assert_eq!(
-            enterprise_settings(&login, true)["802-11-wireless"]["hidden"],
+            enterprise_settings(&login, b"eduroam", true)["802-11-wireless"]["hidden"],
             Value::from(true)
         );
         let wired = EnterpriseLogin { wired: true, ..login };
-        let s = enterprise_settings(&wired, false);
+        let s = enterprise_settings(&wired, &[], false);
         assert_eq!(s["connection"]["type"], Value::from("802-3-ethernet"));
         assert!(!s.contains_key("802-11-wireless-security"));
     }

@@ -150,6 +150,7 @@ export component AppWindow inherits Window {
     welcome := WelcomePage {
         index: 3;
         current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 

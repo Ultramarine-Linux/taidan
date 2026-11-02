@@ -11,6 +11,14 @@ use crate::ui::{A11y, AppWindow};
 /// about [`libtaidan::a11y::ZOOM`]: zoom in multiplies by KWin's default zoom factor, 1.2
 const ZOOM_STEPS: usize = 4;
 
+/// the screen reader, here rather than in the worker so [`shutdown`] can stop it
+static ORCA: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
+
+/// stops Orca, which would outlive taidan otherwise
+pub fn shutdown() {
+    set_orca(false);
+}
+
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, a11y: &A11y<'_>) {
     let (tx, rx) = mpsc::channel();
     // one thread, so changes are applied in order
@@ -49,7 +57,6 @@ fn read(a11y: &A11y<'_>) -> Opts {
 
 fn worker(rx: &mpsc::Receiver<Opts>) {
     let bus = Connection::session().inspect_err(|e| tracing::error!(?e, "no session bus")).ok();
-    let mut orca: Option<std::process::Child> = None;
     // the session's config may be left over from an earlier run, so the first one writes it all
     let mut applied: Option<Opts> = None;
     while let Ok(mut next) = rx.recv() {
@@ -63,11 +70,11 @@ fn worker(rx: &mpsc::Receiver<Opts>) {
             apply_effects(bus, applied.is_none(), &prev, &next);
         }
         if next.screen_reader != prev.screen_reader {
-            set_orca(&mut orca, next.screen_reader);
+            set_orca(next.screen_reader);
         }
         applied = Some(next);
     }
-    set_orca(&mut orca, false);
+    set_orca(false);
 }
 
 /// writes what KWin watches for (keyboard filters, animation speed, plugins), notifying it
@@ -139,7 +146,8 @@ fn shortcut(bus: &Connection, name: &str) {
     }
 }
 
-fn set_orca(orca: &mut Option<std::process::Child>, on: bool) {
+fn set_orca(on: bool) {
+    let mut orca = ORCA.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if let Some(mut child) = orca.take() {
         if let Err(e) = child.kill() {
             tracing::warn!(?e, "cannot stop Orca");

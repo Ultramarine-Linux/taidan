@@ -10,9 +10,13 @@ impl super::Step for SetTimezone {
         _: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        // an empty zone keeps whatever the system already has
-        if !settings.timezone.is_empty() {
-            crate::root("timedatectl", ["set-timezone", &settings.timezone]).await?;
+        // an empty zone keeps whatever the system already has, as does one that didn't take,
+        // which isn't worth failing setup over
+        if !settings.timezone.is_empty()
+            && let Err(e) =
+                crate::root("timedatectl", ["set-timezone", "--", &settings.timezone]).await
+        {
+            tracing::warn!(?e, timezone = settings.timezone, "cannot set the time zone");
         }
         // a wrong clock breaks TLS, but setup can go on without it
         if let Err(e) = crate::time::enable_ntp().await {

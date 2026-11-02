@@ -224,7 +224,11 @@ async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<
         ["--reply-timeout=100", "--reply-timeout=100"],
         ["/Layouts", "org.kde.keyboard.reloadConfig"],
     ];
-    pkexec(user, "dbus-send", &args.concat()).await?;
+    // the layout is written already, a session without the tool or a KWin to hear it just picks
+    // it up on its next login
+    if let Err(e) = pkexec(user, "dbus-send", &args.concat()).await {
+        tracing::warn!(?e, "cannot tell KWin to reload the keyboard layout");
+    }
     Ok(())
 }
 async fn set_gsettings_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<()> {
@@ -247,6 +251,70 @@ async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> Res<()> {
     Ok(())
 }
 
+/// `kwriteconfig6` arguments, after `--file`, that put the layout picked in `settings` into
+/// `kxkbrc`, [`None`] if there's no layout
+fn kxkbrc_entries(settings: &crate::settings::Settings) -> Option<[[&str; 6]; 3]> {
+    if settings.kb_layout.is_empty() {
+        return None;
+    }
+    let variant = settings.kb_variant.as_deref().unwrap_or("");
+    Some([
+        ["--group", "Layout", "--key", "Use", "--type=bool", "true"],
+        ["--group", "Layout", "--key", "LayoutList", "--", &settings.kb_layout],
+        ["--group", "Layout", "--key", "VariantList", "--", variant],
+    ])
+}
+
+/// writes the keyboard layout into the new user's `kxkbrc`, since KWin on Wayland doesn't fall
+/// back to the system's (locale1) layout, only to `XKB_DEFAULT_LAYOUT` or US. Plasma only, and
+/// not on systemd-homed, where it went into the skeleton, see [`write_keymap_to_skel`]
+///
+/// # Errors
+/// - cannot find the user's home directory
+pub async fn apply_keymap_to_user(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+) -> Res<()> {
+    if cfg.taidan0.systemd_homed || !crate::a11y::has_kwriteconfig() {
+        return Ok(());
+    }
+    let Some(entries) = kxkbrc_entries(settings) else { return Ok(()) };
+    let home = crate::a11y::home_of(&settings.username).await?;
+    let file = home.join(".config/kxkbrc");
+    let file = file.to_string_lossy();
+    for entry in entries {
+        // as the user, so the file they get is theirs
+        let mut args = vec!["-u", &settings.username, "--", "kwriteconfig6", "--file", &file];
+        args.extend(entry);
+        root("runuser", &args).await.wrap_msg("cannot write the keyboard layout")?;
+    }
+    Ok(())
+}
+
+/// [`apply_keymap_to_user`] for `skel`, a copy of `/etc/skel` the new user's home is made from,
+/// returns whether there was anything to write
+///
+/// # Errors
+/// - cannot create `skel/.config` or write the file
+pub async fn write_keymap_to_skel(
+    settings: &crate::settings::Settings,
+    skel: &std::path::Path,
+) -> Res<bool> {
+    let Some(entries) = kxkbrc_entries(settings).filter(|_| crate::a11y::has_kwriteconfig()) else {
+        return Ok(false);
+    };
+    let config = skel.join(".config");
+    tokio::fs::create_dir_all(&config).await.map_err(Err::Io)?;
+    let file = config.join("kxkbrc");
+    let file = file.to_string_lossy();
+    for entry in entries {
+        let mut args = vec!["--file", &*file];
+        args.extend(entry);
+        crate::steps::acmd("kwriteconfig6", &args).await?;
+    }
+    Ok(true)
+}
+
 #[allow(clippy::equatable_if_let)]
 #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 pub async fn set_keymap(user: Option<&str>, layout: &str, variant: Option<&str>) -> Res<()> {
@@ -261,11 +329,6 @@ pub async fn set_keymap(user: Option<&str>, layout: &str, variant: Option<&str>)
         set_localectl_keymap(layout, variant).await?;
     }
 
-    // the OOBE's KWin has no Xwayland, so there's no X server to let the user into, and none of
-    // the ways the keymap is set below need one
-    if let Err(e) = crate::xhost_local().await {
-        tracing::debug!(?e, "cannot run xhost, there's probably no X server");
-    }
     let user = match user {
         Some(user) => user,
         None => current_user.to_str().ok_or(Err::Msg("current username is not valid UTF-8"))?,

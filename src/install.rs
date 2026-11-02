@@ -136,8 +136,14 @@ fn start(ui: &slint::Weak<AppWindow>) {
     // `Network.save` only runs from the network page. With it skipped nobody chose to go offline,
     // so go by the connection right now, as the summary does. Leaving `nointernet` off on an
     // offline machine makes the dnf steps fail.
+    let online = app.global::<Network<'_>>().get_online();
     if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Network) {
-        crate::SETTINGS.write().nointernet = !app.global::<Network<'_>>().get_online();
+        crate::SETTINGS.write().nointernet = !online;
+    } else if !online && !crate::SETTINGS.read().nointernet {
+        // online when leaving the network page, but not anymore, e.g. on a retry after the
+        // connection dropped
+        tracing::warn!("The connection is gone since the network page, installing offline");
+        crate::SETTINGS.write().nointernet = true;
     }
     let mut settings = crate::SETTINGS.read().clone();
     // the password is in `SETTINGS` now, so drop the plaintext copies in the UI instead of keeping
@@ -176,19 +182,24 @@ async fn finish(reboot: bool) {
     if is_dev_session() {
         tracing::warn!(reboot, "Dev session: not marking the system configured, nor rebooting");
     } else {
+        // libtaidan did these at the end of the installation already, this only makes sure. Both
+        // succeed when there's nothing left to do
         if let Err(e) = libtaidan::root("rm", ["-rf", "/var/.unconfigured", "/.unconfigured"]).await
         {
-            tracing::error!(?e, "cannot remove /var/.unconfigured and/or /.unconfigured");
+            tracing::warn!(?e, "cannot remove /var/.unconfigured and/or /.unconfigured");
         }
         if let Err(e) =
             libtaidan::root("systemctl", ["disable", "taidan-initial-setup-reconfiguration"]).await
         {
-            tracing::error!(?e, "cannot disable taidan-initial-setup-reconfiguration.service");
+            tracing::warn!(?e, "cannot disable taidan-initial-setup-reconfiguration.service");
         }
         if reboot && let Err(e) = libtaidan::root("systemctl", ["reboot"]).await {
             tracing::error!(?e, "cannot reboot");
         }
     }
+    // the process ends with the event loop, and these would outlive it
+    crate::network::shutdown();
+    crate::a11y::shutdown();
     if let Err(e) = slint::invoke_from_event_loop(|| _ = slint::quit_event_loop()) {
         tracing::error!(?e, "cannot quit");
     }

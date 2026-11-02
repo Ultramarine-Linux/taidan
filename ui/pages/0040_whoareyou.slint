@@ -1,5 +1,5 @@
 import { TdnPage } from "../page.slint";
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { Account } from "../account.slint";
 import { Camera } from "../camera.slint";
 import { TdnInput, TdnField, TdnText, TdnStyle, TdnBtn, TdnSpinner, TdnDialog, Modal } from "../components.slint";
@@ -15,6 +15,7 @@ export component UserIcon inherits Rectangle {
     clip: true;
     background: Account.avatar-id == "" ? TdnStyle.accent : transparent;
     accessible-role: image;
+    accessible-label: Lang.t("page-whoareyou-icon", []);
 
     if Account.avatar-id != "": Image {
         width: 100%;
@@ -134,12 +135,13 @@ component IconPicker inherits VerticalLayout {
 
         // once an icon and a username are chosen, preview the account instead of the hint
         if Account.avatar-id != "" && Account.username-valid: VerticalLayout {
+            layout-order: Dir.order(1);
             alignment: center;
 
             TdnText {
                 text: Account.fullname != "" ? Account.fullname : Account.username;
                 font-weight: Tokens.typography-weight-medium;
-                horizontal-alignment: left;
+                horizontal-alignment: Dir.text-start;
                 overflow: elide;
             }
 
@@ -147,25 +149,26 @@ component IconPicker inherits VerticalLayout {
                 text: Account.username;
                 color: Tokens.color-muted-foreground;
                 font-size: Tokens.typography-body-sm-size;
-                horizontal-alignment: left;
+                horizontal-alignment: Dir.text-start;
                 overflow: elide;
             }
         }
 
         if Account.avatar-id == "" || !Account.username-valid: VerticalLayout {
+            layout-order: Dir.order(1);
             alignment: center;
 
             TdnText {
                 text: Lang.t("page-whoareyou-icon", []);
                 font-weight: Tokens.typography-weight-medium;
-                horizontal-alignment: left;
+                horizontal-alignment: Dir.text-start;
             }
 
             TdnText {
                 text: Lang.t("page-whoareyou-icon-desc", []);
                 color: Tokens.color-muted-foreground;
                 font-size: Tokens.typography-body-sm-size;
-                horizontal-alignment: left;
+                horizontal-alignment: Dir.text-start;
                 wrap: word-wrap;
             }
         }
@@ -259,6 +262,7 @@ export component CameraDialog inherits TdnDialog {
         }
 
         take := TdnBtn {
+            layout-order: Dir.order(1);
             in-dialog: true;
             text: Lang.t("page-whoareyou-camera-take", []);
             enter-hint: true;
@@ -329,10 +333,12 @@ export component WhoAreYouPage inherits TdnPage {
         }
 
         Rectangle {
+            layout-order: Dir.order(1);
             horizontal-stretch: 1;
         }
 
         IconPicker {
+            layout-order: Dir.order(2);
             horizontal-stretch: 0;
             width: 13.5rem;
         }

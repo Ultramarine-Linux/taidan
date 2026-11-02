@@ -8,6 +8,11 @@ use crate::ui::{AppWindow, Lang, TimeZone, Tz};
 
 /// zones with their main cities and coordinates, one per region that's had the same clocks since 1970
 const ZONE_TAB: &str = "/usr/share/zoneinfo/zone1970.tab";
+/// the older table with a zone per country, which has ones `zone1970.tab` merges into another
+/// country's (e.g. Europe/Amsterdam into Europe/Brussels) that people still look for
+const COUNTRY_TAB: &str = "/usr/share/zoneinfo/zone.tab";
+/// the tz database as one file, read for its links from old names (e.g. Asia/Calcutta)
+const TZDATA_ZI: &str = "/usr/share/zoneinfo/tzdata.zi";
 /// the latitudes the map covers, see `data/icons/world-map.svg`
 const MAP_NORTH: f64 = 84.;
 const MAP_SOUTH: f64 = -58.;
@@ -41,7 +46,7 @@ fn parse_angle(s: &str, deg_digits: usize) -> Option<f64> {
 
 /// ISO 6709 coordinates as in `zone1970.tab`, e.g. `+4230+00131`
 fn parse_coords(s: &str) -> Option<(f64, f64)> {
-    let split = s[1..].find(['+', '-'])? + 1;
+    let split = s.get(1..)?.find(['+', '-'])? + 1;
     let (lat, lon) = s.split_at(split);
     Some((parse_angle(lat, 2)?, parse_angle(lon, 3)?))
 }
@@ -55,6 +60,34 @@ fn parse_tab(tab: &str) -> Vec<Zone> {
             let (lat, lon) = parse_coords(cols.next()?)?;
             let id = cols.next()?.to_owned();
             Some(Zone { id, countries, lat, lon })
+        })
+        .collect()
+}
+
+/// adds the zones of `zone.tab` to those of `zone1970.tab`, and the countries it gives to the
+/// ones they share
+fn merge_tabs(mut zones: Vec<Zone>, more: Vec<Zone>) -> Vec<Zone> {
+    for zone in more {
+        if let Some(z) = zones.iter_mut().find(|z| z.id == zone.id) {
+            for c in zone.countries {
+                if !z.countries.contains(&c) {
+                    z.countries.push(c);
+                }
+            }
+        } else {
+            zones.push(zone);
+        }
+    }
+    zones
+}
+
+/// old names and what they point to now, from the `L target name` lines of `tzdata.zi`
+fn parse_links(zi: &str) -> std::collections::HashMap<String, String> {
+    zi.lines()
+        .filter_map(|line| {
+            let mut cols = line.strip_prefix("L ")?.split_whitespace();
+            let target = cols.next()?;
+            Some((cols.next()?.to_owned(), target.to_owned()))
         })
         .collect()
 }
@@ -179,32 +212,62 @@ fn nearest(zones: &[Zone], x: f64, y: f64) -> Option<&Zone> {
         .min_by(|a, b| dist(a).total_cmp(&dist(b)))
 }
 
-/// the zone to start with: the system's, else the main one for the language's country
-fn suggest(zones: &[Zone], locale: &str) -> Option<String> {
-    let system = jiff::tz::TimeZone::system();
-    if let Some(name) = system.iana_name()
-        && zones.iter().any(|z| z.id == name)
-    {
+/// the system's zone `name` as one of `zones`, under its current name if it's an old one, or
+/// added if jiff knows it but the tables don't. None for UTC, which is what a fresh install has
+/// and says nothing about where the user is
+fn system_zone(
+    zones: &mut Vec<Zone>,
+    links: &std::collections::HashMap<String, String>,
+    name: &str,
+) -> Option<String> {
+    let current = links.get(name).map_or(name, String::as_str);
+    if matches!(current, "Etc/UTC" | "Etc/GMT" | UTC) {
+        return None;
+    }
+    // the name itself if it's listed, e.g. Europe/Amsterdam, which is a link to Europe/Brussels
+    if let Some(z) = [name, current].iter().find_map(|id| zones.iter().find(|z| z.id == *id)) {
+        return Some(z.id.clone());
+    }
+    let id = [current, name].into_iter().find(|id| jiff::tz::TimeZone::get(id).is_ok())?;
+    // nowhere on the map, but it can be picked in the list
+    zones.push(Zone { id: id.to_owned(), countries: vec![], lat: f64::NAN, lon: f64::NAN });
+    Some(id.to_owned())
+}
+
+/// the zone to start with: the system's, else the main one for the language's country, or any
+/// that country uses
+fn suggest(zones: &[Zone], system: Option<&str>, locale: &str) -> Option<String> {
+    if let Some(name) = system {
         return Some(name.to_owned());
     }
     let locale = icu::locale::Locale::try_from_str(locale).ok()?;
     let region = locale.id.region?;
+    let region = region.as_str();
     zones
         .iter()
-        .find(|z| z.countries.first().is_some_and(|c| c == region.as_str()))
+        .find(|z| z.countries.first().is_some_and(|c| c == region))
+        .or_else(|| zones.iter().find(|z| z.countries.iter().any(|c| c == region)))
         .map(|z| z.id.clone())
 }
 
-fn matches(tz: &TimeZone, query: &str) -> bool {
-    [&tz.city, &tz.region, &tz.id, &tz.offset]
-        .iter()
-        .any(|s| s.to_lowercase().replace('−', "-").contains(query))
+/// what a zone is found by: its city, every country it's for, its name and offset
+fn search_text(tz: &TimeZone, zone: Option<&Zone>, regions: &Regions) -> String {
+    let countries = zone.into_iter().flat_map(|z| &z.countries).map(|c| regions.name(c));
+    [tz.city.to_string(), tz.id.to_string(), tz.offset.to_string()]
+        .into_iter()
+        .chain(countries)
+        .collect::<Vec<_>>()
+        .join("\n")
+        .to_lowercase()
+        .replace('−', "-")
 }
 
 struct State {
     zones: Vec<Zone>,
     /// the ones with a dot on the map, see [`map_zones`]
     on_map: Vec<Zone>,
+    /// the system's zone, see [`system_zone`]
+    system: Option<String>,
     /// set once the user picks one, so changing the language no longer changes it
     touched: bool,
     query: String,
@@ -224,36 +287,49 @@ fn select(ui: &AppWindow, id: &str) {
 
 fn refresh(ui: &AppWindow, state: &State) {
     let regions = Regions::new(&locale(ui));
-    let mut entries = state.zones.iter().map(|z| entry(z, &regions)).collect::<Vec<_>>();
+    let entries = state.zones.iter().map(|z| entry(z, &regions)).collect::<Vec<_>>();
     let tz = ui.global::<Tz<'_>>();
     let dots = state.on_map.iter().map(|z| entry(z, &regions)).collect::<Vec<_>>();
     tz.set_zones(slint::ModelRc::new(slint::VecModel::from(dots)));
     tz.set_all_zones(slint::ModelRc::new(slint::VecModel::from(entries.clone())));
-    entries.push(utc_entry());
-    entries.sort_by(|a, b| a.city.cmp(&b.city));
-    let query = state.query.clone();
-    let results = entries.into_iter().filter(|e| matches(e, &query)).collect::<Vec<_>>();
+    let mut results = (entries.into_iter().zip(state.zones.iter().map(Some)))
+        .chain([(utc_entry(), None)])
+        .filter(|(e, z)| search_text(e, *z, &regions).contains(&state.query))
+        .map(|(e, _)| e)
+        .collect::<Vec<_>>();
+    results.sort_by(|a, b| a.city.cmp(&b.city));
     tz.set_results(slint::ModelRc::new(slint::VecModel::from(results)));
     let id = if state.touched {
         tz.get_current().id.to_string()
     } else {
-        suggest(&state.zones, &locale(ui)).unwrap_or_else(|| UTC.to_owned())
+        suggest(&state.zones, state.system.as_deref(), &locale(ui))
+            .unwrap_or_else(|| UTC.to_owned())
     };
     select(ui, &id);
 }
 
+fn read(path: &str) -> String {
+    std::fs::read_to_string(path).unwrap_or_else(|e| {
+        tracing::error!(?e, "cannot read {path}");
+        String::new()
+    })
+}
+
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tz: &Tz<'_>) {
-    let zones = std::fs::read_to_string(ZONE_TAB).map_or_else(
-        |e| {
-            tracing::error!(?e, "cannot read {ZONE_TAB}");
-            vec![]
-        },
-        |tab| parse_tab(&tab),
-    );
-    let on_map = map_zones(&zones);
-    tracing::debug!(all = zones.len(), on_map = on_map.len(), "Loaded time zones");
-    let state =
-        Rc::new(RefCell::new(State { zones, on_map, touched: false, query: String::new() }));
+    let main = parse_tab(&read(ZONE_TAB));
+    let on_map = map_zones(&main);
+    let mut zones = merge_tabs(main, parse_tab(&read(COUNTRY_TAB)));
+    let links = parse_links(&read(TZDATA_ZI));
+    let system_tz = jiff::tz::TimeZone::system();
+    let system = system_tz.iana_name().and_then(|name| system_zone(&mut zones, &links, name));
+    tracing::debug!(all = zones.len(), on_map = on_map.len(), ?system, "Loaded time zones");
+    let state = Rc::new(RefCell::new(State {
+        zones,
+        on_map,
+        system,
+        touched: false,
+        query: String::new(),
+    }));
     tz.on_refresh({
         let (ui, state) = (ui.clone(), Rc::clone(&state));
         move || {
@@ -292,11 +368,13 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tz: &Tz<'_>) {
         }
     });
     tz.on_save({
-        let ui = ui.clone();
+        let (ui, state) = (ui.clone(), Rc::clone(&state));
         move || {
             let Some(ui) = ui.upgrade() else { return };
             let id = ui.global::<Tz<'_>>().get_current().id;
-            crate::SETTINGS.write().timezone = if id == UTC { "UTC".into() } else { id.into() };
+            // UTC only because nothing better was known, so the system keeps the zone it has
+            let keep = !state.borrow().touched && id == UTC;
+            crate::SETTINGS.write().timezone = if keep { String::new() } else { id.into() };
         }
     });
     // keeps the clock under the map current
@@ -398,13 +476,87 @@ mod tests {
 
     #[test]
     fn suggests_from_language_country() {
-        let zones =
-            parse_tab("JP\t+353916+1394441\tAsia/Tokyo\nDE,DK\t+5230+01322\tEurope/Berlin\n");
-        // the system zone wins if it's one of these, which it isn't on a build machine in Denver
-        if jiff::tz::TimeZone::system().iana_name().is_none_or(|n| !zones.iter().any(|z| z.id == n))
-        {
-            assert_eq!(suggest(&zones, "de-DE").as_deref(), Some("Europe/Berlin"));
-            assert_eq!(suggest(&zones, "fr"), None);
+        let zones = merge_tabs(
+            parse_tab(
+                "JP\t+353916+1394441\tAsia/Tokyo\nDE,DK\t+5230+01322\tEurope/Berlin\nBE,LU,NL\t+5050+00420\tEurope/Brussels\n",
+            ),
+            parse_tab("NL\t+5222+00454\tEurope/Amsterdam\nBE\t+5050+00420\tEurope/Brussels\n"),
+        );
+        assert_eq!(suggest(&zones, None, "de-DE").as_deref(), Some("Europe/Berlin"));
+        // not the first country of any zone in zone1970.tab, but its own in zone.tab
+        assert_eq!(suggest(&zones, None, "nl-NL").as_deref(), Some("Europe/Amsterdam"));
+        // only a zone shared with another country
+        assert_eq!(suggest(&zones, None, "da-DK").as_deref(), Some("Europe/Berlin"));
+        assert_eq!(suggest(&zones, None, "fr"), None);
+        assert_eq!(suggest(&zones, Some("Asia/Tokyo"), "de-DE").as_deref(), Some("Asia/Tokyo"));
+    }
+
+    #[test]
+    fn merges_tabs() {
+        let zones = merge_tabs(
+            parse_tab("BE,LU,NL\t+5050+00420\tEurope/Brussels\n"),
+            parse_tab(
+                "NL\t+5222+00454\tEurope/Amsterdam\nBE\t+5050+00420\tEurope/Brussels\nLU\t+4936+00609\tEurope/Luxembourg\n",
+            ),
+        );
+        let ids = zones.iter().map(|z| z.id.as_str()).collect::<Vec<_>>();
+        assert_eq!(ids, ["Europe/Brussels", "Europe/Amsterdam", "Europe/Luxembourg"]);
+        assert_eq!(zones[0].countries, ["BE", "LU", "NL"]);
+        let regions = Regions::new("en-US");
+        let brussels = entry(&zones[0], &regions);
+        let text = search_text(&brussels, Some(&zones[0]), &regions);
+        assert!(text.contains("luxembourg") && text.contains("netherlands"), "{text}");
+    }
+
+    #[test]
+    fn system_zone_old_names_and_utc() {
+        let links = parse_links(
+            "# comment\nZ Asia/Kolkata 5:53:28 - LMT\nL Asia/Kolkata Asia/Calcutta\nL Etc/UTC UTC\nL Etc/UTC Etc/Universal\n",
+        );
+        assert_eq!(links["Asia/Calcutta"], "Asia/Kolkata");
+        let mut zones = parse_tab("IN\t+2232+08822\tAsia/Kolkata\n");
+        assert_eq!(
+            system_zone(&mut zones, &links, "Asia/Calcutta").as_deref(),
+            Some("Asia/Kolkata")
+        );
+        assert_eq!(
+            system_zone(&mut zones, &links, "Asia/Kolkata").as_deref(),
+            Some("Asia/Kolkata")
+        );
+        assert_eq!(system_zone(&mut zones, &links, "Etc/Universal"), None);
+        assert_eq!(system_zone(&mut zones, &links, "UTC"), None);
+        assert_eq!(system_zone(&mut zones, &links, "Not/AZone"), None);
+        assert_eq!(zones.len(), 1);
+        // not in the tables, but jiff knows it, so it's added off the map
+        assert_eq!(system_zone(&mut zones, &links, "Etc/GMT-3").as_deref(), Some("Etc/GMT-3"));
+        assert_eq!(zones.len(), 2);
+        assert!(entry(&zones[1], &Regions::new("en-US")).x < 0.);
+    }
+
+    #[test]
+    fn real_tables_find_every_country_zone() {
+        let (Ok(main), Ok(more)) =
+            (std::fs::read_to_string(ZONE_TAB), std::fs::read_to_string(COUNTRY_TAB))
+        else {
+            return;
+        };
+        let zones = merge_tabs(parse_tab(&main), parse_tab(&more));
+        for id in ["Europe/Amsterdam", "Europe/Oslo", "Europe/Stockholm", "Europe/Copenhagen"] {
+            assert!(zones.iter().any(|z| z.id == id), "{id} missing");
+        }
+        assert_eq!(suggest(&zones, None, "nl-NL").as_deref(), Some("Europe/Amsterdam"));
+        assert_eq!(suggest(&zones, None, "nb-NO").as_deref(), Some("Europe/Oslo"));
+        if let Ok(zi) = std::fs::read_to_string(TZDATA_ZI) {
+            let mut zones = zones;
+            let links = parse_links(&zi);
+            assert_eq!(
+                system_zone(&mut zones, &links, "Asia/Calcutta").as_deref(),
+                Some("Asia/Kolkata")
+            );
+            assert_eq!(
+                system_zone(&mut zones, &links, "Europe/Amsterdam").as_deref(),
+                Some("Europe/Amsterdam")
+            );
         }
     }
 }

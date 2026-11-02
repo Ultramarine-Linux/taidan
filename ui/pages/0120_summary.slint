@@ -1,5 +1,5 @@
 import { TdnPage } from "../page.slint";
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { Account } from "../account.slint";
 import { Drivers } from "../install.slint";
 import { Network, NetState } from "../network.slint";
@@ -15,7 +15,7 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 component SectionTitle inherits TdnText {
     font-size: 1.2 * Tokens.text-rem;
     font-weight: Tokens.typography-weight-medium;
-    horizontal-alignment: left;
+    horizontal-alignment: Dir.text-start;
 }
 
 component InfoRow inherits HorizontalLayout {
@@ -32,18 +32,19 @@ component InfoRow inherits HorizontalLayout {
     }
 
     VerticalLayout {
+        layout-order: Dir.order(1);
         alignment: center;
 
         TdnText {
             text: root.label;
             font-size: Tokens.typography-label-size;
             color: Tokens.color-muted-foreground;
-            horizontal-alignment: left;
+            horizontal-alignment: Dir.text-start;
         }
 
         TdnText {
             text: root.value;
-            horizontal-alignment: left;
+            horizontal-alignment: Dir.text-start;
             overflow: elide;
         }
     }
@@ -63,6 +64,10 @@ export component SummaryPage inherits TdnPage {
     forward-focus: review;
 
     review := FocusScope {
+        // a named group, or screen readers skip the FocusScope and say nothing when it's focused
+        accessible-role: groupbox;
+        accessible-label: root.name;
+
         HorizontalLayout {
             spacing: 2rem;
 
@@ -83,19 +88,20 @@ export component SummaryPage inherits TdnPage {
                     }
 
                     VerticalLayout {
+                        layout-order: Dir.order(1);
                         alignment: center;
 
                         TdnText {
                             text: Account.fullname != "" ? Account.fullname : Account.username;
                             font-weight: Tokens.typography-weight-medium;
-                            horizontal-alignment: left;
+                            horizontal-alignment: Dir.text-start;
                             overflow: elide;
                         }
 
                         TdnText {
                             text: Account.username;
                             color: Tokens.color-muted-foreground;
-                            horizontal-alignment: left;
+                            horizontal-alignment: Dir.text-start;
                             overflow: elide;
                         }
                     }
@@ -124,7 +130,10 @@ export component SummaryPage inherits TdnPage {
                 InfoRow {
                     icon: @image-url("../../data/icons/location-active-symbolic.svg");
                     label: Lang.t("page-timezone", []);
-                    value: (Tz.current.region == "" ? Tz.current.city : Tz.current.city + ", " + Tz.current.region) + " (" + Tz.current.offset + ")";
+                    value: Lang.t("page-summary-timezone", [
+                        { key: "place", value: Lang.place(Tz.current.city, Tz.current.region) },
+                        { key: "offset", value: Tz.current.offset },
+                    ]);
                 }
 
                 InfoRow {
@@ -137,6 +146,7 @@ export component SummaryPage inherits TdnPage {
             }
 
             VerticalLayout {
+                layout-order: Dir.order(1);
                 alignment: start;
                 horizontal-stretch: 1;
                 spacing: 0.75rem;
@@ -163,7 +173,7 @@ export component SummaryPage inherits TdnPage {
                         if !Drivers.install && Tweaks.enabled-names.length == 0: TdnText {
                             text: Lang.t("page-summary-software-none", []);
                             color: Tokens.color-muted-foreground;
-                            horizontal-alignment: left;
+                            horizontal-alignment: Dir.text-start;
                             wrap: word-wrap;
                         }
                     }
@@ -171,7 +181,7 @@ export component SummaryPage inherits TdnPage {
 
                 // only when the distro ships tweaks
                 if Tweaks.items.length > 0 && !Cfg.skip-tweaks: HorizontalLayout {
-                    alignment: start;
+                    alignment: Dir.start;
 
                     TdnBtn {
                         text: Lang.t("page-summary-tweaks", []);

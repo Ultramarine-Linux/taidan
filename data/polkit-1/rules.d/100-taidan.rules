@@ -1,17 +1,17 @@
+// installed to /run/polkit-1/rules.d by taidan-initial-setup.service only while the OOBE runs,
+// and removed again when it stops, so none of this outlives the setup.
+//
+// the OOBE runs as the taidan user before any admin account exists to authenticate as. It runs
+// the installation steps as root with pkexec, and adds system-wide network connections (so the
+// new user stays online).
 polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.policykit.exec" &&
-        subject.isInGroup("taidan")) {
-        return polkit.Result.YES;
+    if (!subject.isInGroup("taidan") || !subject.local || !subject.active) {
+        return;
     }
-});
-
-// the OOBE adds system-wide network connections (so the new user stays online) before any
-// admin account exists to authenticate as
-polkit.addRule(function(action, subject) {
-    if ((action.id == "org.freedesktop.NetworkManager.settings.modify.system" ||
-         action.id == "org.freedesktop.NetworkManager.network-control" ||
-         action.id == "org.freedesktop.NetworkManager.wifi.scan") &&
-        subject.isInGroup("taidan")) {
+    if (action.id == "org.freedesktop.policykit.exec" ||
+        action.id == "org.freedesktop.NetworkManager.settings.modify.system" ||
+        action.id == "org.freedesktop.NetworkManager.network-control" ||
+        action.id == "org.freedesktop.NetworkManager.wifi.scan") {
         return polkit.Result.YES;
     }
 });

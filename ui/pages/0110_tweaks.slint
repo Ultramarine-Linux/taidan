@@ -1,4 +1,4 @@
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { Tweaks } from "../tweaks.slint";
 import { TdnText, TdnBtn, TdnToggleRow, TdnDialog, TdnStyle } from "../components.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
@@ -13,7 +13,7 @@ export component TweaksDialog inherits TdnDialog {
     TdnText {
         text: Lang.t("page-tweaks-desc", []);
         color: Tokens.color-muted-foreground;
-        horizontal-alignment: left;
+        horizontal-alignment: Dir.text-start;
         wrap: word-wrap;
     }
 
@@ -50,7 +50,7 @@ export component TweaksDialog inherits TdnDialog {
                     text: Lang.t(tweak.desc, []);
                     color: Tokens.color-muted-foreground;
                     font-size: Tokens.typography-body-sm-size;
-                    horizontal-alignment: left;
+                    horizontal-alignment: Dir.text-start;
                     wrap: word-wrap;
                 }
             }
@@ -61,7 +61,7 @@ export component TweaksDialog inherits TdnDialog {
     }
 
     HorizontalLayout {
-        alignment: end;
+        alignment: Dir.end;
 
         done := TdnBtn {
             in-dialog: true;

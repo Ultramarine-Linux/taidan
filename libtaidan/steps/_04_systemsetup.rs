@@ -37,16 +37,25 @@ impl super::Step for SystemSetup {
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        let sett = serde_json::to_vec(settings)?;
-        for tweak in &*crate::tweaks::TWEAKS {
-            let on = settings.tweaks.iter().any(|id| tweak.id() == id.as_str());
-            tweak.run(&sett, on).await;
+        if let Some(ids) = settings.tweaks.ids() {
+            let sett = serde_json::to_vec(settings)?;
+            for tweak in &*crate::tweaks::TWEAKS {
+                let on = ids.iter().any(|id| tweak.id() == id.as_str());
+                tweak.run(&sett, on).await;
+            }
+        } else {
+            tracing::warn!(
+                "the settings don't say which tweaks to turn on, leaving them as they are"
+            );
         }
-        // GeoClue is D-Bus activated, so only a mask keeps apps from starting it
-        if !settings.location
-            && let Err(e) = crate::root("systemctl", ["mask", "geoclue.service"]).await
-        {
-            tracing::warn!(?e, "cannot turn off location services");
+        // GeoClue is D-Bus activated, so only a mask keeps apps from starting it. Unmasked when
+        // it's on, for a retry after an attempt with it off
+        let (verb, what) = if settings.location { ("unmask", "on") } else { ("mask", "off") };
+        if let Err(e) = crate::root("systemctl", [verb, "geoclue.service"]).await {
+            tracing::warn!(?e, "cannot turn {what} location services");
+        }
+        if let Err(e) = crate::i18n::apply_keymap_to_user(settings, cfg).await {
+            tracing::warn!(?e, "cannot carry over the keyboard layout");
         }
         if let Err(e) = crate::a11y::apply_to_user(settings, cfg).await {
             tracing::warn!(?e, "cannot carry over the accessibility settings");

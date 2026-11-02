@@ -79,6 +79,9 @@ pub async fn start_install(
     if let Err(e) = passwd::clear_record().await {
         tracing::error!(?e, "cannot remove the created user record");
     }
+    // right away rather than when the user leaves the last page, or a machine that dies on it
+    // would boot into the OOBE again with the record gone and the user still there
+    mark_configured().await;
     callback.send(InstallMsg::Finish);
     Ok(())
 }
@@ -238,10 +241,13 @@ where
     run_cmd(pkexec_cmd("root", name, args), name, Some(input)).await.map(drop)
 }
 
-/// # Errors
-/// - cannot run xhost because idk
-pub async fn xhost_local() -> Res<()> {
-    steps::acmd("xhost", &["+", "local:"])
-        .await
-        .wrap_msg("cannot run xhost to pass display; is the current user in group wheel?")
+/// marks the system as configured so the OOBE doesn't run on the next boot, failures are logged.
+/// Safe to run more than once
+pub async fn mark_configured() {
+    if let Err(e) = root("rm", ["-rf", "/var/.unconfigured", "/.unconfigured"]).await {
+        tracing::error!(?e, "cannot remove /var/.unconfigured and/or /.unconfigured");
+    }
+    if let Err(e) = root("systemctl", ["disable", "taidan-initial-setup-reconfiguration"]).await {
+        tracing::error!(?e, "cannot disable taidan-initial-setup-reconfiguration.service");
+    }
 }

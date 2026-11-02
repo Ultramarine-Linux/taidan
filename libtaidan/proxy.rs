@@ -50,10 +50,14 @@ pub fn get() -> Option<Proxy> {
 
 impl Proxy {
     /// parses what the user typed, `host:port` gets an `http://` in front, `None` if the URL is
-    /// invalid, has no host, or isn't an HTTP(S) or SOCKS proxy
+    /// invalid, has no host, isn't an HTTP(S) or SOCKS proxy, or either has control characters
     #[must_use]
     pub fn new(url: &str, no_proxy: &str) -> Option<Self> {
         let url = url.trim();
+        // the URL parser drops tabs and newlines, but they'd stay in what's saved
+        if has_control(url) {
+            return None;
+        }
         let url = if url.contains("://") { url.to_owned() } else { format!("http://{url}") };
         let parsed = reqwest::Url::parse(&url).ok()?;
         if parsed.host_str().is_none_or(str::is_empty)
@@ -67,7 +71,16 @@ impl Proxy {
             .filter(|s| !s.is_empty())
             .collect::<Vec<_>>()
             .join(",");
+        if has_control(&no_proxy) {
+            return None;
+        }
         Some(Self { url: url.trim_end_matches('/').to_owned(), no_proxy })
+    }
+
+    /// whether it's safe to write a line of, which settings that didn't come through [`Self::new`]
+    /// may not be
+    fn is_safe(&self) -> bool {
+        !has_control(&self.url) && !has_control(&self.no_proxy)
     }
 
     /// `KEY=value` pairs for `env`, both cases since tools disagree on which one they read
@@ -98,43 +111,52 @@ impl Proxy {
     /// # Errors
     /// Cannot write the files.
     pub async fn persist(&self) -> Res<()> {
-        // values are passed as arguments, so nothing in them is interpreted by the shell
-        crate::root(
+        // a newline would add lines of its own to the files
+        if !self.is_safe() {
+            return Err(Err::Msg("the proxy has control characters in it"));
+        }
+        // through stdin, since the URL may carry a password and the arguments of commands run as
+        // root are logged
+        let mut lines = self.env().join("\n");
+        lines.push('\n');
+        crate::root_with_stdin(
             "sh",
             [
                 "-c",
                 r#"
                     sed -i '/^\(https\?\|no\)_proxy=/Id' /etc/environment
-                    printf '%s\n' "$@" >> /etc/environment
+                    cat >> /etc/environment
                 "#,
-                "sh",
-            ]
-            .into_iter()
-            .map(str::to_owned)
-            .chain(self.env()),
+            ],
+            lines.as_bytes(),
         )
         .await
         .wrap_msg("cannot write the proxy to /etc/environment")?;
-        // the URL may carry a password, so only root may read it. `/etc/environment` has to stay
-        // readable for login sessions to pick the proxy up
-        crate::root(
+        // only root may read it. `/etc/environment` has to stay readable for login sessions to
+        // pick the proxy up
+        crate::root_with_stdin(
             "sh",
             [
                 "-c",
                 r#"
                     mkdir -p /etc/dnf/libdnf5.conf.d
                     umask 077
-                    printf '[main]\nproxy=%s\n' "$1" > "$2"
-                    chmod 600 "$2"
+                    { printf '[main]\nproxy='; cat; } > "$1"
+                    chmod 600 "$1"
                 "#,
                 "sh",
-                &self.url,
                 DNF_DROPIN,
             ],
+            format!("{}\n", self.url).as_bytes(),
         )
         .await
         .wrap_msg("cannot write the proxy to the dnf config")
     }
+}
+
+/// whether `s` has a control character, like a newline, in it
+fn has_control(s: &str) -> bool {
+    s.chars().any(char::is_control)
 }
 
 /// where [`Proxy::persist`] saves the proxy for dnf
@@ -201,6 +223,21 @@ mod tests {
         assert_eq!(Proxy::new("socks5://10.0.0.1:1080", "").unwrap().url, "socks5://10.0.0.1:1080");
         assert!(Proxy::new("", "").is_none());
         assert!(Proxy::new("ftp://x:21", "").is_none());
+    }
+
+    #[test]
+    fn rejects_control_characters() {
+        assert!(Proxy::new("http://proxy.example.com:3128\nevil=1", "").is_none());
+        assert!(Proxy::new("http://proxy.exa\tmple.com:3128", "").is_none());
+        assert!(Proxy::new("http://proxy.example.com:3128\r", "localhost").is_some());
+        assert!(Proxy::new("p:8080", "localhost\r,example.com").is_some());
+        assert!(Proxy::new("p:8080", "local\rhost").is_none());
+        assert!(Proxy::new("p:8080", "local\u{1b}host").is_none());
+        let p = Proxy { url: "http://p:8080\nevil=1".into(), no_proxy: String::new() };
+        assert!(!p.is_safe());
+        let p = Proxy { url: "http://p:8080".into(), no_proxy: "a\nb".into() };
+        assert!(!p.is_safe());
+        assert!(Proxy::new("p:8080", "a\nb").unwrap().is_safe());
     }
 
     #[test]

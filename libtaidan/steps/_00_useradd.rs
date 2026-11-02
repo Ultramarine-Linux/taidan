@@ -19,17 +19,28 @@ impl super::Step for UserAdd {
         ) {
             return Err(Err::Message(format!("invalid username `{}`", settings.username)));
         }
+        // a passwordless wheel user would be root for anyone at the keyboard. The UI never sends
+        // one, but settings from elsewhere (tdnx) can leave it out
+        if settings.passwd.expose_secret().is_empty() {
+            return Err(Err::Msg("refusing to create a user without a password"));
+        }
+        // only one an earlier attempt made may be taken over, see `remove_previous`
+        let exists = || uzers::get_user_by_name(&settings.username).is_some();
+        if exists() && !crate::passwd::created_by_us(&settings.username) {
+            return Err(Err::Message(format!("user `{}` already exists", settings.username)));
+        }
         remove_previous(cfg).await?;
-        let created =
-            if cfg.taidan0.systemd_homed { homed(settings).await } else { useradd(settings).await };
-        // recorded even if the command failed, it can leave the user behind (useradd exits with 12
-        // when only the home couldn't be made), so the next attempt removes it
-        if uzers::get_user_by_name(&settings.username).is_some() {
-            let recorded = crate::passwd::record_created(&settings.username).await;
-            created?;
-            recorded?;
+        // left behind if it couldn't be removed
+        if exists() {
+            return Err(Err::Message(format!("user `{}` already exists", settings.username)));
+        }
+        // before the user is made, so it's never there without the record, which would keep the
+        // next attempt from removing it. A record of a user that never got made is cleared then
+        crate::passwd::record_created(&settings.username).await?;
+        if cfg.taidan0.systemd_homed {
+            homed(settings, cfg).await?;
         } else {
-            created?;
+            useradd(settings).await?;
         }
         // not worth failing the setup over
         if let Err(e) = set_avatar(settings).await {
@@ -77,7 +88,7 @@ async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
         .wrap_msg("cannot set the password")
 }
 
-async fn homed(settings: &crate::settings::Settings) -> Res<()> {
+async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
     let user = settings.username.as_str();
     let fullname = crate::passwd::sanitize_fullname(&settings.fullname);
     // the password goes through stdin, as the plain text one homed encrypts the home with and the
@@ -86,7 +97,7 @@ async fn homed(settings: &crate::settings::Settings) -> Res<()> {
         "secret": { "password": [settings.passwd.expose_secret()] },
         "privileged": { "hashedPassword": [hash_password(settings)?] },
     });
-    let skel = stage_skel(settings).await;
+    let skel = stage_skel(settings, cfg).await;
     let mut args: Vec<std::ffi::OsString> = vec![
         "create".into(),
         "--identity=-".into(),
@@ -139,7 +150,10 @@ async fn remove_previous(cfg: &crate::cfg::Config) -> Res<()> {
 /// a copy of `/etc/skel` with the user's settings written in, for homed, where the home isn't
 /// mounted after it's created so they can't be written there later, [`None`] if there's nothing to
 /// write or it can't be made, then homed uses `/etc/skel`
-async fn stage_skel(settings: &crate::settings::Settings) -> Option<std::path::PathBuf> {
+async fn stage_skel(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+) -> Option<std::path::PathBuf> {
     let skel = crate::TEMP_DIR.join("skel");
     let res = async {
         if tokio::fs::try_exists(&skel).await.map_err(Err::Io)? {
@@ -151,9 +165,10 @@ async fn stage_skel(settings: &crate::settings::Settings) -> Option<std::path::P
             super::acmd("cp", &["-rT", "--no-preserve=ownership", "/etc/skel", &to]).await?;
         }
         let a11y = crate::a11y::write_to_skel(settings, &skel).await?;
-        let imf = super::_08_setup_imf::write_fcitx5_to_skel(settings, &skel).await?;
+        let imf = super::_08_setup_imf::write_fcitx5_to_skel(settings, cfg, &skel).await?;
         let theme = super::_01_settheme::write_to_skel(settings, &skel).await?;
-        Ok::<_, Err>(a11y || imf || theme)
+        let keymap = crate::i18n::write_keymap_to_skel(settings, &skel).await?;
+        Ok::<_, Err>(a11y || imf || theme || keymap)
     };
     match res.await {
         Ok(true) => Some(skel),

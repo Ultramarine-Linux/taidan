@@ -1,13 +1,20 @@
 import { Tokens } from "../slintcn/theme/tokens.slint";
 import { TdnBasePg, TdnHero } from "../page.slint";
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
 import { Cfg } from "../cfg.slint";
 
 export component WelcomePage inherits TdnBasePg {
+    // false on the first page, which depends on `skip_pages`
+    in property <bool> can-prev: Cfg.prev-page(self.index) != self.index;
+
     forward-focus: go;
 
+    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is
     VerticalLayout {
+        accessible-role: groupbox;
+        accessible-label: Lang.t("page-welcome-hello", []);
+
         TdnHero {
             vertical-stretch: 1;
         }
@@ -23,12 +30,25 @@ export component WelcomePage inherits TdnBasePg {
                 text: Lang.t("page-welcome-hello", []);
                 font-size: 3 * Tokens.text-rem;
                 font-weight: 800;
-                horizontal-alignment: left;
+                horizontal-alignment: Dir.text-start;
                 horizontal-stretch: 1;
                 wrap: word-wrap;
             }
 
+            // back to the keyboard, so a wrong layout can still be fixed
+            if root.can-prev: VerticalLayout {
+                layout-order: Dir.order(1);
+                alignment: center;
+                horizontal-stretch: 0;
+
+                TdnBtn {
+                    text: Lang.t("prev", []);
+                    clicked => { root.prev_page(); }
+                }
+            }
+
             VerticalLayout {
+                layout-order: Dir.order(2);
                 alignment: center;
                 horizontal-stretch: 0;
 

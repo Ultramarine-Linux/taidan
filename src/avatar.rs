@@ -18,6 +18,10 @@ const AVATARS_DIR: &str = "data/avatars";
 const PHOTO_SIZE: u32 = 512;
 /// side of the preview frames sent to the UI, in pixels
 const PREVIEW_SIZE: u32 = 320;
+/// how long a camera may take to send its first frame
+const FIRST_FRAME_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+/// how often a stream waiting for a frame checks whether it should stop, in milliseconds
+const POLL_MS: i32 = 100;
 
 type Buffer = slint::SharedPixelBuffer<slint::Rgba8Pixel>;
 
@@ -153,18 +157,38 @@ fn stream(
     (fmt.width, fmt.height, fmt.fourcc) = (640, 480, fourcc);
     let fmt = dev.set_format(&fmt)?;
     tracing::debug!(?fmt, "Camera started");
+    let handle = dev.handle();
     let mut stream = v4l::io::mmap::Stream::with_buffers(&dev, v4l::buffer::Type::VideoCapture, 4)?;
+    // only for the first frame, which starts the stream, the rest wait in `poll` below. A timed out
+    // `next()` leaves its buffer queued and can't be called again
+    stream.set_timeout(FIRST_FRAME_TIMEOUT);
+    let mut started = false;
+    // a preview the UI hasn't shown yet, newer frames are dropped until it has
+    let in_flight = Arc::new(AtomicBool::new(false));
     while !stop.load(Ordering::Relaxed) {
+        // waits for a frame in short steps, so a stop is noticed even if the camera stalls
+        if started && handle.poll(libc::POLLIN, POLL_MS)? == 0 {
+            continue;
+        }
         let (buf, meta) = stream.next()?;
+        started = true;
         let data = buf.get(..usize::try_from(meta.bytesused).unwrap_or(buf.len())).unwrap_or(buf);
         let Some(frame) = decode(fmt.fourcc, fmt.width, fmt.height, data) else { continue };
-        let preview = to_round_buffer(&square(&frame, PREVIEW_SIZE));
+        let preview = (!in_flight.load(Ordering::Acquire))
+            .then(|| to_round_buffer(&square(&frame, PREVIEW_SIZE)));
         if let Ok(mut last) = last.lock() {
             *last = Some(frame);
         }
-        _ = ui.upgrade_in_event_loop(move |ui| {
+        let Some(preview) = preview else { continue };
+        in_flight.store(true, Ordering::Release);
+        let done = Arc::clone(&in_flight);
+        let sent = ui.upgrade_in_event_loop(move |ui| {
             ui.global::<Camera<'_>>().set_frame(slint::Image::from_rgba8(preview));
+            done.store(false, Ordering::Release);
         });
+        if sent.is_err() {
+            in_flight.store(false, Ordering::Release);
+        }
     }
     Ok(())
 }
@@ -183,8 +207,8 @@ fn start(ui: &slint::Weak<AppWindow>) {
     let ui = ui.clone();
     let previous = STREAM_THREAD.lock().ok().and_then(|mut t| t.take());
     let thread = std::thread::spawn(move || {
-        // the last stream lets go of the camera after its next frame, opening it before then fails
-        // as busy. Not forever, a camera that stopped sending frames never lets it go
+        // the last stream lets go of the camera once it notices it's stopped, within `POLL_MS` or
+        // a frame, opening it before then fails as busy. Not forever, in case it's stuck
         if let Some(previous) = previous {
             for _ in 0..20 {
                 if previous.is_finished() {

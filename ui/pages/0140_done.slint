@@ -1,6 +1,6 @@
 import { Tokens } from "../slintcn/theme/tokens.slint";
 import { TdnBasePg, TdnHero } from "../page.slint";
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
 import { Install } from "../install.slint";
 import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
@@ -8,7 +8,11 @@ import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
 export component DonePage inherits TdnBasePg {
     forward-focus: reboot;
 
+    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is
     VerticalLayout {
+        accessible-role: groupbox;
+        accessible-label: Lang.t("page-done", []);
+
         TdnHero {
             vertical-stretch: 1;
         }
@@ -24,12 +28,13 @@ export component DonePage inherits TdnBasePg {
                 text: Lang.t("page-done", []);
                 font-size: 3 * Tokens.text-rem;
                 font-weight: 800;
-                horizontal-alignment: left;
+                horizontal-alignment: Dir.text-start;
                 horizontal-stretch: 1;
                 wrap: word-wrap;
             }
 
             VerticalLayout {
+                layout-order: Dir.order(1);
                 alignment: center;
                 horizontal-stretch: 0;
 

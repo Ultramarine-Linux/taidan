@@ -4,9 +4,9 @@ import { Label, LabelVariant } from "slintcn/components/label.slint";
 import { Icon } from "slintcn/components/icon.slint";
 import { LucidePaths } from "slintcn/components/lucide-paths.slint";
 import { Cfg } from "cfg.slint";
-import { Lang } from "lang.slint";
+import { Lang, Dir } from "lang.slint";
 import { Modal } from "modal.slint";
-export { Modal }
+export { Modal, Dir }
 import { Card } from "slintcn/components/card.slint";
 
 export global TdnStyle {
@@ -228,7 +228,7 @@ export component TdnInput inherits Rectangle {
     icon := Image {
         visible: root.has-icon;
         source: root.icon;
-        x: 10 * Tokens.unit;
+        x: Dir.x(10 * Tokens.unit, self.width, parent.width);
         width: root.has-icon ? 1.1rem : 0;
         height: self.width;
         y: (parent.height - self.height) / 2;
@@ -237,9 +237,12 @@ export component TdnInput inherits Rectangle {
     }
 
     input := TextInput {
-        x: root.has-icon ? icon.x + icon.width + 8 * Tokens.unit : 12 * Tokens.unit;
+        // from the start edge, the right one for right-to-left languages
+        property <length> offset: root.has-icon ? 10 * Tokens.unit + icon.width + 8 * Tokens.unit : 12 * Tokens.unit;
+        x: Dir.x(self.offset, self.width, parent.width);
         y: 0;
-        width: (reveal.visible ? reveal.x - 4 * Tokens.unit : parent.width - 12 * Tokens.unit) - self.x;
+        width: (reveal.visible ? parent.width - reveal.width - 4 * Tokens.unit : parent.width - 12 * Tokens.unit) - self.offset;
+        horizontal-alignment: Dir.text-start;
         height: parent.height;
         text <=> root.text;
         color: Tokens.color-foreground;
@@ -269,6 +272,7 @@ export component TdnInput inherits Rectangle {
         width: input.width;
         height: parent.height;
         text: root.placeholder;
+        horizontal-alignment: Dir.text-start;
         color: Tokens.color-muted-foreground;
         font-size: Tokens.typography-body-size;
         vertical-alignment: center;
@@ -282,7 +286,7 @@ export component TdnInput inherits Rectangle {
         visible: root.password;
         width: root.password ? parent.height : 0;
         height: parent.height;
-        x: parent.width - self.width;
+        x: Dir.x(parent.width - self.width, self.width, parent.width);
         border-radius: Tokens.radius-md;
         accessible-role: button;
         accessible-label: root.reveal-label;
@@ -386,15 +390,16 @@ export component TdnListRow inherits Rectangle {
 
         TdnText {
             text: root.text;
-            horizontal-alignment: left;
+            horizontal-alignment: Dir.text-start;
             overflow: elide;
             color: root.selected ? TdnStyle.accent-foreground : Tokens.color-foreground;
             accessible-role: none;
         }
 
         if root.secondary != "": TdnText {
+            layout-order: Dir.order(1);
             text: root.secondary;
-            horizontal-alignment: right;
+            horizontal-alignment: Dir.text-end;
             horizontal-stretch: 0;
             color: root.selected ? TdnStyle.accent-foreground : Tokens.color-muted-foreground;
             accessible-role: none;
@@ -488,11 +493,12 @@ export component TdnSelect inherits Rectangle {
                     text: root.options[root.index];
                     horizontal-stretch: 1;
                     min-width: 0;
-                    horizontal-alignment: left;
+                    horizontal-alignment: Dir.text-start;
                     overflow: elide;
                 }
 
                 VerticalLayout {
+                    layout-order: Dir.order(1);
                     alignment: center;
                     horizontal-stretch: 0;
 
@@ -559,7 +565,7 @@ export component TdnField inherits VerticalLayout {
 
     // `Label` sizes itself to its text, which would cap the whole field at that width
     HorizontalLayout {
-        alignment: start;
+        alignment: Dir.start;
 
         Label {
             text: root.label;
@@ -574,7 +580,7 @@ export component TdnField inherits VerticalLayout {
         text: root.error != "" ? root.error : root.help;
         color: root.error != "" ? Tokens.color-destructive : Tokens.color-muted-foreground;
         font-size: Tokens.typography-body-sm-size;
-        horizontal-alignment: left;
+        horizontal-alignment: Dir.text-start;
         wrap: word-wrap;
     }
 }
@@ -632,11 +638,12 @@ export component TdnToggleRow inherits Rectangle {
 
         TdnText {
             text: root.text;
-            horizontal-alignment: left;
+            horizontal-alignment: Dir.text-start;
             font-weight: Tokens.typography-weight-medium;
         }
 
         VerticalLayout {
+            layout-order: Dir.order(1);
             alignment: center;
 
             Rectangle {
@@ -650,7 +657,8 @@ export component TdnToggleRow inherits Rectangle {
                     width: parent.height - 0.3rem;
                     height: self.width;
                     y: 0.15rem;
-                    x: root.checked ? parent.width - self.width - 0.15rem : 0.15rem;
+                    // on is toward the end, the left for right-to-left languages
+                    x: Dir.x(root.checked ? parent.width - self.width - 0.15rem : 0.15rem, self.width, parent.width);
                     border-radius: self.width / 2;
                     background: root.checked ? Tokens.color-primary-foreground : Tokens.color-background;
                     animate x { duration: Tokens.motion-fast; easing: Tokens.motion-easing-standard; }
@@ -749,7 +757,6 @@ export component TdnWifiIcon inherits Rectangle {
     }
 }
 
-// a small green "Connected" badge
 // a small square icon button, the same size as `TdnStatusIcon`, for actions in a list row
 export component TdnIconButton inherits Rectangle {
     // Lucide path commands, see `LucidePaths`
@@ -875,7 +882,7 @@ export component TdnDialog inherits Rectangle {
                     text: root.title;
                     font-size: 1.4 * Tokens.text-rem;
                     font-weight: 500;
-                    horizontal-alignment: left;
+                    horizontal-alignment: Dir.text-start;
                     wrap: word-wrap;
                 }
 

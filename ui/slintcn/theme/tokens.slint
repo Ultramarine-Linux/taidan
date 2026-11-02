@@ -54,7 +54,18 @@ export global Tokens {
         Theme.mode == ThemeMode.light ? Palette.neutral-100 : Palette.neutral-800;
     out property <color> color-muted-foreground:
         Theme.mode == ThemeMode.light ? Palette.neutral-500 : Palette.neutral-400;
-    out property <color> color-destructive:        Palette.red-400;
+    // darker in light mode so red text stays above 4.5:1 on the background and on its tint
+    out property <color> color-destructive:
+        Theme.mode == ThemeMode.light ? Palette.red-700 : Palette.red-400;
+    // behind red text, for the softer destructive buttons
+    out property <color> color-destructive-tint:
+        Theme.mode == ThemeMode.light
+        ? Palette.red-700.with-alpha(0.1)
+        : Palette.red-400.with-alpha(0.2);
+    // filled destructive buttons, dark enough for white text in either mode
+    out property <color> color-destructive-solid:
+        Theme.mode == ThemeMode.light ? Palette.red-700 : Palette.red-600;
+    out property <color> color-destructive-foreground: #ffffff;
     out property <color> color-affirm:             Palette.green-400;
     // subtle hover surface for outline/ghost controls — shadcn's "accent"
     out property <color> color-accent:

@@ -1,5 +1,5 @@
 import { TdnPage } from "../page.slint";
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { Drivers } from "../install.slint";
 import { TdnText, TdnToggleRow } from "../components.slint";
 import { Card } from "../slintcn/components/card.slint";
@@ -19,9 +19,10 @@ export component DriverRow inherits HorizontalLayout {
     }
 
     TdnText {
+        layout-order: Dir.order(1);
         text: root.text;
         font-size: 1.1 * Tokens.text-rem;
-        horizontal-alignment: left;
+        horizontal-alignment: Dir.text-start;
         overflow: elide;
     }
 }
@@ -73,14 +74,14 @@ export component DriversPage inherits TdnPage {
 
             TdnText {
                 text: Lang.t("page-drivers-desc", []);
-                horizontal-alignment: left;
+                horizontal-alignment: Dir.text-start;
                 wrap: word-wrap;
                 font-size: 1.1 * Tokens.text-rem;
             }
 
             TdnText {
                 text: Lang.t("page-drivers-proprietary", []);
-                horizontal-alignment: left;
+                horizontal-alignment: Dir.text-start;
                 wrap: word-wrap;
                 font-size: 1.1 * Tokens.text-rem;
             }
@@ -93,12 +94,14 @@ export component DriversPage inherits TdnPage {
             }
         }
 
-        // pushes the list to the right edge on wider windows
+        // pushes the list to the end edge on wider windows
         Rectangle {
+            layout-order: Dir.order(1);
             horizontal-stretch: 1;
         }
 
         Card {
+            layout-order: Dir.order(2);
             horizontal-stretch: 0;
             width: 15rem;
             card-radius: md;

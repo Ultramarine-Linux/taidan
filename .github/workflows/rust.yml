@@ -5,7 +5,9 @@ permissions:
   packages: read
 
 on:
+  # pull requests are covered by pull_request, so a push to their branch doesn't run this twice
   push:
+    branches: ["main"]
   pull_request:
 
 jobs:
@@ -56,9 +58,10 @@ jobs:
             ~/.cargo/git/db/
             ~/.cargo/git/checkouts/
             target/
-          key: ${{ runner.os }}-clippy-cargo-tdnx-${{ hashFiles('**/Cargo.lock') }}
+          # per backend, they build different crates and would keep overwriting each other's cache
+          key: ${{ runner.os }}-clippy-cargo-tdnx-${{ matrix.feature }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-clippy-cargo-tdnx-
+            ${{ runner.os }}-clippy-cargo-tdnx-${{ matrix.feature }}-
       - name: Install clippy-sarif
         run: cargo install clippy-sarif sarif-fmt
       - name: Clippy

@@ -13,7 +13,8 @@ impl super::Step for SetupImf {
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        if settings.ims.is_empty() || settings.nointernet {
+        // the input methods weren't installed without dnf
+        if settings.ims.is_empty() || settings.nointernet || cfg.taidan0.skip_dnf {
             return Ok(());
         }
         if let Err(e) = match settings.imf {
@@ -33,12 +34,19 @@ impl super::Step for SetupImf {
     }
 }
 
-// kwinrc config for selecting fcitx5 as the virtual input
-const KWINRC_FCITX5: &[u8] = b"
-[Wayland]
-InputMethod[$e]=/usr/share/applications/fcitx5-wayland-launcher.desktop
-VirtualKeyboardEnabled=true
-";
+/// `kwriteconfig6` arguments, after `--file`, that select Fcitx5 as KWin's input method
+/// https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg?ref_type=heads
+const KWINRC_FCITX5: [[&str; 6]; 2] = [
+    [
+        "--group",
+        "Wayland",
+        "--key",
+        "InputMethod",
+        "--",
+        "/usr/share/applications/fcitx5-wayland-launcher.desktop",
+    ],
+    ["--group", "Wayland", "--key", "VirtualKeyboardEnabled", "--type=bool", "true"],
+];
 
 /// `~/.config/fcitx5/profile` with the keyboard layout and the chosen input methods
 fn fcitx5_profile(
@@ -81,11 +89,10 @@ fn fcitx5_profile(
     buf
 }
 
-/// appends `content` to `path` as `user`, so the file is theirs
-async fn tee_as(user: &str, path: &str, content: &[u8]) -> Res<()> {
+/// writes `content` to `path` as `user`, replacing what was there, so the file is theirs
+async fn write_as(user: &str, path: &str, content: &[u8]) -> Res<()> {
     let mut p = tokio::process::Command::new("pkexec")
-        .args(["--user", user, "tee"])
-        .args(["-a", path])
+        .args(["--user", user, "tee", "--", path])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped())
@@ -113,16 +120,29 @@ async fn tee_as(user: &str, path: &str, content: &[u8]) -> Res<()> {
 
 async fn write_fcitx5_profile(settings: &crate::settings::Settings) -> Res<()> {
     let username = &settings.username;
-    crate::pkexec(username, "mkdir", &["-p", &format!("/home/{username}/.config/fcitx5/")])
+    let config = crate::a11y::home_of(username).await?.join(".config");
+    let fcitx5 = config.join("fcitx5");
+    crate::pkexec(username, "mkdir", [std::ffi::OsStr::new("-p"), fcitx5.as_os_str()])
         .await
         .wrap_msg("cannot create ~/.config/fcitx5/")?;
 
-    let profile_path = format!("/home/{username}/.config/fcitx5/profile");
-    tee_as(username, &profile_path, fcitx5_profile(settings).as_bytes()).await?;
+    let profile_path = fcitx5.join("profile");
+    write_as(username, &profile_path.to_string_lossy(), fcitx5_profile(settings).as_bytes())
+        .await?;
 
-    // https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg?ref_type=heads
-    let kwinrc_path = format!("/home/{username}/.config/kwinrc");
-    tee_as(username, &kwinrc_path, KWINRC_FCITX5).await
+    // KWin is only there on Plasma, which has kwriteconfig6 too
+    if !crate::a11y::has_kwriteconfig() {
+        return Ok(());
+    }
+    let kwinrc = config.join("kwinrc");
+    let kwinrc = kwinrc.to_string_lossy();
+    for entry in KWINRC_FCITX5 {
+        // as the user, so the file they get is theirs
+        let mut args = vec!["-u", username, "--", "kwriteconfig6", "--file", &kwinrc];
+        args.extend(entry);
+        crate::root("runuser", &args).await.wrap_msg("cannot select Fcitx5 in kwinrc")?;
+    }
+    Ok(())
 }
 
 /// writes the Fcitx5 config into `skel`, a copy of `/etc/skel` the new user's home is made from,
@@ -132,9 +152,14 @@ async fn write_fcitx5_profile(settings: &crate::settings::Settings) -> Res<()> {
 /// - cannot write the files
 pub async fn write_fcitx5_to_skel(
     settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
     skel: &std::path::Path,
 ) -> Res<bool> {
-    if settings.ims.is_empty() || settings.nointernet || !settings.imf.is_fcitx5() {
+    if settings.ims.is_empty()
+        || settings.nointernet
+        || cfg.taidan0.skip_dnf
+        || !settings.imf.is_fcitx5()
+    {
         return Ok(false);
     }
     let config = skel.join(".config");
@@ -142,13 +167,15 @@ pub async fn write_fcitx5_to_skel(
     tokio::fs::write(config.join("fcitx5/profile"), fcitx5_profile(settings))
         .await
         .map_err(Err::Io)?;
-    let mut kwinrc = tokio::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(config.join("kwinrc"))
-        .await
-        .map_err(Err::Io)?;
-    kwinrc.write_all(KWINRC_FCITX5).await.map_err(Err::Io)?;
+    if crate::a11y::has_kwriteconfig() {
+        let kwinrc = config.join("kwinrc");
+        let kwinrc = kwinrc.to_string_lossy();
+        for entry in KWINRC_FCITX5 {
+            let mut args = vec!["--file", &*kwinrc];
+            args.extend(entry);
+            super::acmd("kwriteconfig6", &args).await?;
+        }
+    }
     Ok(true)
 }
 
@@ -165,7 +192,7 @@ async fn write_ibus_profile(
         return Ok(());
     }
 
-    // Use dbus-launch to run dconf commands as the target user
+    // dconf writes through its D-Bus service, which a bus of its own starts
     let dbus_args = format!(
         "dconf write /desktop/ibus/general/use-system-keyboard-layout true && \
         dconf write /desktop/ibus/general/engines-order \"[{engines}]\" && \
@@ -173,16 +200,7 @@ async fn write_ibus_profile(
     );
 
     let p = tokio::process::Command::new("pkexec")
-        .args([
-            "--user",
-            username,
-            "dbus-launch",
-            "--sh-syntax",
-            "--exit-with-session",
-            "bash",
-            "-c",
-            &dbus_args,
-        ])
+        .args(["--user", username, "dbus-run-session", "--", "bash", "-c", &dbus_args])
         .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| Err::FailToRunProgram("pkexec", e))
@@ -190,11 +208,11 @@ async fn write_ibus_profile(
 
     let p = (p.wait_with_output().await)
         .map_err(|e| Err::FailToRunProgram("pkexec", e))
-        .wrap_msg("cannot run dbus-launch with pkexec")?;
+        .wrap_msg("cannot run dbus-run-session with pkexec")?;
 
     if !p.status.success() {
         return Err(Err::ProgramFail {
-            name: "pkexec (dbus-launch)",
+            name: "pkexec (dbus-run-session)",
             output: String::from_utf8_lossy(&p.stderr).to_string(),
             rc: p.status.code(),
         })

@@ -1,6 +1,7 @@
 import { TdnPage } from "../page.slint";
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
+import { Modal } from "../modal.slint";
 import { TdnText, TdnStyle } from "../components.slint";
 import { Icon } from "../slintcn/components/icon.slint";
 import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
@@ -18,6 +19,8 @@ component ThemeTile inherits Rectangle {
     callback accepted();
     // Left or Right, to the other tile
     callback switched();
+    // whether this is part of a dialog, see `Modal`
+    in property <bool> in-dialog;
 
     forward-focus: focus;
     accessible-role: radio-button;
@@ -50,6 +53,7 @@ component ThemeTile inherits Rectangle {
     // no focus ring, the picked tile is the only Tab stop, as in a radio group, so its own
     // highlight already shows where the focus is
     focus := FocusScope {
+        enabled: Modal.open == root.in-dialog;
         focus-on-tab-navigation: root.checked;
         key-pressed(event) => {
             if event.text == " " {
@@ -127,7 +131,7 @@ component ThemeTile inherits Rectangle {
 
     // a check in the corner, so it isn't only the color that says which one it is
     if root.checked: Rectangle {
-        x: parent.width - self.width - 0.4rem;
+        x: Dir.x(parent.width - self.width - 0.4rem, self.width, parent.width);
         y: 0.4rem;
         width: 1.4rem;
         height: self.width;
@@ -195,6 +199,7 @@ export component ThemePage inherits TdnPage {
             }
 
             dark-tile := ThemeTile {
+                layout-order: Dir.order(1);
                 width: 12rem;
                 text: Lang.t("page-theme-dark", []);
                 dark: true;

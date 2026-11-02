@@ -1,5 +1,5 @@
 import { TdnBasePg, TdnHeader } from "../page.slint";
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { Install } from "../install.slint";
 import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
 import { ScrollView } from "std-widgets.slint";
@@ -8,7 +8,13 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 export component ErrorPage inherits TdnBasePg {
     forward-focus: retry;
 
+    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is, and
+    // what went wrong, when the focus lands on Retry
     VerticalLayout {
+        accessible-role: groupbox;
+        accessible-label: Lang.t("page-error", []);
+        accessible-description: Install.error == "" ? Lang.t("page-error-desc", [])
+            : Lang.t("page-error-desc", []) + "\n\n" + Install.error;
         padding-left: 2rem;
         padding-right: 2rem;
         padding-top: 1rem;
@@ -30,19 +36,20 @@ export component ErrorPage inherits TdnBasePg {
             }
 
             VerticalLayout {
+                layout-order: Dir.order(1);
                 alignment: center;
 
                 TdnText {
                     text: Lang.t("page-error", []);
                     font-size: 1.75 * Tokens.text-rem;
                     font-weight: 500;
-                    horizontal-alignment: left;
+                    horizontal-alignment: Dir.text-start;
                 }
 
                 TdnText {
                     text: Lang.t("page-error-desc", []);
                     color: Tokens.color-muted-foreground;
-                    horizontal-alignment: left;
+                    horizontal-alignment: Dir.text-start;
                     wrap: word-wrap;
                 }
             }
@@ -66,6 +73,7 @@ export component ErrorPage inherits TdnBasePg {
                     wrap: word-wrap;
                     text: Install.error;
                     font-family: "monospace";
+                    accessible-label: Lang.t("page-error-details", []);
                     font-size: Tokens.typography-body-sm-size;
                     color: Tokens.color-foreground;
                 }
@@ -82,6 +90,7 @@ export component ErrorPage inherits TdnBasePg {
             }
 
             retry := TdnBtn {
+                layout-order: Dir.order(1);
                 text: Lang.t("page-error-retry", []);
                 enter-hint: true;
                 background-color: TdnStyle.accent;

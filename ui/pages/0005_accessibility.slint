@@ -1,5 +1,5 @@
 import { TdnBasePg } from "../page.slint";
-import { Lang } from "../lang.slint";
+import { Lang, Dir } from "../lang.slint";
 import { A11y } from "../a11y.slint";
 import { Modal } from "../modal.slint";
 import { TdnText, TdnBtn, TdnStyle, TdnToggleRow, TdnDialog, TdnField, TdnSelect } from "../components.slint";
@@ -102,7 +102,7 @@ component A11yTile inherits Rectangle {
 
     // a check in the corner, so it isn't only the color that says it's on
     if root.checked: Rectangle {
-        x: parent.width - self.width - 0.5rem;
+        x: Dir.x(parent.width - self.width - 0.5rem, self.width, parent.width);
         y: 0.5rem;
         width: 1.4rem;
         height: self.width;
@@ -193,6 +193,7 @@ component A11yContent inherits VerticalLayout {
         }
 
         A11yTile {
+            layout-order: Dir.order(1);
             width: 10rem;
             height: self.width;
             in-dialog: root.interactive-dialog;
@@ -206,6 +207,7 @@ component A11yContent inherits VerticalLayout {
         }
 
         A11yTile {
+            layout-order: Dir.order(2);
             width: 10rem;
             height: self.width;
             in-dialog: root.interactive-dialog;
@@ -246,9 +248,10 @@ component A11yContent inherits VerticalLayout {
         }
 
         TdnText {
+            layout-order: Dir.order(1);
             text: Lang.t("page-accessibility-hint", []);
             font-size: 1.2 * Tokens.text-rem;
-            horizontal-alignment: left;
+            horizontal-alignment: Dir.text-start;
             wrap: word-wrap;
             min-width: 0;
         }
@@ -271,6 +274,7 @@ component A11yContent inherits VerticalLayout {
         }
 
         TdnBtn {
+            layout-order: Dir.order(1);
             in-dialog: root.interactive-dialog;
             text: root.next-text;
             enter-hint: true;
@@ -370,7 +374,7 @@ component OptionRow inherits VerticalLayout {
         text: root.desc;
         color: Tokens.color-muted-foreground;
         font-size: Tokens.typography-body-sm-size;
-        horizontal-alignment: left;
+        horizontal-alignment: Dir.text-start;
         wrap: word-wrap;
     }
 }
@@ -492,7 +496,7 @@ export component A11yMoreDialog inherits TdnDialog {
     }
 
     HorizontalLayout {
-        alignment: end;
+        alignment: Dir.end;
 
         done := TdnBtn {
             in-dialog: true;

@@ -4,8 +4,6 @@ default = Default
 prev = Back
 # btn (next page)
 next = Next
-# btn (close a dialog)
-close = Close
 # btn (dismiss a dialog without doing anything)
 cancel = Cancel
 # btn (skip anything)
@@ -158,6 +156,8 @@ page-password-tip-bad-desc = Much harder to remember, and cracks in 12 days!
 page-timezone = Time Zone
 page-timezone-search = Search for a city or time zone
 page-timezone-none = No matching time zones.
+# a city and the region or country it's in, e.g. "Toronto, Canada"
+page-timezone-place = { $city }, { $region }
 
 ## [Internet]
 
@@ -324,6 +324,8 @@ page-theme-dark = Dark
 ## [Installing]
 
 page-installing-configuring = Configuring your Device
+# the step being done, and which one it is out of how many, e.g. "Creating your Account  (1/12)"
+page-installing-stage = { $stage }  ({ $num }/{ $count })
 ## [Finish]
 
 ## [Location]
@@ -356,6 +358,8 @@ page-summary-account = Your Account
 page-summary-region = Region and Connectivity
 page-summary-network = Network
 page-summary-network-none = Not Connected
+# the time zone's place, e.g. "Toronto, Canada", and its UTC offset, e.g. "UTC−05:00"
+page-summary-timezone = { $place } ({ $offset })
 page-summary-software = Additional Software
 page-summary-software-none = No additional software will be installed.
 # btn, opens the distribution's optional tweaks
@@ -374,6 +378,8 @@ page-done-login = Log In
 
 page-error = Error
 page-error-desc = We hit a snag.
+# for screen readers, the box with the error message
+page-error-details = Error Details
 page-error-retry = Retry
 # btn (back to the summary page to change settings before retrying)
 page-error-back = Go Back
