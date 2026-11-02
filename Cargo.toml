@@ -136,10 +136,6 @@ needless_for_each = "allow"
 
 # Optimize only the crates doing per-frame work (rendering, text, images) in dev builds,
 # so the UI is usable without paying to optimize every dependency.
-# the generated UI code is too big to step through anyway, and its debug info slows down building it
-[profile.dev.package.taidan_ui]
-debug = "line-tables-only"
-
 [profile.dev.package."i-slint-core"]
 opt-level = 3
 [profile.dev.package."i-slint-backend-winit"]

@@ -1,3 +1,7 @@
+# Slint generates ~20 MB of Rust for the UI, which one codegen unit builds on a single core.
+# 16 cut the build from 8m07s to 6m18s.
+%global rustflags_codegen_units 16
+
 Name:           taidan
 Version:        git~%{sub %gitcommit 1 7}
 Release:        1%{?dist}
