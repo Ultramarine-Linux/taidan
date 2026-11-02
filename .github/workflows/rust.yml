@@ -46,6 +46,19 @@ jobs:
         with:
           toolchain: stable
           components: clippy
+      - name: Cache Rust dependencies and build artifacts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ~/.cargo/git/checkouts/
+            target/
+          key: ${{ runner.os }}-clippy-cargo-tdnx-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-clippy-cargo-tdnx-
       - name: Install clippy-sarif
         run: cargo install clippy-sarif sarif-fmt
       - name: Clippy
