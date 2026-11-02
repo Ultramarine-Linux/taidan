@@ -1,0 +1,2 @@
+# the CachyOS kernel is only built for x86-64-v3 and up
+x86_64_level = 3

@@ -9,7 +9,17 @@ use tokio::io::AsyncWriteExt;
 pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
     let tweaks = Tweak::list()
         .inspect_err(|err| tracing::error!(?err, "cannot list tweaks"))
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .into_iter()
+        // hidden here rather than failing in `up` later on
+        .filter(|t| {
+            let supported = t.is_supported();
+            if !supported {
+                tracing::info!(id=?t.id(), level=?t.x86_64_level, "hiding tweak unsupported on this CPU");
+            }
+            supported
+        })
+        .collect::<Box<[_]>>();
     tracing::info!("found {} tweaks", tweaks.len());
     tweaks
 });
@@ -30,12 +40,13 @@ pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
 ///
 /// The ID of a tweak is determined by the directory name (`my_tweak`, `other_tweak`).
 ///
-/// The `tweak.toml` file, if present, MUST specify the following two fields:
-/// - `ftl_name` (alias `name`): the fluent ID for the name of the tweak
-/// - `ftl_desc` (alias `desc`): the fluent ID for the description of the tweak
-///
-/// If the file is unpresent, the above two fields default to `<id>-name` and `<id>-desc`.
+/// The `tweak.toml` file is optional, and so are all of its fields:
+/// - `ftl_name` (alias `name`): the fluent ID for the name of the tweak, defaults to `<id>-name`
+/// - `ftl_desc` (alias `desc`): the fluent ID for the description of the tweak, defaults to `<id>-desc`
+/// - `x86_64_level`: the minimum x86-64 microarchitecture level (1 to 4) the tweak needs.
+///   Tweaks that set it are hidden on CPUs below that level and on other architectures.
 #[derive(Clone, Debug, Default, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct Tweak {
     #[serde(skip)]
     pub path: PathBuf,
@@ -43,6 +54,7 @@ pub struct Tweak {
     pub ftl_name: String,
     #[serde(alias = "desc")]
     pub ftl_desc: String,
+    pub x86_64_level: Option<u8>,
 }
 
 #[cfg(debug_assertions)]
@@ -68,7 +80,7 @@ impl Tweak {
     /// Panics if `dir` ends in `..`, see [`Path::file_name()`].
     #[tracing::instrument]
     fn from_cfg_path(dir: &Path) -> Self {
-        Self::try_from_cfg_path(dir)
+        let mut tweak = Self::try_from_cfg_path(dir)
             .inspect_err(|err| {
                 if err.kind() == std::io::ErrorKind::NotFound {
                     tracing::debug!(?err, "no tweak.toml, using default");
@@ -84,14 +96,21 @@ impl Tweak {
                     })
                     .ok()
             })
-            .unwrap_or_else(|| {
-                let tweak_name = dir.file_name().unwrap().to_string_lossy();
-                Self {
-                    ftl_name: format!("{tweak_name}-name"),
-                    ftl_desc: format!("{tweak_name}-desc"),
-                    ..Self::default()
-                }
-            })
+            .unwrap_or_default();
+        let tweak_name = dir.file_name().unwrap().to_string_lossy();
+        if tweak.ftl_name.is_empty() {
+            tweak.ftl_name = format!("{tweak_name}-name");
+        }
+        if tweak.ftl_desc.is_empty() {
+            tweak.ftl_desc = format!("{tweak_name}-desc");
+        }
+        tweak
+    }
+
+    /// Whether this machine meets the tweak's requirements, see [`Self::x86_64_level`].
+    #[must_use]
+    pub fn is_supported(&self) -> bool {
+        self.x86_64_level.is_none_or(|level| x86_64_level() >= level)
     }
     /// Obtain [`Tweak`] from the path to the tweak directory.
     /// This is the "safe" version of [`Self::from_cfg_path()`].
@@ -189,6 +208,44 @@ impl Tweak {
             Err(err) => tracing::error!(?err, "waiting for the `up` process failed"),
         }
     }
+}
+
+/// The x86-64 microarchitecture level of the running CPU, or 0 on other architectures.
+///
+/// See <https://gitlab.com/x86-psABIs/x86-64-ABI> for the features each level needs.
+#[must_use]
+pub fn x86_64_level() -> u8 {
+    #[cfg(target_arch = "x86_64")]
+    {
+        use std::arch::is_x86_feature_detected as has;
+        // LAHF/SAHF isn't detectable through std, every CPU with the rest has it anyway
+        let v2 = has!("cmpxchg16b")
+            && has!("popcnt")
+            && has!("sse3")
+            && has!("ssse3")
+            && has!("sse4.1")
+            && has!("sse4.2");
+        // `avx` is only detected when the OS saves the AVX state, which covers OSXSAVE
+        let v3 = v2
+            && has!("avx")
+            && has!("avx2")
+            && has!("bmi1")
+            && has!("bmi2")
+            && has!("f16c")
+            && has!("fma")
+            && has!("lzcnt")
+            && has!("movbe")
+            && has!("xsave");
+        let v4 = v3
+            && has!("avx512f")
+            && has!("avx512bw")
+            && has!("avx512cd")
+            && has!("avx512dq")
+            && has!("avx512vl");
+        1 + u8::from(v2) + u8::from(v3) + u8::from(v4)
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    0
 }
 
 #[tracing::instrument]
