@@ -42,12 +42,7 @@ impl super::Step for SystemSetup {
             let on = settings.tweaks.iter().any(|id| tweak.id() == id.as_str());
             tweak.run(&sett, on).await;
         }
-        // services as the distro's presets want them, the image may have been built otherwise
-        if let Err(e) = crate::root("systemctl", ["preset-all"]).await {
-            tracing::warn!(?e, "cannot apply systemd presets");
-        }
-        // after the presets, which could bring it back. GeoClue is D-Bus activated, so only a
-        // mask keeps apps from starting it
+        // GeoClue is D-Bus activated, so only a mask keeps apps from starting it
         if !settings.location
             && let Err(e) = crate::root("systemctl", ["mask", "geoclue.service"]).await
         {

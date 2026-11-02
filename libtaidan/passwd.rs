@@ -7,6 +7,8 @@ use std::{
 
 use crate::prelude::*;
 
+/// whether there's a regular user, apart from one an unfinished install made (see
+/// [`CREATED_RECORD`]), which the next install removes
 #[must_use]
 pub fn user_already_exists() -> bool {
     if cfg!(debug_assertions) {
@@ -18,7 +20,12 @@ pub fn user_already_exists() -> bool {
     else {
         return false;
     };
-    let reader = BufReader::new(f);
+    regular_user_in(BufReader::new(f), recorded_user().as_deref())
+}
+
+/// [`user_already_exists`] for the passwd file `reader`, with `recorded` the user from
+/// [`CREATED_RECORD`]
+fn regular_user_in(reader: impl BufRead, recorded: Option<&str>) -> bool {
     reader.lines().any(|l| {
         l.is_ok_and(|l| {
             let Some([user, _, uid, _]) = l.splitn(4, ':').collect_array() else {
@@ -30,11 +37,15 @@ pub fn user_already_exists() -> bool {
             else {
                 return false;
             };
-            if (1000..60000).contains(&uid) {
-                tracing::info!(?user, ?uid, "found normal user");
-                return true;
+            if !(1000..60000).contains(&uid) {
+                return false;
             }
-            false
+            if recorded == Some(user) {
+                tracing::info!(?user, ?uid, "found the user an unfinished install made");
+                return false;
+            }
+            tracing::info!(?user, ?uid, "found normal user");
+            true
         })
     })
 }
@@ -233,6 +244,18 @@ mod tests {
         assert!(!removable("taidan", 1001));
         assert!(!removable("systemd-network", 1001));
         assert!(!removable("Alice", 1000));
+    }
+
+    #[test]
+    fn recorded_user_isnt_an_existing_one() {
+        let passwd = "root:x:0:0::/root:/bin/bash\ntaidan:x:980:980::/usr/lib/taidan:/bin/sh\n";
+        assert!(!regular_user_in(passwd.as_bytes(), None));
+        let passwd = format!("{passwd}alice:x:1000:1000:Alice:/home/alice:/bin/bash\n");
+        assert!(regular_user_in(passwd.as_bytes(), None));
+        assert!(!regular_user_in(passwd.as_bytes(), Some("alice")));
+        assert!(regular_user_in(passwd.as_bytes(), Some("bob")));
+        let passwd = format!("{passwd}bob:x:1001:1001::/home/bob:/bin/bash\n");
+        assert!(regular_user_in(passwd.as_bytes(), Some("alice")));
     }
 
     #[test]

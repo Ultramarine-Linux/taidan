@@ -89,7 +89,7 @@ component IconButton inherits Rectangle {
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == " " || event.text == Key.Return {
-                root.clicked();
+                if !event.repeat { root.clicked(); }
                 return accept;
             }
             reject

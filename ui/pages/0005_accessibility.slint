@@ -67,7 +67,7 @@ component A11yTile inherits Rectangle {
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == Key.Return || event.text == " " {
-                root.toggle();
+                if !event.repeat { root.toggle(); }
                 return accept;
             }
             reject
@@ -298,7 +298,7 @@ export component AccessibilityPage inherits TdnBasePg {
         }
         key-pressed(event) => {
             if event.text == Key.Return && !Modal.open {
-                root.next_page();
+                if !event.repeat { root.next_page(); }
                 return accept;
             }
             reject

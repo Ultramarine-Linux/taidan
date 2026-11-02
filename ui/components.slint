@@ -75,8 +75,10 @@ export component TdnBtn inherits Rectangle {
         enabled: root.enabled && Modal.open == root.in-dialog;
         key-pressed(event) => {
             root.pointer-focus = false;
+            // a held key repeats, which would go on to press whatever gets the focus next, like
+            // Confirm on the summary
             if event.text == Key.Return || event.text == " " {
-                root.clicked();
+                if !event.repeat { root.clicked(); }
                 return accept;
             }
             reject
@@ -251,6 +253,8 @@ export component TdnInput inherits Rectangle {
         accepted => { root.accepted(self.text); }
         key-pressed(event) => {
             root.pointer-focus = false;
+            // Enter is `accepted`, which moves on, so a held one would go through the next pages too
+            if event.text == Key.Return && event.repeat { return accept; }
             root.key-pressed(event)
         }
         init => { if (root.auto-focus) { self.focus(); } }
@@ -289,7 +293,7 @@ export component TdnInput inherits Rectangle {
             key-pressed(event) => {
                 root.reveal-pointer-focus = false;
                 if event.text == Key.Return || event.text == " " {
-                    root.revealed = !root.revealed;
+                    if !event.repeat { root.revealed = !root.revealed; }
                     return accept;
                 }
                 reject
@@ -365,7 +369,7 @@ export component TdnListRow inherits Rectangle {
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == Key.Return || event.text == " " {
-                root.clicked();
+                if !event.repeat { root.clicked(); }
                 return accept;
             }
             reject
@@ -458,7 +462,7 @@ export component TdnSelect inherits Rectangle {
                 key-pressed(event) => {
                     root.pointer-focus = false;
                     if event.text == " " || event.text == Key.Return {
-                        root.open = !root.open;
+                        if !event.repeat { root.open = !root.open; }
                         return accept;
                     }
                     if event.text == Key.DownArrow { root.pick(root.index + 1); return accept; }
@@ -607,11 +611,11 @@ export component TdnToggleRow inherits Rectangle {
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == " " {
-                root.toggle();
+                if !event.repeat { root.toggle(); }
                 return accept;
             }
             if event.text == Key.Return {
-                root.accepted();
+                if !event.repeat { root.accepted(); }
                 return accept;
             }
             reject
@@ -777,7 +781,7 @@ export component TdnIconButton inherits Rectangle {
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == Key.Return || event.text == " " {
-                root.clicked();
+                if !event.repeat { root.clicked(); }
                 return accept;
             }
             reject
