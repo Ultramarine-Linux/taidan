@@ -13,9 +13,17 @@ export component LanguagePage inherits TdnPage {
     property <length> row-height: 2.25rem;
     // row moved to with the arrow keys, -1 until the user does so
     property <int> cursor: -1;
+    // row of the current language in the list, -1 if it's filtered out, see the finder below
+    property <int> current-row: -1;
 
     function move-cursor(delta: int) {
         if Lang.languages.length == 0 { return; }
+        // start from the current language, so the first press moves away from it instead of
+        // jumping to the top of the list and switching to that
+        if cursor < 0 && current-row >= 0 && current-row < Lang.languages.length
+            && Lang.languages[current-row].locale == Lang.current_language.locale {
+            cursor = current-row;
+        }
         cursor = max(0, min(Lang.languages.length - 1, cursor + delta));
         Lang.select(Lang.languages[cursor]);
         // keep the row in view
@@ -30,6 +38,19 @@ export component LanguagePage inherits TdnPage {
     Card {
         variant: solid;
         vertical-stretch: 1;
+
+        // finds the current language's row, which `ListView` can't tell as it only creates the
+        // rows in view
+        for lang[i] in Lang.languages: Rectangle {
+            property <bool> current: lang.locale == Lang.current_language.locale;
+            width: 0;
+            height: 0;
+            init => { if self.current { root.current-row = i; } }
+            changed current => {
+                if self.current { root.current-row = i; }
+                else if root.current-row == i { root.current-row = -1; }
+            }
+        }
 
         VerticalLayout {
             padding: 1rem;

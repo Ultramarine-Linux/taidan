@@ -18,7 +18,7 @@ pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
 ///
 /// The tweaks must be stored in [`TWEAKS_DIR`] as folders, as so:
 ///
-/// ```no_run
+/// ```text
 /// /usr/share/taidan/tweaks/ (TWEAKS_DIR)
 /// ┣╸my_tweak/
 /// ┃ ├╴tweak.toml (optional)

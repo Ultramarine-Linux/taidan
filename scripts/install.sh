@@ -3,6 +3,10 @@ DESTDIR=${DESTDIR:-/}
 mkdir -p $DESTDIR/usr/share/taidan
 cp -r data/tweaks/ $DESTDIR/usr/share/taidan/
 cp -r data/avatars/ $DESTDIR/usr/share/taidan/
+# read by KWin before the OOBE starts, see taidan-initial-setup.service
+cp -r data/session-config/ $DESTDIR/usr/share/taidan/
+# translations, read at runtime in release builds (src/l10n.rs)
+cp -r po/ $DESTDIR/usr/share/taidan/
 
 install -Dpm644 data/sysusers.d/taidan.conf             -t $DESTDIR/usr/lib/sysusers.d/
 install -Dpm644 data/systemd/*.service                  -t $DESTDIR/usr/lib/systemd/system/

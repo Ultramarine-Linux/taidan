@@ -260,7 +260,7 @@ export component NetworkPage inherits TdnPage {
                 }
             }
 
-            TdnField {
+            device-name-field := TdnField {
                 vertical-stretch: 0;
                 label: Lang.t("page-internet-devicename", []);
                 help: Network.hostname != ""
@@ -269,6 +269,8 @@ export component NetworkPage inherits TdnPage {
                 label-clicked => { device-name.focus(); }
 
                 device-name := TdnInput {
+                    label: device-name-field.label;
+                    description: device-name-field.description;
                     text <=> Network.device-name;
                     accepted => { root.try-next(); }
                 }
@@ -290,16 +292,17 @@ export component PasswordDialog inherits TdnDialog {
         }
     }
 
-    TdnField {
+    pw-field := TdnField {
         label: Lang.t("page-internet-password", []);
         error: Network.error-ssid == Network.password-ssid && Network.error-id != "" ? Lang.t(Network.error-id, []) : "";
 
         pw := TdnInput {
             in-dialog: true;
+            label: pw-field.label;
+            description: pw-field.description;
             password: true;
             auto-focus: true;
             enabled: !root.busy;
-            reveal-label: Lang.t("page-password-show", []);
             accepted => { root.submit(); }
         }
     }
@@ -447,6 +450,8 @@ component FileBrowser inherits VerticalLayout {
                 padding-right: 0.9rem;
 
                 for entry in Network.browse-entries: TdnListRow {
+                    in-dialog: true;
+                    focusable: true;
                     text: entry.dir ? entry.name + "/" : entry.name;
                     clicked => {
                         if entry.dir {
@@ -632,11 +637,12 @@ export component EnterpriseDialog inherits TdnDialog {
                 }
             }
 
-            TdnField {
+            identity-field := TdnField {
                 label: Lang.t(root.method == EapMethod.tls ? "page-internet-8021x-identity" : "page-internet-username", []);
 
                 TdnInput {
                     in-dialog: true;
+                    label: identity-field.label;
                     text <=> root.username;
                     placeholder: Lang.t("page-internet-username-placeholder", []);
                     auto-focus: true;
@@ -651,15 +657,15 @@ export component EnterpriseDialog inherits TdnDialog {
                 }
             }
 
-            if root.method != EapMethod.tls: TdnField {
+            if root.method != EapMethod.tls: eap-pw-field := TdnField {
                 label: Lang.t("page-internet-password", []);
 
                 TdnInput {
                     in-dialog: true;
+                    label: eap-pw-field.label;
                     text <=> root.password;
                     password: true;
                     enabled: !root.busy;
-                    reveal-label: Lang.t("page-password-show", []);
                     accepted => { root.submit(); }
                 }
             }
@@ -681,16 +687,17 @@ export component EnterpriseDialog inherits TdnDialog {
                 clear => { root.private-key = ""; }
             }
 
-            if root.method == EapMethod.tls: TdnField {
+            if root.method == EapMethod.tls: key-pw-field := TdnField {
                 label: Lang.t("page-internet-8021x-key-password", []);
                 help: Lang.t("page-internet-8021x-key-password-desc", []);
 
                 TdnInput {
                     in-dialog: true;
+                    label: key-pw-field.label;
+                    description: key-pw-field.description;
                     text <=> root.private-key-password;
                     password: true;
                     enabled: !root.busy;
-                    reveal-label: Lang.t("page-password-show", []);
                     accepted => { root.submit(); }
                 }
             }
@@ -719,12 +726,14 @@ export component EnterpriseDialog inherits TdnDialog {
                 clear => { root.ca-cert = ""; }
             }
 
-            if root.uses-ca && root.ca != CaSource.none: TdnField {
+            if root.uses-ca && root.ca != CaSource.none: server-field := TdnField {
                 label: Lang.t("page-internet-server", []);
                 help: Lang.t(root.ca == CaSource.system ? "page-internet-server-desc" : "page-internet-server-desc-optional", []);
 
                 TdnInput {
                     in-dialog: true;
+                    label: server-field.label;
+                    description: server-field.description;
                     text <=> root.domain;
                     placeholder: "radius.example.edu";
                     enabled: !root.busy;
@@ -744,6 +753,7 @@ export component EnterpriseDialog inherits TdnDialog {
                 in-dialog: true;
                 text: Lang.t("page-internet-8021x-fast-provisioning", []);
                 checked <=> root.fast-provisioning;
+                accepted => { root.submit(); }
             }
 
             if root.method == EapMethod.fast && root.fast-provisioning: TdnSelect {
@@ -804,12 +814,14 @@ export component EnterpriseDialog inherits TdnDialog {
                 }
             }
 
-            if root.tunneled && root.advanced: TdnField {
+            if root.tunneled && root.advanced: anonymous-field := TdnField {
                 label: Lang.t("page-internet-8021x-anonymous", []);
                 help: Lang.t("page-internet-8021x-anonymous-desc", []);
 
                 TdnInput {
                     in-dialog: true;
+                    label: anonymous-field.label;
+                    description: anonymous-field.description;
                     text <=> root.anonymous-identity;
                     enabled: !root.busy;
                     edited => { root.anonymous-touched = true; }
@@ -916,13 +928,15 @@ export component ProxyDialog inherits TdnDialog {
         wrap: word-wrap;
     }
 
-    TdnField {
+    server-field := TdnField {
         label: Lang.t("page-internet-proxy-server", []);
         error: Network.proxy-error-id != "" ? Lang.t(Network.proxy-error-id, []) : "";
         label-clicked => { server.focus(); }
 
         server := TdnInput {
             in-dialog: true;
+            label: server-field.label;
+            description: server-field.description;
             text: Network.proxy-url;
             placeholder: "proxy.example.com:3128";
             auto-focus: true;
@@ -931,13 +945,15 @@ export component ProxyDialog inherits TdnDialog {
         }
     }
 
-    TdnField {
+    bypass-field := TdnField {
         label: Lang.t("page-internet-proxy-bypass", []);
         help: Lang.t("page-internet-proxy-bypass-desc", []);
         label-clicked => { bypass.focus(); }
 
         bypass := TdnInput {
             in-dialog: true;
+            label: bypass-field.label;
+            description: bypass-field.description;
             text: Network.proxy-bypass;
             enabled: !Network.proxy-busy;
             accepted => { root.submit(); }
@@ -994,6 +1010,8 @@ export component IpDialog inherits TdnDialog {
     title: Lang.t("page-internet-ip", [{ key: "name", value: Network.ip-ssid != "" ? Network.ip-ssid : Lang.t("page-internet-wired", []) }]);
     dialog-width: 24rem;
     dismissed => { Network.ip-open = false; }
+    // the switch takes it over once the settings load, see its `init`
+    init => { if Network.ip-loading { cancel.focus(); } }
 
     function submit() {
         if !root.busy {
@@ -1011,12 +1029,15 @@ export component IpDialog inherits TdnDialog {
         text: Lang.t("page-internet-ip-manual", []);
         checked: Network.ip.manual;
         toggled(on) => { Network.ip.manual = on; }
+        accepted => { root.submit(); }
+        // the first control, focused once the settings have loaded
+        init => { self.focus(); }
     }
 
     if !Network.ip-loading && Network.ip.manual: HorizontalLayout {
         spacing: 0.75rem;
 
-        TdnField {
+        address-field := TdnField {
             // equal halves, so a long translated label can't push the other field out
             min-width: 0;
             horizontal-stretch: 1;
@@ -1024,6 +1045,7 @@ export component IpDialog inherits TdnDialog {
 
             TdnInput {
                 in-dialog: true;
+                label: address-field.label;
                 text: Network.ip.address;
                 placeholder: "192.168.1.20/24";
                 enabled: !root.busy;
@@ -1032,13 +1054,14 @@ export component IpDialog inherits TdnDialog {
             }
         }
 
-        TdnField {
+        gateway-field := TdnField {
             min-width: 0;
             horizontal-stretch: 1;
             label: Lang.t("page-internet-ip-gateway", []);
 
             TdnInput {
                 in-dialog: true;
+                label: gateway-field.label;
                 text: Network.ip.gateway;
                 placeholder: "192.168.1.1";
                 enabled: !root.busy;
@@ -1048,13 +1071,15 @@ export component IpDialog inherits TdnDialog {
         }
     }
 
-    if !Network.ip-loading: TdnField {
+    if !Network.ip-loading: dns-field := TdnField {
         label: Lang.t("page-internet-ip-dns", []);
         help: Lang.t(Network.ip.manual ? "page-internet-ip-dns-desc-manual" : "page-internet-ip-dns-desc", []);
         error: Network.ip-error-id != "" ? Lang.t(Network.ip-error-id, []) : "";
 
         TdnInput {
             in-dialog: true;
+            label: dns-field.label;
+            description: dns-field.description;
             text: Network.ip.dns;
             placeholder: "1.1.1.1, 9.9.9.9";
             enabled: !root.busy;
@@ -1086,7 +1111,7 @@ export component IpDialog inherits TdnDialog {
     HorizontalLayout {
         alignment: space-between;
 
-        TdnBtn {
+        cancel := TdnBtn {
             in-dialog: true;
             text: Lang.t("cancel", []);
             clicked => { root.dismissed(); }

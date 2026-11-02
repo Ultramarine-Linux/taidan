@@ -34,7 +34,7 @@ impl super::Step for SystemSetup {
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,
-        _: &crate::cfg::Config,
+        cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
         let sett = serde_json::to_vec(settings)?;
@@ -53,14 +53,16 @@ impl super::Step for SystemSetup {
         {
             tracing::warn!(?e, "cannot turn off location services");
         }
-        if let Err(e) = crate::a11y::apply_to_user(settings).await {
+        if let Err(e) = crate::a11y::apply_to_user(settings, cfg).await {
             tracing::warn!(?e, "cannot carry over the accessibility settings");
         }
         // for cameras and brightness controls on systems where these aren't given to the seat
         let has_video = tokio::fs::read_to_string("/etc/group")
             .await
             .is_ok_and(|groups| groups.lines().any(|l| l.starts_with("video:")));
+        // homed users get it when they're created
         if has_video
+            && !cfg.taidan0.systemd_homed
             && let Err(e) = crate::root("usermod", ["-aG", "video", &settings.username]).await
         {
             tracing::warn!(?e, "cannot add the user to the video group");

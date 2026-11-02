@@ -1178,7 +1178,35 @@ fn push(ui: &slint::Weak<AppWindow>, f: impl FnOnce(&Network<'_>) + Send + 'stat
     }
 }
 
+/// runs the distro's `/etc/com.fyralabs.Taidan/detect-internet` hook (e.g. for analytics) in the
+/// background if it exists, only the first time this is called. `NetworkManager` decides whether
+/// we're online, the hook's result is only logged.
+fn run_detect_internet_hook() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let script = format!("/etc/{}/detect-internet", crate::APPID);
+        if !std::path::Path::new(&script).exists() {
+            return;
+        }
+        std::thread::spawn(move || match std::process::Command::new(&script).output() {
+            Ok(out) if out.status.success() => {
+                tracing::info!(script, "detect-internet hook succeeded");
+            }
+            Ok(out) => tracing::warn!(
+                script,
+                status = ?out.status,
+                stderr = %String::from_utf8_lossy(&out.stderr),
+                "detect-internet hook failed"
+            ),
+            Err(e) => tracing::warn!(?e, script, "cannot run detect-internet hook"),
+        });
+    });
+}
+
 fn push_snapshot(ui: &slint::Weak<AppWindow>, snap: Snapshot) {
+    if snap.state == NetState::Online {
+        run_detect_internet_hook();
+    }
     push(ui, move |net| {
         net.set_state(snap.state);
         net.set_wifi_available(snap.wifi);

@@ -15,6 +15,9 @@ export component KeyboardPage inherits TdnPage {
     property <int> layout-cursor: -1;
     // 0 is the "Default" row, `n` is `Lang.variants[n - 1]`
     property <int> variant-cursor: -1;
+    // rows of the current layout and variant, -1 if they're filtered out, see the finders below
+    property <int> current-layout-row: -1;
+    property <int> current-variant-row: -1;
 
     function select-keymap(keymap: Keymap) {
         if keymap.id != Lang.current_keymap.id {
@@ -32,6 +35,12 @@ export component KeyboardPage inherits TdnPage {
 
     function move-layout-cursor(delta: int) {
         if Lang.keymaps.length == 0 { return; }
+        // start from the current layout, so the first press moves away from it instead of
+        // jumping to the top of the list and applying that
+        if layout-cursor < 0 && current-layout-row >= 0 && current-layout-row < Lang.keymaps.length
+            && Lang.keymaps[current-layout-row].id == Lang.current_keymap.id {
+            layout-cursor = current-layout-row;
+        }
         layout-cursor = max(0, min(Lang.keymaps.length - 1, layout-cursor + delta));
         select-keymap(Lang.keymaps[layout-cursor]);
         let top = layout-cursor * row-height;
@@ -43,6 +52,14 @@ export component KeyboardPage inherits TdnPage {
     }
 
     function move-variant-cursor(delta: int) {
+        if variant-cursor < 0 {
+            if Lang.current_variant.id == "" {
+                variant-cursor = 0;
+            } else if current-variant-row >= 0 && current-variant-row < Lang.variants.length
+                && Lang.variants[current-variant-row].id == Lang.current_variant.id {
+                variant-cursor = current-variant-row + 1;
+            }
+        }
         select-variant(max(0, min(Lang.variants.length, variant-cursor + delta)));
         let top = variant-cursor * row-height;
         if top < -variants.content-y {
@@ -55,6 +72,30 @@ export component KeyboardPage inherits TdnPage {
     Card {
         variant: solid;
         vertical-stretch: 1;
+
+        // find the current layout's and variant's rows for the arrow keys to start from, the
+        // layouts' `ListView` only creates the rows in view so its rows can't tell
+        for keymap[i] in Lang.keymaps: Rectangle {
+            property <bool> current: keymap.id == Lang.current_keymap.id;
+            width: 0;
+            height: 0;
+            init => { if self.current { root.current-layout-row = i; } }
+            changed current => {
+                if self.current { root.current-layout-row = i; }
+                else if root.current-layout-row == i { root.current-layout-row = -1; }
+            }
+        }
+
+        for variant[i] in Lang.variants: Rectangle {
+            property <bool> current: variant.id == Lang.current_variant.id;
+            width: 0;
+            height: 0;
+            init => { if self.current { root.current-variant-row = i; } }
+            changed current => {
+                if self.current { root.current-variant-row = i; }
+                else if root.current-variant-row == i { root.current-variant-row = -1; }
+            }
+        }
 
         HorizontalLayout {
             padding: 1rem;

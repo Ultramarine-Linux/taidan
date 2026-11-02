@@ -66,6 +66,8 @@ Linux, written in Rust and the Slint toolkit.
 %package default-configs
 Summary:        Default configurations for Taidan
 Provides:       %{name}-configs
+# the tweaks run `um tweaks enable`
+Requires:       umcli
 BuildArch:      noarch
 
 %description default-configs
@@ -97,6 +99,8 @@ DESTDIR=%buildroot ./scripts/install.sh
 %dir %{_prefix}/lib/taidan/
 %dir %{_datadir}/taidan/
 %{_datadir}/taidan/avatars/
+%{_datadir}/taidan/po/
+%{_datadir}/taidan/session-config/
 
 %files default-configs
 %{_datadir}/taidan/tweaks/

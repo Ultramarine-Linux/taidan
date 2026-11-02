@@ -22,6 +22,8 @@ export global Account {
     out property <bool> password-valid: password != "" && password == password-repeat;
 
     pure callback valid-username(username: string) -> bool;
+    // fluent id of the message explaining why `username` can't be used
+    pure callback username-error(username: string) -> string;
     // username suggested by the full name, or `current` if none can be derived
     pure callback suggest-username(fullname: string, current: string) -> string;
     // what to call the user: their first name, else their username
@@ -29,6 +31,7 @@ export global Account {
     callback save();
 
     valid-username(username) => username != "";
+    username-error(username) => "page-whoareyou-error";
     suggest-username(fullname, current) => current;
     first-name(fullname, username) => fullname != "" ? fullname : username;
 }

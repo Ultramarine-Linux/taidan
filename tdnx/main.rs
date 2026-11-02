@@ -1,3 +1,7 @@
+// each backend defines its own `main`
+#[cfg(all(feature = "desktop-install", feature = "server-oobe"))]
+compile_error!("`desktop-install` and `server-oobe` can't be enabled together, pick one");
+
 #[cfg(feature = "server-oobe")]
 use std::io::{self, Read};
 

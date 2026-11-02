@@ -6,6 +6,7 @@ use crate::prelude::*;
 
 /// what the user turned on in the OOBE
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct A11y {
     /// Orca, which Plasma's kaccess starts at login
@@ -155,16 +156,30 @@ impl A11y {
     }
 }
 
+/// whether `kwriteconfig6` is there, which it is on Plasma
+fn has_kwriteconfig() -> bool {
+    std::path::Path::new("/usr/bin/kwriteconfig6").exists()
+}
+
 /// writes the options into the new user's config, so their Plasma session starts with them
+///
+/// on systemd-homed the home isn't mounted after it's created, so there they go in the skeleton
+/// it's created from instead, see [`write_to_skel`]
 ///
 /// # Errors
 /// - cannot find the user's home directory
-pub async fn apply_to_user(settings: &crate::settings::Settings) -> Res<()> {
+pub async fn apply_to_user(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+) -> Res<()> {
+    if cfg.taidan0.systemd_homed {
+        return Ok(());
+    }
     let entries = settings.a11y.user_entries();
     if entries.is_empty() {
         return Ok(());
     }
-    if !std::path::Path::new("/usr/bin/kwriteconfig6").exists() {
+    if !has_kwriteconfig() {
         tracing::info!("no kwriteconfig6, so not a Plasma system; skipping accessibility settings");
         return Ok(());
     }
@@ -185,6 +200,31 @@ pub async fn apply_to_user(settings: &crate::settings::Settings) -> Res<()> {
         }
     }
     Ok(())
+}
+
+/// writes the options into `skel`, a copy of `/etc/skel` the new user's home is made from,
+/// returns whether there was anything to write
+///
+/// # Errors
+/// - cannot create `skel/.config`
+pub async fn write_to_skel(
+    settings: &crate::settings::Settings,
+    skel: &std::path::Path,
+) -> Res<bool> {
+    let entries = settings.a11y.user_entries();
+    if entries.is_empty() || !has_kwriteconfig() {
+        return Ok(false);
+    }
+    let config = skel.join(".config");
+    tokio::fs::create_dir_all(&config).await.map_err(Err::Io)?;
+    for entry in entries {
+        let args = entry.kwriteconfig_args(&config.join(entry.file).to_string_lossy());
+        let args = args.iter().map(String::as_str).collect_vec();
+        if let Err(e) = crate::steps::acmd("kwriteconfig6", &args).await {
+            tracing::warn!(?e, ?entry, "cannot write accessibility setting");
+        }
+    }
+    Ok(true)
 }
 
 /// the home directory of `user`, from the passwd database

@@ -6,7 +6,8 @@ use crate::ui::{AppWindow, Drivers, Install, InstallState, Location};
 
 /// whether this is a developer running Taidan on their own machine, where installing (creating a
 /// user, running dnf, …) or rebooting would be destructive, the same rule as libtaidan's `set_keymap`
-fn is_dev_session() -> bool {
+#[must_use]
+pub fn is_dev_session() -> bool {
     cfg!(debug_assertions)
         && uzers::get_current_username().is_none_or(|user| user.as_encoded_bytes() != b"taidan")
 }
@@ -30,12 +31,45 @@ const fn stage_l10n_id(stage: Stage) -> &'static str {
 }
 
 /// libtaidan's view of [`crate::CFG`]
-fn backend_cfg() -> libtaidan::cfg::Config {
-    let json = serde_json::to_value(&*crate::CFG).expect("cannot serialize cfg");
-    let mut cfg: libtaidan::cfg::Config =
-        serde_json::from_value(json).expect("cfg is not a valid libtaidan cfg");
+fn backend_cfg() -> serde_json::Result<libtaidan::cfg::Config> {
+    let json = serde_json::to_value(&*crate::CFG)?;
+    let mut cfg: libtaidan::cfg::Config = serde_json::from_value(json)?;
     cfg.distro.clone_from(&crate::CFG.distro);
-    cfg
+    Ok(cfg)
+}
+
+/// the text of a panic's payload
+fn panic_msg(payload: &(dyn std::any::Any + Send)) -> String {
+    payload
+        .downcast_ref::<&str>()
+        .map(|s| (*s).to_owned())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "unknown panic".to_owned())
+}
+
+/// runs the installation (or [`simulate_install`]), the error message if it fails or panics
+fn run_install(
+    settings: &mut libtaidan::settings::Settings,
+    callback: &(impl libtaidan::Callback + Sync),
+) -> Option<String> {
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if is_dev_session() {
+            tracing::warn!("Dev session: simulating the installation instead");
+            return crate::RT.block_on(simulate_install(callback)).map_err(|e| format!("{e:?}"));
+        }
+        let cfg = backend_cfg().map_err(|e| format!("cannot convert the config: {e:?}"))?;
+        crate::RT
+            .block_on(libtaidan::start_install(settings, &cfg, callback))
+            .map_err(|e| format!("{e:?}"))
+    }));
+    let msg = match res {
+        Ok(Ok(())) => return None,
+        Ok(Err(msg)) => msg,
+        Err(payload) => format!("the installation crashed: {}", panic_msg(&*payload)),
+    };
+    tracing::error!(msg, "installation failed");
+    sentry::capture_message(&msg, sentry::Level::Error);
+    Some(strip_ansi_escapes::strip_str(msg))
 }
 
 /// whether `TAIDAN_SIMULATE_HW` pretends `name` is present, a comma-separated list of `nvidia`,
@@ -96,8 +130,9 @@ fn start(ui: &slint::Weak<AppWindow>) {
     crate::SETTINGS.write().install_codecs_drivers = app.global::<Drivers<'_>>().get_install();
     crate::SETTINGS.write().location = app.global::<Location<'_>>().get_enabled();
     let mut settings = crate::SETTINGS.read().clone();
-    // the password is in `SETTINGS` now and there's no way back to its page, so drop the
-    // plaintext copies in the UI instead of keeping them around for the rest of the session
+    // the password is in `SETTINGS` now, so drop the plaintext copies in the UI instead of keeping
+    // them around for the rest of the session. Going back from the error page to its page means
+    // typing it again, retrying from the summary keeps the saved one.
     let account = app.global::<crate::ui::Account<'_>>();
     account.set_password("".into());
     account.set_password_repeat("".into());
@@ -107,18 +142,7 @@ fn start(ui: &slint::Weak<AppWindow>) {
             let ui = ui.clone();
             move |msg| on_install_msg(&ui, msg)
         };
-        let res = if is_dev_session() {
-            tracing::warn!("Dev session: simulating the installation instead");
-            crate::RT.block_on(simulate_install(&callback))
-        } else {
-            crate::RT.block_on(libtaidan::start_install(&mut settings, &backend_cfg(), &callback))
-        };
-        let error = res.err().map(|e| {
-            let msg = format!("{e:?}");
-            tracing::error!(msg, "installation failed");
-            sentry::capture_message(&msg, sentry::Level::Error);
-            strip_ansi_escapes::strip_str(msg)
-        });
+        let error = run_install(&mut settings, &callback);
         let set = ui.upgrade_in_event_loop(move |ui| {
             let install = ui.global::<Install<'_>>();
             if let Some(error) = error {
@@ -157,14 +181,48 @@ async fn finish(reboot: bool) {
     }
 }
 
+/// back to [`InstallState::Idle`] after a failure, so the summary page can start it again
+fn reset(ui: &slint::Weak<AppWindow>) {
+    let Some(app) = ui.upgrade() else { return };
+    let install = app.global::<Install<'_>>();
+    if install.get_state() == InstallState::Running {
+        return;
+    }
+    install.set_state(InstallState::Idle);
+    install.set_error("".into());
+    install.set_needs_reboot(false);
+    install.set_stage_id("".into());
+    install.set_stage_num(0);
+    install.set_stage_progress(-1.0);
+}
+
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
     install.on_start({
         let ui = ui.clone();
         move || start(&ui)
     });
-    install.on_finish(|reboot| {
-        std::thread::spawn(move || crate::RT.block_on(finish(reboot)));
+    install.on_reset({
+        let ui = ui.clone();
+        move || reset(&ui)
     });
+    install.on_finish({
+        let ui = ui.clone();
+        move |reboot| {
+            // a failed installation may have left no user, so the OOBE must run again
+            let state = ui.upgrade().map(|app| app.global::<Install<'_>>().get_state());
+            if state != Some(InstallState::Done) {
+                tracing::error!(?state, "not finishing, the installation hasn't succeeded");
+                return;
+            }
+            std::thread::spawn(move || crate::RT.block_on(finish(reboot)));
+        }
+    });
+    // as on the GTK version, skipping the drivers (`codecs`) page means not installing them
+    if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Drivers)
+        && let Some(app) = ui.upgrade()
+    {
+        app.global::<Drivers<'_>>().set_install(false);
+    }
 
     // detect hardware for the drivers page in the background, as `lspci` can take a moment
     let ui = ui.clone();

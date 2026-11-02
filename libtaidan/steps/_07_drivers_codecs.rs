@@ -155,11 +155,10 @@ impl Drivers {
 
     /// the kernel that boots next, which may be newer than the running one after the updates
     async fn next_kernel() -> Res<String> {
-        let out = Command::new("grubby").arg("--default-kernel").output().await;
+        // grubby reads the boot loader entries, which only root may
+        let out = crate::root_output("grubby", ["--default-kernel"]).await;
         if let Ok(out) = &out
-            && out.status.success()
-            && let Some(kver) =
-                String::from_utf8_lossy(&out.stdout).trim().strip_prefix("/boot/vmlinuz-")
+            && let Some(kver) = out.trim().strip_prefix("/boot/vmlinuz-")
         {
             return Ok(kver.to_owned());
         }

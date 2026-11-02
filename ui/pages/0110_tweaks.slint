@@ -42,6 +42,8 @@ export component TweaksDialog inherits TdnDialog {
                     text: Lang.t(tweak.name, []);
                     checked: tweak.on;
                     toggled(on) => { Tweaks.set(i, on); }
+                    // Enter closes it like Done, Space toggles
+                    accepted => { root.dismissed(); }
                 }
 
                 TdnText {

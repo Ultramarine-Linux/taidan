@@ -174,12 +174,16 @@ export component TdnPage inherits TdnBasePg {
     // pages with inputs focus those instead
     forward-focus: next-btn;
 
+    // a named group around the page, so screen readers say which page it is when the focus moves
+    // into it, e.g. after Next
     VerticalLayout {
         padding-left: 2rem;
         padding-right: 2rem;
         padding-top: 1rem;
         padding-bottom: 1.5rem;
         spacing: 1.5rem;
+        accessible-role: groupbox;
+        accessible-label: root.name;
 
         TdnHeader {
             step_i: root.step_i;
@@ -191,8 +195,8 @@ export component TdnPage inherits TdnBasePg {
             font-weight: 500;
             horizontal-alignment: left;
             wrap: word-wrap;
+            // readable text when reviewing the screen, the group above announces it on focus
             text: root.name;
-            accessible-role: none;
         }
 
         VerticalLayout {

@@ -86,7 +86,7 @@ Taidan reads an optional configuration file at `/etc/taidan.toml`:
 
 ```toml
 edition = "plasma"
-skip_pages = ["theme", "browser"] # maybe you don't want taidan to setup themes / install a browser
+skip_pages = ["location", "drivers"] # hide pages you don't want, see `SkipPage` in src/cfg.rs for the names
 org = "Fyra Labs"
 ```
 

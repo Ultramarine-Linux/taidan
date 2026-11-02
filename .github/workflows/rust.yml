@@ -12,6 +12,11 @@ jobs:
   rust:
     uses: FyraLabs/actions/.github/workflows/rust.yml@main
     with:
+      # the same build deps for both, clippy builds the crates too
+      clippy-pre: |
+        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
       test-pre: |
         dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
+      # every crate's tests, taidan's are in the binary
+      test-cargo-flags: --workspace
       test-cache: true

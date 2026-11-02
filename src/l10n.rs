@@ -75,45 +75,6 @@ impl LanguageRow {
     }
 }
 
-#[macro_export]
-macro_rules! t {
-    (@$msgid:literal) => {
-        if $crate::backend::l10n::PO_LOADER.read().has($msgid) {
-            $crate::backend::l10n::PO_LOADER.read().get($msgid)
-        } else {
-            i18n_embed_fl::fl!($crate::LL.read(), $msgid)
-        }
-    };
-    ($msgid:literal $(, $k:ident = $v:expr)*$(,)?) => {
-        if $crate::backend::l10n::PO_LOADER.read().has($msgid) {
-            $crate::backend::l10n::PO_LOADER.read()
-                .get_args_concrete($msgid, [$((stringify!($k), $v.into())),*].into())
-        } else {
-            i18n_embed_fl::fl!($crate::LL.read(), $msgid $(, $k = $v)*)
-        }
-    };
-    (@$msgid:expr) => {
-        if $crate::backend::l10n::PO_LOADER.read().has($msgid) {
-            $crate::backend::l10n::PO_LOADER.read().get($msgid)
-        } else {
-            $crate::LL.read().get($msgid)
-        }
-    };
-    ($msgid:expr $(, $k:ident = $v:expr)*$(,)?) => {
-        if $crate::backend::l10n::PO_LOADER.read().has($msgid) {
-            $crate::backend::l10n::PO_LOADER.read()
-                .get_args_concrete($msgid, [$((stringify!($k), $v.into())),*].into())
-        } else {
-            $crate::LL.read()
-                .get_args_concrete($msgid, [$((stringify!($k), $v.into())),*].into())
-        }
-    };
-}
-
-/// Switch the UI to `lang`, falling back to `en-US` if no translation is available.
-///
-/// # Panics
-/// If the fluent translations cannot be loaded.
 /// the system locale for a language tag from [`LANGS`], `pt-BR` → `pt_BR.UTF-8`, `None` for ones
 /// that are only for the UI
 fn posix_locale(lang: &str) -> Option<String> {
@@ -211,14 +172,48 @@ static KEYMAP_TX: LazyLock<std::sync::mpsc::Sender<(String, Option<String>)>> =
         tx
     });
 
-fn set_keymap(layout: &str, variant: Option<&str>) {
+/// keeps the keymap for the installed system, without applying it
+fn save_keymap(layout: &str, variant: Option<&str>) {
     let mut settings = crate::SETTINGS.write();
     layout.clone_into(&mut settings.kb_layout);
     settings.kb_variant = variant.map(ToOwned::to_owned);
-    drop(settings);
+}
+
+fn set_keymap(layout: &str, variant: Option<&str>) {
+    save_keymap(layout, variant);
     if let Err(e) = KEYMAP_TX.send((layout.to_owned(), variant.map(ToOwned::to_owned))) {
         tracing::error!(?e, "keymap worker is gone");
     }
+}
+
+/// the first X11 layout and its variant in `localectl status`'s output
+fn parse_localectl_keymap(status: &str) -> Option<(String, Option<String>)> {
+    let field = |name: &str| {
+        status.lines().find_map(|line| {
+            let (key, val) = line.split_once(':')?;
+            (key.trim() == name).then(|| val.split(',').next().unwrap_or_default().trim())
+        })
+    };
+    let layout = field("X11 Layout").filter(|l| !l.is_empty() && *l != "n/a")?;
+    let variant = field("X11 Variant").filter(|v| !v.is_empty() && *v != "n/a");
+    Some((layout.to_owned(), variant.map(ToOwned::to_owned)))
+}
+
+/// the keymap the system already has, so the keyboard page starts there instead of changing it
+fn system_keymap() -> Option<(String, Option<String>)> {
+    let out = std::process::Command::new("localectl")
+        .arg("status")
+        .env("LC_ALL", "C")
+        .output()
+        .inspect_err(|e| tracing::warn!(?e, "cannot run localectl"))
+        .ok()?;
+    if !out.status.success() {
+        tracing::warn!(status = ?out.status, "localectl status failed");
+        return None;
+    }
+    let keymap = parse_localectl_keymap(&String::from_utf8_lossy(&out.stdout));
+    tracing::debug!(?keymap, "System keymap");
+    keymap
 }
 
 /// a search query shared between a Slint callback and the [`slint::FilterModel`] it drives
@@ -314,7 +309,7 @@ fn init_language_list(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::
 
 fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
     use crate::ui::{Keymap, KeymapVariant};
-    use slint::{ComponentHandle, FilterModel, ModelRc, ToSharedString, VecModel};
+    use slint::{ComponentHandle, FilterModel, Model, ModelRc, ToSharedString, VecModel};
     let keymaps = libtaidan::i18n::LAYOUTS
         .entries()
         .map(|(id, layout)| Keymap {
@@ -335,7 +330,18 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
         // `us` first, as it's the most likely pick, then the rest alphabetically
         .sorted_by_key(|km| (km.id != "us", km.name.clone()))
         .collect_vec();
-    let initial = keymaps.first().expect("no keymaps").clone();
+    // start at the system's keymap, `us` (sorted first) if it's unknown
+    let system = system_keymap();
+    let initial = system
+        .as_ref()
+        .and_then(|(layout, _)| keymaps.iter().find(|km| km.id == layout.as_str()))
+        .or_else(|| keymaps.first())
+        .expect("no keymaps")
+        .clone();
+    let initial_variant = system
+        .and_then(|(layout, variant)| (layout == initial.id.as_str()).then_some(variant)?)
+        .and_then(|variant| initial.variants.iter().find(|v| v.id == variant.as_str()))
+        .unwrap_or_default();
 
     let keymap_query = Query::default();
     let keymap_model = Rc::new(FilterModel::new(VecModel::from(keymaps), {
@@ -369,9 +375,13 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
         }
     });
 
-    set_keymap(&initial.id, None);
+    // nothing is applied until a layout is picked, the system already has this one
+    save_keymap(
+        &initial.id,
+        (!initial_variant.id.is_empty()).then_some(initial_variant.id.as_str()),
+    );
     lang.set_current_keymap(initial);
-    lang.set_current_variant(KeymapVariant::default());
+    lang.set_current_variant(initial_variant);
     lang.on_select_keymap({
         let ui = ui.clone();
         move |km| {
@@ -419,6 +429,17 @@ fn display_name(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn localectl_keymap() {
+        let status = "   System Locale: LANG=en_US.UTF-8\n       VC Keymap: de\n      X11 Layout: de,us\n       X11 Model: pc105\n     X11 Variant: nodeadkeys,\n";
+        assert_eq!(
+            parse_localectl_keymap(status),
+            Some(("de".to_owned(), Some("nodeadkeys".to_owned())))
+        );
+        assert_eq!(parse_localectl_keymap("      X11 Layout: us\n"), Some(("us".to_owned(), None)));
+        assert_eq!(parse_localectl_keymap("       VC Keymap: n/a\n      X11 Layout: n/a\n"), None);
+    }
 
     #[test]
     fn posix_locales() {

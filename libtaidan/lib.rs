@@ -59,17 +59,25 @@ pub async fn start_install(
 ) -> Res<()> {
     tracing::info!("Starting installation");
     proxy::set(settings.proxy.clone());
-    if let Some(proxy) = &settings.proxy
-        && let Err(e) = proxy.persist().await
-    {
+    let saved = match &settings.proxy {
+        Some(proxy) => proxy.persist().await,
+        // one saved by an earlier attempt would otherwise stay
+        None => proxy::clear().await,
+    };
+    if let Err(e) = saved {
         tracing::error!(?e, "cannot save the proxy");
     }
+    i18n::fill_settings(settings, cfg);
     for stage in steps::Stage::all() {
         callback.send(InstallMsg::UpdStage(*stage));
         tracing::debug!(?stage, "Running pre()");
         stage.pre(settings, cfg, callback).await?;
         tracing::info!(?stage, "Running stage");
         stage.run(settings, cfg, callback).await?;
+    }
+    // the user is theirs now, so no later run of Taidan should remove it
+    if let Err(e) = passwd::clear_record().await {
+        tracing::error!(?e, "cannot remove the created user record");
     }
     callback.send(InstallMsg::Finish);
     Ok(())
@@ -107,6 +115,58 @@ mod parseutil {
     }
 }
 
+/// `name` with `args` as `user` through `pkexec`, with the environment and proxy passed on since
+/// `pkexec` clears them
+fn pkexec_cmd<I>(user: &str, name: &'static str, args: I) -> tokio::process::Command
+where
+    I: IntoIterator,
+    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
+{
+    // TODO: use logic from anda
+    let mut cmd = tokio::process::Command::new("pkexec");
+    cmd.args(["--user", user, "env"])
+        .args(std::env::vars().map(|(k, v)| format!("{k}={v}")))
+        .args(proxy::env())
+        .arg(name)
+        .args(args);
+    cmd
+}
+
+/// runs `cmd`, with `input` on its stdin if there's any, and returns its stdout
+async fn run_cmd(
+    mut cmd: tokio::process::Command,
+    name: &'static str,
+    input: Option<&[u8]>,
+) -> Res<Vec<u8>> {
+    use tokio::io::AsyncWriteExt;
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stdin(if input.is_some() {
+        std::process::Stdio::piped()
+    } else {
+        std::process::Stdio::inherit()
+    });
+    let mut p = cmd.spawn().map_err(|e| Err::FailToRunProgram(name, e))?;
+    if let Some(input) = input
+        && let Some(mut stdin) = p.stdin.take()
+    {
+        // a failed write shows up as the program failing, so wait for it anyway
+        if let Err(e) = stdin.write_all(input).await {
+            tracing::error!(?e, name, "cannot write to stdin");
+        }
+        drop(stdin);
+    }
+    let p = p.wait_with_output().await.map_err(|e| Err::FailToRunProgram(name, e))?;
+    if !p.status.success() {
+        // TODO: more logging
+        return Err(Err::ProgramFail {
+            name,
+            output: String::from_utf8_lossy(&p.stdout).into_owned(),
+            rc: p.status.code(),
+        });
+    }
+    Ok(p.stdout)
+}
+
 /// # Errors
 /// - command failed to run
 /// - command exited with non-zero status code
@@ -119,27 +179,7 @@ where
     <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
 {
     tracing::debug!(?name, ?args, "running pkexec");
-    // TODO: use logic from anda
-    let stdio = std::process::Stdio::piped();
-    let p = tokio::process::Command::new("pkexec")
-        .args(["--user", user, "env"])
-        .args(std::env::vars().map(|(k, v)| format!("{k}={v}")))
-        .args(proxy::env())
-        .arg(name)
-        .args(args)
-        .stdout(stdio)
-        .spawn()
-        .map_err(|e| Err::FailToRunProgram(name, e))?;
-    let p = p.wait_with_output().await.map_err(|e| Err::FailToRunProgram(name, e))?;
-    if !p.status.success() {
-        // TODO: more logging
-        return Err(Err::ProgramFail {
-            name,
-            output: String::from_utf8_lossy(&p.stdout).into_owned(),
-            rc: p.status.code(),
-        });
-    }
-    Ok(())
+    run_cmd(pkexec_cmd(user, name, args), name, None).await.map(drop)
 }
 
 /// # Errors
@@ -150,6 +190,41 @@ where
     <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
 {
     pkexec("root", name, args).await
+}
+
+/// like [`root`], but returns what the command printed
+///
+/// # Errors
+/// - command failed to run
+/// - command exited with non-zero status code
+pub async fn root_output<I: IntoIterator + std::fmt::Debug>(
+    name: &'static str,
+    args: I,
+) -> Res<String>
+where
+    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
+{
+    tracing::debug!(?name, ?args, "running pkexec");
+    let out = run_cmd(pkexec_cmd("root", name, args), name, None).await?;
+    Ok(String::from_utf8_lossy(&out).into_owned())
+}
+
+/// like [`root`], but feeds `input` to the command's stdin, for secrets that shouldn't be in its
+/// arguments, which anyone can read
+///
+/// # Errors
+/// - command failed to run
+/// - command exited with non-zero status code
+pub async fn root_with_stdin<I: IntoIterator + std::fmt::Debug>(
+    name: &'static str,
+    args: I,
+    input: &[u8],
+) -> Res<()>
+where
+    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
+{
+    tracing::debug!(?name, ?args, "running pkexec");
+    run_cmd(pkexec_cmd("root", name, args), name, Some(input)).await.map(drop)
 }
 
 /// # Errors

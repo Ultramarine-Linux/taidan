@@ -29,6 +29,17 @@ pub fn run() {
     crate::tweaks::initialize_ui(&ui.as_weak(), &ui.global());
     crate::a11y::initialize_ui(&ui.as_weak(), &ui.global());
     init_actions(ui.as_weak(), &ui.global());
+    ui.set_pagenum(crate::cfg::first_page());
+    // the OOBE has to be completed, Alt+F4 shouldn't drop to an unconfigured system. Finishing
+    // quits the event loop directly instead of closing the window.
+    ui.window().on_close_requested(|| {
+        if crate::install::is_dev_session() {
+            slint::CloseRequestResponse::HideWindow
+        } else {
+            tracing::info!("Ignoring the request to close the window");
+            slint::CloseRequestResponse::KeepWindowShown
+        }
+    });
     ui.run().expect("cannot run ui");
 }
 

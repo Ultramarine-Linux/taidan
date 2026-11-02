@@ -75,9 +75,10 @@ export component ErrorPage inherits TdnBasePg {
         HorizontalLayout {
             alignment: space-between;
 
+            // no way to leave from here, the system isn't set up and the OOBE has to run again
             TdnBtn {
-                text: Lang.t("page-error-done", []);
-                clicked => { Install.finish(false); }
+                text: Lang.t("page-error-back", []);
+                clicked => { root.prev_page(); }
             }
 
             retry := TdnBtn {

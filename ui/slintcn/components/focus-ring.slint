@@ -28,11 +28,14 @@ export component FocusRing inherits Rectangle {
     in property <length> ring-width: Tokens.focus-ring-width;
     in property <length> radius:     Tokens.radius-md + root.offset;
     in property <color>  ring-color: Tokens.color-ring-muted;
+    // draws the ring `offset` inside the box instead, for hosts with no room around them,
+    // like rows packed in a list
+    in property <bool>   inset;
 
-    x: -root.offset;
-    y: -root.offset;
-    width:  root.host-width  + 2 * root.offset;
-    height: root.host-height + 2 * root.offset;
+    x: root.inset ? root.offset : -root.offset;
+    y: self.x;
+    width:  root.host-width  - 2 * self.x;
+    height: root.host-height - 2 * self.x;
     border-width:  root.ring-width;
     border-color:  root.ring-color;
     border-radius: root.radius;

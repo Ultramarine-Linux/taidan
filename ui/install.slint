@@ -16,7 +16,10 @@ export global Install {
     in property <bool> needs-reboot;
 
     callback start();
-    // leave the OOBE: mark the system as configured, then reboot or just exit
+    // back to `idle` after a failed installation, so it can be started again
+    callback reset();
+    // leave the OOBE after a successful installation: mark the system as configured, then reboot
+    // or just exit
     callback finish(reboot: bool);
 }
 

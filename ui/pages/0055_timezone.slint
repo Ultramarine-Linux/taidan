@@ -69,11 +69,34 @@ export component TimezonePage inherits TdnPage {
     forward-focus: search;
 
     property <bool> searching: search.text != "";
+    property <length> row-height: 2.25rem;
+    // result moved to with the arrow keys, -1 until the user does so
+    property <int> cursor: -1;
+    // row of the current zone in the results, -1 if it isn't there, see the finder below
+    property <int> current-row: -1;
+    // the result Enter picks and that's highlighted: the one moved to, else the current zone,
+    // else the first
+    property <int> active-row: cursor >= 0 && cursor < Tz.results.length ? cursor
+        : current-row >= 0 && current-row < Tz.results.length && Tz.results[current-row].id == Tz.current.id ? current-row
+        : 0;
 
     function pick(zone: TimeZone) {
         Tz.pick(zone.id);
         search.text = "";
+        cursor = -1;
         Tz.search("");
+    }
+
+    function move-cursor(delta: int) {
+        if !searching || Tz.results.length == 0 { return; }
+        cursor = max(0, min(Tz.results.length - 1, active-row + delta));
+        // keep the row in view
+        let top = cursor * row-height;
+        if top < -list.content-y {
+            list.content-y = -top;
+        } else if top + row-height > -list.content-y + list.visible-height {
+            list.content-y = list.visible-height - top - row-height;
+        }
     }
 
     VerticalLayout {
@@ -82,17 +105,42 @@ export component TimezonePage inherits TdnPage {
         search := TdnInput {
             icon: @image-url("../../data/icons/system-search-symbolic.svg");
             placeholder: Lang.t("page-timezone-search", []);
-            edited(text) => { Tz.search(text); }
-            // Enter takes the first match
+            edited(text) => {
+                cursor = -1;
+                list.content-y = 0;
+                Tz.search(text);
+            }
+            // Enter takes the highlighted match, the first unless the arrow keys moved
             accepted => {
-                if root.searching && Tz.results.length > 0 { root.pick(Tz.results[0]); }
+                if root.searching && Tz.results.length > 0 { root.pick(Tz.results[root.active-row]); }
                 else if !root.searching { root.try-next(); }
+            }
+            key-pressed(event) => {
+                if !root.searching { return reject; }
+                if event.text == Key.DownArrow { move-cursor(1); return accept; }
+                if event.text == Key.UpArrow { move-cursor(-1); return accept; }
+                if event.text == Key.PageDown { move-cursor(10); return accept; }
+                if event.text == Key.PageUp { move-cursor(-10); return accept; }
+                reject
             }
         }
 
         Card {
             vertical-stretch: 1;
             card-radius: md;
+
+            // finds the current zone's row, which `ListView` can't tell as it only creates the
+            // rows in view
+            for zone[i] in Tz.results: Rectangle {
+                property <bool> current: zone.id == Tz.current.id;
+                width: 0;
+                height: 0;
+                init => { if self.current { root.current-row = i; } }
+                changed current => {
+                    if self.current { root.current-row = i; }
+                    else if root.current-row == i { root.current-row = -1; }
+                }
+            }
 
             if !root.searching: WorldMap {
                 x: 0.75rem;
@@ -106,17 +154,21 @@ export component TimezonePage inherits TdnPage {
                 color: Tokens.color-muted-foreground;
             }
 
-            if root.searching && Tz.results.length > 0: ListView {
+            // always there, so the arrow keys can scroll it, hidden when there's nothing to list
+            list := ListView {
+                visible: root.searching && Tz.results.length > 0;
                 x: 0.25rem;
                 y: 0.25rem;
                 width: parent.width - 0.5rem;
                 height: parent.height - 0.5rem;
                 horizontal-scrollbar-policy: always-off;
 
-                for zone in Tz.results: TdnListRow {
+                for zone[i] in Tz.results: TdnListRow {
+                    height: root.row-height;
                     text: zone.region == "" ? zone.city : zone.city + ", " + zone.region;
                     secondary: zone.offset;
                     selected: zone.id == Tz.current.id;
+                    highlighted: i == root.active-row;
                     clicked => { root.pick(zone); }
                 }
             }

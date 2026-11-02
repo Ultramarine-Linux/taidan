@@ -4,6 +4,7 @@ import { Label, LabelVariant } from "slintcn/components/label.slint";
 import { Icon } from "slintcn/components/icon.slint";
 import { LucidePaths } from "slintcn/components/lucide-paths.slint";
 import { Cfg } from "cfg.slint";
+import { Lang } from "lang.slint";
 import { Modal } from "modal.slint";
 export { Modal }
 import { Card } from "slintcn/components/card.slint";
@@ -143,6 +144,11 @@ export component TdnInput inherits Rectangle {
     in-out property <string> text;
     // hint shown when the field is empty
     in property <string> placeholder;
+    // accessible name, usually the visible label of the `TdnField` around it, falls back to
+    // the placeholder
+    in property <string> label;
+    // read by screen readers after the name, usually the field's help or error text
+    in property <string> description;
     // when false, the input dims and stops accepting keystrokes
     in property <bool> enabled: true;
     // when true, the user can focus but not edit
@@ -154,7 +160,7 @@ export component TdnInput inherits Rectangle {
     // leading icon, e.g. a magnifier for search fields
     in property <image> icon;
     // accessible name of the show/hide toggle on password fields
-    in property <string> reveal-label;
+    in property <string> reveal-label: Lang.t("page-password-show", []);
     // whether this is part of a dialog, see `Modal`
     in property <bool> in-dialog;
     // draws the border in the destructive color
@@ -173,12 +179,25 @@ export component TdnInput inherits Rectangle {
     // on any key interaction
     property <bool> pointer-focus: false;
     property <bool> revealed: false;
+    property <bool> reveal-pointer-focus: false;
     property <bool> has-icon: root.icon.width > 0;
 
+    // the focused `TextInput` has no accessible role of its own, so screen readers land on
+    // this element and read the label from here, like the std-widgets `LineEdit`
     forward-focus: input;
     accessible-role: text-input;
-    accessible-label: root.placeholder;
+    accessible-label: root.label != "" ? root.label : root.placeholder;
+    accessible-description: root.description;
+    accessible-placeholder-text: root.label != "" ? root.placeholder : "";
     accessible-value: root.password ? "" : root.text;
+    accessible-enabled: root.enabled;
+    accessible-read-only: root.read-only;
+    accessible-action-set-value(v) => {
+        if root.enabled && !root.read-only {
+            root.text = v;
+            root.edited(v);
+        }
+    }
 
     height: Tokens.density-input;
     background: Theme.mode == ThemeMode.light ? #ffffff : Tokens.color-surface-1;
@@ -209,6 +228,7 @@ export component TdnInput inherits Rectangle {
         height: self.width;
         y: (parent.height - self.height) / 2;
         colorize: Tokens.color-muted-foreground;
+        accessible-role: none;
     }
 
     input := TextInput {
@@ -225,6 +245,8 @@ export component TdnInput inherits Rectangle {
         enabled: root.enabled && Modal.open == root.in-dialog;
         input-type: root.password && !root.revealed ? InputType.password : InputType.text;
         vertical-alignment: center;
+        // exposed through the wrapper instead, see `accessible-role` above
+        accessible-role: none;
         edited => { root.edited(self.text); }
         accepted => { root.accepted(self.text); }
         key-pressed(event) => {
@@ -244,26 +266,60 @@ export component TdnInput inherits Rectangle {
         font-size: Tokens.typography-body-size;
         vertical-alignment: center;
         overflow: elide;
+        // `accessible-placeholder-text` is set on the wrapper already
+        accessible-role: none;
     }
 
-    // show/hide toggle for password fields
-    reveal := TouchArea {
+    // show/hide toggle for password fields, a Tab stop after the text so it works without a mouse
+    reveal := Rectangle {
         visible: root.password;
         width: root.password ? parent.height : 0;
         height: parent.height;
         x: parent.width - self.width;
-        mouse-cursor: pointer;
+        border-radius: Tokens.radius-md;
         accessible-role: button;
         accessible-label: root.reveal-label;
+        accessible-enabled: root.enabled;
         accessible-checkable: true;
         accessible-checked: root.revealed;
-        accessible-action-default => { root.revealed = !root.revealed; }
-        clicked => { root.revealed = !root.revealed; }
+        accessible-action-default => { if root.enabled { root.revealed = !root.revealed; } }
+
+        reveal-focus := FocusScope {
+            enabled: root.password && root.enabled && Modal.open == root.in-dialog;
+            key-pressed(event) => {
+                root.reveal-pointer-focus = false;
+                if event.text == Key.Return || event.text == " " {
+                    root.revealed = !root.revealed;
+                    return accept;
+                }
+                reject
+            }
+        }
+
         Image {
             source: @image-url("../data/icons/eye-open-negative-filled-symbolic.svg");
             width: 1.1rem;
             height: self.width;
             colorize: root.revealed ? Tokens.color-foreground : Tokens.color-muted-foreground;
+            accessible-role: none;
+        }
+
+        // doesn't take focus, so clicking it leaves the cursor in the text
+        TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            pointer-event(ev) => {
+                if ev.kind == PointerEventKind.down { root.reveal-pointer-focus = true; }
+            }
+            clicked => { root.revealed = !root.revealed; }
+        }
+
+        if reveal-focus.has-focus && !root.reveal-pointer-focus: FocusRing {
+            host-width: parent.width;
+            host-height: parent.height;
+            inset: true;
+            offset: 3px;
+            radius: Tokens.radius-sm;
         }
     }
 
@@ -280,8 +336,18 @@ export component TdnListRow inherits Rectangle {
     // extra text on the trailing side, e.g. a language's native name
     in property <string> secondary;
     in property <bool> selected;
+    // the row the arrow keys are on, for lists driven from a search field
+    in property <bool> highlighted;
+    // a Tab stop of its own, activated with Enter or Space, for lists with no search field
+    // driving them
+    in property <bool> focusable;
+    // whether this is part of a dialog, see `Modal`
+    in property <bool> in-dialog;
     callback clicked;
 
+    property <bool> pointer-focus;
+
+    forward-focus: focus;
     accessible-role: list-item;
     accessible-label: root.secondary == "" ? root.text : root.text + ", " + root.secondary;
     accessible-item-selectable: true;
@@ -291,8 +357,20 @@ export component TdnListRow inherits Rectangle {
     height: 2.25rem;
     border-radius: Tokens.radius-sm;
     background: root.selected ? TdnStyle.accent
-        : area.has-hover ? Tokens.color-accent
+        : area.has-hover || root.highlighted ? Tokens.color-accent
         : transparent;
+
+    focus := FocusScope {
+        enabled: root.focusable && Modal.open == root.in-dialog;
+        key-pressed(event) => {
+            root.pointer-focus = false;
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
 
     HorizontalLayout {
         padding-left: 0.75rem;
@@ -304,6 +382,7 @@ export component TdnListRow inherits Rectangle {
             horizontal-alignment: left;
             overflow: elide;
             color: root.selected ? TdnStyle.accent-foreground : Tokens.color-foreground;
+            accessible-role: none;
         }
 
         if root.secondary != "": TdnText {
@@ -311,12 +390,25 @@ export component TdnListRow inherits Rectangle {
             horizontal-alignment: right;
             horizontal-stretch: 0;
             color: root.selected ? TdnStyle.accent-foreground : Tokens.color-muted-foreground;
+            accessible-role: none;
         }
     }
 
     area := TouchArea {
         mouse-cursor: pointer;
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
+        }
         clicked => { root.clicked(); }
+    }
+
+    // inset, the rows sit flush against each other and the edge of their list
+    if focus.has-focus && !root.pointer-focus: FocusRing {
+        host-width: parent.width;
+        host-height: parent.height;
+        inset: true;
+        offset: 0;
+        radius: Tokens.radius-sm;
     }
 }
 
@@ -452,6 +544,8 @@ export component TdnField inherits VerticalLayout {
     // shown below the input, replaced by `error` when that is set
     in property <string> help;
     in property <string> error;
+    // the text shown under the input, for the input's `description`
+    out property <string> description: root.error != "" ? root.error : root.help;
     callback label-clicked;
 
     spacing: 0.4rem;
@@ -573,12 +667,13 @@ export component TdnToggleRow inherits Rectangle {
     }
 }
 
-// an indeterminate progress ring
+// an indeterminate progress ring, standing still with reduced motion
 export component TdnSpinner inherits Rectangle {
     in property <color> tint: Tokens.color-foreground;
     in property <length> stroke: 2.5 * Tokens.unit;
 
-    property <angle> start: mod(animation-tick() / 1ms * 0.36deg, 360deg);
+    // `animation-tick()` is only read while it turns, so a still spinner doesn't redraw every frame
+    property <angle> start: Tokens.reduce-motion ? -90deg : mod(animation-tick() / 1ms * 0.36deg, 360deg);
     property <length> r: (min(self.width, self.height) - self.stroke) / 2;
 
     width: 1.5rem;
@@ -596,7 +691,7 @@ export component TdnSpinner inherits Rectangle {
         stroke-width: root.stroke;
         stroke-line-cap: round;
 
-        // a 270° arc, rotating
+        // a 270° arc, rotating unless motion is reduced
         MoveTo {
             x: (root.width / 2 + root.r * cos(root.start)) / 1px;
             y: (root.height / 2 + root.r * sin(root.start)) / 1px;

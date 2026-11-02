@@ -17,8 +17,18 @@ ConditionKernelCommandLine=!rd.live.image
 Type=oneshot
 TimeoutSec=0
 RemainAfterExit=no
+# the taidan user's home, /usr/lib/taidan, isn't writable, so the session (KWin, Taidan and
+# kwriteconfig6 changing KWin's config for accessibility and the keymap) keeps its config here.
+# It's gone when the unit stops, so every run starts from /usr/share/taidan/session-config.
+RuntimeDirectory=taidan
+RuntimeDirectoryMode=0700
+Environment=XDG_CONFIG_HOME=%t/taidan/config
+Environment=XDG_CACHE_HOME=%t/taidan/cache
+Environment=XDG_DATA_HOME=%t/taidan/data
+Environment=XDG_STATE_HOME=%t/taidan/state
 ExecStartPre=-/bin/plymouth quit
 ExecStartPre=+sh -c "exec chvt 7"
+ExecStartPre=cp -rT /usr/share/taidan/session-config %t/taidan/config
 ExecStart=systemd-inhibit \
  --who="taidan" \
  --what=handle-lid-switch:sleep:shutdown \

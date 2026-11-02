@@ -10,6 +10,10 @@ close = Close
 cancel = Cancel
 # btn (skip anything)
 skip = Skip
+# hidden menu entry for the Alt+Shift+T debug terminal, read out by screen readers
+menu-open-terminal = Open Terminal
+# hidden menu entry for the Meta+Alt+S shortcut, read out by screen readers
+menu-toggle-screen-reader = Toggle Screen Reader
 steps-useradd = Creating Your Account…
 steps-sethostname = Naming Your Device…
 steps-settimezone = Setting Your Time Zone and Clock…
@@ -52,11 +56,9 @@ page-accessibility-desc = Press the Feature to Enable
 page-accessibility-screen-reader = Screen Reader
 page-accessibility-zoom = Zoom
 page-accessibility-sticky-keys = Sticky Keys
-# .hint-before, .hint-after: the text before and after a picture of the accessibility button,
-# "You can access this page with the [button] button any time". Leave one empty if your
-# language puts the button at the start or the end
-page-accessibility-hint-before = You can access this page with the
-page-accessibility-hint-after = button any time
+# shown next to a picture of the accessibility button, which is in the top right corner of the
+# later pages
+page-accessibility-hint = You can come back to this page any time with the accessibility button in the top right corner.
 # btn, opens the dialog with the rest of the options
 page-accessibility-more = More Options
 # btn, closes the page when it was opened with the accessibility button
@@ -140,6 +142,8 @@ page-whoareyou-camera-take = Take Photo
 page-whoareyou-camera-error = Can't use the camera:
 # .error: multiline, explanation pops out if invalid username
 page-whoareyou-error = Username must start with lowercase letters and must only contain lowercase letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
+page-whoareyou-error-taken = That username is already used on this system. Pick another one.
+page-whoareyou-error-long = Usernames can be at most 32 characters long.
 
 ## [Password]
 
@@ -430,6 +434,8 @@ page-error = Error
 page-error-desc = We hit a snag.
 page-error-done = Exit
 page-error-retry = Retry
+# btn (back to the summary page to change settings before retrying)
+page-error-back = Go Back
 
 ## [Tweaks in Ultramarine]
 

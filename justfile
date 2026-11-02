@@ -5,7 +5,7 @@ build-desktop:
   cargo build --release -p taidan
 
 test-desktop:
-  cargo test --workspace --lib
+  cargo test --workspace --lib --bins
 
 # libtaidan validation bridge used by ultramarine-server-oobe
 # (https://github.com/Ultramarine-Linux/server-oobe)

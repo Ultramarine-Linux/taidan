@@ -137,7 +137,21 @@ component A11yContent inherits VerticalLayout {
     in property <string> next-text;
     callback next;
 
-    public function focus-first() { screen-reader.focus(); }
+    // whether "More Options" was opened from here, so its button gets the focus back when it
+    // closes, cleared by the page once it's left
+    in-out property <bool> opened-more;
+
+    public function focus-first() {
+        if root.opened-more { more.focus(); } else { screen-reader.focus(); }
+    }
+
+    // "More Options" opens a dialog over this one, which takes the keyboard until it closes, so
+    // Tab can't reach this content behind it
+    property <bool> interactive-dialog: root.in-dialog && !A11y.more-open;
+    property <bool> more-open: A11y.more-open;
+    changed more-open => {
+        if !self.more-open && root.opened-more { more.focus(); }
+    }
 
     padding-left: 2rem;
     padding-right: 2rem;
@@ -167,7 +181,7 @@ component A11yContent inherits VerticalLayout {
         screen-reader := A11yTile {
             width: 10rem;
             height: self.width;
-            in-dialog: root.in-dialog;
+            in-dialog: root.interactive-dialog;
             icon: A11yIcons.ear;
             text: Lang.t("page-accessibility-screen-reader", []);
             checked: A11y.screen-reader;
@@ -180,7 +194,7 @@ component A11yContent inherits VerticalLayout {
         A11yTile {
             width: 10rem;
             height: self.width;
-            in-dialog: root.in-dialog;
+            in-dialog: root.interactive-dialog;
             icon: A11yIcons.zoom-in;
             text: Lang.t("page-accessibility-zoom", []);
             checked: A11y.zoom;
@@ -193,7 +207,7 @@ component A11yContent inherits VerticalLayout {
         A11yTile {
             width: 10rem;
             height: self.width;
-            in-dialog: root.in-dialog;
+            in-dialog: root.interactive-dialog;
             icon: A11yIcons.keyboard;
             text: Lang.t("page-accessibility-sticky-keys", []);
             checked: A11y.sticky-keys;
@@ -204,18 +218,15 @@ component A11yContent inherits VerticalLayout {
         }
     }
 
-    // "You can access this page with the [button] button any time", the icon drawn like the button
+    // the header button drawn next to the hint, which names it in words for screen readers and
+    // so a translation doesn't need to fit around a picture
     HorizontalLayout {
-        spacing: 0.4rem;
+        spacing: 0.6rem;
         alignment: center;
-
-        TdnText {
-            text: Lang.t("page-accessibility-hint-before", []);
-            font-size: 1.2 * Tokens.text-rem;
-        }
 
         VerticalLayout {
             alignment: center;
+            horizontal-stretch: 0;
 
             Rectangle {
                 width: 1.75rem * Tokens.text-scale;
@@ -228,13 +239,17 @@ component A11yContent inherits VerticalLayout {
                     source: @image-url("../../data/icons/settings-accessibility-symbolic.svg");
                     colorize: Tokens.color-primary-foreground;
                     width: 1rem * Tokens.text-scale;
+                    accessible-role: none;
                 }
             }
         }
 
         TdnText {
-            text: Lang.t("page-accessibility-hint-after", []);
+            text: Lang.t("page-accessibility-hint", []);
             font-size: 1.2 * Tokens.text-rem;
+            horizontal-alignment: left;
+            wrap: word-wrap;
+            min-width: 0;
         }
     }
 
@@ -243,16 +258,19 @@ component A11yContent inherits VerticalLayout {
     HorizontalLayout {
         alignment: space-between;
 
-        TdnBtn {
-            in-dialog: root.in-dialog;
+        more := TdnBtn {
+            in-dialog: root.interactive-dialog;
             outline: true;
             text: Lang.t("page-accessibility-more", []);
             foreground-color: Tokens.color-foreground;
-            clicked => { A11y.more-open = true; }
+            clicked => {
+                root.opened-more = true;
+                A11y.more-open = true;
+            }
         }
 
         TdnBtn {
-            in-dialog: root.in-dialog;
+            in-dialog: root.interactive-dialog;
             text: root.next-text;
             enter-hint: true;
             background-color: TdnStyle.accent;
@@ -267,8 +285,17 @@ export component AccessibilityPage inherits TdnBasePg {
     pageid: "accessibility";
     forward-focus: focus;
 
+    changed active => {
+        if !self.active { content.opened-more = false; }
+    }
+
     // Enter goes on, unless a tile or button has focus and takes it first
     focus := FocusScope {
+        // focused when the page is shown, and when the window refocuses the page after a dialog
+        // closes, the content takes it from here
+        focus-gained(reason) => {
+            if reason == FocusReason.programmatic { content.focus-first(); }
+        }
         key-pressed(event) => {
             if event.text == Key.Return && !Modal.open {
                 root.next_page();
@@ -322,6 +349,8 @@ component OptionRow inherits VerticalLayout {
     in property <string> desc;
     in-out property <bool> checked;
     callback toggled(bool);
+    // Enter, which closes the dialog like Done
+    callback accepted();
 
     spacing: 0.4rem;
 
@@ -330,6 +359,7 @@ component OptionRow inherits VerticalLayout {
         text: root.text;
         checked: root.checked;
         toggled(on) => { root.toggled(on); }
+        accepted => { root.accepted(); }
     }
 
     TdnText {
@@ -368,6 +398,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 text: Lang.t("page-accessibility-larger-text", []);
                 desc: Lang.t("page-accessibility-larger-text-desc", []);
                 checked: A11y.larger-text;
+                accepted => { root.dismissed(); }
                 toggled(on) => {
                     A11y.larger-text = on;
                     A11y.changed();
@@ -378,6 +409,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 text: Lang.t("page-accessibility-legible-font", []);
                 desc: Lang.t("page-accessibility-legible-font-desc", []);
                 checked: A11y.legible-font;
+                accepted => { root.dismissed(); }
                 toggled(on) => {
                     A11y.legible-font = on;
                     A11y.changed();
@@ -388,6 +420,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 text: Lang.t("page-accessibility-reduce-motion", []);
                 desc: Lang.t("page-accessibility-reduce-motion-desc", []);
                 checked: A11y.reduce-motion;
+                accepted => { root.dismissed(); }
                 toggled(on) => {
                     A11y.reduce-motion = on;
                     A11y.changed();
@@ -398,6 +431,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 text: Lang.t("page-accessibility-slow-keys", []);
                 desc: Lang.t("page-accessibility-slow-keys-desc", []);
                 checked: A11y.slow-keys;
+                accepted => { root.dismissed(); }
                 toggled(on) => {
                     A11y.slow-keys = on;
                     A11y.changed();
@@ -408,6 +442,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 text: Lang.t("page-accessibility-bounce-keys", []);
                 desc: Lang.t("page-accessibility-bounce-keys-desc", []);
                 checked: A11y.bounce-keys;
+                accepted => { root.dismissed(); }
                 toggled(on) => {
                     A11y.bounce-keys = on;
                     A11y.changed();
@@ -418,6 +453,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 text: Lang.t("page-accessibility-dwell-click", []);
                 desc: Lang.t("page-accessibility-dwell-click-desc", []);
                 checked: A11y.dwell-click;
+                accepted => { root.dismissed(); }
                 toggled(on) => {
                     A11y.dwell-click = on;
                     A11y.changed();

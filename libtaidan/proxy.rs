@@ -91,21 +91,54 @@ impl Proxy {
         )
         .await
         .wrap_msg("cannot write the proxy to /etc/environment")?;
+        // the URL may carry a password, so only root may read it. `/etc/environment` has to stay
+        // readable for login sessions to pick the proxy up
         crate::root(
             "sh",
             [
                 "-c",
                 r#"
                     mkdir -p /etc/dnf/libdnf5.conf.d
-                    printf '[main]\nproxy=%s\n' "$1" > /etc/dnf/libdnf5.conf.d/50-taidan-proxy.conf
+                    umask 077
+                    printf '[main]\nproxy=%s\n' "$1" > "$2"
+                    chmod 600 "$2"
                 "#,
                 "sh",
                 &self.url,
+                DNF_DROPIN,
             ],
         )
         .await
         .wrap_msg("cannot write the proxy to the dnf config")
     }
+}
+
+/// where [`Proxy::persist`] saves the proxy for dnf
+const DNF_DROPIN: &str = "/etc/dnf/libdnf5.conf.d/50-taidan-proxy.conf";
+
+/// removes a proxy saved by [`Proxy::persist`] in an earlier attempt, nothing is touched if there
+/// isn't one, so proxies set up by other means stay
+///
+/// # Errors
+/// Cannot change the files.
+pub async fn clear() -> Res<()> {
+    if !tokio::fs::try_exists(DNF_DROPIN).await.unwrap_or(true) {
+        return Ok(());
+    }
+    crate::root(
+        "sh",
+        [
+            "-c",
+            r#"
+                sed -i '/^\(https\?\|no\)_proxy=/Id' /etc/environment
+                rm -f "$1"
+            "#,
+            "sh",
+            DNF_DROPIN,
+        ],
+    )
+    .await
+    .wrap_msg("cannot remove the saved proxy")
 }
 
 /// `KEY=value` pairs of the current proxy, for `env`, empty if there's none

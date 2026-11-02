@@ -1,13 +1,9 @@
 //! user account details (full name, username, password)
-use std::sync::LazyLock;
 
-use regex::Regex;
-
-static USERNAME_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new("^[a-z][-a-z0-9_]*$").expect("invalid username regex"));
-
+/// whether the new user can be called `s`: well-formed, not too long, and not a system account or
+/// an existing user or group (unless this install already created it)
 fn valid_username(s: &str) -> bool {
-    USERNAME_RE.is_match(s)
+    libtaidan::passwd::username_problem(s).is_none()
 }
 
 /// suggest a username from the full name: the first word if usable, otherwise the last
@@ -35,6 +31,15 @@ fn derive_username(fullname: &str) -> Option<String> {
 pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, account: &crate::ui::Account<'_>) {
     use slint::ComponentHandle;
     account.on_valid_username(|s| valid_username(&s));
+    account.on_username_error(|s| {
+        use libtaidan::passwd::UsernameProblem;
+        match libtaidan::passwd::username_problem(&s) {
+            Some(UsernameProblem::Taken) => "page-whoareyou-error-taken",
+            Some(UsernameProblem::TooLong) => "page-whoareyou-error-long",
+            Some(UsernameProblem::Invalid) | None => "page-whoareyou-error",
+        }
+        .into()
+    });
     account.on_suggest_username(|fullname, current| {
         derive_username(&fullname).map_or(current, Into::into)
     });
@@ -46,9 +51,9 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, account: &crate::ui:
         let account = ui.global::<crate::ui::Account<'_>>();
         let mut settings = crate::SETTINGS.write();
         settings.username = account.get_username().into();
-        let fullname = account.get_fullname();
-        settings.fullname =
-            if fullname.trim().is_empty() { settings.username.clone() } else { fullname.into() };
+        // `:` and newlines would break the passwd entry
+        let fullname = libtaidan::passwd::sanitize_fullname(&account.get_fullname());
+        settings.fullname = if fullname.is_empty() { settings.username.clone() } else { fullname };
         settings.passwd = account.get_password().as_str().into();
         let avatar = account.get_avatar_id();
         settings.avatar = (!avatar.is_empty()).then(|| avatar.as_str().into());
@@ -86,5 +91,14 @@ mod tests {
         assert!(!valid_username(""));
         assert!(!valid_username("1alice"));
         assert!(!valid_username("Alice"));
+        assert!(!valid_username(&"a".repeat(33)));
+        assert!(!valid_username("root"));
+        assert!(!valid_username("taidan"));
+    }
+
+    #[test]
+    fn existing_user_is_taken() {
+        let me = uzers::get_current_username().expect("no current user");
+        assert!(!valid_username(&me.to_string_lossy()));
     }
 }

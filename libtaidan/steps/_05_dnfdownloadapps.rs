@@ -14,8 +14,11 @@ impl super::Step for DnfDownloadApps {
         if cfg.taidan0.skip_dnf || settings.nointernet {
             return Ok(());
         }
-        settings.actions[1]
-            .extend(super::_07_drivers_codecs::Codecs::codecs().iter().map(ToString::to_string));
+        if settings.install_codecs_drivers {
+            settings.actions[1].extend(
+                super::_07_drivers_codecs::Codecs::codecs().iter().map(ToString::to_string),
+            );
+        }
 
         if !settings.ims.is_empty() {
             let pkgs: &[&str] = match settings.imf {

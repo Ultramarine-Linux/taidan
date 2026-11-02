@@ -5,6 +5,7 @@ import { Drivers } from "../install.slint";
 import { Network, NetState } from "../network.slint";
 import { Tz } from "../timezone.slint";
 import { Tweaks } from "../tweaks.slint";
+import { Cfg } from "../cfg.slint";
 import { TdnText, TdnStyle, TdnBtn } from "../components.slint";
 import { DriverList, DriverRow } from "0100_drivers.slint";
 import { UserIcon } from "0040_whoareyou.slint";
@@ -164,7 +165,7 @@ export component SummaryPage inherits TdnPage {
             }
 
             // only when the distro ships tweaks
-            if Tweaks.items.length > 0: HorizontalLayout {
+            if Tweaks.items.length > 0 && !Cfg.skip-tweaks: HorizontalLayout {
                 alignment: start;
 
                 TdnBtn {

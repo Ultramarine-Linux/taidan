@@ -4,6 +4,6 @@ pub use color_eyre::{
 };
 pub use itertools::{Either, Itertools};
 
-pub use crate::{CFG, SETTINGS, t};
+pub use crate::{CFG, SETTINGS};
 
 pub use std::sync::LazyLock;

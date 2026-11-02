@@ -29,6 +29,8 @@ import { Actions } from "actions.slint";
 export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y }
 
 export component AppWindow inherits Window {
+    // set from Rust to the first page not in `skip_pages`, Next and Back skip those too
+    // (`Cfg.next-page` and `Cfg.prev-page`)
     in-out property <int> pagenum: 0;
     title: "Taidan";
     // no-frame: true;
@@ -51,6 +53,7 @@ export component AppWindow inherits Window {
     // the designs use 14px and all `rem` sizes derive from this
     default-font-size: 14 * Tokens.unit;
 
+    property <int> summary-page: 10;
     // pages that are jumped to, rather than reached with Next and Back
     property <int> installing-page: 11;
     property <int> done-page: 12;
@@ -69,7 +72,7 @@ export component AppWindow inherits Window {
         else if pagenum == 7 { network.focus(); }
         else if pagenum == 8 { location.focus(); }
         else if pagenum == 9 { drivers.focus(); }
-        else if pagenum == 10 { summary.focus(); }
+        else if pagenum == summary-page { summary.focus(); }
         else if pagenum == done-page { done.focus(); }
         else if pagenum == error-page { error.focus(); }
     }
@@ -103,13 +106,13 @@ export component AppWindow inherits Window {
         visible: false;
         Menu {
             MenuItem {
-                title: "Open Terminal";
+                title: Lang.t("menu-open-terminal", []);
                 activated => { Actions.open-terminal(); }
                 shortcut: @keys(Alt + Shift + T);
             }
             // the same as Plasma's, for anyone who can't find the screen reader tile
             MenuItem {
-                title: "Toggle Screen Reader";
+                title: Lang.t("menu-toggle-screen-reader", []);
                 activated => {
                     A11y.screen-reader = !A11y.screen-reader;
                     A11y.changed();
@@ -122,86 +125,86 @@ export component AppWindow inherits Window {
     accessibility := AccessibilityPage {
         index: 0;
         current: pagenum;
-        next_page => { pagenum += 1; }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     language := LanguagePage {
         index: 1;
         current: pagenum;
-        next_page => { pagenum += 1; }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     keyboard := KeyboardPage {
         index: 2;
         current: pagenum;
-        prev_page => { pagenum -= 1; }
-        next_page => { pagenum += 1; }
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     welcome := WelcomePage {
         index: 3;
         current: pagenum;
-        next_page => { pagenum += 1; }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     whoareyou := WhoAreYouPage {
         index: 4;
         current: pagenum;
-        prev_page => { pagenum -= 1; }
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
             Account.save();
-            pagenum += 1;
+            pagenum = Cfg.next-page(pagenum);
         }
     }
 
     password := PasswordPage {
         index: 5;
         current: pagenum;
-        prev_page => { pagenum -= 1; }
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
             Account.save();
-            pagenum += 1;
+            pagenum = Cfg.next-page(pagenum);
         }
     }
 
     timezone := TimezonePage {
         index: 6;
         current: pagenum;
-        prev_page => { pagenum -= 1; }
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
             Tz.save();
-            pagenum += 1;
+            pagenum = Cfg.next-page(pagenum);
         }
     }
 
     network := NetworkPage {
         index: 7;
         current: pagenum;
-        prev_page => { pagenum -= 1; }
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
             Network.save(!Network.online);
-            pagenum += 1;
+            pagenum = Cfg.next-page(pagenum);
         }
     }
 
     location := LocationPage {
         index: 8;
         current: pagenum;
-        prev_page => { pagenum -= 1; }
-        next_page => { pagenum += 1; }
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     drivers := DriversPage {
         index: 9;
         current: pagenum;
-        prev_page => { pagenum -= 1; }
-        next_page => { pagenum += 1; }
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     summary := SummaryPage {
-        index: 10;
+        index: summary-page;
         current: pagenum;
-        prev_page => { pagenum -= 1; }
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
             Install.start();
             pagenum = installing-page;
@@ -221,6 +224,11 @@ export component AppWindow inherits Window {
     error := ErrorPage {
         index: error-page;
         current: pagenum;
+        // back to the summary, to change what made it fail before trying again
+        prev_page => {
+            Install.reset();
+            pagenum = summary-page;
+        }
         // the retry button
         next_page => {
             Install.start();
@@ -264,7 +272,7 @@ export component AppWindow inherits Window {
         skipped => {
             Network.offline-prompt = false;
             Network.save(true);
-            pagenum += 1;
+            pagenum = Cfg.next-page(pagenum);
         }
     }
 
@@ -276,69 +284,5 @@ export component AppWindow inherits Window {
     if A11y.more-open: A11yMoreDialog {
         width: 100%;
         height: 100%;
-    }
-}
-
-export component ErrorDialog inherits Window {
-    in property <string> body;
-    default-font-family: "Geist";
-    no-frame: true;
-    background: transparent;
-
-    min-width: 600px;
-    min-height: 200px;
-
-    Rectangle {
-        border-radius: Tokens.radius-xl;
-        background: Tokens.color-background;
-        border-width: 1px;
-        border-color: Tokens.color-border-hairline;
-
-        VerticalLayout {
-            padding: 2rem;
-            padding-left: 3rem;
-            padding-right: 3rem;
-            spacing: 1rem;
-
-            HorizontalLayout {
-                spacing: 1rem;
-                vertical-stretch: 1;
-
-                Image {
-                    source: @image-url("../data/icons/dialog-error-symbolic.svg");
-                    colorize: Tokens.color-destructive;
-                    width: 4rem;
-                    height: self.width;
-                    accessible-role: none;
-                }
-
-                VerticalLayout {
-                    spacing: 0.2rem;
-                    alignment: start;
-
-                    TdnText {
-                        horizontal-alignment: left;
-                        color: Tokens.color-destructive;
-                        font-size: 2 * Tokens.text-rem;
-                        text: Lang.t("page-error", []);
-                    }
-
-                    TdnText {
-                        horizontal-alignment: left;
-                        wrap: word-wrap;
-                        text: root.body;
-                    }
-                }
-            }
-
-            HorizontalLayout {
-                alignment: end;
-
-                TdnBtn {
-                    text: Lang.t("close", []);
-                    clicked => { root.close(); }
-                }
-            }
-        }
     }
 }
