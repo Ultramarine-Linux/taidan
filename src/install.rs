@@ -2,7 +2,7 @@
 use libtaidan::{InstallMsg, steps::Stage};
 use slint::ComponentHandle;
 
-use crate::ui::{AppWindow, Drivers, Install, InstallState, Location};
+use crate::ui::{AppWindow, Drivers, Install, InstallState, Location, Network};
 
 /// whether this is a developer running Taidan on their own machine, where installing (creating a
 /// user, running dnf, …) or rebooting would be destructive, the same rule as libtaidan's `set_keymap`
@@ -129,6 +129,12 @@ fn start(ui: &slint::Weak<AppWindow>) {
     install.set_stage_count(i32::try_from(Stage::all().len()).expect("too many stages"));
     crate::SETTINGS.write().install_codecs_drivers = app.global::<Drivers<'_>>().get_install();
     crate::SETTINGS.write().location = app.global::<Location<'_>>().get_enabled();
+    // `Network.save` only runs from the network page. With it skipped nobody chose to go offline,
+    // so go by the connection right now, as the summary does. Leaving `nointernet` off on an
+    // offline machine makes the dnf steps fail.
+    if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Network) {
+        crate::SETTINGS.write().nointernet = !app.global::<Network<'_>>().get_online();
+    }
     let mut settings = crate::SETTINGS.read().clone();
     // the password is in `SETTINGS` now, so drop the plaintext copies in the UI instead of keeping
     // them around for the rest of the session. Going back from the error page to its page means
