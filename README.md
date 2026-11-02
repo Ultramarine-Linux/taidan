@@ -91,10 +91,31 @@ Taidan reads an optional configuration file at `/etc/taidan.toml`:
 edition = "plasma"
 skip_pages = ["location", "drivers"] # hide pages you don't want, see `SkipPage` in src/cfg.rs for the names
 org = "Fyra Labs"
-logo = "/usr/share/pixmaps/my-distro.svg" # in the header and the window icon, Ultramarine's if unset
+```
+
+### Branding
+
+Other distros can swap Ultramarine's look out from the same file. Every key is optional.
+Colors follow `#rrggbb` or `#aarrggbb`.
+
+```toml
+logo = "/usr/share/pixmaps/my-distro.svg"  # header and window icon
+font = "Inter"                             # needs to be installed, Geist if unset
+accent_color = "#00078f"                   # main buttons and selections, light mode
+accent_color_dark = "#4a56e2"              # the same in dark mode
+accent_foreground_color = "#ffffff"        # text and icons on the accent
+accent_foreground_color_dark = "#ffffff"   # dark mode, accent_foreground_color if unset
 
 [welcome]
-t0 = "Ultramarine Linux 42" # caption on the picture beside the pages, none if unset
+t0 = "My Distro 42"                        # caption on the picture beside the pages, none if unset
+t0_color = "#ffffff"                       # caption color
+t1_color = "#ffffff"                       # Taidan version color
+hero_image = "/usr/share/backgrounds/my-distro.png"       # the picture, light mode
+hero_image_dark = "/usr/share/backgrounds/my-distro-dark.png"
 ```
+
+The picture falls back to `/usr/share/backgrounds/default.png` (or `default-dark.png`), then to
+Ultramarine's. The distro name comes from `NAME=` in `/etc/os-release`. Choosing the legible font in
+the accessibility settings always uses Atkinson Hyperlegible Next instead of `font`.
 
 [Slint]: https://slint.dev

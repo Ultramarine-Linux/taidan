@@ -37,9 +37,10 @@ export component AppWindow inherits Window {
     // full-screen: true;
     icon: Cfg.distro_icon();
     background: Tokens.color-background;
-    // from the `vercel-geist-fonts` package, scripts Geist lacks (CJK, …) fall back to system fonts.
-    // Atkinson Hyperlegible Next is from `atkinson-hyperlegible-next-fonts`
-    default-font-family: A11y.legible-font ? "Atkinson Hyperlegible Next" : "Geist";
+    // from the `vercel-geist-fonts` package unless `font` in /etc/taidan.toml names the distro's,
+    // scripts the font lacks (CJK, …) fall back to system fonts. Atkinson Hyperlegible Next is from
+    // `atkinson-hyperlegible-next-fonts` and wins over both, since someone asked for it
+    default-font-family: A11y.legible-font ? "Atkinson Hyperlegible Next" : Cfg.get_string("font", "Geist");
     // shown as a standalone window in the middle of the kiosk session, the designs are 600×500 and
     // `Tokens.scale` fits that to the screen (`src/screen.rs`), the size is locked to keep it 6:5
     preferred-width: 600 * Tokens.unit;

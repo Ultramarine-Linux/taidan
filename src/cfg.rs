@@ -268,6 +268,29 @@ fn load_hero_images(ui: slint::Weak<crate::ui::AppWindow>) {
     });
 }
 
+/// the `#rrggbb` or `#aarrggbb` color at `path` in `/etc/taidan.toml`, [`None`] if it isn't set or
+/// isn't valid
+fn config_color(path: &str) -> Option<slint::Color> {
+    let serde_json::Value::String(s) = get_val(path)? else {
+        tracing::error!(?path, "invalid color, expected a string");
+        return None;
+    };
+    let color = parse_color(s);
+    if color.is_none() {
+        tracing::error!(?path, s, "invalid color, expected #aarrggbb or #rrggbb");
+    }
+    color
+}
+
+fn parse_color(code: &str) -> Option<slint::Color> {
+    let bytes = hex::decode(code.strip_prefix('#')?).ok()?;
+    match bytes[..] {
+        [alpha, red, green, blue] => Some(slint::Color::from_argb_u8(alpha, red, green, blue)),
+        [red, green, blue] => Some(slint::Color::from_rgb_u8(red, green, blue)),
+        _ => None,
+    }
+}
+
 fn load_image(path: &str) -> Option<slint::Image> {
     slint::Image::load_from_path(std::path::Path::new(path))
         .inspect_err(|e| tracing::error!(?path, ?e, "cannot load image"))
@@ -296,32 +319,22 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, cfg: &crate::ui::Cfg
             default
         }
     });
-    cfg.on_get_brush(|path, default| {
-        if let Some(serde_json::Value::String(s)) = get_val(&path) {
-            if let Some(code) = s.strip_prefix('#') {
-                let Ok(bytes) = hex::decode(code).inspect_err(|e| tracing::error!(?path, s, ?e))
-                else {
-                    return default;
-                };
-                return slint::Brush::SolidColor(match bytes[..] {
-                    [a, r, g, b] => slint::Color::from_argb_u8(a, r, g, b),
-                    [r, g, b] => slint::Color::from_rgb_u8(r, g, b),
-                    _ => {
-                        tracing::error!(?path, s, "invalid length, expected #aarrggbb or #rrggbb");
-                        return default;
-                    }
-                });
-            }
-            tracing::error!(?path, s, "invalid brush/color, expected #aarrggbb or #rrggbb");
-            return default;
-        }
-        default
-    });
+    cfg.on_get_brush(|path, default| config_color(&path).map_or(default, slint::Brush::SolidColor));
+    cfg.on_get_color(|path, default| config_color(&path).unwrap_or(default));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn colors() {
+        assert_eq!(parse_color("#00078f"), Some(slint::Color::from_rgb_u8(0, 7, 0x8f)));
+        assert_eq!(parse_color("#8000078f"), Some(slint::Color::from_argb_u8(0x80, 0, 7, 0x8f)));
+        for bad in ["00078f", "#00078", "#zz078f", "#", "blue"] {
+            assert_eq!(parse_color(bad), None, "{bad}");
+        }
+    }
 
     #[test]
     fn skip_pages_accepts_old_names() {

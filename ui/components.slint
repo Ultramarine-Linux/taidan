@@ -14,7 +14,10 @@ export global TdnStyle {
     out property <brush> accent: Theme.mode == ThemeMode.dark
         ? Cfg.get_brush("accent_color_dark", #4a56e2)
         : Cfg.get_brush("accent_color", #00078f);
-    out property <color> accent-foreground: white;
+    // text and icons on the accent, for distros with a light one
+    out property <color> accent-foreground: Theme.mode == ThemeMode.dark
+        ? Cfg.get_color("accent_foreground_color_dark", Cfg.get_color("accent_foreground_color", white))
+        : Cfg.get_color("accent_foreground_color", white);
 }
 
 export component TdnText inherits Text {

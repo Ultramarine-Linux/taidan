@@ -2,12 +2,14 @@ export global Cfg {
     pure callback get_string(path: string, default: string) -> string;
     pure callback get_image(path: string, default: image) -> image;
     pure callback get_brush(path: string, default: brush) -> brush;
+    pure callback get_color(path: string, default: color) -> color;
     pure callback distro_icon() -> image;
     // `logo` in /etc/taidan.toml is a path to the distro's own
     distro_icon() => { Cfg.get_image("logo", @image-url("../data/icons/distro-icon.svg")) }
     get_string(path, default) => default;
     get_image(path, default) => default;
     get_brush(path, default) => default;
+    get_color(path, default) => default;
     in-out property <string> version: "0.0.0";
     in-out property <string> distro: "Ultramarine Linux";
     // welcome page image, decoded off the UI thread and set from Rust
