@@ -353,7 +353,7 @@ mod tests {
     fn old_internet_keys_still_parse() {
         let cfg: Config =
             basic_toml::from_str("internet_timeout = 20\ninternet_retry_interval = 5").unwrap();
-        assert!(cfg.skip_pages.is_empty());
+        assert_eq!(cfg.skip_pages, []);
     }
 
     #[test]
