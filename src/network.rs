@@ -10,8 +10,8 @@ use zbus::proxy::{CacheProperties, Defaults};
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value};
 
 use crate::ui::{
-    AppWindow, CaSource, EapMethod, EnterpriseLogin, IpSettings, NetState, Network, Security,
-    WifiNetwork,
+    AppWindow, CaSource, EapMethod, EnterpriseLogin, HiddenSecurity, IpSettings, NetState, Network,
+    Security, WifiNetwork,
 };
 
 /// how often the state and network list are refreshed while nothing else happens
@@ -236,6 +236,12 @@ enum Cmd {
         password: String,
     },
     ConnectEnterprise(EnterpriseLogin),
+    /// a network that doesn't announce its name, so it isn't in the list
+    ConnectHidden {
+        ssid: String,
+        key_mgmt: KeyMgmt,
+        password: String,
+    },
     SetProxy {
         url: String,
         bypass: String,
@@ -496,9 +502,18 @@ impl Nm {
             })?;
             return self.wait(&active, &dev);
         }
-        let key_mgmt =
-            self.aps.iter().find(|ap| ap.ssid == ssid).map_or(KeyMgmt::Psk, |ap| ap.key_mgmt);
-        self.add_and_connect(ssid, wifi_settings(ssid, key_mgmt, password))
+        // not in the scan, so it's a hidden one, like when the password dialog retries it
+        let Some(ap) = self.aps.iter().find(|ap| ap.ssid == ssid) else {
+            return self.connect_hidden(ssid, KeyMgmt::Psk, password);
+        };
+        self.add_and_connect(ssid, wifi_settings(ssid, ap.key_mgmt, password))
+    }
+
+    /// connects to a network that doesn't announce its name, which `NetworkManager` then probes for
+    fn connect_hidden(&self, ssid: &str, key_mgmt: KeyMgmt, password: &str) -> Result<(), Failure> {
+        let mut settings = wifi_settings(ssid, key_mgmt, password);
+        mark_hidden(&mut settings);
+        self.add_and_connect(ssid, settings)
     }
 }
 
@@ -529,6 +544,13 @@ fn base_settings(ssid: &str) -> nm::ConnSettings<'_> {
     ])
 }
 
+/// tells `NetworkManager` to look for the network even though it doesn't announce its name
+fn mark_hidden(settings: &mut nm::ConnSettings<'_>) {
+    if let Some(wifi) = settings.get_mut("802-11-wireless") {
+        wifi.insert("hidden", true.into());
+    }
+}
+
 /// name of the wired connection taidan makes for 802.1X, so a retry replaces it
 const WIRED_8021X_ID: &str = "Wired 802.1X";
 
@@ -554,8 +576,8 @@ fn enterprise_settings(login: &EnterpriseLogin, hidden: bool) -> nm::ConnSetting
         ])
     } else {
         let mut settings = base_settings(&login.ssid);
-        if hidden && let Some(wifi) = settings.get_mut("802-11-wireless") {
-            wifi.insert("hidden", true.into());
+        if hidden {
+            mark_hidden(&mut settings);
         }
         settings
             .insert("802-11-wireless-security", HashMap::from([("key-mgmt", "wpa-eap".into())]));
@@ -1236,6 +1258,9 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
                 nm.aps.iter().any(|ap| ap.ssid == ssid && ap.key_mgmt == KeyMgmt::Enterprise);
             (ssid, res, enterprise)
         }
+        Cmd::ConnectHidden { ssid, key_mgmt, password } => {
+            return connect_hidden(nm, ui, ssid, key_mgmt, &password);
+        }
         Cmd::ConnectEnterprise(mut login) => {
             login.ssid = login.ssid.trim().into();
             push(ui, |net| {
@@ -1317,6 +1342,28 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
     });
 }
 
+/// [`Cmd::ConnectHidden`], the dialog closes once it's connected and shows why if it can't
+fn connect_hidden(
+    nm: &Nm,
+    ui: &slint::Weak<AppWindow>,
+    ssid: String,
+    key_mgmt: KeyMgmt,
+    password: &str,
+) {
+    start_connecting(ui, &ssid);
+    let res = nm.connect_hidden(&ssid, key_mgmt, password);
+    push(ui, move |net| {
+        net.set_connecting_ssid("".into());
+        match res {
+            Ok(()) => net.set_hidden_open(false),
+            Err(failure) => {
+                net.set_error_ssid(ssid.as_str().into());
+                net.set_error_id(failure.into());
+            }
+        }
+    });
+}
+
 fn start_connecting(ui: &slint::Weak<AppWindow>, ssid: &str) {
     let ssid = slint::SharedString::from(ssid);
     push(ui, move |net| {
@@ -1378,24 +1425,50 @@ fn browse(net: &Network<'_>, dir: slint::SharedString, pac: bool, all: bool) {
 }
 
 /// connecting to a network from the list or the password dialog
-fn init_connect(ui: &slint::Weak<AppWindow>, net: &Network<'_>, send: impl Fn(Cmd) + 'static) {
+fn init_connect(
+    ui: &slint::Weak<AppWindow>,
+    net: &Network<'_>,
+    send: impl Fn(Cmd) + Clone + 'static,
+) {
     net.on_connect({
-        let ui = ui.clone();
+        let (ui, send) = (ui.clone(), send.clone());
         move |ssid, password| {
-            // busy right away, not once the worker gets to it after a scan, so a second click or
-            // Enter doesn't queue another connect that drops the first one
-            if let Some(ui) = ui.upgrade() {
-                let net = ui.global::<Network<'_>>();
-                if !net.get_connecting_ssid().is_empty() {
-                    return;
-                }
-                net.set_error_id("".into());
-                net.set_error_ssid("".into());
-                net.set_connecting_ssid(ssid.clone());
+            if start_busy(&ui, &ssid) {
+                send(Cmd::Connect { ssid: ssid.into(), password: password.into() });
             }
-            send(Cmd::Connect { ssid: ssid.into(), password: password.into() });
         }
     });
+    net.on_connect_hidden({
+        let ui = ui.clone();
+        move |ssid, security, password| {
+            let ssid = ssid.trim();
+            let key_mgmt = match security {
+                HiddenSecurity::Open => KeyMgmt::Open,
+                HiddenSecurity::Wpa => KeyMgmt::Psk,
+                HiddenSecurity::Wpa3 => KeyMgmt::Sae,
+                // the 802.1X dialog takes it from here
+                HiddenSecurity::Enterprise => return,
+            };
+            if start_busy(&ui, ssid) {
+                send(Cmd::ConnectHidden { ssid: ssid.into(), key_mgmt, password: password.into() });
+            }
+        }
+    });
+}
+
+/// marks `ssid` as connecting right away, not once the worker gets to it after a scan, so a second
+/// click or Enter doesn't queue another connect that drops the first one. False if one is going
+/// already
+fn start_busy(ui: &slint::Weak<AppWindow>, ssid: &str) -> bool {
+    let Some(ui) = ui.upgrade() else { return true };
+    let net = ui.global::<Network<'_>>();
+    if !net.get_connecting_ssid().is_empty() {
+        return false;
+    }
+    net.set_error_id("".into());
+    net.set_error_ssid("".into());
+    net.set_connecting_ssid(ssid.into());
+    true
 }
 
 /// the captive portal button, which opens and closes the browser through the network worker
@@ -1519,6 +1592,18 @@ mod tests {
         assert_eq!(derive_hostname("Jane's Laptop"), "janes-laptop");
         assert_eq!(derive_hostname("  -- My  PC 2! "), "my-pc-2");
         assert_eq!(derive_hostname("ノートパソコン"), "");
+    }
+
+    #[test]
+    fn hidden_wifi_settings() {
+        let mut s = wifi_settings("Home", KeyMgmt::Sae, "hunter22");
+        assert!(!s["802-11-wireless"].contains_key("hidden"));
+        mark_hidden(&mut s);
+        assert_eq!(s["802-11-wireless"]["hidden"], Value::from(true));
+        assert_eq!(s["802-11-wireless-security"]["key-mgmt"], Value::from("sae"));
+        let mut s = wifi_settings("Cafe", KeyMgmt::Open, "");
+        mark_hidden(&mut s);
+        assert!(!s.contains_key("802-11-wireless-security"));
     }
 
     #[test]

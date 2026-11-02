@@ -1,5 +1,8 @@
 export enum Security { open, password, enterprise, unsupported }
 
+// what a hidden network is secured with, as picked in its dialog
+export enum HiddenSecurity { open, wpa, wpa3, enterprise }
+
 export struct WifiNetwork {
     ssid: string,
     // signal strength as the number of lit arcs in the wi-fi icon, 0–3
@@ -145,6 +148,10 @@ export global Network {
     // `password` is empty for open or saved networks
     callback connect(ssid: string, password: string);
     callback connect-enterprise(login: EnterpriseLogin);
+    // the dialog for a network that doesn't announce its name, which closes once it's connected
+    in-out property <bool> hidden-open;
+    // `password` is empty for open networks, enterprise ones go through `connect-enterprise`
+    callback connect-hidden(ssid: string, security: HiddenSecurity, password: string);
     // whether the captive portal browser is open, opening it again closes it
     in property <bool> portal-open;
     callback open-portal();

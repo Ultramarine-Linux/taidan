@@ -218,6 +218,15 @@ page-internet-devicename-desc = How this device shows up to others on the networ
 page-internet-hostname = Hostname: { $hostname }
 # dialog title; $ssid is the name of the wi-fi network
 page-internet-connect-to = Connect to { $ssid }
+# opens a dialog for wi-fi networks that don't show up in the list
+page-internet-hidden = Hidden Network…
+page-internet-hidden-title = Connect to a Hidden Network
+page-internet-hidden-ssid = Network Name
+page-internet-hidden-security = Security
+page-internet-hidden-wpa = WPA & WPA2 Personal
+page-internet-hidden-wpa3 = WPA3 Personal
+page-internet-hidden-open = None
+page-internet-hidden-enterprise = WPA & WPA2 Enterprise
 page-internet-password = Password
 page-internet-error = Couldn't connect to this network.
 page-internet-error-password = Couldn't connect. Check the password and try again.

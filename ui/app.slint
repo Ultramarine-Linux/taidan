@@ -11,7 +11,7 @@ import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
 import { Camera } from "camera.slint";
 import { KeyboardPage } from "pages/0020_keyboard.slint";
 import { PasswordPage } from "pages/0050_password.slint";
-import { NetworkPage, PasswordDialog, EnterpriseDialog, OfflineDialog, ProxyDialog, IpDialog } from "pages/0060_network.slint";
+import { NetworkPage, PasswordDialog, EnterpriseDialog, HiddenDialog, OfflineDialog, ProxyDialog, IpDialog } from "pages/0060_network.slint";
 import { Network, NetState } from "network.slint";
 import { TimezonePage } from "pages/0055_timezone.slint";
 import { Tz } from "timezone.slint";
@@ -246,6 +246,11 @@ export component AppWindow inherits Window {
     }
 
     if Network.password-ssid != "": PasswordDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.hidden-open: HiddenDialog {
         width: 100%;
         height: 100%;
     }
