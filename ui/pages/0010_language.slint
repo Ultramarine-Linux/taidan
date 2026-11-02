@@ -15,6 +15,10 @@ export component LanguagePage inherits TdnPage {
     property <int> cursor: -1;
     // row of the current language in the list, -1 if it's filtered out, see the finder below
     property <int> current-row: -1;
+    // what Enter picks when the search filtered out the current language and the arrow keys
+    // weren't used: the first match
+    property <bool> first-match: search.text != "" && cursor < 0 && current-row < 0
+        && Lang.languages.length > 0;
 
     function move-cursor(delta: int) {
         if Lang.languages.length == 0 { return; }
@@ -59,12 +63,18 @@ export component LanguagePage inherits TdnPage {
             search := TdnInput {
                 placeholder: Lang.t("page-language-search-lang", []);
                 icon: @image-url("../../data/icons/system-search-symbolic.svg");
+                // the arrow keys pick a language while the focus stays here, so screen readers
+                // hear about it from the description changing
+                description: root.first-match ? Lang.name(Lang.languages[0]) : Lang.name(Lang.current_language);
                 edited(text) => {
                     cursor = -1;
                     list.content-y = 0;
                     Lang.filter_languages(text);
                 }
-                accepted => { root.try-next(); }
+                accepted => {
+                    if root.first-match { Lang.select(Lang.languages[0]); }
+                    root.try-next();
+                }
                 key-pressed(event) => {
                     if event.text == Key.DownArrow { move-cursor(1); return accept; }
                     if event.text == Key.UpArrow { move-cursor(-1); return accept; }
@@ -80,6 +90,7 @@ export component LanguagePage inherits TdnPage {
                     text: Lang.name(lang);
                     secondary: lang.native-name;
                     selected: lang.locale == Lang.current_language.locale;
+                    highlighted: i == 0 && root.first-match;
                     clicked => {
                         cursor = i;
                         Lang.select(lang);

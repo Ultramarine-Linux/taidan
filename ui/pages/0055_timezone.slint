@@ -105,6 +105,12 @@ export component TimezonePage inherits TdnPage {
         search := TdnInput {
             icon: @image-url("../../data/icons/system-search-symbolic.svg");
             placeholder: Lang.t("page-timezone-search", []);
+            // the arrow keys move through the results while the focus stays here, so screen
+            // readers hear the one Enter would pick from the description changing
+            description: !root.searching ? ""
+                : Tz.results.length == 0 ? Lang.t("page-timezone-none", [])
+                : Tz.results[root.active-row].region == "" ? Tz.results[root.active-row].city
+                : Tz.results[root.active-row].city + ", " + Tz.results[root.active-row].region;
             edited(text) => {
                 cursor = -1;
                 list.content-y = 0;

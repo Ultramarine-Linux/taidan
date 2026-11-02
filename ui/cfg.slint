@@ -3,7 +3,8 @@ export global Cfg {
     pure callback get_image(path: string, default: image) -> image;
     pure callback get_brush(path: string, default: brush) -> brush;
     pure callback distro_icon() -> image;
-    distro_icon() => { @image-url("../data/icons/distro-icon.svg") }
+    // `logo` in /etc/taidan.toml is a path to the distro's own
+    distro_icon() => { Cfg.get_image("logo", @image-url("../data/icons/distro-icon.svg")) }
     get_string(path, default) => default;
     get_image(path, default) => default;
     get_brush(path, default) => default;

@@ -4,12 +4,36 @@
 //! explicitly instead of inheriting `http_proxy` and friends.
 use crate::prelude::*;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Proxy {
     /// e.g. `http://proxy.example.com:3128`, may carry `user:password@`
     pub url: String,
     /// comma-separated hosts and domains to reach directly, e.g. `localhost,.example.com`
     pub no_proxy: String,
+}
+
+/// without the password, since the settings with the proxy in them are logged
+impl std::fmt::Debug for Proxy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Proxy")
+            .field("url", &redact(&self.url))
+            .field("no_proxy", &self.no_proxy)
+            .finish()
+    }
+}
+
+/// `url` with its password, if any, replaced
+fn redact(url: &str) -> String {
+    match reqwest::Url::parse(url) {
+        Ok(mut parsed) if parsed.password().is_some() => {
+            // only fails for URLs that can't have a password, and this one has one
+            _ = parsed.set_password(Some("redacted"));
+            parsed.to_string()
+        }
+        Ok(_) => url.to_owned(),
+        // can't tell where a password would be
+        Err(_) => "<invalid>".to_owned(),
+    }
 }
 
 /// the proxy for the installation, set by [`crate::start_install`] from the settings
@@ -157,6 +181,16 @@ pub(crate) fn client() -> reqwest::Client {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn debug_hides_the_password() {
+        let proxy = Proxy::new("http://bob:hunter2@proxy.example.com:3128", "").unwrap();
+        let debug = format!("{proxy:?}");
+        assert!(!debug.contains("hunter2"), "{debug}");
+        assert!(debug.contains("bob:redacted@proxy.example.com:3128"), "{debug}");
+        let proxy = Proxy::new("proxy.example.com:3128", "").unwrap();
+        assert!(format!("{proxy:?}").contains("http://proxy.example.com:3128"));
+    }
 
     #[test]
     fn parses() {

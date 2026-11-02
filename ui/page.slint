@@ -71,7 +71,8 @@ export component TdnHero inherits Rectangle {
         x: 1rem;
         y: parent.height - self.height - 1rem;
         font-size: Tokens.typography-body-size;
-        text: Cfg.get_string("welcome.t0", "Ultramarine Technical Preview, please edit welcome.t0\nin /etc/taidan.toml");
+        // only the version when the distro doesn't set a caption
+        text: Cfg.get_string("welcome.t0", "");
         color: Cfg.get_brush("welcome.t0_color", white);
     }
 

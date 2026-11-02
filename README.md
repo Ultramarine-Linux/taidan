@@ -91,6 +91,10 @@ Taidan reads an optional configuration file at `/etc/taidan.toml`:
 edition = "plasma"
 skip_pages = ["location", "drivers"] # hide pages you don't want, see `SkipPage` in src/cfg.rs for the names
 org = "Fyra Labs"
+logo = "/usr/share/pixmaps/my-distro.svg" # in the header and the window icon, Ultramarine's if unset
+
+[welcome]
+t0 = "Ultramarine Linux 42" # caption on the picture beside the pages, none if unset
 ```
 
 [Slint]: https://slint.dev

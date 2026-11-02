@@ -18,6 +18,10 @@ export component KeyboardPage inherits TdnPage {
     // rows of the current layout and variant, -1 if they're filtered out, see the finders below
     property <int> current-layout-row: -1;
     property <int> current-variant-row: -1;
+    // what Enter picks when the search filtered out the current layout and the arrow keys weren't
+    // used: the first match
+    property <bool> first-layout-match: search-layout.text != "" && layout-cursor < 0
+        && current-layout-row < 0 && Lang.keymaps.length > 0;
 
     function select-keymap(keymap: Keymap) {
         if keymap.id != Lang.current_keymap.id {
@@ -108,12 +112,18 @@ export component KeyboardPage inherits TdnPage {
                 search-layout := TdnInput {
                     placeholder: Lang.t("page-keyboard-search-layout", []);
                     icon: @image-url("../../data/icons/system-search-symbolic.svg");
+                    // the arrow keys pick a layout while the focus stays here, so screen readers
+                    // hear about it from the description changing
+                    description: root.first-layout-match ? Lang.keymaps[0].name : Lang.current_keymap.name;
                     edited(text) => {
                         layout-cursor = -1;
                         layouts.content-y = 0;
                         Lang.filter_keymaps(text);
                     }
-                    accepted => { search-variant.focus(); }
+                    accepted => {
+                        if root.first-layout-match { select-keymap(Lang.keymaps[0]); }
+                        search-variant.focus();
+                    }
                     key-pressed(event) => {
                         if event.text == Key.DownArrow { move-layout-cursor(1); return accept; }
                         if event.text == Key.UpArrow { move-layout-cursor(-1); return accept; }
@@ -129,6 +139,7 @@ export component KeyboardPage inherits TdnPage {
                         text: keymap.name;
                         secondary: keymap.id;
                         selected: keymap.id == Lang.current_keymap.id;
+                        highlighted: i == 0 && root.first-layout-match;
                         clicked => {
                             layout-cursor = i;
                             select-keymap(keymap);
@@ -148,6 +159,7 @@ export component KeyboardPage inherits TdnPage {
                 search-variant := TdnInput {
                     placeholder: Lang.t("page-keyboard-search-variant", []);
                     icon: @image-url("../../data/icons/system-search-symbolic.svg");
+                    description: Lang.current_variant.id == "" ? Lang.t("default", []) : Lang.current_variant.name;
                     edited(text) => {
                         variant-cursor = -1;
                         variants.content-y = 0;
