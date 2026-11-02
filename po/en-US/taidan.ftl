@@ -306,6 +306,10 @@ page-tweaks-done = Done
 ## [Choose Your Theme]
 
 # page title
+page-theme = Choose Your Theme
+page-theme-light = Light
+page-theme-dark = Dark
+
 ## [Browser Selection]
 
 ## page: Categories

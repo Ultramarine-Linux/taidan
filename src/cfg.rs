@@ -40,6 +40,7 @@ pub enum SkipPage {
     Language,
     Keyboard,
     Welcome,
+    Theme,
     Timezone,
     Network,
     Location,
@@ -50,7 +51,7 @@ pub enum SkipPage {
 }
 
 /// index of the last page that Next and Back go through (the summary), as in `ui/app.slint`
-const LAST_PAGE: i32 = 10;
+const LAST_PAGE: i32 = 11;
 
 impl SkipPage {
     /// parses a page name, including the ones from before the Slint rewrite (`internet`, `codecs`)
@@ -60,12 +61,13 @@ impl SkipPage {
             "language" => Self::Language,
             "keyboard" => Self::Keyboard,
             "welcome" => Self::Welcome,
+            "theme" => Self::Theme,
             "timezone" => Self::Timezone,
             "network" | "internet" => Self::Network,
             "location" => Self::Location,
             "drivers" | "codecs" => Self::Drivers,
             "tweaks" => Self::Tweaks,
-            "devicename" | "analytics" | "crashreport" | "inputmethod" | "theme" => {
+            "devicename" | "analytics" | "crashreport" | "inputmethod" => {
                 return Err("this page no longer exists");
             }
             // the install can't create the account without these
@@ -83,10 +85,11 @@ impl SkipPage {
             Self::Language => 1,
             Self::Keyboard => 2,
             Self::Welcome => 3,
-            Self::Timezone => 6,
-            Self::Network => 7,
-            Self::Location => 8,
-            Self::Drivers => 9,
+            Self::Theme => 4,
+            Self::Timezone => 7,
+            Self::Network => 8,
+            Self::Location => 9,
+            Self::Drivers => 10,
             Self::Tweaks => return None,
         })
     }
@@ -341,7 +344,7 @@ mod tests {
         let cfg: Config =
             basic_toml::from_str(r#"skip_pages = ["codecs", "internet", "Theme", "nope"]"#)
                 .unwrap();
-        assert_eq!(cfg.skip_pages, [SkipPage::Drivers, SkipPage::Network]);
+        assert_eq!(cfg.skip_pages, [SkipPage::Drivers, SkipPage::Network, SkipPage::Theme]);
         // not swallowed by the flattened `ui` map
         assert!(!cfg.ui.contains_key("skip_pages"));
     }
@@ -360,8 +363,8 @@ mod tests {
             ..Config::default()
         };
         assert_eq!(next_page(&cfg, -1), 1);
-        assert_eq!(next_page(&cfg, 6), 9);
-        assert_eq!(prev_page(&cfg, 9), 6);
+        assert_eq!(next_page(&cfg, 7), 10);
+        assert_eq!(prev_page(&cfg, 10), 7);
         assert_eq!(prev_page(&cfg, 1), 1);
         assert_eq!(next_page(&cfg, LAST_PAGE), LAST_PAGE);
     }

@@ -33,6 +33,9 @@ pub struct Settings {
     /// accessibility options, carried over to the new user
     pub a11y: crate::a11y::A11y,
 
+    /// dark (`true`) or light mode for the new user, [`None`] to keep the distro's default
+    pub dark_mode: Option<bool>,
+
     /// for networks that only reach the internet through a proxy
     pub proxy: Option<crate::proxy::Proxy>,
 

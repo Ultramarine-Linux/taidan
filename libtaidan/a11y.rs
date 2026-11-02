@@ -228,7 +228,7 @@ pub async fn write_to_skel(
 }
 
 /// the home directory of `user`, from the passwd database
-async fn home_of(user: &str) -> Res<std::path::PathBuf> {
+pub(crate) async fn home_of(user: &str) -> Res<std::path::PathBuf> {
     let out = tokio::process::Command::new("getent")
         .args(["passwd", user])
         .output()

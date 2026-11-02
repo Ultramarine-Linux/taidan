@@ -1,0 +1,211 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { Cfg } from "../cfg.slint";
+import { TdnText, TdnStyle } from "../components.slint";
+import { Icon } from "../slintcn/components/icon.slint";
+import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
+import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
+import { Palette } from "../slintcn/theme/palette.slint";
+import { Palette as StdPalette } from "std-widgets.slint";
+
+// the wallpaper with a window on it, in light or dark, picked like a radio button
+component ThemeTile inherits Rectangle {
+    in property <string> text;
+    in property <bool> dark;
+    in property <bool> checked;
+    callback picked();
+    // Enter, to go on with this one
+    callback accepted();
+    // Left or Right, to the other tile
+    callback switched();
+
+    forward-focus: focus;
+    accessible-role: radio-button;
+    accessible-label: root.text;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-action-default => { root.picked(); }
+
+    border-radius: Tokens.radius-lg;
+    border-width: root.checked ? 2px : 1px;
+    border-color: root.checked ? TdnStyle.accent : Tokens.color-border-hairline;
+    background: Tokens.color-card;
+    animate border-color { duration: Tokens.motion-fast; }
+
+    // a layer that fades in, see `A11yTile`
+    Rectangle {
+        border-radius: root.border-radius;
+        background: TdnStyle.accent;
+        opacity: root.checked ? 0.15 : 0;
+        animate opacity { duration: Tokens.motion-fast; }
+    }
+
+    Rectangle {
+        border-radius: root.border-radius;
+        background: Tokens.color-foreground;
+        opacity: area.pressed ? 0.1 : area.has-hover ? 0.05 : 0;
+        animate opacity { duration: Tokens.motion-fast; easing: ease-out; }
+    }
+
+    // no focus ring, the picked tile is the only Tab stop, as in a radio group, so its own
+    // highlight already shows where the focus is
+    focus := FocusScope {
+        focus-on-tab-navigation: root.checked;
+        key-pressed(event) => {
+            if event.text == " " {
+                if !event.repeat { root.picked(); }
+                return accept;
+            }
+            if event.text == Key.Return {
+                if !event.repeat {
+                    root.picked();
+                    root.accepted();
+                }
+                return accept;
+            }
+            if event.text == Key.LeftArrow || event.text == Key.RightArrow {
+                root.switched();
+                return accept;
+            }
+            reject
+        }
+    }
+
+    VerticalLayout {
+        padding: 0.6rem;
+        spacing: 0.6rem;
+
+        Rectangle {
+            // the wallpaper's 16:9
+            height: self.width * 9 / 16;
+            border-radius: Tokens.radius-md;
+            clip: true;
+
+            Image {
+                width: 100%;
+                height: 100%;
+                image-fit: cover;
+                source: root.dark ? Cfg.hero-dark : Cfg.hero-light;
+                accessible-role: none;
+            }
+
+            // a window, so the difference shows even where the wallpapers look alike
+            Rectangle {
+                x: parent.width * 0.18;
+                y: parent.height * 0.22;
+                width: parent.width * 0.64;
+                height: parent.height * 0.56;
+                border-radius: Tokens.radius-sm;
+                background: root.dark ? Palette.neutral-900 : Palette.neutral-50;
+                drop-shadow-blur: 6 * Tokens.unit;
+                drop-shadow-color: #0000004d;
+                clip: true;
+
+                Rectangle {
+                    y: 0;
+                    height: 18%;
+                    background: root.dark ? Palette.neutral-800 : Palette.neutral-200;
+                }
+
+                for line[i] in [0.7, 0.5, 0.6]: Rectangle {
+                    x: parent.width * 0.1;
+                    y: parent.height * (0.32 + i * 0.18);
+                    width: parent.width * line;
+                    height: parent.height * 0.08;
+                    border-radius: self.height / 2;
+                    background: root.dark ? Palette.neutral-800 : Palette.neutral-200;
+                }
+            }
+        }
+
+        TdnText {
+            text: root.text;
+            font-size: 1.1 * Tokens.text-rem;
+            font-weight: Tokens.typography-weight-medium;
+        }
+    }
+
+    // a check in the corner, so it isn't only the color that says which one it is
+    if root.checked: Rectangle {
+        x: parent.width - self.width - 0.4rem;
+        y: 0.4rem;
+        width: 1.4rem;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: TdnStyle.accent;
+
+        Icon {
+            commands: LucidePaths.check;
+            size: parent.width * 0.65;
+            tint: TdnStyle.accent-foreground;
+            stroke-width: 3px;
+        }
+    }
+
+    area := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.picked();
+            focus.focus();
+        }
+    }
+}
+
+// light or dark mode, for the new user and for the rest of the setup, which switches as soon as
+// one is picked
+export component ThemePage inherits TdnPage {
+    pageid: "theme";
+    step_i: 0;
+    forward-focus: light-tile;
+
+    property <bool> dark: Theme.mode == ThemeMode.dark;
+
+    function pick(dark: bool) {
+        // the std widgets and `Theme` (so every token) follow this
+        StdPalette.color-scheme = dark ? ColorScheme.dark : ColorScheme.light;
+    }
+
+    // for when the page is shown, the picked tile rather than always the first
+    public function focus-picked() {
+        if root.dark { dark-tile.focus(); } else { light-tile.focus(); }
+    }
+
+    // the tiles at their own height, in the middle of the page
+    VerticalLayout {
+        vertical-stretch: 1;
+        alignment: center;
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: 1.5rem;
+            accessible-role: radio-group;
+            accessible-label: root.name;
+
+            light-tile := ThemeTile {
+                width: 12rem;
+                text: Lang.t("page-theme-light", []);
+                dark: false;
+                checked: !root.dark;
+                picked => { root.pick(false); }
+                accepted => { root.try-next(); }
+                switched => {
+                    root.pick(true);
+                    dark-tile.focus();
+                }
+            }
+
+            dark-tile := ThemeTile {
+                width: 12rem;
+                text: Lang.t("page-theme-dark", []);
+                dark: true;
+                checked: root.dark;
+                picked => { root.pick(true); }
+                accepted => { root.try-next(); }
+                switched => {
+                    root.pick(false);
+                    light-tile.focus();
+                }
+            }
+        }
+    }
+}

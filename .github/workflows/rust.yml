@@ -15,6 +15,7 @@ jobs:
       # the same build deps for both, clippy builds the crates too
       clippy-pre: |
         dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
+      clippy-cargo-flags: --workspace --exclude tdnx --all-targets
       test-pre: |
         dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
       # every crate's tests, taidan's are in the binary
@@ -25,9 +26,13 @@ jobs:
   # built together
   tdnx:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     container:
       image: ghcr.io/fyralabs/ci:f44
     strategy:
+      fail-fast: false
       matrix:
         feature: [server-oobe, desktop-install]
     steps:
@@ -38,5 +43,20 @@ jobs:
         with:
           toolchain: stable
           components: clippy
+      - name: Install clippy-sarif
+        run: cargo install clippy-sarif sarif-fmt
       - name: Clippy
-        run: cargo clippy -p tdnx --features ${{ matrix.feature }} -- -D warnings
+        # bash for pipefail, so clippy failing fails the step and not just sarif-fmt
+        shell: bash
+        run: >
+          cargo clippy -p tdnx --features ${{ matrix.feature }} --all-targets
+          --message-format=json -- --no-deps -D warnings
+          | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
+      - name: Upload clippy results
+        # also when clippy found something, which is when they matter
+        if: success() || failure()
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: rust-clippy-results.sarif
+          # a category per backend, code scanning keeps one set of results per category
+          category: clippy-tdnx-${{ matrix.feature }}

@@ -2,7 +2,7 @@
 use libtaidan::{InstallMsg, steps::Stage};
 use slint::ComponentHandle;
 
-use crate::ui::{AppWindow, Drivers, Install, InstallState, Location, Network};
+use crate::ui::{AppWindow, Drivers, Install, InstallState, Location, Network, Theme, ThemeMode};
 
 /// whether this is a developer running Taidan on their own machine, where installing (creating a
 /// user, running dnf, …) or rebooting would be destructive, the same rule as libtaidan's `set_keymap`
@@ -129,6 +129,10 @@ fn start(ui: &slint::Weak<AppWindow>) {
     install.set_stage_count(i32::try_from(Stage::all().len()).expect("too many stages"));
     crate::SETTINGS.write().install_codecs_drivers = app.global::<Drivers<'_>>().get_install();
     crate::SETTINGS.write().location = app.global::<Location<'_>>().get_enabled();
+    // what the theme page shows, unless it's skipped, then the distro's default stays
+    crate::SETTINGS.write().dark_mode =
+        (!crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Theme))
+            .then(|| app.global::<Theme<'_>>().get_mode() == ThemeMode::Dark);
     // `Network.save` only runs from the network page. With it skipped nobody chose to go offline,
     // so go by the connection right now, as the summary does. Leaving `nointernet` off on an
     // offline machine makes the dnf steps fail.

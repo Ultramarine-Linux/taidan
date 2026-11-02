@@ -152,7 +152,8 @@ async fn stage_skel(settings: &crate::settings::Settings) -> Option<std::path::P
         }
         let a11y = crate::a11y::write_to_skel(settings, &skel).await?;
         let imf = super::_08_setup_imf::write_fcitx5_to_skel(settings, &skel).await?;
-        Ok::<_, Err>(a11y || imf)
+        let theme = super::_01_settheme::write_to_skel(settings, &skel).await?;
+        Ok::<_, Err>(a11y || imf || theme)
     };
     match res.await {
         Ok(true) => Some(skel),

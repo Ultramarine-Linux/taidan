@@ -1,6 +1,7 @@
 import { AccessibilityPage, AccessibilityDialog, A11yMoreDialog } from "pages/0005_accessibility.slint";
 import { A11y } from "a11y.slint";
 import { WelcomePage } from "pages/0030_welcome.slint";
+import { ThemePage } from "pages/0035_theme.slint";
 import { Lang } from "lang.slint";
 import { Cfg } from "cfg.slint";
 import { Account } from "account.slint";
@@ -54,11 +55,11 @@ export component AppWindow inherits Window {
     // the designs use 14px and all `rem` sizes derive from this
     default-font-size: 14 * Tokens.unit;
 
-    property <int> summary-page: 10;
+    property <int> summary-page: 11;
     // pages that are jumped to, rather than reached with Next and Back
-    property <int> installing-page: 11;
-    property <int> done-page: 12;
-    property <int> error-page: 13;
+    property <int> installing-page: 12;
+    property <int> done-page: 13;
+    property <int> error-page: 14;
 
     // move keyboard focus to the page being shown, unless a dialog has it
     function focus-page() {
@@ -67,12 +68,13 @@ export component AppWindow inherits Window {
         else if pagenum == 1 { language.focus(); }
         else if pagenum == 2 { keyboard.focus(); }
         else if pagenum == 3 { welcome.focus(); }
-        else if pagenum == 4 { whoareyou.focus(); }
-        else if pagenum == 5 { password.focus(); }
-        else if pagenum == 6 { timezone.focus(); }
-        else if pagenum == 7 { network.focus(); }
-        else if pagenum == 8 { location.focus(); }
-        else if pagenum == 9 { drivers.focus(); }
+        else if pagenum == 4 { theme.focus-picked(); }
+        else if pagenum == 5 { whoareyou.focus(); }
+        else if pagenum == 6 { password.focus(); }
+        else if pagenum == 7 { timezone.focus(); }
+        else if pagenum == 8 { network.focus(); }
+        else if pagenum == 9 { location.focus(); }
+        else if pagenum == 10 { drivers.focus(); }
         else if pagenum == summary-page { summary.focus(); }
         else if pagenum == installing-page { installing.focus(); }
         else if pagenum == done-page { done.focus(); }
@@ -80,10 +82,10 @@ export component AppWindow inherits Window {
     }
     changed pagenum => {
         focus-page();
-        if pagenum == 6 { Tz.refresh(); }
+        if pagenum == 7 { Tz.refresh(); }
         // with the time zone page skipped, the summary still shows the system's
         if pagenum == summary-page && Tz.current.id == "" { Tz.refresh(); }
-        if pagenum == 7 { Network.refresh(); }
+        if pagenum == 8 { Network.refresh(); }
     }
     init => { focus-page(); }
 
@@ -151,17 +153,14 @@ export component AppWindow inherits Window {
         next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
-    whoareyou := WhoAreYouPage {
+    theme := ThemePage {
         index: 4;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => {
-            Account.save();
-            pagenum = Cfg.next-page(pagenum);
-        }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
-    password := PasswordPage {
+    whoareyou := WhoAreYouPage {
         index: 5;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
@@ -171,8 +170,18 @@ export component AppWindow inherits Window {
         }
     }
 
-    timezone := TimezonePage {
+    password := PasswordPage {
         index: 6;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => {
+            Account.save();
+            pagenum = Cfg.next-page(pagenum);
+        }
+    }
+
+    timezone := TimezonePage {
+        index: 7;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
@@ -182,7 +191,7 @@ export component AppWindow inherits Window {
     }
 
     network := NetworkPage {
-        index: 7;
+        index: 8;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
@@ -192,14 +201,14 @@ export component AppWindow inherits Window {
     }
 
     location := LocationPage {
-        index: 8;
+        index: 9;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     drivers := DriversPage {
-        index: 9;
+        index: 10;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => { pagenum = Cfg.next-page(pagenum); }
