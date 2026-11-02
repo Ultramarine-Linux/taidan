@@ -20,8 +20,8 @@ const POLL: Duration = Duration::from_secs(3);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(45);
 /// how long scan results take to come in after asking for them
 const SCAN_TIME: Duration = Duration::from_secs(3);
-/// how often `NetworkManager` is asked to check connectivity while the portal browser is open,
-/// each check is a request to the internet that can take a while
+/// how often `NetworkManager` is asked to check connectivity while behind a captive portal, each
+/// check is a request to the internet that can take a while
 const PORTAL_CHECK: Duration = Duration::from_secs(10);
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
@@ -159,6 +159,7 @@ mod nm {
 
 // values from NetworkManager's D-Bus API docs
 const STATE_CONNECTED_GLOBAL: u32 = 70;
+const CONNECTIVITY_PORTAL: u32 = 2;
 const CONNECTIVITY_FULL: u32 = 4;
 const DEVICE_TYPE_ETHERNET: u32 = 1;
 const DEVICE_TYPE_WIFI: u32 = 2;
@@ -449,7 +450,7 @@ impl Nm {
 
     fn snapshot(&mut self) -> Snapshot {
         let state = self.manager.state().unwrap_or_default();
-        let portal = self.manager.connectivity().is_ok_and(|c| c == 2);
+        let portal = self.manager.connectivity().is_ok_and(|c| c == CONNECTIVITY_PORTAL);
         let state = match state {
             _ if portal => NetState::Portal,
             70 => NetState::Online,
@@ -1110,21 +1111,28 @@ impl Nm {
         }
     }
 
-    /// whether the portal browser is still open, it's closed once the internet works
+    /// whether the portal browser is still open, it's closed once the internet works. Connectivity
+    /// keeps being rechecked while behind the portal, even with the browser closed, since it's
+    /// often closed right after logging in
     fn check_portal(&mut self) -> bool {
-        {
+        let closed = {
             let mut portal = portal();
-            if let Some(child) = &mut *portal
-                && !matches!(child.try_wait(), Ok(None))
-            {
+            let exited =
+                (portal.as_mut()).is_some_and(|child| !matches!(child.try_wait(), Ok(None)));
+            if exited {
                 *portal = None;
             }
-            if portal.is_none() {
-                return false;
-            }
+            exited
+        };
+        let open = portal().is_some();
+        let behind_portal = self.manager.connectivity().is_ok_and(|c| c == CONNECTIVITY_PORTAL);
+        if !open && !behind_portal {
+            self.portal_checked = None;
+            return false;
         }
-        if self.portal_checked.is_some_and(|at| at.elapsed() < PORTAL_CHECK) {
-            return true;
+        // right away once the browser closes, the login most likely just went through
+        if !closed && self.portal_checked.is_some_and(|at| at.elapsed() < PORTAL_CHECK) {
+            return open;
         }
         self.portal_checked = Some(Instant::now());
         // NetworkManager only rechecks every few minutes on its own, which is far too slow to notice
@@ -1136,7 +1144,7 @@ impl Nm {
                 self.manager.state().is_ok_and(|s| s == STATE_CONNECTED_GLOBAL)
             }
         };
-        if online {
+        if online && open {
             tracing::info!("Online, closing the captive portal browser");
             close_portal();
         }
@@ -1438,6 +1446,8 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
         }
         Cmd::ClosePortal => {
             close_portal();
+            // check whether logging in worked on the next publish
+            nm.portal_checked = None;
             push(ui, |net| net.set_portal_open(false));
             return;
         }
