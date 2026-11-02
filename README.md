@@ -60,6 +60,9 @@ TAIDAN_LOG=trace cargo r
   reboot)
 - `TAIDAN_SIMULATE_ERROR=1` makes the simulated install fail halfway
 
+To debug the OOBE on a real machine, boot with `taidan.debug_shell` on the kernel command line,
+then press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> to open a root terminal.
+
 ## 📃 License
 
 `GPL-3.0-or-later`

@@ -43,10 +43,36 @@ pub fn run() {
     ui.run().expect("cannot run ui");
 }
 
+/// whether `taidan.debug_shell` is on the kernel command line, either bare or set to a true value
+/// like systemd's `systemd.debug_shell`. The taidan user can pkexec anything, so the root terminal
+/// has to be opt-in.
+fn debug_shell_enabled() -> bool {
+    match std::fs::read_to_string("/proc/cmdline") {
+        Ok(cmdline) => cmdline_has_debug_shell(&cmdline),
+        Err(e) => {
+            tracing::error!(?e, "cannot read /proc/cmdline");
+            false
+        }
+    }
+}
+
+fn cmdline_has_debug_shell(cmdline: &str) -> bool {
+    cmdline.split_ascii_whitespace().any(|arg| match arg.split_once('=') {
+        None => arg == "taidan.debug_shell",
+        Some((key, value)) => {
+            key == "taidan.debug_shell" && matches!(value, "1" | "yes" | "y" | "true" | "on")
+        }
+    })
+}
+
 fn init_actions(_ui: slint::Weak<impl slint::ComponentHandle + 'static>, actions: &Actions<'_>) {
     actions.on_open_terminal(|| {
         // wait on a separate thread so the UI keeps running while the terminal is open
         std::thread::spawn(|| {
+            if !debug_shell_enabled() {
+                tracing::info!("Ignoring Alt+Shift+T, boot with taidan.debug_shell to enable it");
+                return;
+            }
             let status = std::process::Command::new("pkexec")
                 .args(["--user", "root", "env"])
                 .args(std::env::vars().map(|(k, v)| format!("{k}={v}")))
@@ -60,4 +86,21 @@ fn init_actions(_ui: slint::Weak<impl slint::ComponentHandle + 'static>, actions
             }
         });
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_shell_needs_the_flag() {
+        assert!(cmdline_has_debug_shell("BOOT_IMAGE=/vmlinuz ro taidan.debug_shell quiet\n"));
+        assert!(cmdline_has_debug_shell("ro taidan.debug_shell=1"));
+        assert!(cmdline_has_debug_shell("ro taidan.debug_shell=yes"));
+        assert!(!cmdline_has_debug_shell("BOOT_IMAGE=/vmlinuz ro rhgb quiet\n"));
+        assert!(!cmdline_has_debug_shell("ro taidan.debug_shell=0"));
+        assert!(!cmdline_has_debug_shell("ro taidan.debug_shell=no"));
+        assert!(!cmdline_has_debug_shell("ro systemd.debug_shell"));
+        assert!(!cmdline_has_debug_shell("ro taidan.debug_shellx"));
+    }
 }
