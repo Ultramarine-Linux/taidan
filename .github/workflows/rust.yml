@@ -16,6 +16,7 @@ jobs:
       clippy-pre: |
         dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
       clippy-cargo-flags: --workspace --exclude tdnx --all-targets
+      clippy-cache: true
       test-pre: |
         dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
       # every crate's tests, taidan's are in the binary
