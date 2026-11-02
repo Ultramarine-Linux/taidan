@@ -153,8 +153,8 @@ export component TdnPage inherits TdnBasePg {
     in property <int> step_i;
     // whether the page's input is complete, which gates the Next button and Enter
     in property <bool> can-next: true;
-    // false on the first page
-    in property <bool> can-prev: true;
+    // false on the first page, which depends on `skip_pages`
+    in property <bool> can-prev: Cfg.prev-page(self.index) != self.index;
     // false for pages before the welcome screen, which aren't part of any step
     in property <bool> show-steps: true;
     in property <string> next-text: Lang.t("next", []);

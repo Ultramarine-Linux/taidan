@@ -126,11 +126,7 @@ pub fn cmd(name: &'static str, args: &[&str]) -> Res<()> {
         .output()
         .map_err(|e| Err::FailToRunProgram(name, e))?;
     if !p.status.success() {
-        return Err(Err::ProgramFail {
-            name,
-            output: String::from_utf8_lossy(&p.stdout).into_owned(),
-            rc: p.status.code(),
-        });
+        return Err(Err::program_fail(name, &p));
     }
     Ok(())
 }
@@ -145,11 +141,7 @@ pub async fn acmd(name: &'static str, args: &[&str]) -> Res<()> {
         .await
         .map_err(|e| Err::FailToRunProgram(name, e))?;
     if !p.status.success() {
-        return Err(Err::ProgramFail {
-            name,
-            output: String::from_utf8_lossy(&p.stdout).into_owned(),
-            rc: p.status.code(),
-        });
+        return Err(Err::program_fail(name, &p));
     }
     Ok(())
 }

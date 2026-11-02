@@ -176,14 +176,34 @@ fn start(ui: &slint::Weak<AppWindow>) {
     camera.set_frame(slint::Image::default());
     camera.set_open(true);
     let (stop, last) = (Arc::new(AtomicBool::new(false)), Arc::new(Mutex::new(None)));
-    RUNNING.set(Some(Running { stop: Arc::clone(&stop), last: Arc::clone(&last) }));
+    let old = RUNNING.replace(Some(Running { stop: Arc::clone(&stop), last: Arc::clone(&last) }));
+    if let Some(old) = old {
+        old.stop.store(true, Ordering::Relaxed);
+    }
     let ui = ui.clone();
-    std::thread::spawn(move || {
+    let previous = STREAM_THREAD.lock().ok().and_then(|mut t| t.take());
+    let thread = std::thread::spawn(move || {
+        // the last stream lets go of the camera after its next frame, opening it before then fails
+        // as busy. Not forever, a camera that stopped sending frames never lets it go
+        if let Some(previous) = previous {
+            for _ in 0..20 {
+                if previous.is_finished() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
         if let Err(e) = stream(&ui, &stop, &last) {
             set_error(&ui, e.to_string());
         }
     });
+    if let Ok(mut t) = STREAM_THREAD.lock() {
+        *t = Some(thread);
+    }
 }
+
+/// the thread of the last stream, see [`start`]
+static STREAM_THREAD: Mutex<Option<std::thread::JoinHandle<()>>> = Mutex::new(None);
 
 fn stop(ui: &slint::Weak<AppWindow>) {
     if let Some(running) = RUNNING.take() {

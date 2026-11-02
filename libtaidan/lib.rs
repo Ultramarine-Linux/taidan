@@ -116,20 +116,29 @@ mod parseutil {
 }
 
 /// `name` with `args` as `user` through `pkexec`, with the environment and proxy passed on since
-/// `pkexec` clears them
+/// `pkexec` clears them. Root only gets the locale, the rest (`HOME`, `XDG_*`, the session bus) is
+/// the OOBE session's and would have root write into it
 fn pkexec_cmd<I>(user: &str, name: &'static str, args: I) -> tokio::process::Command
 where
     I: IntoIterator,
     <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
 {
-    // TODO: use logic from anda
+    let as_root = user == "root";
     let mut cmd = tokio::process::Command::new("pkexec");
     cmd.args(["--user", user, "env"])
-        .args(std::env::vars().map(|(k, v)| format!("{k}={v}")))
+        .args(
+            std::env::vars()
+                .filter(|(k, _)| !as_root || is_locale_var(k))
+                .map(|(k, v)| format!("{k}={v}")),
+        )
         .args(proxy::env())
         .arg(name)
         .args(args);
     cmd
+}
+
+fn is_locale_var(key: &str) -> bool {
+    key == "LANG" || key == "LANGUAGE" || key.starts_with("LC_")
 }
 
 /// runs `cmd`, with `input` on its stdin if there's any, and returns its stdout
@@ -140,6 +149,8 @@ async fn run_cmd(
 ) -> Res<Vec<u8>> {
     use tokio::io::AsyncWriteExt;
     cmd.stdout(std::process::Stdio::piped());
+    // for the error, which would say nothing about why otherwise
+    cmd.stderr(std::process::Stdio::piped());
     cmd.stdin(if input.is_some() {
         std::process::Stdio::piped()
     } else {
@@ -157,12 +168,12 @@ async fn run_cmd(
     }
     let p = p.wait_with_output().await.map_err(|e| Err::FailToRunProgram(name, e))?;
     if !p.status.success() {
-        // TODO: more logging
-        return Err(Err::ProgramFail {
-            name,
-            output: String::from_utf8_lossy(&p.stdout).into_owned(),
-            rc: p.status.code(),
-        });
+        let e = Err::program_fail(name, &p);
+        tracing::error!(%e, "command failed");
+        return Err(e);
+    }
+    if !p.stderr.is_empty() {
+        tracing::debug!(name, stderr = %String::from_utf8_lossy(&p.stderr), "command succeeded");
     }
     Ok(p.stdout)
 }

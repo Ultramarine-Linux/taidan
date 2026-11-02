@@ -164,6 +164,9 @@ fn start(ui: &slint::Weak<AppWindow>) {
     });
 }
 
+/// whether [`finish`] has started
+static FINISHING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// marks the system as configured so the OOBE doesn't run again, then reboots or exits
 async fn finish(reboot: bool) {
     if is_dev_session() {
@@ -218,6 +221,10 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
             let state = ui.upgrade().map(|app| app.global::<Install<'_>>().get_state());
             if state != Some(InstallState::Done) {
                 tracing::error!(?state, "not finishing, the installation hasn't succeeded");
+                return;
+            }
+            // once, a second press on Done would run it all again
+            if FINISHING.swap(true, std::sync::atomic::Ordering::SeqCst) {
                 return;
             }
             std::thread::spawn(move || crate::RT.block_on(finish(reboot)));

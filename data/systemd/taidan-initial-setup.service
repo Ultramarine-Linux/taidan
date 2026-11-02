@@ -12,6 +12,10 @@ Before=getty-pre.target
 Before=display-manager.service
 Conflicts=plymouth-quit-wait.service initial-setup-text.service initial-setup-graphical.service initial-setup.service
 ConditionKernelCommandLine=!rd.live.image
+# also here, not only on the reconfiguration trigger: units it pulls in with Requires= still start
+# when its conditions fail, so without these the OOBE would run on every boot it's enabled
+ConditionPathExists=|/var/.unconfigured
+ConditionPathExists=|/.unconfigured
 
 [Service]
 Type=oneshot

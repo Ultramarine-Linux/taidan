@@ -94,7 +94,7 @@ component NetworkRow inherits HorizontalLayout {
 
         if !root.net.connected && Network.connecting-ssid != root.net.ssid: TdnIconButton {
             icon: LucidePaths.arrow-right;
-            label: Lang.t("page-internet-connect", []) + " " + root.net.ssid;
+            label: Lang.t("page-internet-connect-to", [{ key: "ssid", value: root.net.ssid }]);
             enabled: Network.connecting-ssid == "" && root.net.security != Security.unsupported;
             clicked => { root.connect(); }
         }
@@ -341,8 +341,19 @@ export component PasswordDialog inherits TdnDialog {
 component FileRow inherits TdnField {
     in property <string> path;
     in property <bool> enabled: true;
+    // whether the file browser was opened from here, so Choose gets the focus back when this is
+    // made again as it closes
+    in property <bool> refocus;
     callback pick();
     callback clear();
+    callback refocused();
+
+    init => {
+        if root.refocus {
+            choose.focus();
+            root.refocused();
+        }
+    }
 
     HorizontalLayout {
         spacing: 0.5rem;
@@ -366,7 +377,7 @@ component FileRow inherits TdnField {
             clicked => { root.clear(); }
         }
 
-        TdnBtn {
+        choose := TdnBtn {
             in-dialog: true;
             outline: true;
             text: Lang.t("page-internet-8021x-choose", []);
@@ -389,7 +400,11 @@ component FileBrowser inherits VerticalLayout {
     callback cancelled();
 
     spacing: 0.75rem;
-    init => { Network.browse(Network.browse-dir, root.pac, root.show-all); }
+    init => {
+        Network.browse(Network.browse-dir, root.pac, root.show-all);
+        // the Choose button it was opened from is gone, so Escape and Tab need the focus in here
+        cancel.focus();
+    }
 
     HorizontalLayout {
         spacing: 0.4rem;
@@ -475,7 +490,7 @@ component FileBrowser inherits VerticalLayout {
     HorizontalLayout {
         alignment: start;
 
-        TdnBtn {
+        cancel := TdnBtn {
             in-dialog: true;
             text: Lang.t("cancel", []);
             clicked => { root.cancelled(); }
@@ -541,6 +556,13 @@ export component EnterpriseDialog inherits TdnDialog {
 
     // the file being picked: "ca", "client", "key" or "pac", empty when not picking
     property <string> picking;
+    // the file the browser just closed for, whose row takes the focus back, see `FileRow.refocus`
+    property <string> picked-from;
+
+    function stop-picking() {
+        root.picked-from = root.picking;
+        root.picking = "";
+    }
     property <bool> show-all-files;
 
     property <bool> complete: root.username != ""
@@ -555,7 +577,7 @@ export component EnterpriseDialog inherits TdnDialog {
     dialog-width: 26rem;
     dismissed => {
         if root.picking != "" {
-            root.picking = "";
+            root.stop-picking();
         } else {
             Network.enterprise-open = false;
         }
@@ -571,7 +593,7 @@ export component EnterpriseDialog inherits TdnDialog {
         if root.picking == "client" { root.client-cert = path; }
         if root.picking == "key" { root.private-key = path; }
         if root.picking == "pac" { root.pac-file = path; }
-        root.picking = "";
+        root.stop-picking();
     }
 
     function submit() {
@@ -601,7 +623,7 @@ export component EnterpriseDialog inherits TdnDialog {
         show-all <=> root.show-all-files;
         list-height: min(12rem, root.height - 22rem);
         picked(path) => { root.picked(path); }
-        cancelled => { root.picking = ""; }
+        cancelled => { root.stop-picking(); }
     }
 
     if root.picking == "": scroll := ScrollView {
@@ -645,7 +667,8 @@ export component EnterpriseDialog inherits TdnDialog {
                     label: identity-field.label;
                     text <=> root.username;
                     placeholder: Lang.t("page-internet-username-placeholder", []);
-                    auto-focus: true;
+                    // unless a file row takes it back from the file browser
+                    auto-focus: root.picked-from == "";
                     enabled: !root.busy;
                     edited(text) => {
                         if !root.domain-touched { root.domain = Network.realm(text); }
@@ -674,6 +697,8 @@ export component EnterpriseDialog inherits TdnDialog {
                 label: Lang.t("page-internet-8021x-client-cert", []);
                 path: root.client-cert;
                 enabled: !root.busy;
+                refocus: root.picked-from == "client";
+                refocused => { root.picked-from = ""; }
                 pick => { root.picking = "client"; }
                 clear => { root.client-cert = ""; }
             }
@@ -683,6 +708,8 @@ export component EnterpriseDialog inherits TdnDialog {
                 label: Lang.t("page-internet-8021x-private-key", []);
                 path: root.private-key;
                 enabled: !root.busy;
+                refocus: root.picked-from == "key";
+                refocused => { root.picked-from = ""; }
                 pick => { root.picking = "key"; }
                 clear => { root.private-key = ""; }
             }
@@ -722,6 +749,8 @@ export component EnterpriseDialog inherits TdnDialog {
                 label: Lang.t("page-internet-8021x-ca-cert", []);
                 path: root.ca-cert;
                 enabled: !root.busy;
+                refocus: root.picked-from == "ca";
+                refocused => { root.picked-from = ""; }
                 pick => { root.picking = "ca"; }
                 clear => { root.ca-cert = ""; }
             }
@@ -773,6 +802,8 @@ export component EnterpriseDialog inherits TdnDialog {
                 help: root.fast-provisioning ? Lang.t("page-internet-8021x-pac-desc", []) : "";
                 path: root.pac-file;
                 enabled: !root.busy;
+                refocus: root.picked-from == "pac";
+                refocused => { root.picked-from = ""; }
                 pick => { root.picking = "pac"; }
                 clear => { root.pac-file = ""; }
             }

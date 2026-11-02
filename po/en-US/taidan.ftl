@@ -26,12 +26,6 @@ steps-dnfinstallapps = Installing Apps…
 steps-driverscodecs = Installing Drivers and Codecs…
 steps-setupimf = Setting Up Input Methods…
 steps-setlocale = Applying Your Language…
-imelangs-ch = Chinese
-imelangs-ja = Japanese
-imelangs-ko = Korean
-imelangs-vi = Vietnamese
-imelangs-in = Indic
-imelangs-th = Thai
 # .display:
 # This is intentional and you are required to fill in this field.
 # $lang_name is the language name you probably have just translated (see
@@ -45,8 +39,6 @@ imelangs-th = Thai
 #
 # In other languages, you might need to change the order around and maybe
 # use different brackets, etc.
-imelangs-display = { $lang_name } ({ $native_lang_name })
-
 ## [Accessibility]
 
 # also the name of the button that opens it, in the header of every page
@@ -96,15 +88,11 @@ page-language-search-lang = Search Language/Locale…
 
 ## [Welcome]
 
-page-welcome = Welcome to { $distro }
 # page title
-page-welcome-ready = Let's get your device ready.
 page-welcome-go = Let's Go
 # big heading on the first page
 page-welcome-hello = Welcome!
 # .skipcfg: also a "Next" btn, but skips some pages
-page-welcome-skipcfg = Skip Configuration
-
 ## [Keyboard Layout]
 
 # page title
@@ -114,11 +102,6 @@ page-keyboard-search-layout = Search keyboard layouts…
 page-keyboard-search-variant = Search keyboard variants…
 
 ## [Device Name]
-page-devicename = Name This Device
-page-devicename-devicename = Name
-page-devicename-hostname = Hostname
-page-devicename-error = Hostname must start with a letter, and may only contain lowercase letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
-
 ## [Username]
 
 # page title
@@ -133,6 +116,8 @@ page-whoareyou-fullname-desc = Your name, shown on the login screen.
 page-whoareyou-username-desc = The name of your home folder.
 # .icon: the picture shown for the user, e.g. on the login screen
 page-whoareyou-icon = User Icon
+# accessible name of each preset icon, $n counts from 1
+page-whoareyou-icon-n = User Icon { $n }
 page-whoareyou-icon-desc = Pick one, or take a photo.
 # .camera: title of the dialog for taking the user icon with the webcam (also its button)
 page-whoareyou-camera = Take a Photo
@@ -180,9 +165,6 @@ page-timezone-none = No matching time zones.
 page-internet = Get Online
 page-internet-desc = Connect to the internet to install codecs, drivers, and apps.
 page-internet-skip = I Don't Have Internet
-page-internet-warn = Codecs, drivers and some apps won't be installed without internet.
-page-internet-open = Connect to a WiFi Network
-page-internet-ok = You're connected! Press next to continue.
 # btn, opens a browser to log in to networks like hotel or airport wi-fi
 page-internet-portal = Captive Portal
 # btn, closes the browser opened by page-internet-portal
@@ -247,7 +229,6 @@ page-internet-username-placeholder = name@university.edu
 # btn, shows more settings for the network login
 page-internet-advanced = Advanced
 # label for picking how to log in to the network, e.g. PEAP or TTLS
-page-internet-method = Authentication
 page-internet-server = Authentication Server
 page-internet-server-desc = Your password is only sent to a server with a valid certificate for this domain.
 page-internet-server-desc-optional = Optional. Only connect to a server with a certificate for this domain.
@@ -301,83 +282,35 @@ page-internet-offline-desc = If you don't connect to the internet, drivers and c
 ## [Analytics and Crash Reporting]
 ## this page is currently not in use, we recommend skipping
 
-page-analytics = Analytics and Crash Reporting
-page-crashreport = Crash Reporting
-page-crashreport-desc = Allow { $org } to collect crash data to find bugs and assist you.
-page-crashreport-lbl1 = All data collected is anonymous and end-to-end-encrypted.
-page-crashreport-lbl2 = You will be given a crash ID to help support find what went wrong.
-switch-crashreport = Send Crash Data
-switch-crashreport-desc = Press next to keep off
-
 ## [Tweaks]
 page-tweaks = System Tweaks
 page-tweaks-desc = Optional changes from your distribution. You can change them again later.
 # btn, closes the tweaks dialog
 page-tweaks-done = Done
-page-tweaks-more = Show advanced configurations
-
 ## [Codecs and Drivers]
-
-page-codecs = Codecs and Drivers
-page-codecs-desc1 = Install common media codecs and drivers for your device.
-page-codecs-desc2 =
-    Consult the { $wiki } if you don't have an Internet connection.
-page-codecs-wiki = wiki
-switch-codecs = Install Codecs and Drivers
-switch-codecs-desc = Turning this on installs proprietary codecs and drivers
 
 ## [Input Method]
 
 # page title
-page-inputmethod = Additional Input Methods
 # languages that do require IMEs should change the second line to:
 # Press "Add Input Method" to continue.
-page-inputmethod-desc =
-    Languages with non-Latin characters may require an extra <b>input method editor (IME)</b>.
-    You can skip this page if you do not need to type in one of these languages.
-    More information is available on { $wiki }.
-page-inputmethod-add = Add Input Method
-page-inputmethod-wiki = the wiki
-page-inputmethod-search-lang = Search language…
-page-inputmethod-search-ims = Search IMs/IMEs…
-
 ## [Choose Your Theme]
 
 # page title
-page-theme = Choose Your Theme
-page-theme-desc =
-    Make this system your own with a splash of colour.
-    You can change this option later in settings.
-page-theme-note = Some apps may not respect this preference.
-page-theme-light = Light
-page-theme-dark = Dark
-
 ## [Browser Selection]
-
-page-browser = Browser Selection
 
 ## page: Categories
 
 # page title
-page-categories = What Do You Use This Device For?
-page-categories-confirm = Confirm and Setup System
-page-categories-done = Done
 # category names
 # you should use a selector; e.g.
 # { $cat ->
 #   [Productivity] -> projdsalkaj;cjzkpqi
 #   […]
 # }
-categories = { $cat }
-
 ## [Installing]
 
-page-installing = Installing Your Apps
 page-installing-configuring = Configuring your Device
-page-installing-desc = This won't take long!
-page-installing-loading = Loading…
-page-installing-flatpak = Installing {$n} Flatpaks…
-
 ## [Finish]
 
 ## [Location]
@@ -424,15 +357,10 @@ page-done-reboot = Reboot
 # btn, ends the setup and shows the login screen, when no reboot is needed
 page-done-login = Log In
 
-page-finish = Ready to Do Your Thing?
-page-finish-desc = We hope you enjoy Ultramarine!
-page-finish-done = Done
-
 ## [Error]
 
 page-error = Error
 page-error-desc = We hit a snag.
-page-error-done = Exit
 page-error-retry = Retry
 # btn (back to the summary page to change settings before retrying)
 page-error-back = Go Back

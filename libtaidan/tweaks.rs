@@ -164,8 +164,10 @@ impl Tweak {
     /// Expects `pkexec` to be available.
     #[tracing::instrument]
     pub async fn run(&self, settings: &[u8], on: bool) {
+        // `pkexec` clears the environment, and tweaks may download things too
         let cmd = tokio::process::Command::new("pkexec")
-            .args(["--user", "root"])
+            .args(["--user", "root", "env"])
+            .args(crate::proxy::env())
             .arg(self.path.join("up"))
             .arg(if on { "1" } else { "0" })
             .stdin(std::process::Stdio::piped())

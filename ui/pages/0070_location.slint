@@ -30,7 +30,8 @@ export component LocationPage inherits TdnPage {
 
             toggle := TdnToggleRow {
                 text: Lang.t("page-location", []);
-                checked <=> Location.enabled;
+                checked: Location.enabled;
+                toggled(on) => { Location.enabled = on; }
                 accepted => { root.try-next(); }
             }
         }

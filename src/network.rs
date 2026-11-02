@@ -1377,6 +1377,27 @@ fn browse(net: &Network<'_>, dir: slint::SharedString, pac: bool, all: bool) {
     net.set_browse_dir(dir);
 }
 
+/// connecting to a network from the list or the password dialog
+fn init_connect(ui: &slint::Weak<AppWindow>, net: &Network<'_>, send: impl Fn(Cmd) + 'static) {
+    net.on_connect({
+        let ui = ui.clone();
+        move |ssid, password| {
+            // busy right away, not once the worker gets to it after a scan, so a second click or
+            // Enter doesn't queue another connect that drops the first one
+            if let Some(ui) = ui.upgrade() {
+                let net = ui.global::<Network<'_>>();
+                if !net.get_connecting_ssid().is_empty() {
+                    return;
+                }
+                net.set_error_id("".into());
+                net.set_error_ssid("".into());
+                net.set_connecting_ssid(ssid.clone());
+            }
+            send(Cmd::Connect { ssid: ssid.into(), password: password.into() });
+        }
+    });
+}
+
 /// the captive portal button, which opens and closes the browser through the network worker
 fn init_portal(
     ui: &slint::Weak<AppWindow>,
@@ -1427,10 +1448,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
         let send = send.clone();
         move || send(Cmd::Refresh)
     });
-    net.on_connect({
-        let send = send.clone();
-        move |ssid, password| send(Cmd::Connect { ssid: ssid.into(), password: password.into() })
-    });
+    init_connect(ui, net, send.clone());
     net.on_connect_enterprise({
         let send = send.clone();
         move |login| send(Cmd::ConnectEnterprise(login))

@@ -74,12 +74,15 @@ export component AppWindow inherits Window {
         else if pagenum == 8 { location.focus(); }
         else if pagenum == 9 { drivers.focus(); }
         else if pagenum == summary-page { summary.focus(); }
+        else if pagenum == installing-page { installing.focus(); }
         else if pagenum == done-page { done.focus(); }
         else if pagenum == error-page { error.focus(); }
     }
     changed pagenum => {
         focus-page();
         if pagenum == 6 { Tz.refresh(); }
+        // with the time zone page skipped, the summary still shows the system's
+        if pagenum == summary-page && Tz.current.id == "" { Tz.refresh(); }
         if pagenum == 7 { Network.refresh(); }
     }
     init => { focus-page(); }
@@ -212,7 +215,7 @@ export component AppWindow inherits Window {
         }
     }
 
-    InstallingPage {
+    installing := InstallingPage {
         index: installing-page;
         current: pagenum;
     }

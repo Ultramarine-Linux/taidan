@@ -27,7 +27,9 @@ export component FocusRing inherits Rectangle {
     in property <length> offset:     Tokens.focus-ring-offset;
     in property <length> ring-width: Tokens.focus-ring-width;
     in property <length> radius:     Tokens.radius-md + root.offset;
-    in property <color>  ring-color: Tokens.color-ring-muted;
+    // solid, the translucent `color-ring-muted` is under the 3:1 WCAG asks of focus indicators
+    // against the background in both modes
+    in property <color>  ring-color: Tokens.color-ring;
     // draws the ring `offset` inside the box instead, for hosts with no room around them,
     // like rows packed in a list
     in property <bool>   inset;

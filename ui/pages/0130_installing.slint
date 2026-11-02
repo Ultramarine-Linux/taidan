@@ -6,6 +6,12 @@ import { TdnText, TdnSpinner } from "../components.slint";
 import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
 
 export component InstallingPage inherits TdnBasePg {
+    property <string> stage: Install.stage-id == "" ? "" : Lang.t(Install.stage-id, []) + "  (" + Install.stage-num + "/" + Install.stage-count + ")";
+
+    // nothing to press here, so the focus goes to the progress, which screen readers read out as
+    // the stage changes
+    forward-focus: status;
+
     VerticalLayout {
         VerticalLayout {
             padding-left: 2rem;
@@ -25,40 +31,50 @@ export component InstallingPage inherits TdnBasePg {
             accessible-role: none;
         }
 
-        HorizontalLayout {
-            padding-left: 1.75rem;
-            padding-right: 1.75rem;
-            padding-top: 1.25rem;
-            padding-bottom: 1.25rem;
-            spacing: 1rem;
+        status := FocusScope {
+            accessible-role: progress-indicator;
+            accessible-label: Lang.t("page-installing-configuring", []);
+            accessible-value: root.stage;
+            accessible-value-minimum: 0;
+            accessible-value-maximum: Install.stage-count;
 
-            VerticalLayout {
-                alignment: center;
-                horizontal-stretch: 0;
+            HorizontalLayout {
+                padding-left: 1.75rem;
+                padding-right: 1.75rem;
+                padding-top: 1.25rem;
+                padding-bottom: 1.25rem;
+                spacing: 1rem;
 
-                TdnSpinner {
-                    width: 1.6rem;
-                }
-            }
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 0;
 
-            VerticalLayout {
-                alignment: center;
-                spacing: 0.2rem;
-
-                TdnText {
-                    text: Lang.t("page-installing-configuring", []);
-                    font-size: 1.5 * Tokens.text-rem;
-                    font-weight: Tokens.typography-weight-medium;
-                    horizontal-alignment: left;
-                    wrap: word-wrap;
+                    TdnSpinner {
+                        width: 1.6rem;
+                        // the progress around it says what's going on
+                        accessible-role: none;
+                    }
                 }
 
-                TdnText {
-                    text: Install.stage-id == "" ? "" : Lang.t(Install.stage-id, []) + "  (" + Install.stage-num + "/" + Install.stage-count + ")";
-                    color: Tokens.color-muted-foreground;
-                    font-size: Tokens.typography-body-sm-size;
-                    horizontal-alignment: left;
-                    overflow: elide;
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 0.2rem;
+
+                    TdnText {
+                        text: Lang.t("page-installing-configuring", []);
+                        font-size: 1.5 * Tokens.text-rem;
+                        font-weight: Tokens.typography-weight-medium;
+                        horizontal-alignment: left;
+                        wrap: word-wrap;
+                    }
+
+                    TdnText {
+                        text: root.stage;
+                        color: Tokens.color-muted-foreground;
+                        font-size: Tokens.typography-body-sm-size;
+                        horizontal-alignment: left;
+                        overflow: elide;
+                    }
                 }
             }
         }

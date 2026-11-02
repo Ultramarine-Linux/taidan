@@ -106,7 +106,12 @@ impl Drivers {
     }
 
     async fn get_nvidia_chipset() -> Res<String> {
-        Ok(String::from_utf8_lossy(Command::new("sh").arg("-c").arg("lspci | grep -i NVIDIA | head -n 1 | cut -d ':' -f 3 | cut -d '[' -f 1 | sed -e 's/^[[:space:]]*//'").stdout(std::process::Stdio::piped()).output().await.map_err(|e| Err::FailToRunProgram("sh", e)).wrap_msg("cannot detect nvidia chipset")?.stdout.rsplit(|&c| c == b' ').next().expect("malformatted output from shell")).to_string())
+        let out = Command::new("lspci")
+            .output()
+            .await
+            .map_err(|e| Err::FailToRunProgram("lspci", e))
+            .wrap_msg("cannot detect nvidia chipset")?;
+        Ok(nvidia_chipset(&String::from_utf8_lossy(&out.stdout)).unwrap_or_default().to_owned())
     }
 
     ///    Returns a list of Nvidia packages to install
@@ -146,7 +151,7 @@ impl Drivers {
                 "--append=rd.driver.blacklist=nouveau",
                 "--append=modprobe.blacklist=nouveau",
                 "--append=nvidia-drm.modeset=1",
-                "initcall_blacklist=simpledrm_platform_driver_init",
+                "--append=initcall_blacklist=simpledrm_platform_driver_init",
             ],
         )
         .await?;
@@ -211,10 +216,13 @@ impl Drivers {
         if primary_gpu {
             root(
                 "sh",
-                &[r#"
+                &[
+                    "-c",
+                    r#"
                     cp -p /usr/share/X11/xorg.conf.d/nvidia.conf /etc/X11/xorg.conf.d/nvidia.conf
                     sed -i '10i\\\tOption "PrimaryGPU" "yes"' /etc/X11/xorg.conf.d/nvidia.conf
-                "#],
+                "#,
+                ],
             )
             .await
             .wrap_msg("cannot set nvidia as primary gpu")?;
@@ -261,9 +269,37 @@ impl Drivers {
     }
 }
 
+/// the chip of the first NVIDIA GPU in `lspci`'s output, e.g. `GA106` from
+/// `01:00.0 VGA compatible controller: NVIDIA Corporation GA106 [GeForce RTX 3060] (rev a1)`
+fn nvidia_chipset(lspci: &str) -> Option<&str> {
+    lspci
+        .lines()
+        .filter(|l| l.contains("VGA compatible controller") || l.contains("3D controller"))
+        .filter_map(|l| l.split_once(": ")?.1.strip_prefix("NVIDIA Corporation "))
+        .find_map(|desc| desc.split_whitespace().next())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nvidia_chipset_from_lspci() {
+        let lspci = "\
+00:02.0 VGA compatible controller: Intel Corporation Alder Lake-P GT2 [Iris Xe Graphics] (rev 0c)
+01:00.1 Audio device: NVIDIA Corporation GA106 High Definition Audio Controller (rev a1)
+01:00.0 3D controller: NVIDIA Corporation GA106M [GeForce RTX 3060 Mobile / Max-Q] (rev a1)
+";
+        assert_eq!(nvidia_chipset(lspci), Some("GA106M"));
+        let lspci = "01:00.0 VGA compatible controller: NVIDIA Corporation GK208B [GeForce GT 710] (rev a1)";
+        assert_eq!(nvidia_chipset(lspci), Some("GK208B"));
+        assert_eq!(Drivers::get_nvidia_driver(nvidia_chipset(lspci).unwrap()), "470xx");
+        assert_eq!(
+            nvidia_chipset("00:02.0 VGA compatible controller: Intel Corporation UHD"),
+            None
+        );
+    }
+
     #[test]
     fn test_get_nvidia_driver() {
         assert_eq!(Drivers::get_nvidia_driver("NV34"), "unsupported");

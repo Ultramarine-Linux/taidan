@@ -21,6 +21,9 @@ Requires:       (glib2 or (/usr/bin/plasma-apply-colorscheme and kf6-kconfig))
 Requires:       shadow-utils
 Requires:       systemd
 Requires:       systemd-udev
+# chvt for the unit, pkill for start-taidan
+Requires:       kbd
+Requires:       procps-ng
 Requires:       bash
 Requires:       (dnf5 and dnf5-command(copr))
 Requires:       flatpak

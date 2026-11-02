@@ -582,7 +582,8 @@ export component TdnField inherits VerticalLayout {
 // a bordered row with a label and a switch, e.g. "Install Drivers"
 export component TdnToggleRow inherits Rectangle {
     in property <string> text;
-    in-out property <bool> checked;
+    // set it from what `toggled` changes, rather than `<=>`, so it keeps following the setting
+    in property <bool> checked;
     callback toggled(bool);
     // fired on Enter, while Space toggles
     callback accepted();
@@ -592,8 +593,7 @@ export component TdnToggleRow inherits Rectangle {
     property <bool> pointer-focus;
 
     function toggle() {
-        root.checked = !root.checked;
-        root.toggled(root.checked);
+        root.toggled(!root.checked);
     }
 
     forward-focus: focus;
@@ -866,6 +866,10 @@ export component TdnDialog inherits Rectangle {
             content := VerticalLayout {
                 padding: 1.25rem;
                 spacing: 1rem;
+                // Slint has no dialog role, so a named group like `TdnPage`'s, which screen
+                // readers announce when the focus moves into the dialog
+                accessible-role: groupbox;
+                accessible-label: root.title;
 
                 TdnText {
                     text: root.title;

@@ -87,7 +87,8 @@ export component DriversPage inherits TdnPage {
 
             toggle := TdnToggleRow {
                 text: Lang.t("page-drivers-install", []);
-                checked <=> Drivers.install;
+                checked: Drivers.install;
+                toggled(on) => { Drivers.install = on; }
                 accepted => { root.try-next(); }
             }
         }

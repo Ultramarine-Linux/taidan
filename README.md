@@ -11,19 +11,25 @@ For an up-to-date list, see `scripts/taidan.spec`.
 
 ```
 kwin, dbus-daemon, swaybg [the OOBE session]
+polkit [running the setup as root]
 fontconfig
-vercel-geist-fonts
+vercel-geist-fonts, atkinson-hyperlegible-next-fonts and atkinson-hyperlegible-mono-fonts
+orca [screen reader]
 libxkbcommon, wayland and EGL libraries [loaded at runtime by Slint]
 NetworkManager
 cog [browser for captive portals]
 tzdata [time zones]
 gsettings or (plasma-apply-colorscheme and kwriteconfig6)
+kwriteconfig6
 shadow-utils
-systemd
-sh
+systemd and systemd-udev
+kbd and procps-ng [chvt and pkill for the session]
+bash, util-linux-script
 dnf5 and dnf5-command(copr)
 flatpak
-chrony [recommended, keeps the clock right]
+xdg-terminal-exec [the debug terminal, see Testing]
+umcli [tweaks, through taidan-default-configs]
+chrony and grubby [recommended, the clock and NVIDIA drivers]
 ```
 
 ### 🛠️ Build Dependencies

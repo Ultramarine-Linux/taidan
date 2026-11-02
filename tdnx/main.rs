@@ -23,7 +23,10 @@ async fn main() {
     let settings_content = fs::read_to_string(settings_file).expect("cannot read settings file");
     let mut settings: libtaidan::settings::Settings =
         serde_json::from_str(&settings_content).expect("cannot parse settings json");
-    let cfg = libtaidan::cfg::Config::new().expect("cannot read system taidan config");
+    let mut cfg = libtaidan::cfg::Config::new().expect("cannot read system taidan config");
+    // the edition picks the input method framework, among others. Not `populate`, which exits
+    // when a user exists already
+    cfg.read_os_release();
     libtaidan::start_install(&mut settings, &cfg, &|_| {}).await.expect("taidan install failed");
 }
 

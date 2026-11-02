@@ -20,3 +20,23 @@ jobs:
       # every crate's tests, taidan's are in the binary
       test-cargo-flags: --workspace
       test-cache: true
+
+  # the reusable workflow's clippy only covers the default features, and tdnx's backends can't be
+  # built together
+  tdnx:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/fyralabs/ci:f44
+    strategy:
+      matrix:
+        feature: [server-oobe, desktop-install]
+    steps:
+      - name: Install build deps
+        run: dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: stable
+          components: clippy
+      - name: Clippy
+        run: cargo clippy -p tdnx --features ${{ matrix.feature }} -- -D warnings

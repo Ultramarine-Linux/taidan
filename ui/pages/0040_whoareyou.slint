@@ -116,7 +116,7 @@ component Preset inherits IconButton {
     in property <int> index;
     image: Account.avatars[root.index].image;
     selected: Account.avatar-id == Account.avatars[root.index].id;
-    label: Lang.t("page-whoareyou-icon", []) + " " + (root.index + 1);
+    label: Lang.t("page-whoareyou-icon-n", [{ key: "n", value: root.index + 1 }]);
     clicked => {
         Account.avatar-id = Account.avatars[root.index].id;
         Account.avatar = Account.avatars[root.index].image;

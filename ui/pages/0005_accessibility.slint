@@ -21,7 +21,9 @@ global A11yIcons {
 component A11yTile inherits Rectangle {
     in property <string> icon;
     in property <string> text;
-    in-out property <bool> checked;
+    // set it from what `toggled` changes, so it keeps following the setting when something else
+    // (Meta+Alt+S for the screen reader) changes it
+    in property <bool> checked;
     // whether this is part of a dialog, see `Modal`
     in property <bool> in-dialog;
     callback toggled(bool);
@@ -29,8 +31,7 @@ component A11yTile inherits Rectangle {
     property <bool> pointer-focus;
 
     function toggle() {
-        root.checked = !root.checked;
-        root.toggled(root.checked);
+        root.toggled(!root.checked);
     }
 
     forward-focus: focus;
@@ -336,6 +337,9 @@ export component AccessibilityDialog inherits Rectangle {
             height: parent.height;
             in-dialog: true;
             next-text: Lang.t("page-accessibility-done", []);
+            // read when the focus moves into it, as on the page
+            accessible-role: groupbox;
+            accessible-label: Lang.t("page-accessibility", []);
             next => { A11y.open = false; }
         }
     }
@@ -347,7 +351,7 @@ export component AccessibilityDialog inherits Rectangle {
 component OptionRow inherits VerticalLayout {
     in property <string> text;
     in property <string> desc;
-    in-out property <bool> checked;
+    in property <bool> checked;
     callback toggled(bool);
     // Enter, which closes the dialog like Done
     callback accepted();

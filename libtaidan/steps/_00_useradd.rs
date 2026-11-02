@@ -68,9 +68,13 @@ async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
     let pass = hash_password(settings)?;
     let fullname = crate::passwd::sanitize_fullname(&settings.fullname);
     let user = settings.username.as_str();
-    super::super::root("useradd", ["-p", &pass, "-c", &fullname, "-m", "-G", "wheel", "--", user])
+    super::super::root("useradd", ["-c", &fullname, "-m", "-G", "wheel", "--", user])
         .await
-        .wrap_msg("cannot create the user")
+        .wrap_msg("cannot create the user")?;
+    // through stdin, since anyone can read a command's arguments
+    super::super::root_with_stdin("chpasswd", ["-e"], format!("{user}:{pass}\n").as_bytes())
+        .await
+        .wrap_msg("cannot set the password")
 }
 
 async fn homed(settings: &crate::settings::Settings) -> Res<()> {

@@ -55,7 +55,15 @@ impl Config {
     #[tracing::instrument]
     pub fn populate(&mut self) {
         self.taidan0.check();
-        // distro
+        self.read_os_release();
+        tracing::trace!("Populated config: {self:#?}");
+    }
+
+    /// the distro name, and the edition unless the config sets it, from `/etc/os-release`
+    ///
+    /// # Panics
+    /// `/etc/os-release` can't be read or has no `NAME=` or `VARIANT_ID=`.
+    pub fn read_os_release(&mut self) {
         let file = std::fs::read_to_string("/etc/os-release").expect("Cannot read /etc/os-release");
         let name = file
             .split('\n')
@@ -77,8 +85,6 @@ impl Config {
                 .unwrap_or(edition)
                 .clone_into(&mut self.edition);
         }
-
-        tracing::trace!("Populated config: {self:#?}");
     }
 }
 
