@@ -1,9 +1,4 @@
-// Slint's generated code only allows clippy::{all,pedantic,nursery}, not the restriction lints we enable.
-#[allow(clippy::restriction)]
-mod generated {
-    slint::include_modules!();
-}
-pub use generated::*;
+pub use taidan_ui::*;
 
 /// # Panics
 /// If the UI cannot be created or the event loop fails.

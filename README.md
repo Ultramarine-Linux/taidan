@@ -115,7 +115,7 @@ accent_foreground_color_dark = "#ffffff"   # dark mode, accent_foreground_color 
 [welcome]
 t0 = "My Distro 42"                        # caption on the picture beside the pages, none if unset
 t0_color = "#ffffff"                       # caption color
-t1_color = "#ffffff"                       # Taidan version color
+t1_color = "#ffffff"                       # Taidan version color, only shown in dev sessions
 hero_image = "/usr/share/backgrounds/my-distro.png"       # the picture, light mode
 hero_image_dark = "/usr/share/backgrounds/my-distro-dark.png"
 ```

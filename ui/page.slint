@@ -67,25 +67,29 @@ export component TdnHero inherits Rectangle {
         accessible-role: none;
     }
 
-    // distro branding on the wallpaper, kept where the artwork expects it in every language
-    caption := Text {
+    // marks a dev session, kept where the artwork expects it in every language. Distros can also
+    // set their own caption, which production shows alone.
+    property <string> caption: Cfg.get_string("welcome.t0", Cfg.dev-session ? "Development Session" : "");
+
+    if root.caption != "" || Cfg.dev-session: VerticalLayout {
         x: 1rem;
         y: parent.height - self.height - 1rem;
-        font-size: Tokens.typography-body-size;
-        // only the version when the distro doesn't set a caption
-        text: Cfg.get_string("welcome.t0", "");
-        color: Cfg.get_brush("welcome.t0_color", white);
-    }
+        width: self.preferred-width;
+        height: self.preferred-height;
+        spacing: 0.125rem;
 
-    // right-aligned on the caption's last line
-    Text {
-        x: caption.x;
-        y: caption.y + caption.height - self.height;
-        width: caption.width;
-        font-size: Tokens.typography-body-size;
-        text: "Taidan " + Cfg.version;
-        color: Cfg.get_brush("welcome.t1_color", white);
-        horizontal-alignment: right;
+        if root.caption != "": Text {
+            font-size: Tokens.typography-body-size;
+            font-weight: 600;
+            text: root.caption;
+            color: Cfg.get_brush("welcome.t0_color", white);
+        }
+
+        if Cfg.dev-session: Text {
+            font-size: Tokens.typography-body-sm-size;
+            text: "Taidan " + Cfg.version;
+            color: Cfg.get_brush("welcome.t1_color", white);
+        }
     }
 }
 

@@ -6367,9 +6367,9 @@ dependencies = [
  "serde",
  "serde_json",
  "slint",
- "slint-build",
  "strip-ansi-escapes",
  "taidan_proc_macros",
+ "taidan_ui",
  "tempfile",
  "tokio",
  "tracing",
@@ -6392,6 +6392,14 @@ dependencies = [
  "quote",
  "rust_icu_uloc",
  "unic-langid-impl",
+]
+
+[[package]]
+name = "taidan_ui"
+version = "0.2.7"
+dependencies = [
+ "slint",
+ "slint-build",
 ]
 
 [[package]]

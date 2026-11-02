@@ -245,11 +245,14 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
             std::thread::spawn(move || crate::RT.block_on(finish(reboot)));
         }
     });
-    // as on the GTK version, skipping the drivers (`codecs`) page means not installing them
-    if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Drivers)
-        && let Some(app) = ui.upgrade()
-    {
-        app.global::<Drivers<'_>>().set_install(false);
+    if let Some(app) = ui.upgrade() {
+        let drivers = app.global::<Drivers<'_>>();
+        // as on the GTK version, skipping the drivers (`codecs`) page means not installing them
+        if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Drivers) {
+            drivers.set_install(false);
+        }
+        // codecs come from dnf, see `DnfDownloadApps`
+        drivers.set_codecs(!crate::CFG.taidan0.skip_dnf);
     }
 
     // detect hardware for the drivers page in the background, as `lspci` can take a moment

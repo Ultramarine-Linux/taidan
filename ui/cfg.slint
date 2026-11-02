@@ -12,6 +12,8 @@ export global Cfg {
     get_color(path, default) => default;
     in-out property <string> version: "0.0.0";
     in-out property <string> distro: "Ultramarine Linux";
+    // a developer running Taidan on their own machine, see `is_dev_session` in src/install.rs
+    in property <bool> dev-session;
     // welcome page image, decoded off the UI thread and set from Rust
     in property <image> hero-light: @image-url("../data/icons/background-light.webp");
     in property <image> hero-dark: @image-url("../data/icons/background-dark.webp");

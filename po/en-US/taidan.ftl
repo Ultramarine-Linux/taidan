@@ -344,11 +344,12 @@ page-drivers-desc = Install additional drivers, codecs, and tools to support har
 page-drivers-proprietary = Some drivers may be proprietary.
 # toggle
 page-drivers-install = Install Drivers
-# .nvidia, .broadcom-*, .builtin: items in the list of drivers to install
+# .nvidia, .broadcom-*, .builtin, .codecs: items in the list of drivers to install
 page-drivers-nvidia = NVIDIA Graphics
 page-drivers-broadcom-wifi = Broadcom WiFi
 page-drivers-broadcom-bluetooth = Broadcom Bluetooth
 page-drivers-builtin = Built-in Drivers
+page-drivers-codecs = Multimedia Codecs
 
 ## [Summary]
 

@@ -33,6 +33,8 @@ export global Drivers {
     in property <bool> nvidia;
     in property <bool> broadcom-wifi;
     in property <bool> broadcom-bluetooth;
+    // false when the distro skips dnf (`taidan0.skip_dnf`), which is how codecs get installed
+    in property <bool> codecs: true;
     // whether to install drivers and codecs
     in-out property <bool> install: true;
 }

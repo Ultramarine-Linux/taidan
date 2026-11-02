@@ -17,6 +17,25 @@ export component WelcomePage inherits TdnBasePg {
 
         TdnHero {
             vertical-stretch: 1;
+
+            // back to the keyboard, so a wrong layout can still be fixed. In the top corner, away
+            // from Let's Go.
+            if root.can-prev: TdnBtn {
+                x: Dir.x(1rem, self.width, parent.width);
+                y: 1rem;
+                width: self.min-width;
+                height: self.min-height;
+                border-radius: self.height / 2;
+                padding-x: 0;
+                icon-size: 1rem;
+                // a dark scrim reads on any wallpaper
+                background-color: #000000a0;
+                foreground-color: white;
+                icon: Lang.rtl ? @image-url("../../data/icons/go-previous-symbolic-rtl.svg")
+                    : @image-url("../../data/icons/go-previous-symbolic.svg");
+                accessible-label: Lang.t("prev", []);
+                clicked => { root.prev_page(); }
+            }
         }
 
         HorizontalLayout {
@@ -35,20 +54,8 @@ export component WelcomePage inherits TdnBasePg {
                 wrap: word-wrap;
             }
 
-            // back to the keyboard, so a wrong layout can still be fixed
-            if root.can-prev: VerticalLayout {
-                layout-order: Dir.order(1);
-                alignment: center;
-                horizontal-stretch: 0;
-
-                TdnBtn {
-                    text: Lang.t("prev", []);
-                    clicked => { root.prev_page(); }
-                }
-            }
-
             VerticalLayout {
-                layout-order: Dir.order(2);
+                layout-order: Dir.order(1);
                 alignment: center;
                 horizontal-stretch: 0;
 

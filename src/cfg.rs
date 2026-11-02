@@ -304,6 +304,7 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, cfg: &crate::ui::Cfg
     use slint::ToSharedString;
     cfg.set_version(env!("CARGO_PKG_VERSION").into());
     cfg.set_distro(crate::CFG.distro.to_shared_string());
+    cfg.set_dev_session(crate::install::is_dev_session());
     cfg.set_skip_tweaks(crate::CFG.skip_pages.contains(&SkipPage::Tweaks));
     cfg.on_next_page(|page| next_page(&crate::CFG, page));
     cfg.on_prev_page(|page| prev_page(&crate::CFG, page));
