@@ -14,6 +14,10 @@ export global Install {
     in property <string> error;
     // the NVIDIA driver was installed and built, otherwise finishing just drops to the login screen
     in property <bool> needs-reboot;
+    // the failed installation had online steps, so it can be retried without them
+    in property <bool> used-internet;
+    // set by the error page to retry offline, e.g. when a mirror is broken. Cleared by `reset()`
+    in-out property <bool> force-offline;
 
     callback start();
     // back to `idle` after a failed installation, so it can be started again

@@ -145,6 +145,12 @@ fn start(ui: &slint::Weak<AppWindow>) {
         tracing::warn!("The connection is gone since the network page, installing offline");
         crate::SETTINGS.write().nointernet = true;
     }
+    // the error page's way out when an online step keeps failing. Skipping them all still leaves
+    // a working system, just without updates and the extra software
+    if install.get_force_offline() {
+        tracing::warn!("Retrying without the online steps");
+        crate::SETTINGS.write().nointernet = true;
+    }
     let mut settings = crate::SETTINGS.read().clone();
     // the password is in `SETTINGS` now, so drop the plaintext copies in the UI instead of keeping
     // them around for the rest of the session. Going back from the error page to its page means
@@ -159,9 +165,11 @@ fn start(ui: &slint::Weak<AppWindow>) {
             move |msg| on_install_msg(&ui, msg)
         };
         let error = run_install(&mut settings, &callback);
+        let used_internet = !settings.nointernet;
         let set = ui.upgrade_in_event_loop(move |ui| {
             let install = ui.global::<Install<'_>>();
             if let Some(error) = error {
+                install.set_used_internet(used_internet);
                 install.set_error(error.into());
                 install.set_state(InstallState::Failed);
             } else {
@@ -214,6 +222,8 @@ fn reset(ui: &slint::Weak<AppWindow>) {
     }
     install.set_state(InstallState::Idle);
     install.set_error("".into());
+    install.set_used_internet(false);
+    install.set_force_offline(false);
     install.set_needs_reboot(false);
     install.set_stage_id("".into());
     install.set_stage_num(0);

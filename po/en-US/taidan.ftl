@@ -382,6 +382,8 @@ page-error-desc = We hit a snag.
 # for screen readers, the box with the error message
 page-error-details = Error Details
 page-error-retry = Retry
+# btn, retries without the steps that need the internet (updates, codecs, drivers, input methods, language packs)
+page-error-offline = Continue Offline
 # btn (back to the summary page to change settings before retrying)
 page-error-back = Go Back
 

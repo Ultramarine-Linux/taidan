@@ -89,13 +89,28 @@ export component ErrorPage inherits TdnBasePg {
                 clicked => { root.prev_page(); }
             }
 
-            retry := TdnBtn {
+            HorizontalLayout {
                 layout-order: Dir.order(1);
-                text: Lang.t("page-error-retry", []);
-                enter-hint: true;
-                background-color: TdnStyle.accent;
-                foreground-color: TdnStyle.accent-foreground;
-                clicked => { root.next_page(); }
+                spacing: 0.5rem;
+
+                // the way out when an online step keeps failing, e.g. a broken mirror, without
+                // having to unplug the network
+                if Install.used-internet: TdnBtn {
+                    text: Lang.t("page-error-offline", []);
+                    clicked => {
+                        Install.force-offline = true;
+                        root.next_page();
+                    }
+                }
+
+                retry := TdnBtn {
+                    layout-order: Dir.order(1);
+                    text: Lang.t("page-error-retry", []);
+                    enter-hint: true;
+                    background-color: TdnStyle.accent;
+                    foreground-color: TdnStyle.accent-foreground;
+                    clicked => { root.next_page(); }
+                }
             }
         }
     }
