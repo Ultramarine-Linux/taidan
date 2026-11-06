@@ -75,28 +75,33 @@ impl Tweak {
     }
     /// Obtain [`Tweak`] from the path to the tweak directory, assuming the entry is valid.
     ///
+    /// A missing `tweak.toml` gives the defaults.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `tweak.toml` exists but cannot be read or parsed. Falling back to the
+    /// defaults there would drop requirements like [`Self::x86_64_level`], and offer the tweak on
+    /// machines it doesn't support.
+    ///
     /// # Panics
     ///
     /// Panics if `dir` ends in `..`, see [`Path::file_name()`].
     #[tracing::instrument]
-    fn from_cfg_path(dir: &Path) -> Self {
-        let mut tweak = Self::try_from_cfg_path(dir)
-            .inspect_err(|err| {
-                if err.kind() == std::io::ErrorKind::NotFound {
-                    tracing::debug!(?err, "no tweak.toml, using default");
-                } else {
-                    tracing::warn!(?err, "cannot read tweak.toml, using default");
-                }
-            })
-            .ok()
-            .and_then(|inner_toml| {
-                inner_toml
-                    .inspect_err(|err| {
-                        tracing::error!(?err, "cannot parse tweak.toml, using default");
-                    })
-                    .ok()
-            })
-            .unwrap_or_default();
+    fn from_cfg_path(dir: &Path) -> std::io::Result<Self> {
+        let mut tweak = match Self::try_from_cfg_path(dir) {
+            Ok(Ok(tweak)) => tweak,
+            Ok(Err(err)) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("cannot parse `{}`: {err}", dir.join("tweak.toml").display()),
+                ));
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                tracing::debug!(?err, "no tweak.toml, using default");
+                Self::default()
+            }
+            Err(err) => return Err(err),
+        };
         let tweak_name = dir.file_name().unwrap().to_string_lossy();
         if tweak.ftl_name.is_empty() {
             tweak.ftl_name = format!("{tweak_name}-name");
@@ -104,7 +109,7 @@ impl Tweak {
         if tweak.ftl_desc.is_empty() {
             tweak.ftl_desc = format!("{tweak_name}-desc");
         }
-        tweak
+        Ok(tweak)
     }
 
     /// Whether this machine meets the tweak's requirements, see [`Self::x86_64_level`].
@@ -120,6 +125,7 @@ impl Tweak {
     /// The constructor expects the directory to contain an executable file named `up`.
     /// For more information, see the struct docs.
     /// [`std::io::ErrorKind::NotFound`], [`std::io::ErrorKind::PermissionDenied`] may be returned.
+    /// A `tweak.toml` that exists but cannot be read or parsed is also an error, see [`Self::from_cfg_path()`].
     #[tracing::instrument]
     pub fn from_dir(path: PathBuf) -> std::io::Result<Self> {
         debug_assert!(path.is_dir());
@@ -137,7 +143,7 @@ impl Tweak {
                 format!("{up:?} is not executable"),
             ));
         }
-        let cfg_self = Self::from_cfg_path(&path);
+        let cfg_self = Self::from_cfg_path(&path)?;
         Ok(Self { path, ..cfg_self })
     }
 
@@ -255,6 +261,57 @@ pub fn is_executable(f: &Path) -> bool {
         Err(err) => {
             tracing::error!(?err, "fail to obtain metadata");
             false
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tweak_dir(toml: Option<&str>) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let up = dir.path().join("up");
+        std::fs::write(&up, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&up, std::fs::Permissions::from_mode(0o755)).unwrap();
+        if let Some(toml) = toml {
+            std::fs::write(dir.path().join("tweak.toml"), toml).unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn missing_toml_uses_defaults() {
+        let dir = tweak_dir(None);
+        let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
+        assert_eq!(tweak.x86_64_level, None);
+        assert!(tweak.ftl_name.ends_with("-name"));
+    }
+
+    #[test]
+    fn valid_toml_keeps_level() {
+        let dir = tweak_dir(Some("x86_64_level = 3\n"));
+        let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
+        assert_eq!(tweak.x86_64_level, Some(3));
+    }
+
+    // a broken tweak.toml must not fall back to no CPU requirement
+    #[test]
+    fn unparsable_toml_is_rejected() {
+        for toml in ["x86_64_level = \"3\"\n", "x86_64_level = 3\nunknown = 1\n", "not toml ["] {
+            let dir = tweak_dir(Some(toml));
+            let err = Tweak::from_dir(dir.path().to_path_buf()).unwrap_err();
+            assert_eq!(err.kind(), std::io::ErrorKind::InvalidData, "{toml:?}");
+        }
+    }
+
+    #[test]
+    fn shipped_tweaks_parse() {
+        for entry in
+            std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../data/tweaks")).unwrap()
+        {
+            let path = entry.unwrap().path();
+            Tweak::from_dir(path.clone()).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
         }
     }
 }
