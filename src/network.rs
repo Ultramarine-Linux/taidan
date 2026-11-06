@@ -4,7 +4,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use slint::ComponentHandle;
+use slint::{ComponentHandle, Model as _};
 use zbus::blocking::Connection;
 use zbus::proxy::{CacheProperties, Defaults};
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value};
@@ -266,6 +266,7 @@ enum Cmd {
 type Failure = &'static str;
 const FAILED: Failure = "page-internet-error";
 const FAILED_SECRETS: Failure = "page-internet-error-password";
+const FAILED_PSK_LENGTH: Failure = "page-internet-error-password-length";
 const FAILED_TIMEOUT: Failure = "page-internet-error-timeout";
 const FAILED_IP: Failure = "page-internet-ip-error";
 const PROXY_INVALID: Failure = "page-internet-proxy-invalid";
@@ -543,7 +544,8 @@ impl Nm {
     }
 
     /// connects with new `settings`, replacing any saved connection for `ssid` but keeping its IP
-    /// settings, and doesn't keep them if connecting fails, so a wrong password isn't saved
+    /// settings, and doesn't keep them if connecting fails, so a wrong password isn't saved. The
+    /// old connection is only deleted once the new one works, so a failed attempt keeps it.
     fn add_and_connect(
         &mut self,
         ssid: &[u8],
@@ -560,9 +562,7 @@ impl Nm {
                 settings.entry(name).or_default().extend(values);
             }
         }
-        if let Some(old) = old {
-            self.delete(&old);
-        }
+        let was_active = old.is_some() && self.active_on(&dev) == old;
         let root = ObjectPath::from_static_str_unchecked("/");
         let (conn, active) =
             self.manager.add_and_activate_connection(settings, &dev, &root).map_err(|e| {
@@ -573,6 +573,15 @@ impl Nm {
         let res = self.wait(&active, &dev);
         if res.is_err() {
             self.delete(&conn);
+            // go back to the network it was on before
+            if was_active
+                && let Some(old) = &old
+                && let Err(e) = self.manager.activate_connection(old, &dev, &root)
+            {
+                tracing::warn!(?e, "cannot reactivate the previous connection");
+            }
+        } else if let Some(old) = old {
+            self.delete(&old);
         }
         res
     }
@@ -603,6 +612,7 @@ impl Nm {
                 },
             )?,
         };
+        check_psk(key_mgmt, password)?;
         let mut settings = wifi_settings(&ssid, name, key_mgmt, password);
         if hidden {
             mark_hidden(&mut settings);
@@ -617,10 +627,25 @@ impl Nm {
         key_mgmt: KeyMgmt,
         password: &str,
     ) -> Result<(), Failure> {
+        check_psk(key_mgmt, password)?;
         let mut settings = wifi_settings(ssid.as_bytes(), ssid, key_mgmt, password);
         mark_hidden(&mut settings);
         self.add_and_connect(ssid.as_bytes(), settings)
     }
+}
+
+/// `NetworkManager` rejects a WPA-PSK key that isn't 8 to 63 characters or 64 hex digits, so
+/// catch it before adding the connection. SAE passwords have no such limit.
+fn check_psk(key_mgmt: KeyMgmt, password: &str) -> Result<(), Failure> {
+    let valid = match password.len() {
+        8..=63 => true,
+        64 => password.bytes().all(|b| b.is_ascii_hexdigit()),
+        _ => false,
+    };
+    if key_mgmt == KeyMgmt::Psk && !valid {
+        return Err(FAILED_PSK_LENGTH);
+    }
+    Ok(())
 }
 
 /// how a saved wi-fi connection with a password (or none) is secured, and whether it's for a
@@ -1394,8 +1419,46 @@ fn push_snapshot(ui: &slint::Weak<AppWindow>, snap: Snapshot) {
         net.set_connected_ssid(
             snap.networks.iter().find(|n| n.connected).map(|n| n.ssid.clone()).unwrap_or_default(),
         );
-        net.set_networks(slint::ModelRc::new(slint::VecModel::from(snap.networks)));
+        // update the list in place, so rows that are still there keep keyboard and screen reader
+        // focus rather than being rebuilt on every scan
+        let model = net.get_networks();
+        if let Some(model) = model.as_any().downcast_ref::<slint::VecModel<WifiNetwork>>() {
+            sync_model(model, snap.networks, |n| n.ssid.clone());
+        } else {
+            net.set_networks(slint::ModelRc::new(slint::VecModel::from(snap.networks)));
+        }
     });
+}
+
+/// makes `model` match `rows`, moving rows with the same key rather than replacing them and only
+/// touching rows that changed
+fn sync_model<T: Clone + PartialEq + 'static, K: PartialEq>(
+    model: &slint::VecModel<T>,
+    rows: Vec<T>,
+    key: impl Fn(&T) -> K,
+) {
+    let keys = rows.iter().map(&key).collect::<Vec<_>>();
+    for i in (0..model.row_count()).rev() {
+        if model.row_data(i).is_none_or(|r| !keys.contains(&key(&r))) {
+            model.remove(i);
+        }
+    }
+    for (i, (row, k)) in rows.into_iter().zip(&keys).enumerate() {
+        let found =
+            (i..model.row_count()).find(|&j| model.row_data(j).is_some_and(|r| key(&r) == *k));
+        match found {
+            Some(j) => {
+                if j != i {
+                    let moved = model.remove(j);
+                    model.insert(i, moved);
+                }
+                if model.row_data(i).as_ref() != Some(&row) {
+                    model.set_row_data(i, row);
+                }
+            }
+            None => model.insert(i, row),
+        }
+    }
 }
 
 fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
@@ -1941,6 +2004,28 @@ mod tests {
         l.ca = CaSource::None;
         let x = eap_settings(&l);
         assert!(!x.contains_key("domain-suffix-match"));
+    }
+
+    #[test]
+    fn psk_length_is_checked() {
+        assert_eq!(check_psk(KeyMgmt::Psk, "short"), Err(FAILED_PSK_LENGTH));
+        assert_eq!(check_psk(KeyMgmt::Psk, "12345678"), Ok(()));
+        assert_eq!(check_psk(KeyMgmt::Psk, &"a".repeat(64)), Ok(()));
+        assert_eq!(check_psk(KeyMgmt::Psk, &"g".repeat(64)), Err(FAILED_PSK_LENGTH));
+        assert_eq!(check_psk(KeyMgmt::Psk, &"a".repeat(65)), Err(FAILED_PSK_LENGTH));
+        assert_eq!(check_psk(KeyMgmt::Sae, "short"), Ok(()));
+        assert_eq!(check_psk(KeyMgmt::Open, ""), Ok(()));
+    }
+
+    #[test]
+    fn sync_model_keeps_rows() {
+        let model = slint::VecModel::from(vec![(1, 'a'), (2, 'b'), (3, 'c')]);
+        sync_model(&model, vec![(3, 'C'), (1, 'a'), (4, 'd')], |r| r.0);
+        assert_eq!(model.iter().collect::<Vec<_>>(), [(3, 'C'), (1, 'a'), (4, 'd')]);
+        sync_model(&model, vec![], |r| r.0);
+        assert_eq!(model.row_count(), 0);
+        sync_model(&model, vec![(5, 'e'), (6, 'f')], |r| r.0);
+        assert_eq!(model.iter().collect::<Vec<_>>(), [(5, 'e'), (6, 'f')]);
     }
 
     #[test]

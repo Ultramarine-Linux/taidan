@@ -230,6 +230,7 @@ page-internet-hidden-enterprise = WPA & WPA2 Enterprise
 page-internet-password = Password
 page-internet-error = Couldn't connect to this network.
 page-internet-error-password = Couldn't connect. Check the password and try again.
+page-internet-error-password-length = Wi-Fi passwords are 8 to 63 characters long.
 page-internet-error-timeout = Connecting took too long. Try moving closer to the router.
 # for 802.1X networks like eduroam, which take a username and password
 page-internet-error-login = Couldn't connect. Check your username and password, or the server under Advanced.
