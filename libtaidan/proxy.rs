@@ -295,6 +295,22 @@ mod tests {
         assert!(Proxy::new("ftp://x:21", "").is_none());
     }
 
+    #[tokio::test]
+    async fn socks_proxy_speaks_socks() {
+        use tokio::io::AsyncReadExt;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let client = Proxy::new(&format!("socks5h://{addr}"), "").unwrap().client().unwrap();
+        let req = tokio::spawn(async move { client.get("http://example.com").send().await });
+        let (mut sock, _) = listener.accept().await.unwrap();
+        let mut greeting = [0; 1];
+        sock.read_exact(&mut greeting).await.unwrap();
+        // without reqwest's `socks` feature this would be an HTTP request instead
+        assert_eq!(greeting[0], 5, "not a SOCKS5 greeting");
+        drop(sock);
+        assert!(req.await.unwrap().is_err());
+    }
+
     #[test]
     fn rejects_control_characters() {
         assert!(Proxy::new("http://proxy.example.com:3128\nevil=1", "").is_none());

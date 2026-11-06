@@ -21,6 +21,7 @@ phf = { version = "0.14.0", features = ["macros", "phf_macros"] }
 regex = { workspace = true }
 reqwest = { version = "0.13.5", features = [
   "native-tls",
+  "socks",
 ], default-features = false }
 secrecy = { workspace = true }
 serde = { workspace = true }
@@ -32,3 +33,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 uzers = "0.12.2"
 xcrypt = "0.3.2"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["net", "rt"] }
