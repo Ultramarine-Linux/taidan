@@ -130,8 +130,8 @@ async fn write_fcitx5_profile(settings: &crate::settings::Settings) -> Res<()> {
     write_as(username, &profile_path.to_string_lossy(), fcitx5_profile(settings).as_bytes())
         .await?;
 
-    // KWin is only there on Plasma, which has kwriteconfig6 too
-    if !crate::a11y::has_kwriteconfig() {
+    // KWin is only the user's compositor on Plasma
+    if !crate::a11y::is_plasma() {
         return Ok(());
     }
     let kwinrc = config.join("kwinrc");
@@ -167,7 +167,7 @@ pub async fn write_fcitx5_to_skel(
     tokio::fs::write(config.join("fcitx5/profile"), fcitx5_profile(settings))
         .await
         .map_err(Err::Io)?;
-    if crate::a11y::has_kwriteconfig() {
+    if crate::a11y::is_plasma() {
         let kwinrc = config.join("kwinrc");
         let kwinrc = kwinrc.to_string_lossy();
         for entry in KWINRC_FCITX5 {

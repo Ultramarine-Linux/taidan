@@ -156,9 +156,9 @@ impl A11y {
     }
 }
 
-/// whether `kwriteconfig6` is there, which it is on Plasma
-pub(crate) fn has_kwriteconfig() -> bool {
-    std::path::Path::new("/usr/bin/kwriteconfig6").exists()
+/// whether the installed system's desktop is Plasma
+pub(crate) fn is_plasma() -> bool {
+    std::path::Path::new("/usr/bin/plasmashell").exists()
 }
 
 /// writes the options into the new user's config, so their Plasma session starts with them
@@ -179,8 +179,8 @@ pub async fn apply_to_user(
     if entries.is_empty() {
         return Ok(());
     }
-    if !has_kwriteconfig() {
-        tracing::info!("no kwriteconfig6, so not a Plasma system; skipping accessibility settings");
+    if !is_plasma() {
+        tracing::info!("not a Plasma system; skipping accessibility settings");
         return Ok(());
     }
     let home = home_of(&settings.username).await?;
@@ -212,7 +212,7 @@ pub async fn write_to_skel(
     skel: &std::path::Path,
 ) -> Res<bool> {
     let entries = settings.a11y.user_entries();
-    if entries.is_empty() || !has_kwriteconfig() {
+    if entries.is_empty() || !is_plasma() {
         return Ok(false);
     }
     let config = skel.join(".config");

@@ -275,7 +275,7 @@ pub async fn apply_keymap_to_user(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
 ) -> Res<()> {
-    if cfg.taidan0.systemd_homed || !crate::a11y::has_kwriteconfig() {
+    if cfg.taidan0.systemd_homed || !crate::a11y::is_plasma() {
         return Ok(());
     }
     let Some(entries) = kxkbrc_entries(settings) else { return Ok(()) };
@@ -300,7 +300,7 @@ pub async fn write_keymap_to_skel(
     settings: &crate::settings::Settings,
     skel: &std::path::Path,
 ) -> Res<bool> {
-    let Some(entries) = kxkbrc_entries(settings).filter(|_| crate::a11y::has_kwriteconfig()) else {
+    let Some(entries) = kxkbrc_entries(settings).filter(|_| crate::a11y::is_plasma()) else {
         return Ok(false);
     };
     let config = skel.join(".config");
