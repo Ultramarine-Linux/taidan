@@ -15,15 +15,36 @@ pub fn user_already_exists() -> bool {
         tracing::info!("skipping user_already_exists() check since debug_assertions is on");
         return false;
     }
+    let recorded = recorded_user();
+    // through NSS, since systemd-homed users aren't in /etc/passwd
+    match std::process::Command::new("getent").arg("passwd").output() {
+        Ok(out) if out.status.success() => {
+            return regular_user_in(out.stdout.as_slice(), recorded.as_deref());
+        }
+        Ok(out) => tracing::error!(status = ?out.status, "getent passwd failed"),
+        Err(e) => tracing::error!(?e, "cannot run getent passwd"),
+    }
     let Ok(f) =
         File::open("/etc/passwd").inspect_err(|e| tracing::error!(?e, "cannot open /etc/passwd"))
     else {
         return false;
     };
-    regular_user_in(BufReader::new(f), recorded_user().as_deref())
+    regular_user_in(BufReader::new(f), recorded.as_deref())
 }
 
-/// [`user_already_exists`] for the passwd file `reader`, with `recorded` the user from
+/// uids `useradd` gives regular users
+const REGULAR_UIDS: std::ops::Range<u32> = 1000..60000;
+
+/// uids systemd-homed gives its users
+pub const HOMED_UIDS: std::ops::RangeInclusive<u32> = 60001..=60513;
+
+/// whether `uid` belongs to a regular user, made by `useradd` or systemd-homed
+#[must_use]
+pub fn regular_uid(uid: u32) -> bool {
+    REGULAR_UIDS.contains(&uid) || HOMED_UIDS.contains(&uid)
+}
+
+/// [`user_already_exists`] for the passwd database `reader`, with `recorded` the user from
 /// [`CREATED_RECORD`]
 fn regular_user_in(reader: impl BufRead, recorded: Option<&str>) -> bool {
     reader.lines().any(|l| {
@@ -33,11 +54,11 @@ fn regular_user_in(reader: impl BufRead, recorded: Option<&str>) -> bool {
                 return false;
             };
             let Ok(uid) =
-                uid.parse::<usize>().inspect_err(|e| tracing::error!(?e, ?uid, "cannot parse uid"))
+                uid.parse::<u32>().inspect_err(|e| tracing::error!(?e, ?uid, "cannot parse uid"))
             else {
                 return false;
             };
-            if !(1000..60000).contains(&uid) {
+            if !regular_uid(uid) {
                 return false;
             }
             if recorded == Some(user) {
@@ -110,7 +131,7 @@ pub async fn clear_record() -> Res<()> {
 /// would accept
 #[must_use]
 pub fn removable(username: &str, uid: u32) -> bool {
-    (1000..60000).contains(&uid) && username_problem_with(username, |_| false, None).is_none()
+    regular_uid(uid) && username_problem_with(username, |_| false, None).is_none()
 }
 
 /// the most `useradd` takes
@@ -240,6 +261,12 @@ mod tests {
         assert!(!removable("alice", 0));
         assert!(!removable("alice", 999));
         assert!(!removable("alice", 65534));
+        assert!(!removable("alice", 60000));
+        assert!(removable("alice", 60001));
+        assert!(removable("alice", 60513));
+        assert!(!removable("alice", 60514));
+        // DynamicUser= services
+        assert!(!removable("earlyoom", 61876));
         assert!(!removable("root", 1000));
         assert!(!removable("taidan", 1001));
         assert!(!removable("systemd-network", 1001));
@@ -256,6 +283,15 @@ mod tests {
         assert!(regular_user_in(passwd.as_bytes(), Some("bob")));
         let passwd = format!("{passwd}bob:x:1001:1001::/home/bob:/bin/bash\n");
         assert!(regular_user_in(passwd.as_bytes(), Some("alice")));
+    }
+
+    #[test]
+    fn homed_user_is_an_existing_one() {
+        let passwd = "root:x:0:0::/root:/bin/bash\nearlyoom:x:61876:61876::/:/usr/sbin/nologin\n";
+        assert!(!regular_user_in(passwd.as_bytes(), None));
+        let passwd = format!("{passwd}alice:x:60123:60123:Alice:/home/alice:/bin/bash\n");
+        assert!(regular_user_in(passwd.as_bytes(), None));
+        assert!(!regular_user_in(passwd.as_bytes(), Some("alice")));
     }
 
     #[test]

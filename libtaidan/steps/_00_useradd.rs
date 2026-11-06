@@ -29,7 +29,7 @@ impl super::Step for UserAdd {
         if exists() && !crate::passwd::created_by_us(&settings.username) {
             return Err(Err::Message(format!("user `{}` already exists", settings.username)));
         }
-        remove_previous(cfg).await?;
+        remove_previous().await?;
         // left behind if it couldn't be removed
         if exists() {
             return Err(Err::Message(format!("user `{}` already exists", settings.username)));
@@ -121,17 +121,22 @@ async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -
 
 /// removes the user an earlier, unfinished attempt created (see
 /// [`crate::passwd::CREATED_RECORD`]), so retrying, renaming the user or changing the password
-/// all start over from no user. Only a regular user the record names is removed
-async fn remove_previous(cfg: &crate::cfg::Config) -> Res<()> {
+/// all start over from no user. Only a regular user the record names is removed, and the record
+/// stays if it can't be, so the user is never left behind without it
+async fn remove_previous() -> Res<()> {
     let Some(prev) = crate::passwd::recorded_user() else { return Ok(()) };
     match uzers::get_user_by_name(&prev) {
         None => tracing::info!(prev, "user from an earlier attempt is already gone"),
         Some(u) if !crate::passwd::removable(&prev, u.uid()) => {
-            tracing::warn!(prev, uid = u.uid(), "not removing a user that isn't a regular one");
+            return Err(Err::Message(format!(
+                "user `{prev}` from an earlier attempt isn't a regular one (uid {}), not removing it",
+                u.uid()
+            )));
         }
-        Some(_) => {
+        Some(u) => {
             tracing::info!(prev, "removing the user from an earlier attempt");
-            if cfg.taidan0.systemd_homed {
+            // by uid rather than the config, in case it changed since the user was made
+            if crate::passwd::HOMED_UIDS.contains(&u.uid()) {
                 super::super::root("homectl", ["remove", prev.as_str()]).await
             } else {
                 super::super::root("userdel", ["-r", "--", prev.as_str()]).await
