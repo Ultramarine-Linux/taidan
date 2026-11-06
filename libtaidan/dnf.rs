@@ -21,7 +21,7 @@ pub(super) async fn handle_dnf(
     f: impl Fn(&mut tokio::process::Command) -> &mut tokio::process::Command + Send,
 ) -> Res<()> {
     let mut cmd = tokio::process::Command::new("pkexec");
-    cmd.args(["--user", "root", "env"]).args(crate::proxy::env()).arg("dnf5");
+    cmd.args(["--user", "root", "env"]).args(crate::proxy::wrapper()).arg("dnf5");
     f(&mut cmd);
     let (writer, reader) = tokio::net::unix::pipe::pipe().expect("cannot create pipe");
     let writer = writer.into_blocking_fd().expect("cannot set blocking mode to pipe writer");

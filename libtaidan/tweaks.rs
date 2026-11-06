@@ -187,7 +187,7 @@ impl Tweak {
         // `pkexec` clears the environment, and tweaks may download things too
         let cmd = tokio::process::Command::new("pkexec")
             .args(["--user", "root", "env"])
-            .args(crate::proxy::env())
+            .args(crate::proxy::wrapper())
             .arg(self.path.join("up"))
             .arg(if on { "1" } else { "0" })
             .stdin(std::process::Stdio::piped())

@@ -118,9 +118,9 @@ mod parseutil {
     }
 }
 
-/// `name` with `args` as `user` through `pkexec`, with the environment and proxy passed on since
-/// `pkexec` clears them. Root only gets the locale, the rest (`HOME`, `XDG_*`, the session bus) is
-/// the OOBE session's and would have root write into it
+/// `name` with `args` as `user` through `pkexec`, with the environment passed on since `pkexec`
+/// clears it. Root only gets the locale and the proxy, the rest (`HOME`, `XDG_*`, the session bus)
+/// is the OOBE session's and would have root write into it
 fn pkexec_cmd<I>(user: &str, name: &'static str, args: I) -> tokio::process::Command
 where
     I: IntoIterator,
@@ -134,7 +134,9 @@ where
                 .filter(|(k, _)| !as_root || is_locale_var(k))
                 .map(|(k, v)| format!("{k}={v}")),
         )
-        .args(proxy::env())
+        // other users can't read the file the proxy is passed in, and nothing run as them
+        // downloads anything
+        .args(if as_root { proxy::wrapper() } else { vec![] })
         .arg(name)
         .args(args);
     cmd

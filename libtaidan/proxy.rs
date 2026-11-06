@@ -1,7 +1,7 @@
 //! a manual HTTP proxy, for networks that only reach the internet through one
 //!
-//! `pkexec` clears the environment, so anything run through it gets the proxy from [`env`]
-//! explicitly instead of inheriting `http_proxy` and friends.
+//! `pkexec` clears the environment, so anything run through it as root gets the proxy through
+//! [`wrapper`] instead of inheriting `http_proxy` and friends.
 use crate::prelude::*;
 
 #[derive(Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -40,6 +40,9 @@ fn redact(url: &str) -> String {
 static PROXY: std::sync::RwLock<Option<Proxy>> = std::sync::RwLock::new(None);
 
 pub fn set(proxy: Option<Proxy>) {
+    if let Err(e) = write_env_file(&env_file(), proxy.as_ref()) {
+        tracing::error!(?e, "cannot save the proxy for commands run as root");
+    }
     *PROXY.write().unwrap_or_else(std::sync::PoisonError::into_inner) = proxy;
 }
 
@@ -83,19 +86,40 @@ impl Proxy {
         !has_control(&self.url) && !has_control(&self.no_proxy)
     }
 
-    /// `KEY=value` pairs for `env`, both cases since tools disagree on which one they read
-    #[must_use]
-    pub fn env(&self) -> Vec<String> {
+    /// the environment variables for the proxy, both cases since tools disagree on which one
+    /// they read
+    fn vars(&self) -> Vec<(&'static str, &str)> {
         let mut vars = vec![];
         for key in ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"] {
-            vars.push(format!("{key}={}", self.url));
+            vars.push((key, self.url.as_str()));
         }
         if !self.no_proxy.is_empty() {
             for key in ["no_proxy", "NO_PROXY"] {
-                vars.push(format!("{key}={}", self.no_proxy));
+                vars.push((key, self.no_proxy.as_str()));
             }
         }
         vars
+    }
+
+    /// `KEY=value` lines of [`Self::vars`]
+    #[must_use]
+    pub fn env(&self) -> Vec<String> {
+        self.vars().into_iter().map(|(k, v)| format!("{k}={v}")).collect()
+    }
+
+    /// the proxy without the `user:password@` in its URL, for places other users can read.
+    /// [`None`] if the URL can't be parsed
+    fn without_credentials(&self) -> Option<Self> {
+        let mut url = reqwest::Url::parse(&self.url).ok()?;
+        if url.username().is_empty() && url.password().is_none() {
+            return Some(self.clone());
+        }
+        url.set_username("").ok()?;
+        url.set_password(None).ok()?;
+        Some(Self {
+            url: url.as_str().trim_end_matches('/').to_owned(),
+            no_proxy: self.no_proxy.clone(),
+        })
     }
 
     /// # Errors
@@ -115,9 +139,11 @@ impl Proxy {
         if !self.is_safe() {
             return Err(Err::Msg("the proxy has control characters in it"));
         }
-        // through stdin, since the URL may carry a password and the arguments of commands run as
-        // root are logged
-        let mut lines = self.env().join("\n");
+        // every user can read `/etc/environment` and gets it in their session, so the password
+        // only goes into the dnf config. Apps ask for it themselves when the proxy wants one
+        let public = self.without_credentials().ok_or(Err::Msg("the proxy URL is invalid"))?;
+        // through stdin, since the arguments of commands run as root are logged
+        let mut lines = public.env().join("\n");
         lines.push('\n');
         crate::root_with_stdin(
             "sh",
@@ -187,10 +213,53 @@ pub async fn clear() -> Res<()> {
     .wrap_msg("cannot remove the saved proxy")
 }
 
-/// `KEY=value` pairs of the current proxy, for `env`, empty if there's none
+/// where [`set`] saves the current proxy for [`wrapper`], in Taidan's own temporary directory,
+/// which only its user (and root) can read
+fn env_file() -> std::path::PathBuf {
+    crate::TEMP_DIR.join("proxy.env")
+}
+
+/// writes `proxy` to `path` as `export` lines for `sh`, only readable by its owner, or removes
+/// the file if there's no proxy
+fn write_env_file(path: &std::path::Path, proxy: Option<&Proxy>) -> std::io::Result<()> {
+    use std::io::Write as _;
+    use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
+    let Some(proxy) = proxy else {
+        return match std::fs::remove_file(path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            res => res,
+        };
+    };
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    // the mode only applies to a new file
+    file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    let mut lines = String::new();
+    for (key, value) in proxy.vars() {
+        lines.push_str(&format!("export {key}={}\n", sh_quote(value)));
+    }
+    file.write_all(lines.as_bytes())
+}
+
+/// `s` in single quotes for `sh`, where nothing in it is special
+fn sh_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', r"'\''"))
+}
+
+/// what to put between `pkexec --user root env` and the command so it runs with the current
+/// proxy, empty if there's none. The proxy is read from [`env_file`] instead of being passed as
+/// arguments, since the URL may carry a password, and `pkexec` logs the arguments of what it runs
+/// and anyone can read them in `/proc`
 #[must_use]
-pub fn env() -> Vec<String> {
-    get().map(|p| p.env()).unwrap_or_default()
+pub fn wrapper() -> Vec<std::ffi::OsString> {
+    if get().is_none() {
+        return vec![];
+    }
+    vec!["/bin/sh".into(), "-c".into(), r#". "$0" && exec "$@""#.into(), env_file().into()]
 }
 
 /// a client that goes through the current proxy
@@ -238,6 +307,43 @@ mod tests {
         let p = Proxy { url: "http://p:8080".into(), no_proxy: "a\nb".into() };
         assert!(!p.is_safe());
         assert!(Proxy::new("p:8080", "a\nb").unwrap().is_safe());
+    }
+
+    #[test]
+    fn strips_credentials() {
+        let p = Proxy::new("http://bob:hunter2@proxy.example.com:3128", "localhost").unwrap();
+        let public = p.without_credentials().unwrap();
+        assert_eq!(public.url, "http://proxy.example.com:3128");
+        assert_eq!(public.no_proxy, "localhost");
+        let p = Proxy::new("http://bob@proxy.example.com:3128", "").unwrap();
+        assert_eq!(p.without_credentials().unwrap().url, "http://proxy.example.com:3128");
+        let p = Proxy::new("proxy.example.com:3128", "").unwrap();
+        assert_eq!(p.without_credentials().unwrap(), p);
+    }
+
+    #[test]
+    fn env_file_round_trips_through_sh() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("proxy.env");
+        let p = Proxy {
+            url: "http://bob:it's $HOME `x`@proxy.example.com:3128".into(),
+            no_proxy: "localhost".into(),
+        };
+        write_env_file(&path, Some(&p)).unwrap();
+        let mode = std::os::unix::fs::PermissionsExt::mode(&path.metadata().unwrap().permissions());
+        assert_eq!(mode & 0o777, 0o600);
+        let out = std::process::Command::new("/bin/sh")
+            .args(["-c", r#". "$0" && exec "$@""#])
+            .arg(&path)
+            .args(["/usr/bin/printenv", "HTTPS_PROXY", "no_proxy"])
+            .env_clear()
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        assert_eq!(String::from_utf8(out.stdout).unwrap(), format!("{}\nlocalhost\n", p.url));
+        write_env_file(&path, None).unwrap();
+        assert!(!path.exists());
+        write_env_file(&path, None).unwrap();
     }
 
     #[test]

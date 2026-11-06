@@ -98,7 +98,7 @@ async fn available(pkgs: &[String]) -> Res<Vec<String>> {
     // as root, to use the metadata the system update just downloaded
     let out = tokio::process::Command::new("pkexec")
         .args(["--user", "root", "env"])
-        .args(crate::proxy::env())
+        .args(crate::proxy::wrapper())
         .args(["dnf5", "-q", "repoquery", "--latest-limit", "1", "--qf", "%{name}\\n"])
         .args(pkgs)
         .output()
