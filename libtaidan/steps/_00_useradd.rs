@@ -121,12 +121,17 @@ async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -
 
 /// removes the user an earlier, unfinished attempt created (see
 /// [`crate::passwd::CREATED_RECORD`]), so retrying, renaming the user or changing the password
-/// all start over from no user. Only a regular user the record names is removed, and the record
-/// stays if it can't be, so the user is never left behind without it
+/// all start over from no user. Only a regular user the record names that nobody has logged in as
+/// is removed, and the record stays if it can't be, so the user is never left behind without it
 async fn remove_previous() -> Res<()> {
     let Some(prev) = crate::passwd::recorded_user() else { return Ok(()) };
     match uzers::get_user_by_name(&prev) {
         None => tracing::info!(prev, "user from an earlier attempt is already gone"),
+        // the record outlived the install that made it (it couldn't be cleared, or Taidan died
+        // after making the user) and the account is in use, so it's theirs to keep
+        Some(_) if crate::passwd::has_logged_in(&prev) => {
+            tracing::warn!(prev, "user from an earlier attempt has logged in, keeping it");
+        }
         Some(u) if !crate::passwd::removable(&prev, u.uid()) => {
             return Err(Err::Message(format!(
                 "user `{prev}` from an earlier attempt isn't a regular one (uid {}), not removing it",

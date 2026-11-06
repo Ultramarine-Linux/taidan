@@ -7,15 +7,15 @@ use std::{
 
 use crate::prelude::*;
 
-/// whether there's a regular user, apart from one an unfinished install made (see
-/// [`CREATED_RECORD`]), which the next install removes
+/// whether there's a regular user, apart from one an unfinished install made that nobody has
+/// logged in as (see [`CREATED_RECORD`]), which the next install removes
 #[must_use]
 pub fn user_already_exists() -> bool {
     if cfg!(debug_assertions) {
         tracing::info!("skipping user_already_exists() check since debug_assertions is on");
         return false;
     }
-    let recorded = recorded_user();
+    let recorded = unused_recorded_user();
     // through NSS, since systemd-homed users aren't in /etc/passwd
     match std::process::Command::new("getent").arg("passwd").output() {
         Ok(out) if out.status.success() => {
@@ -84,10 +84,43 @@ pub fn recorded_user() -> Option<String> {
     (!user.is_empty()).then(|| user.to_owned())
 }
 
-/// whether an unfinished install created `username`, see [`CREATED_RECORD`]
+/// the user named in [`CREATED_RECORD`], if there's one and nobody has logged in as it. One that
+/// has been is someone's account now, whatever the record says
+#[must_use]
+pub fn unused_recorded_user() -> Option<String> {
+    recorded_user().filter(|u| !has_logged_in(u))
+}
+
+/// whether an unfinished install created `username` and nobody has logged in as it since, see
+/// [`CREATED_RECORD`]
 #[must_use]
 pub fn created_by_us(username: &str) -> bool {
-    recorded_user().is_some_and(|u| u == username)
+    unused_recorded_user().is_some_and(|u| u == username)
+}
+
+/// whether `username` has ever logged in, going by lastlog2, which PAM updates for display
+/// manager, console and ssh logins but not `runuser` or `pkexec`. If it can't be told, the user
+/// is taken to have logged in, since that only costs a retry while the opposite can cost their
+/// home
+#[must_use]
+pub fn has_logged_in(username: &str) -> bool {
+    // `-a` leaves out users who never logged in. A missing database prints nothing
+    match std::process::Command::new("lastlog2").args(["-a", "-u", username]).output() {
+        Ok(out) if out.status.success() => logged_in_from(&out.stdout, username),
+        Ok(out) => {
+            tracing::error!(status = ?out.status, stderr = %String::from_utf8_lossy(&out.stderr), "lastlog2 failed");
+            true
+        }
+        Err(e) => {
+            tracing::error!(?e, "cannot run lastlog2");
+            true
+        }
+    }
+}
+
+/// whether `lastlog2 -a -u username` printed a record for `username`, past its header
+fn logged_in_from(output: &[u8], username: &str) -> bool {
+    String::from_utf8_lossy(output).lines().any(|l| l.split_whitespace().next() == Some(username))
 }
 
 /// writes `username` to [`CREATED_RECORD`], world-readable since the OOBE checks it as its own
@@ -161,7 +194,7 @@ pub fn username_problem(username: &str) -> Option<UsernameProblem> {
     username_problem_with(
         username,
         |name| uzers::get_user_by_name(name).is_some() || uzers::get_group_by_name(name).is_some(),
-        recorded_user().as_deref(),
+        unused_recorded_user().as_deref(),
     )
 }
 
@@ -292,6 +325,20 @@ mod tests {
         let passwd = format!("{passwd}alice:x:60123:60123:Alice:/home/alice:/bin/bash\n");
         assert!(regular_user_in(passwd.as_bytes(), None));
         assert!(!regular_user_in(passwd.as_bytes(), Some("alice")));
+    }
+
+    #[test]
+    fn lastlog2_output() {
+        let header =
+            "Username         Port     From                                       Latest \n";
+        assert!(!logged_in_from(b"", "alice"));
+        assert!(!logged_in_from(header.as_bytes(), "alice"));
+        let used = format!(
+            "{header}alice            tty1                    Tue Nov  3 13:38:37 -0700 2026\n"
+        );
+        assert!(logged_in_from(used.as_bytes(), "alice"));
+        assert!(!logged_in_from(used.as_bytes(), "ali"));
+        assert!(!logged_in_from(used.as_bytes(), "bob"));
     }
 
     #[test]

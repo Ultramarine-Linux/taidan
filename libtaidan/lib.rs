@@ -75,15 +75,30 @@ pub async fn start_install(
         tracing::info!(?stage, "Running stage");
         stage.run(settings, cfg, callback).await?;
     }
-    // the user is theirs now, so no later run of Taidan should remove it
-    if let Err(e) = passwd::clear_record().await {
-        tracing::error!(?e, "cannot remove the created user record");
-    }
+    // the user is theirs now, so no later run of Taidan should remove it. Not marked configured
+    // if the record stays, since a machine that leaves the OOBE with it could later have the
+    // account and its home removed by a rerun
+    clear_record_retrying().await?;
     // right away rather than when the user leaves the last page, or a machine that dies on it
     // would boot into the OOBE again with the record gone and the user still there
     mark_configured().await;
     callback.send(InstallMsg::Finish);
     Ok(())
+}
+
+/// [`passwd::clear_record`], tried a few times since the `pkexec` it needs can fail for a moment
+/// (the session going inactive after a VT switch)
+async fn clear_record_retrying() -> Res<()> {
+    for attempt in 1..3 {
+        match passwd::clear_record().await {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                tracing::warn!(?e, attempt, "cannot remove the created user record, retrying")
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    }
+    passwd::clear_record().await
 }
 
 #[allow(clippy::arithmetic_side_effects)]
