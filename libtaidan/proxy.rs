@@ -88,7 +88,8 @@ impl Proxy {
 
     /// the environment variables for the proxy, both cases since tools disagree on which one
     /// they read
-    fn vars(&self) -> Vec<(&'static str, &str)> {
+    #[must_use]
+    pub fn vars(&self) -> Vec<(&'static str, &str)> {
         let mut vars = vec![];
         for key in ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"] {
             vars.push((key, self.url.as_str()));

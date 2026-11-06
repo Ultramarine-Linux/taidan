@@ -1091,11 +1091,14 @@ impl Nm {
         // `legacy-wayland` and Fedora doesn't build that (https://github.com/Igalia/cog/issues/776),
         // `gtk4` is native Wayland too, and its window has a close button
         cmd.args(["--platform", "gtk4"]);
-        if let Some((url, bypass)) = proxy {
-            cmd.args(["--proxy", &url]);
-            for host in bypass.split(',').map(str::trim).filter(|h| !h.is_empty()) {
-                cmd.args(["--ignore-host", host]);
-            }
+        // through the environment rather than `--proxy`, since anyone can read a command's
+        // arguments and the URL may carry a password. WebKit then uses GLib's default proxy
+        // resolver, and the libproxy one reads `http_proxy` and friends. GNOME's would go by its
+        // own settings instead, so it's picked explicitly
+        if let Some(proxy) =
+            proxy.and_then(|(url, bypass)| libtaidan::proxy::Proxy::new(&url, &bypass))
+        {
+            cmd.envs(proxy.vars()).env("GIO_USE_PROXY_RESOLVER", "libproxy");
         }
         match cmd.arg(&uri).spawn() {
             Ok(child) => {
