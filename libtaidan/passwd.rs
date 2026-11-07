@@ -76,12 +76,35 @@ fn regular_user_in(reader: impl BufRead, recorded: Option<&str>) -> bool {
 /// install finishes, so a later run of Taidan never touches the user
 pub const CREATED_RECORD: &str = "/var/lib/taidan/created-user";
 
+/// what [`CREATED_RECORD`] says about the user an unfinished install made
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Record {
+    pub user: String,
+    /// the user's home was there before the user was made (a reinstall that kept `/home`), so
+    /// removing the user mustn't take it along
+    pub keep_home: bool,
+}
+
+/// the line after the username in [`CREATED_RECORD`] that sets [`Record::keep_home`]
+const KEEP_HOME: &str = "keep-home";
+
+/// what [`CREATED_RECORD`] says, if there's one
+#[must_use]
+pub fn record() -> Option<Record> {
+    parse_record(&std::fs::read_to_string(CREATED_RECORD).ok()?)
+}
+
+/// [`record`] from the contents of [`CREATED_RECORD`]
+fn parse_record(s: &str) -> Option<Record> {
+    let mut lines = s.lines().map(str::trim);
+    let user = lines.next().filter(|u| !u.is_empty())?.to_owned();
+    Some(Record { user, keep_home: lines.any(|l| l == KEEP_HOME) })
+}
+
 /// the user named in [`CREATED_RECORD`], if there's one
 #[must_use]
 pub fn recorded_user() -> Option<String> {
-    let s = std::fs::read_to_string(CREATED_RECORD).ok()?;
-    let user = s.trim();
-    (!user.is_empty()).then(|| user.to_owned())
+    record().map(|r| r.user)
 }
 
 /// the user named in [`CREATED_RECORD`], if there's one and nobody has logged in as it. One that
@@ -124,27 +147,28 @@ fn logged_in_from(output: &[u8], username: &str) -> bool {
 }
 
 /// writes `username` to [`CREATED_RECORD`], world-readable since the OOBE checks it as its own
-/// user
+/// user. `keep_home` if its home is already there, see [`Record::keep_home`]
 ///
 /// # Errors
 /// Cannot write the file.
-pub async fn record_created(username: &str) -> Res<()> {
-    crate::root(
+pub async fn record_created(username: &str, keep_home: bool) -> Res<()> {
+    let mut args = vec![
+        "-c",
+        r#"
+            f=$1
+            shift
+            mkdir -p "$(dirname "$f")"
+            printf '%s\n' "$@" > "$f"
+            chmod 644 "$f"
+        "#,
         "sh",
-        [
-            "-c",
-            r#"
-                mkdir -p "$(dirname "$1")"
-                printf '%s\n' "$2" > "$1"
-                chmod 644 "$1"
-            "#,
-            "sh",
-            CREATED_RECORD,
-            username,
-        ],
-    )
-    .await
-    .wrap_msg("cannot record the created user")
+        CREATED_RECORD,
+        username,
+    ];
+    if keep_home {
+        args.push(KEEP_HOME);
+    }
+    crate::root("sh", args).await.wrap_msg("cannot record the created user")
 }
 
 /// removes [`CREATED_RECORD`], if it's there
@@ -339,6 +363,20 @@ mod tests {
         assert!(logged_in_from(used.as_bytes(), "alice"));
         assert!(!logged_in_from(used.as_bytes(), "ali"));
         assert!(!logged_in_from(used.as_bytes(), "bob"));
+    }
+
+    #[test]
+    fn record_parsed() {
+        assert_eq!(parse_record(""), None);
+        assert_eq!(parse_record("\n"), None);
+        assert_eq!(
+            parse_record("alice\n"),
+            Some(Record { user: "alice".into(), keep_home: false })
+        );
+        assert_eq!(
+            parse_record("alice\nkeep-home\n"),
+            Some(Record { user: "alice".into(), keep_home: true })
+        );
     }
 
     #[test]

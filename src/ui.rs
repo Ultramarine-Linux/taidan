@@ -27,6 +27,7 @@ pub fn run() {
     crate::a11y::initialize_ui(&ui.as_weak(), &ui.global());
     init_actions(ui.as_weak(), &ui.global());
     ui.set_pagenum(crate::cfg::first_page());
+    ui.set_framed(crate::install::is_dev_session());
     // the OOBE has to be completed, Alt+F4 shouldn't drop to an unconfigured system. Finishing
     // quits the event loop directly instead of closing the window.
     ui.window().on_close_requested(|| {

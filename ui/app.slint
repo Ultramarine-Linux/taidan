@@ -37,8 +37,9 @@ export component AppWindow inherits Window {
     // (`Cfg.next-page` and `Cfg.prev-page`)
     in-out property <int> pagenum: 0;
     title: Lang.t("window-title", [{ key: "distro", value: Cfg.distro }]);
-    // no-frame: true;
-    // full-screen: true;
+    // set from Rust, dev runs keep the title bar to move and close the window
+    in property <bool> framed: false;
+    no-frame: !self.framed;
     icon: Cfg.distro_icon();
     background: Tokens.color-background;
     // from the `vercel-geist-fonts` package unless `font` in /etc/taidan.toml names the distro's,

@@ -34,9 +34,16 @@ impl super::Step for UserAdd {
         if exists() {
             return Err(Err::Message(format!("user `{}` already exists", settings.username)));
         }
+        // `useradd -m` takes over a home that's already there (a reinstall that kept /home), and
+        // that one isn't ours to remove with the user. homectl refuses to make a user whose home
+        // is there, so it never gets one it didn't make
+        let keep_home = !cfg.taidan0.systemd_homed && home_exists(&settings.username);
+        if keep_home {
+            tracing::info!(user = settings.username, "home is already there, keeping it");
+        }
         // before the user is made, so it's never there without the record, which would keep the
         // next attempt from removing it. A record of a user that never got made is cleared then
-        crate::passwd::record_created(&settings.username).await?;
+        crate::passwd::record_created(&settings.username, keep_home).await?;
         if cfg.taidan0.systemd_homed {
             homed(settings, cfg).await?;
         } else {
@@ -115,12 +122,36 @@ async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -
         .wrap_msg("cannot create the user with homectl")
 }
 
+/// whether the home `useradd -m` would give `user` is already there: under the `HOME=` from
+/// `/etc/default/useradd`, or `/home`. If it can't be told, it's taken to be, since that only
+/// leaves a home behind while the opposite can remove someone's files
+fn home_exists(user: &str) -> bool {
+    let base = std::fs::read_to_string("/etc/default/useradd")
+        .ok()
+        .and_then(|s| {
+            s.lines().find_map(|l| l.trim().strip_prefix("HOME=").map(|h| h.trim().to_owned()))
+        })
+        .filter(|h| h.starts_with('/'))
+        .unwrap_or_else(|| "/home".to_owned());
+    // a dangling symlink counts too, userdel -r would remove what it points to
+    match std::path::Path::new(&base).join(user).symlink_metadata() {
+        Ok(_) => true,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) => {
+            tracing::warn!(?e, "cannot tell whether the home is already there, keeping it");
+            true
+        }
+    }
+}
+
 /// removes the user an earlier, unfinished attempt created (see
 /// [`crate::passwd::CREATED_RECORD`]), so retrying, renaming the user or changing the password
 /// all start over from no user. Only a regular user the record names that nobody has logged in as
 /// is removed, and the record stays if it can't be, so the user is never left behind without it
 async fn remove_previous() -> Res<()> {
-    let Some(prev) = crate::passwd::recorded_user() else { return Ok(()) };
+    let Some(crate::passwd::Record { user: prev, keep_home }) = crate::passwd::record() else {
+        return Ok(());
+    };
     match uzers::get_user_by_name(&prev) {
         None => tracing::info!(prev, "user from an earlier attempt is already gone"),
         // the record outlived the install that made it (it couldn't be cleared, or Taidan died
@@ -139,6 +170,9 @@ async fn remove_previous() -> Res<()> {
             // by uid rather than the config, in case it changed since the user was made
             if crate::passwd::HOMED_UIDS.contains(&u.uid()) {
                 super::super::root("homectl", ["remove", prev.as_str()]).await
+            } else if keep_home {
+                tracing::info!(prev, "its home was there before it, keeping it");
+                super::super::root("userdel", ["--", prev.as_str()]).await
             } else {
                 super::super::root("userdel", ["-r", "--", prev.as_str()]).await
             }
