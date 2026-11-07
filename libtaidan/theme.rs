@@ -74,29 +74,46 @@ pub fn accent_supported(edition: &str) -> bool {
     ["gnome", "plasma", "kde"].iter().any(|e| edition.eq_ignore_ascii_case(e))
 }
 
-/// the GTK theme set through `gsettings` for GTK 3 apps, which don't read `color-scheme`, [`None`]
-/// to leave it alone
-#[must_use]
-pub fn gtk_theme(edition: &str, dark: bool) -> Option<&'static str> {
-    match edition.to_ascii_lowercase().as_str() {
-        "gnome" => Some(if dark { "Adwaita-dark" } else { "Adwaita" }),
-        // Ultramarine's Budgie ships `Fluent-round-Dark` in its gschema override
-        "budgie" | "flagship" => {
-            Some(if dark { "Fluent-round-Dark" } else { "Fluent-round-Light" })
-        }
-        _ => None,
-    }
+/// the GTK and icon themes that go with light or dark mode, and Xfce's window manager theme
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Themes {
+    pub gtk: &'static str,
+    /// [`None`] where the icons work in either mode
+    pub icons: Option<&'static str>,
+    /// only on Xfce, where xfwm4 draws the title bars from a theme of its own
+    pub wm: Option<&'static str>,
 }
 
-/// the GTK theme for Xfce, which reads it from xfconf rather than `gsettings`. Ultramarine's
-/// xfce-config ships `Orchis-Dark`
+/// the themes for the edition, [`None`] to leave them alone. GNOME's are for GTK 3 apps, which
+/// don't read `color-scheme`. Budgie and Xfce keep their panel dark in either mode, so the light
+/// icon themes are the ones with light panel icons: `Fluent` rather than `Fluent-light`, `Papirus`
+/// rather than `Papirus-Light`
 #[must_use]
-pub fn xfce_theme(edition: &str, dark: bool) -> Option<&'static str> {
-    edition.eq_ignore_ascii_case("xfce").then_some(if dark {
-        "Orchis-Dark"
-    } else {
-        "Orchis-Light"
+pub fn themes(edition: &str, dark: bool) -> Option<Themes> {
+    Some(match edition.to_ascii_lowercase().as_str() {
+        "gnome" => {
+            Themes { gtk: if dark { "Adwaita-dark" } else { "Adwaita" }, icons: None, wm: None }
+        }
+        // as Ultramarine's budgie-filesystem gschema override has them for dark
+        "budgie" | "flagship" => Themes {
+            gtk: if dark { "Fluent-round-Dark" } else { "Fluent-round-Light" },
+            icons: Some(if dark { "Fluent-dark" } else { "Fluent" }),
+            wm: None,
+        },
+        // as Ultramarine's xfce-config has them for dark
+        "xfce" => Themes {
+            gtk: if dark { "Orchis-Dark" } else { "Orchis-Light" },
+            icons: Some(if dark { "Papirus-Dark" } else { "Papirus" }),
+            wm: Some(if dark { "Orchis-Dark" } else { "Orchis-Light" }),
+        },
+        _ => return None,
     })
+}
+
+/// whether the edition reads its themes from xfconf rather than `gsettings`
+#[must_use]
+pub fn uses_xfconf(edition: &str) -> bool {
+    edition.eq_ignore_ascii_case("xfce")
 }
 
 #[cfg(test)]
@@ -123,11 +140,19 @@ mod tests {
     }
 
     #[test]
-    fn gtk_themes() {
-        assert_eq!(gtk_theme("flagship", true), Some("Fluent-round-Dark"));
-        assert_eq!(gtk_theme("gnome", false), Some("Adwaita"));
-        assert_eq!(gtk_theme("plasma", true), None);
-        assert_eq!(xfce_theme("xfce", false), Some("Orchis-Light"));
-        assert_eq!(xfce_theme("gnome", false), None);
+    fn themes_per_edition() {
+        let budgie = themes("flagship", true).unwrap();
+        assert_eq!((budgie.gtk, budgie.icons), ("Fluent-round-Dark", Some("Fluent-dark")));
+        let budgie = themes("budgie", false).unwrap();
+        assert_eq!((budgie.gtk, budgie.icons), ("Fluent-round-Light", Some("Fluent")));
+        let xfce = themes("xfce", false).unwrap();
+        assert_eq!(
+            (xfce.gtk, xfce.icons, xfce.wm),
+            ("Orchis-Light", Some("Papirus"), Some("Orchis-Light"))
+        );
+        let gnome = themes("gnome", true).unwrap();
+        assert_eq!((gnome.gtk, gnome.icons), ("Adwaita-dark", None));
+        assert_eq!(themes("plasma", true), None);
+        assert!(uses_xfconf("xfce") && !uses_xfconf("gnome"));
     }
 }

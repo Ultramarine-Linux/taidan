@@ -37,10 +37,21 @@ fn gsettings(key: &str, value: &str) -> Vec<String> {
         .to_vec()
 }
 
+/// `xfconf-query` setting a string, through a D-Bus of its own like [`gsettings`]. `-n` creates
+/// the property in case the defaults don't have it
+fn xfconf(channel: &str, property: &str, value: &str) -> Vec<String> {
+    ["dbus-run-session", "--", "xfconf-query", "-c", channel, "-p", property]
+        .into_iter()
+        .chain(["-n", "-t", "string", "-s", value])
+        .map(str::to_owned)
+        .collect()
+}
+
 /// the commands that switch the config under `HOME` to `dark` or light, with the accent if the
 /// edition follows one, empty if there is no tool for it on this system
 fn commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String>> {
     let accent = accent.filter(|_| crate::theme::accent_supported(edition));
+    let themes = crate::theme::themes(edition, dark);
     let mut cmds = vec![];
     if std::path::Path::new(PLASMA).exists() {
         // a `QGuiApplication`, so it needs a platform even though it shows nothing
@@ -55,18 +66,23 @@ fn commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String
         if let Some(accent) = accent {
             cmds.push(gsettings("accent-color", accent.id()));
         }
-        if let Some(theme) = crate::theme::gtk_theme(edition, dark) {
-            cmds.push(gsettings("gtk-theme", theme));
+        if let Some(themes) = themes.filter(|_| !crate::theme::uses_xfconf(edition)) {
+            cmds.push(gsettings("gtk-theme", themes.gtk));
+            if let Some(icons) = themes.icons {
+                cmds.push(gsettings("icon-theme", icons));
+            }
         }
     }
-    if let Some(theme) = crate::theme::xfce_theme(edition, dark)
+    if let Some(themes) = themes.filter(|_| crate::theme::uses_xfconf(edition))
         && std::path::Path::new(XFCONF).exists()
     {
-        // `-n` creates the property in case the defaults don't have it
-        let args = ["dbus-run-session", "--", "xfconf-query", "-c", "xsettings"];
-        let args =
-            [&args[..], &["-p", "/Net/ThemeName", "-n", "-t", "string", "-s", theme]].concat();
-        cmds.push(args.into_iter().map(str::to_owned).collect());
+        cmds.push(xfconf("xsettings", "/Net/ThemeName", themes.gtk));
+        if let Some(icons) = themes.icons {
+            cmds.push(xfconf("xsettings", "/Net/IconThemeName", icons));
+        }
+        if let Some(wm) = themes.wm {
+            cmds.push(xfconf("xfwm4", "/general/theme", wm));
+        }
     }
     cmds
 }

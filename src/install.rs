@@ -147,6 +147,11 @@ fn start(ui: &slint::Weak<AppWindow>) {
     if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Language) {
         crate::SETTINGS.write().locale.clear();
     }
+    // the input methods the keyboard page and summary show, even the ones that only followed the
+    // UI language, since the locale they came from may have just been cleared
+    let ims = crate::ims::enabled(&app.global());
+    crate::SETTINGS.write().ims = ims;
+    crate::SETTINGS.write().ims_picked = true;
     // `Network.save` only runs from the network page. With it skipped the device name stays empty,
     // so the system keeps its hostname as when the name is left blank. Nobody chose to go offline
     // either, so go by the connection right now, as the summary does. Leaving `nointernet` off on

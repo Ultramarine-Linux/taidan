@@ -31,6 +31,12 @@ fn show_enabled(ims: &Ims<'_>, model: &VecModel<ImItem>) {
     ims.set_enabled(enabled.join(", ").into());
 }
 
+/// names of the ones turned on
+#[must_use]
+pub fn enabled(ims: &Ims<'_>) -> Vec<String> {
+    ims.get_items().iter().filter(|im| im.on).map(|im| im.name.into()).collect()
+}
+
 /// turns on the ones for the UI language, unless the user picked some already
 pub fn follow_locale(ui: &AppWindow) {
     if crate::SETTINGS.read().ims_picked {
