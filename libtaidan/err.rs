@@ -10,10 +10,6 @@ pub enum Err {
     ReadDir(&'static str, std::io::Error),
     #[error("fail to read file `{0}`: {1}")]
     ReadFile(Cow<'static, std::path::Path>, std::io::Error),
-    #[error(
-        "unknown repo `{0}` (this does not seem like a url, and this repo is not installed in /etc/yum.repos.d/)"
-    )]
-    UnknownRepo(String),
     #[error("request error: {0}")]
     Reqwest(#[from] reqwest::Error),
     #[error("{0}: {1}")]

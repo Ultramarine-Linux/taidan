@@ -76,10 +76,13 @@ impl LanguageRow {
 }
 
 /// the system locale for a language tag from [`LANGS`], `pt-BR` → `pt_BR.UTF-8`, `None` for ones
-/// that are only for the UI
+/// that can't be one
 fn posix_locale(lang: &str) -> Option<String> {
     let tag = lang.split_once('.').map_or(lang, |(left, _)| left);
-    // en-Xowo, the OwO translation
+    // the OwO translation is only for the UI, the system gets US English
+    if tag == "en-Xowo" {
+        return Some("en_US.UTF-8".to_owned());
+    }
     if tag.is_empty() || tag.split('-').any(|part| part.starts_with('X')) {
         return None;
     }
@@ -99,10 +102,11 @@ pub fn set_lang(lang: &str) {
         .inspect_err(|e| tracing::error!(?e, ?lang, "Cannot apply language"))
     {
         tracing::info!(?locale, lang, "Using selected locale");
-        let mut locales = crate::LOCALE_SOLVER
-            .solve_locale(locale)
-            .into_iter()
+        // the solver doesn't return the tag itself, so an exact match (e.g. en-Xowo) goes first
+        let mut locales = std::iter::once(locale.clone())
+            .chain(crate::LOCALE_SOLVER.solve_locale(locale))
             .filter(|li| crate::AVAILABLE_LANGS.contains(li))
+            .unique()
             .collect_vec();
         let loader = fluent_language_loader!();
         if locales.is_empty() {
@@ -281,7 +285,17 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
                 ui.global::<crate::ui::Lang<'_>>().set_rtl(is_rtl(&lang.locale));
                 crate::ims::follow_locale(&ui);
             }
-            ui.upgrade_in_event_loop(|ui| ui.window().request_redraw()).expect("event loop err");
+            ui.upgrade_in_event_loop(|ui| {
+                // runs after `current_language` changed. The time zone names are localized in
+                // Rust, so redo them even when the time zone page is skipped. Ones never shown
+                // yet are filled when their page or the summary is entered.
+                let tz = ui.global::<crate::ui::Tz<'_>>();
+                if !tz.get_current().id.is_empty() {
+                    tz.invoke_refresh();
+                }
+                ui.window().request_redraw();
+            })
+            .expect("event loop err");
         }
     });
     init_language_list(ui, lang);
@@ -471,6 +485,6 @@ mod tests {
     fn posix_locales() {
         assert_eq!(posix_locale("pt-BR").as_deref(), Some("pt_BR.UTF-8"));
         assert_eq!(posix_locale("eo").as_deref(), Some("eo.UTF-8"));
-        assert_eq!(posix_locale("en-Xowo"), None);
+        assert_eq!(posix_locale("en-Xowo").as_deref(), Some("en_US.UTF-8"));
     }
 }

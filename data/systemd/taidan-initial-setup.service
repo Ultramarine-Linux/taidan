@@ -38,12 +38,15 @@ ExecStartPre=cp -rT /usr/share/taidan/session-config %t/taidan/config
 # but the reload makes them apply right away even if /run/polkit-1/rules.d didn't exist yet.
 ExecStartPre=+install -Dpm644 /usr/share/taidan/polkit/100-taidan.rules -t /run/polkit-1/rules.d/
 ExecStartPre=-+systemctl try-reload-or-restart polkit.service
+# not `shutdown`: logind refuses the power key while that's blocked, and that left holding the
+# button down as the only way out. Shutting down stops this unit first, like any other.
+# start-taidan runs the KWin session and restarts it if taidan crashes.
 ExecStart=systemd-inhibit \
  --who="taidan" \
- --what=handle-lid-switch:sleep:shutdown \
+ --what=handle-lid-switch:sleep \
  --why="Taidan Initial Setup is running" \
  --mode=block \
- dbus-run-session kwin_wayland --no-lockscreen 'sh /usr/libexec/start-taidan'
+ sh /usr/libexec/start-taidan
 ExecStopPost=+sh -c "exec chvt 1"
 ExecStopPost=+rm -f /run/polkit-1/rules.d/100-taidan.rules
 ExecStopPost=-+systemctl try-reload-or-restart polkit.service

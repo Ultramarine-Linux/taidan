@@ -1,6 +1,7 @@
 import { TdnBasePg, TdnHeader } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Install } from "../install.slint";
+import { Actions } from "../actions.slint";
 import { Modal } from "../modal.slint";
 import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
 import { ScrollView } from "std-widgets.slint";
@@ -85,10 +86,21 @@ export component ErrorPage inherits TdnBasePg {
         HorizontalLayout {
             alignment: space-between;
 
-            // no way to leave from here, the system isn't set up and the OOBE has to run again
-            TdnBtn {
-                text: Lang.t("page-error-back", []);
-                clicked => { root.prev_page(); }
+            // no way to leave the OOBE from here, the system isn't set up. Powering off keeps the
+            // recovery record, so the next boot starts over
+            HorizontalLayout {
+                spacing: 0.5rem;
+
+                TdnBtn {
+                    text: Lang.t("page-error-back", []);
+                    clicked => { root.prev_page(); }
+                }
+
+                TdnBtn {
+                    layout-order: Dir.order(1);
+                    text: Lang.t("page-error-poweroff", []);
+                    clicked => { Actions.power-off(); }
+                }
             }
 
             HorizontalLayout {

@@ -24,6 +24,8 @@ component ThemeTile inherits Rectangle {
     // whether this is part of a dialog, see `Modal`
     in property <bool> in-dialog;
 
+    property <bool> pointer-focus;
+
     forward-focus: focus;
     accessible-role: radio-button;
     accessible-label: root.text;
@@ -52,12 +54,12 @@ component ThemeTile inherits Rectangle {
         animate opacity { duration: Tokens.motion-fast; easing: ease-out; }
     }
 
-    // no focus ring, the picked tile is the only Tab stop, as in a radio group, so its own
-    // highlight already shows where the focus is
+    // the picked tile is the only Tab stop, as in a radio group
     focus := FocusScope {
         enabled: Modal.open == root.in-dialog;
         focus-on-tab-navigation: root.checked;
         key-pressed(event) => {
+            root.pointer-focus = false;
             if event.text == " " {
                 if !event.repeat { root.picked(); }
                 return accept;
@@ -150,24 +152,37 @@ component ThemeTile inherits Rectangle {
 
     area := TouchArea {
         mouse-cursor: pointer;
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
+        }
         clicked => {
             root.picked();
             focus.focus();
         }
     }
+
+    if focus.has-focus && !root.pointer-focus: FocusRing {
+        host-width: parent.width;
+        host-height: parent.height;
+        radius: Tokens.radius-lg + self.offset;
+    }
 }
 
 // the accent colors as a row of swatches, a radio group with one Tab stop, where Left and Right
-// pick the next one as they read
+// pick the next one as they read. The focus moves along with the pick, so screen readers say
+// which color it is
 component AccentRow inherits Rectangle {
     // Enter, to go on with the picked one
     callback accepted();
 
     property <length> size: 1.75rem;
     property <bool> pointer-focus;
+    // set by the arrows, so the swatch they pick takes the focus
+    property <bool> moving;
 
     function move(delta: int) {
         let step = Lang.rtl ? -delta : delta;
+        root.moving = true;
         if Appearance.accent < 0 {
             Appearance.accent = step > 0 ? 0 : Appearance.accents.length - 1;
         } else {
@@ -175,27 +190,8 @@ component AccentRow inherits Rectangle {
         }
     }
 
-    forward-focus: focus;
     accessible-role: radio-group;
     accessible-label: Lang.t("page-theme-accent", []);
-
-    focus := FocusScope {
-        enabled: !Modal.open;
-        key-pressed(event) => {
-            root.pointer-focus = false;
-            if event.text == Key.LeftArrow { root.move(-1); return accept; }
-            if event.text == Key.RightArrow { root.move(1); return accept; }
-            if event.text == " " {
-                if !event.repeat && Appearance.accent < 0 { Appearance.accent = 0; }
-                return accept;
-            }
-            if event.text == Key.Return {
-                if !event.repeat { root.accepted(); }
-                return accept;
-            }
-            reject
-        }
-    }
 
     HorizontalLayout {
         alignment: center;
@@ -212,6 +208,33 @@ component AccentRow inherits Rectangle {
             accessible-checkable: true;
             accessible-checked: self.checked;
             accessible-action-default => { Appearance.accent = i; }
+
+            changed checked => {
+                if self.checked && root.moving {
+                    root.moving = false;
+                    focus.focus();
+                }
+            }
+
+            // on the picked one, or the first while none is
+            focus := FocusScope {
+                enabled: !Modal.open;
+                focus-on-tab-navigation: swatch.checked || (Appearance.accent < 0 && i == 0);
+                key-pressed(event) => {
+                    root.pointer-focus = false;
+                    if event.text == Key.LeftArrow { root.move(-1); return accept; }
+                    if event.text == Key.RightArrow { root.move(1); return accept; }
+                    if event.text == " " {
+                        if !event.repeat { Appearance.accent = i; }
+                        return accept;
+                    }
+                    if event.text == Key.Return {
+                        if !event.repeat { root.accepted(); }
+                        return accept;
+                    }
+                    reject
+                }
+            }
 
             Rectangle {
                 border-radius: self.width / 2;
@@ -237,9 +260,7 @@ component AccentRow inherits Rectangle {
                 }
             }
 
-            // on the picked one, or the first while none is
-            if focus.has-focus && !root.pointer-focus
-                && (swatch.checked || (Appearance.accent < 0 && i == 0)): FocusRing {
+            if focus.has-focus && !root.pointer-focus: FocusRing {
                 host-width: swatch.width;
                 host-height: swatch.height;
                 radius: swatch.width / 2 + self.offset;

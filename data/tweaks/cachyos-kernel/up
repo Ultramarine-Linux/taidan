@@ -1,6 +1,9 @@
 #!/bin/sh
-# $1 is 1 to turn the tweak on and 0 to leave it off, the settings are on stdin as JSON
+# $1 is 1 to turn the tweak on and 0 to turn it back off, the settings are on stdin as JSON.
+# Taidan only runs it with 0 when an earlier, unfinished attempt turned it on
 
 if [ "$1" = 1 ]; then
-	um tweaks enable cachyos-kernel
+	um tweaks enable -y cachyos-kernel
+else
+	um tweaks disable -y cachyos-kernel
 fi

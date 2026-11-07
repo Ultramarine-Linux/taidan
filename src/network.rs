@@ -53,8 +53,15 @@ mod nm {
             device: &ObjectPath<'_>,
             specific_object: &ObjectPath<'_>,
         ) -> zbus::Result<(OwnedObjectPath, OwnedObjectPath)>;
+        fn deactivate_connection(&self, active_connection: &ObjectPath<'_>) -> zbus::Result<()>;
         #[zbus(property)]
         fn state(&self) -> zbus::Result<u32>;
+        #[zbus(property)]
+        fn wireless_enabled(&self) -> zbus::Result<bool>;
+        #[zbus(property)]
+        fn set_wireless_enabled(&self, enabled: bool) -> zbus::Result<()>;
+        #[zbus(property)]
+        fn wireless_hardware_enabled(&self) -> zbus::Result<bool>;
         #[zbus(property)]
         fn connectivity(&self) -> zbus::Result<u32>;
         #[zbus(property)]
@@ -166,6 +173,8 @@ const DEVICE_TYPE_ETHERNET: u32 = 1;
 const DEVICE_TYPE_WIFI: u32 = 2;
 /// has a carrier (a cable is plugged in), so a connection can be activated on it
 const DEVICE_STATE_DISCONNECTED: u32 = 30;
+/// connecting, from preparing up to being connected
+const DEVICE_STATE_PREPARE: u32 = 40;
 const DEVICE_STATE_ACTIVATED: u32 = 100;
 const DEVICE_STATE_FAILED: u32 = 120;
 const ACTIVE_STATE_ACTIVATED: u32 = 2;
@@ -187,6 +196,8 @@ enum KeyMgmt {
     Psk,
     Sae,
     Enterprise,
+    /// WPA3-Enterprise 192-bit only, which needs its own key management and EAP-TLS
+    EnterpriseSuiteB,
     /// old WEP security, which isn't supported
     Wep,
 }
@@ -194,8 +205,10 @@ enum KeyMgmt {
 impl KeyMgmt {
     const fn from_flags(flags: u32, wpa: u32, rsn: u32) -> Self {
         let sec = wpa | rsn;
-        if sec & (AP_SEC_KEY_MGMT_802_1X | AP_SEC_KEY_MGMT_EAP_SUITE_B_192) != 0 {
+        if sec & AP_SEC_KEY_MGMT_802_1X != 0 {
             Self::Enterprise
+        } else if sec & AP_SEC_KEY_MGMT_EAP_SUITE_B_192 != 0 {
+            Self::EnterpriseSuiteB
         } else if sec & AP_SEC_KEY_MGMT_PSK != 0 {
             // also covers WPA2/WPA3 transition networks
             Self::Psk
@@ -214,7 +227,7 @@ impl KeyMgmt {
         match self {
             Self::Open | Self::Owe => Security::Open,
             Self::Psk | Self::Sae => Security::Password,
-            Self::Enterprise => Security::Enterprise,
+            Self::Enterprise | Self::EnterpriseSuiteB => Security::Enterprise,
             Self::Wep => Security::Unsupported,
         }
     }
@@ -234,9 +247,20 @@ struct Ap {
 struct Snapshot {
     state: NetState,
     wifi: bool,
+    radio: Radio,
     ethernet: bool,
     wired: bool,
     networks: Vec<WifiNetwork>,
+}
+
+/// whether the wi-fi radio is on
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Radio {
+    #[default]
+    On,
+    Off,
+    /// by a switch or key on the device, which only that can undo
+    HardwareOff,
 }
 
 enum Cmd {
@@ -244,6 +268,8 @@ enum Cmd {
     Connect {
         ssid: String,
         password: String,
+        /// [`PAGE_VISIT`] when it was asked for
+        visit: u64,
     },
     ConnectEnterprise(EnterpriseLogin),
     /// a network that doesn't announce its name, so it isn't in the list
@@ -261,7 +287,13 @@ enum Cmd {
     ClosePortal,
     LoadIp(String),
     SaveIp(String, IpSettings),
+    /// turns the wi-fi radio back on
+    EnableWifi,
 }
+
+/// counts page changes, so a connection that fails after that doesn't
+/// open its password or login dialog over a later page
+static PAGE_VISIT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// why a connection failed, as a translation id
 type Failure = &'static str;
@@ -391,8 +423,18 @@ impl Nm {
             .collect()
     }
 
+    /// the wi-fi adapter to use, one that's connected or connecting, else one that can connect,
+    /// so an unmanaged or blocked card doesn't hide a working one (e.g. a USB dongle)
     fn wifi_device(&self) -> Option<OwnedObjectPath> {
-        self.devices_of(DEVICE_TYPE_WIFI).into_iter().next()
+        let rank = |path: &OwnedObjectPath| match self
+            .at::<nm::Device<'_>>(path)
+            .and_then(|d| d.state())
+        {
+            Ok(DEVICE_STATE_PREPARE..=DEVICE_STATE_ACTIVATED) => 0,
+            Ok(s) if s >= DEVICE_STATE_DISCONNECTED => 1,
+            _ => 2,
+        };
+        self.devices_of(DEVICE_TYPE_WIFI).into_iter().min_by_key(rank)
     }
 
     fn scan(&self) {
@@ -472,9 +514,16 @@ impl Nm {
                 .and_then(|d| d.state())
                 .is_ok_and(|s| s == DEVICE_STATE_ACTIVATED)
         });
+        let radio = if !self.manager.wireless_hardware_enabled().unwrap_or(true) {
+            Radio::HardwareOff
+        } else if !self.manager.wireless_enabled().unwrap_or(true) {
+            Radio::Off
+        } else {
+            Radio::On
+        };
         let Some(dev) = self.wifi_device() else {
             self.aps.clear();
-            return Snapshot { state, wifi: false, ethernet, wired, networks: vec![] };
+            return Snapshot { state, wifi: false, radio, ethernet, wired, networks: vec![] };
         };
         let (aps, active) = self.access_points(&dev);
         let known = self.known();
@@ -493,7 +542,7 @@ impl Nm {
             (b.connected, b.strength).cmp(&(a.connected, a.strength)).then(a.ssid.cmp(&b.ssid))
         });
         self.aps = aps;
-        Snapshot { state, wifi: true, ethernet, wired, networks }
+        Snapshot { state, wifi: true, radio, ethernet, wired, networks }
     }
 
     fn delete(&self, path: &ObjectPath<'_>) {
@@ -521,6 +570,7 @@ impl Nm {
         mut watch: Option<zbus::proxy::SignalStream<'static>>,
     ) -> Result<(), Failure> {
         let deadline = Instant::now() + CONNECT_TIMEOUT;
+        let active_path = active;
         let (active, dev) =
             (self.at::<nm::ActiveConnection<'_>>(active), self.at::<nm::Device<'_>>(dev));
         let mut reason = 0;
@@ -551,6 +601,10 @@ impl Nm {
                 Ok(Ok(_)) => {}
             }
             if Instant::now() > deadline {
+                // so it doesn't come up later after all, while the UI says it failed
+                if let Err(e) = self.manager.deactivate_connection(active_path) {
+                    tracing::warn!(?e, "cannot stop the connection that took too long");
+                }
                 return Err(FAILED_TIMEOUT);
             }
             // the network list and the end of a scan, which would wait for this otherwise
@@ -617,8 +671,12 @@ impl Nm {
             {
                 tracing::warn!(?e, "cannot reactivate the previous connection");
             }
-        } else if let Some(old) = old {
-            self.delete(&old);
+        } else {
+            // in the saved connection now, where later changes go
+            self.pending_ip.remove(ssid);
+            if let Some(old) = old {
+                self.delete(&old);
+            }
         }
         res
     }
@@ -719,7 +777,7 @@ fn wifi_settings<'a>(
         KeyMgmt::Psk => &[("key-mgmt", "wpa-psk".into()), ("psk", password.into())],
         KeyMgmt::Sae => &[("key-mgmt", "sae".into()), ("psk", password.into())],
         KeyMgmt::Owe => &[("key-mgmt", "owe".into())],
-        KeyMgmt::Open | KeyMgmt::Enterprise | KeyMgmt::Wep => &[],
+        KeyMgmt::Open | KeyMgmt::Enterprise | KeyMgmt::EnterpriseSuiteB | KeyMgmt::Wep => &[],
     };
     if !security.is_empty() {
         settings.insert("802-11-wireless-security", security.iter().cloned().collect());
@@ -756,11 +814,12 @@ fn realm(username: &str) -> &str {
 }
 
 /// settings for an 802.1X login, on the wi-fi network `ssid` unless it's wired, `hidden` for one
-/// that doesn't announce its name
+/// that doesn't announce its name, `key_mgmt` as the network announces it
 fn enterprise_settings<'a>(
     login: &'a EnterpriseLogin,
     ssid: &[u8],
     hidden: bool,
+    key_mgmt: KeyMgmt,
 ) -> nm::ConnSettings<'a> {
     let mut settings = if login.wired {
         HashMap::from([
@@ -780,8 +839,10 @@ fn enterprise_settings<'a>(
         if hidden {
             mark_hidden(&mut settings);
         }
-        settings
-            .insert("802-11-wireless-security", HashMap::from([("key-mgmt", "wpa-eap".into())]));
+        // `wpa-eap` only tries Suite-B-192 with PMF required, which this one turns on itself
+        let key_mgmt =
+            if key_mgmt == KeyMgmt::EnterpriseSuiteB { "wpa-eap-suite-b-192" } else { "wpa-eap" };
+        settings.insert("802-11-wireless-security", HashMap::from([("key-mgmt", key_mgmt.into())]));
         settings
     };
     settings.insert("802-1x", eap_settings(login));
@@ -888,9 +949,51 @@ fn cert_name(wired: bool, ssid: &str) -> String {
     }
 }
 
-/// copies the files `login` uses to [`CERT_DIR`], readable only by root, and points it at them
-fn install_certs(login: &mut EnterpriseLogin) -> Result<(), Failure> {
-    let name = cert_name(login.wired, &login.ssid);
+/// certificate files copied for one login attempt, see [`install_certs`]
+struct Certs {
+    /// the folder for the network's certificates, with one folder per attempt inside
+    dir: String,
+    /// the folder of this attempt, if it copied anything
+    attempt: Option<String>,
+}
+
+impl Certs {
+    /// keeps this attempt's files and removes those of earlier ones once it `worked`, or else
+    /// removes this attempt's, leaving the ones the network's saved connection still uses
+    fn finish(&self, worked: bool) {
+        let res = if worked {
+            if !std::path::Path::new(&self.dir).is_dir() {
+                return;
+            }
+            let mut args = vec![self.dir.as_str(), "-mindepth", "1", "-maxdepth", "1"];
+            if let Some(attempt) = &self.attempt {
+                let name = attempt.rsplit('/').next().unwrap_or_default();
+                args.extend(["!", "-name", name]);
+            }
+            args.extend(["-exec", "rm", "-rf", "--", "{}", "+"]);
+            crate::RT.block_on(libtaidan::root("find", args))
+        } else if let Some(attempt) = &self.attempt {
+            crate::RT.block_on(libtaidan::root("rm", ["-rf", "--", attempt.as_str()]))
+        } else {
+            return;
+        };
+        if let Err(e) = res {
+            tracing::warn!(?e, dir = self.dir, "cannot remove old certificates");
+        }
+    }
+}
+
+/// copies the files `login` uses to a new folder in [`CERT_DIR`] for this attempt, readable only
+/// by root, and points it at them. A new folder each time, so a failed attempt can't overwrite the
+/// files the network's working connection uses
+fn install_certs(login: &mut EnterpriseLogin) -> Result<Certs, Failure> {
+    let dir = format!("{CERT_DIR}/{}", cert_name(login.wired, &login.ssid));
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let attempt = format!("{dir}/{stamp}");
+    let mut certs = Certs { dir, attempt: None };
     let files = [
         ("ca", &mut login.ca_cert),
         ("client", &mut login.client_cert),
@@ -898,7 +1001,8 @@ fn install_certs(login: &mut EnterpriseLogin) -> Result<(), Failure> {
         ("pac", &mut login.pac_file),
     ];
     for (kind, path) in files {
-        if path.is_empty() || path.starts_with(CERT_DIR) {
+        // copied even from `CERT_DIR`, as that file goes once this attempt works
+        if path.is_empty() {
             continue;
         }
         let ext = std::path::Path::new(path.as_str())
@@ -906,18 +1010,20 @@ fn install_certs(login: &mut EnterpriseLogin) -> Result<(), Failure> {
             .and_then(|e| e.to_str())
             .map(|e| format!(".{}", e.to_ascii_lowercase()))
             .unwrap_or_default();
-        let dest = format!("{CERT_DIR}/{name}-{kind}{ext}");
+        let dest = format!("{attempt}/{kind}{ext}");
+        certs.attempt = Some(attempt.clone());
         let res = crate::RT.block_on(libtaidan::root(
             "install",
             ["-D", "-m", "0600", path.as_str(), dest.as_str()],
         ));
         if let Err(e) = res {
             tracing::error!(?e, %path, dest, "cannot copy certificate");
+            certs.finish(false);
             return Err("page-internet-8021x-error-file");
         }
         *path = dest.into();
     }
-    Ok(())
+    Ok(certs)
 }
 
 /// certificate files, as offered by `NetworkManager`'s connection editor
@@ -1241,35 +1347,46 @@ impl Nm {
         portal().is_some()
     }
 
-    /// logs in to the wired network with 802.1X, replacing an earlier attempt, and doesn't keep
-    /// the connection if it fails, so a wrong password isn't saved
+    /// logs in to the wired network with 802.1X, replacing an earlier attempt once it works, and
+    /// doesn't keep the connection if it fails, so a wrong password isn't saved and the earlier
+    /// login still works
     fn connect_wired_8021x(&mut self, login: &EnterpriseLogin) -> Result<(), Failure> {
         let dev = self.ethernet_device().ok_or(FAILED)?;
         let settings: zbus::Result<nm::Settings<'_>> =
             zbus::blocking::proxy::Builder::new(&self.conn).build();
-        for path in settings.and_then(|s| s.list_connections()).unwrap_or_default() {
-            let id = self
-                .at::<nm::SettingsConnection<'_>>(&path)
-                .and_then(|c| c.get_settings())
-                .ok()
-                .and_then(|mut s| s.get_mut("connection")?.remove("id"))
-                .and_then(|id| String::try_from(id).ok());
-            if id.as_deref() == Some(WIRED_8021X_ID) {
-                self.delete(&path);
-            }
-        }
+        let old = (settings.and_then(|s| s.list_connections()).unwrap_or_default().into_iter())
+            .filter(|path| {
+                let id = self
+                    .at::<nm::SettingsConnection<'_>>(path)
+                    .and_then(|c| c.get_settings())
+                    .ok()
+                    .and_then(|mut s| s.get_mut("connection")?.remove("id"))
+                    .and_then(|id| String::try_from(id).ok());
+                id.as_deref() == Some(WIRED_8021X_ID)
+            })
+            .collect::<Vec<_>>();
+        let was_active = self.active_on(&dev).filter(|active| old.contains(active));
         let root = ObjectPath::from_static_str_unchecked("/");
         let watch = self.watch(&dev);
-        let (conn, active) = self
-            .manager
-            .add_and_activate_connection(enterprise_settings(login, &[], false), &dev, &root)
-            .map_err(|e| {
+        let settings = enterprise_settings(login, &[], false, KeyMgmt::Enterprise);
+        let (conn, active) =
+            self.manager.add_and_activate_connection(settings, &dev, &root).map_err(|e| {
                 tracing::error!(?e, "cannot add wired 802.1X connection");
                 FAILED
             })?;
         let res = self.wait(&active, &dev, watch);
         if res.is_err() {
             self.delete(&conn);
+            // go back to the login that worked before
+            if let Some(old) = was_active
+                && let Err(e) = self.manager.activate_connection(&old, &dev, &root)
+            {
+                tracing::warn!(?e, "cannot reactivate the previous wired 802.1X connection");
+            }
+        } else {
+            for old in old {
+                self.delete(&old);
+            }
         }
         res
     }
@@ -1365,6 +1482,7 @@ impl Nm {
                 self.pending_ip.insert(bytes, ip);
                 return Ok(());
             };
+            self.pending_ip.remove(&bytes);
             self.update_ip(&conn, &ip).map_err(failed)?;
             let dev = self.wifi_device().ok_or(FAILED_IP)?;
             if self.active_on(&dev).as_ref() == Some(&conn) {
@@ -1465,6 +1583,8 @@ fn push_snapshot(ui: &slint::Weak<AppWindow>, snap: Snapshot) {
     push(ui, move |net| {
         net.set_state(snap.state);
         net.set_wifi_available(snap.wifi);
+        net.set_wifi_enabled(snap.radio == Radio::On);
+        net.set_wifi_hardware_enabled(snap.radio != Radio::HardwareOff);
         net.set_ethernet(snap.ethernet);
         net.set_wired(snap.wired);
         net.set_connected_ssid(
@@ -1513,7 +1633,7 @@ fn sync_model<T: Clone + PartialEq + 'static, K: PartialEq>(
 }
 
 fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
-    let (ssid, res, enterprise) = match cmd {
+    let (ssid, res, enterprise, visit) = match cmd {
         Cmd::Refresh => {
             push(ui, |net| net.set_scanning(true));
             nm.scan();
@@ -1521,40 +1641,19 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
             nm.scanning_until = Some(Instant::now() + SCAN_TIME);
             return;
         }
-        Cmd::Connect { ssid, password } => {
+        Cmd::Connect { ssid, password, visit } => {
             start_connecting(ui, &ssid);
             let res = nm.connect(&ssid, &password);
-            let enterprise =
-                nm.aps.iter().any(|ap| ap.name == ssid && ap.key_mgmt == KeyMgmt::Enterprise);
-            (ssid, res, enterprise)
+            let enterprise = nm
+                .aps
+                .iter()
+                .any(|ap| ap.name == ssid && ap.key_mgmt.security() == Security::Enterprise);
+            (ssid, res, enterprise, visit)
         }
         Cmd::ConnectHidden { ssid, key_mgmt, password } => {
             return connect_hidden(nm, ui, ssid, key_mgmt, &password);
         }
-        Cmd::ConnectEnterprise(mut login) => {
-            login.ssid = login.ssid.trim().into();
-            if !login.wired {
-                start_connecting(ui, &login.ssid);
-            }
-            let res = if let Err(failure) = install_certs(&mut login) {
-                Err(failure)
-            } else if login.wired {
-                nm.connect_wired_8021x(&login)
-            } else {
-                let hidden = !nm.aps.iter().any(|ap| ap.name == login.ssid.as_str());
-                let ssid = nm.ssid_of(&login.ssid);
-                nm.add_and_connect(&ssid, enterprise_settings(&login, &ssid, hidden))
-            };
-            push(ui, move |net| {
-                net.set_connecting_ssid("".into());
-                net.set_enterprise_busy(false);
-                match res {
-                    Ok(()) => net.set_enterprise_open(false),
-                    Err(failure) => net.set_enterprise_error_id(failure.into()),
-                }
-            });
-            return;
-        }
+        Cmd::ConnectEnterprise(login) => return connect_enterprise(nm, ui, login),
         Cmd::SetProxy { url, bypass } => return set_proxy(nm, ui, &url, &bypass),
         Cmd::OpenPortal(proxy) => {
             let open = nm.open_portal(proxy);
@@ -1587,6 +1686,7 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
             });
             return;
         }
+        Cmd::EnableWifi => return enable_wifi(nm, ui),
     };
     push(ui, move |net| {
         net.set_connecting_ssid("".into());
@@ -1595,8 +1695,10 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
             Err(failure) => {
                 net.set_error_ssid(ssid.as_str().into());
                 net.set_error_id(failure.into());
-                // ask for the password if a saved one didn't work, or one was given and was wrong
-                if failure == FAILED_SECRETS {
+                // ask for the password if a saved one didn't work, or one was given and was wrong,
+                // unless the page was left meanwhile, where a dialog would come out of nowhere
+                let left = PAGE_VISIT.load(std::sync::atomic::Ordering::SeqCst) != visit;
+                if failure == FAILED_SECRETS && !left {
                     if enterprise {
                         net.set_enterprise_ssid(ssid.as_str().into());
                         net.set_enterprise_wired(false);
@@ -1609,6 +1711,50 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
             }
         }
     });
+}
+
+/// [`Cmd::ConnectEnterprise`], the dialog closes once it's connected and shows why if it can't
+fn connect_enterprise(nm: &mut Nm, ui: &slint::Weak<AppWindow>, mut login: EnterpriseLogin) {
+    // spaces around a typed hidden network's name are a slip, but a network in the list
+    // can really have them
+    if !nm.aps.iter().any(|ap| ap.name == login.ssid.as_str()) {
+        login.ssid = login.ssid.trim().into();
+    }
+    if !login.wired {
+        start_connecting(ui, &login.ssid);
+    }
+    let res = install_certs(&mut login).and_then(|certs| {
+        let res = if login.wired {
+            nm.connect_wired_8021x(&login)
+        } else {
+            let ap = nm.aps.iter().find(|ap| ap.name == login.ssid.as_str());
+            let (hidden, key_mgmt) =
+                ap.map_or((true, KeyMgmt::Enterprise), |ap| (false, ap.key_mgmt));
+            let ssid = nm.ssid_of(&login.ssid);
+            nm.add_and_connect(&ssid, enterprise_settings(&login, &ssid, hidden, key_mgmt))
+        };
+        certs.finish(res.is_ok());
+        res
+    });
+    push(ui, move |net| {
+        net.set_connecting_ssid("".into());
+        net.set_enterprise_busy(false);
+        match res {
+            Ok(()) => net.set_enterprise_open(false),
+            Err(failure) => net.set_enterprise_error_id(failure.into()),
+        }
+    });
+}
+
+/// [`Cmd::EnableWifi`]
+fn enable_wifi(nm: &mut Nm, ui: &slint::Weak<AppWindow>) {
+    if let Err(e) = nm.manager.set_wireless_enabled(true) {
+        tracing::error!(?e, "cannot turn on wi-fi");
+        return;
+    }
+    // `NetworkManager` scans once the adapter is up, which takes a moment
+    push(ui, |net| net.set_scanning(true));
+    nm.scanning_until = Some(Instant::now() + SCAN_TIME * 2);
 }
 
 /// [`Cmd::ConnectHidden`], the dialog closes once it's connected and shows why if it can't
@@ -1697,17 +1843,22 @@ fn browse(ui: &slint::Weak<AppWindow>, dir: &str, pac: bool, all: bool) {
     });
 }
 
-/// connecting to a network from the list or the password dialog
+/// connecting to a network from the list or the password dialog, and turning wi-fi on for it
 fn init_connect(
     ui: &slint::Weak<AppWindow>,
     net: &Network<'_>,
     send: impl Fn(Cmd) + Clone + 'static,
 ) {
+    net.on_enable_wifi({
+        let send = send.clone();
+        move || send(Cmd::EnableWifi)
+    });
     net.on_connect({
         let (ui, send) = (ui.clone(), send.clone());
         move |ssid, password| {
             if start_busy(&ui, &ssid) {
-                send(Cmd::Connect { ssid: ssid.into(), password: password.into() });
+                let visit = PAGE_VISIT.load(std::sync::atomic::Ordering::SeqCst);
+                send(Cmd::Connect { ssid: ssid.into(), password: password.into(), visit });
             }
         }
     });
@@ -1894,9 +2045,13 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
         }
     });
     init_portal(ui, net, send.clone());
+    net.on_page_changed(|| {
+        PAGE_VISIT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    });
     net.on_save({
         let ui = ui.clone();
         move |offline| {
+            PAGE_VISIT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             // done with the network page, so done logging in to the portal too
             send(Cmd::ClosePortal);
             let Some(ui) = ui.upgrade() else { return };
@@ -1999,6 +2154,15 @@ mod tests {
         );
         assert_eq!(KeyMgmt::from_flags(1, 0, AP_SEC_KEY_MGMT_SAE), KeyMgmt::Sae);
         assert_eq!(KeyMgmt::from_flags(1, 0, AP_SEC_KEY_MGMT_802_1X), KeyMgmt::Enterprise);
+        // transition networks take plain WPA-EAP
+        assert_eq!(
+            KeyMgmt::from_flags(1, 0, AP_SEC_KEY_MGMT_802_1X | AP_SEC_KEY_MGMT_EAP_SUITE_B_192),
+            KeyMgmt::Enterprise
+        );
+        assert_eq!(
+            KeyMgmt::from_flags(1, 0, AP_SEC_KEY_MGMT_EAP_SUITE_B_192),
+            KeyMgmt::EnterpriseSuiteB
+        );
     }
 
     fn ip(manual: bool, address: &str, gateway: &str, dns: &str) -> IpSettings {
@@ -2075,7 +2239,7 @@ mod tests {
     #[test]
     fn enterprise_settings_verify_server() {
         let login = login(EapMethod::Peap, "mschapv2");
-        let s = enterprise_settings(&login, b"eduroam", false);
+        let s = enterprise_settings(&login, b"eduroam", false, KeyMgmt::Enterprise);
         let x = &s["802-1x"];
         assert_eq!(x["eap"], Value::from(vec!["peap"]));
         assert_eq!(x["phase2-auth"], Value::from("mschapv2"));
@@ -2084,12 +2248,16 @@ mod tests {
         assert_eq!(x["system-ca-certs"], Value::from(true));
         assert!(!x.contains_key("phase1-peapver"));
         assert!(!s["802-11-wireless"].contains_key("hidden"));
+        assert_eq!(s["802-11-wireless-security"]["key-mgmt"], Value::from("wpa-eap"));
+        let suite_b = enterprise_settings(&login, b"eduroam", false, KeyMgmt::EnterpriseSuiteB);
         assert_eq!(
-            enterprise_settings(&login, b"eduroam", true)["802-11-wireless"]["hidden"],
-            Value::from(true)
+            suite_b["802-11-wireless-security"]["key-mgmt"],
+            Value::from("wpa-eap-suite-b-192")
         );
+        let hidden = enterprise_settings(&login, b"eduroam", true, KeyMgmt::Enterprise);
+        assert_eq!(hidden["802-11-wireless"]["hidden"], Value::from(true));
         let wired = EnterpriseLogin { wired: true, ..login };
-        let s = enterprise_settings(&wired, &[], false);
+        let s = enterprise_settings(&wired, &[], false, KeyMgmt::Enterprise);
         assert_eq!(s["connection"]["type"], Value::from("802-3-ethernet"));
         assert!(!s.contains_key("802-11-wireless-security"));
     }

@@ -21,6 +21,13 @@ component IpSettingsButton inherits TdnBtn {
     padding-x: 0.3rem;
 }
 
+// the column for the lock of secured networks, a fixed width so the columns after it line up
+component LockCell inherits VerticalLayout {
+    width: 0.9rem * Tokens.text-scale;
+    horizontal-stretch: 0;
+    alignment: center;
+}
+
 // the trailing column of a network row, a fixed width so it lines up between rows
 component StatusCell inherits VerticalLayout {
     width: 1.6rem * Tokens.text-scale;
@@ -44,6 +51,18 @@ component NetworkRow inherits VerticalLayout {
     property <string> error: Network.error-ssid == root.net.ssid && Network.error-id != ""
         && Network.password-ssid == "" && !Network.enterprise-open && !Network.hidden-open
         ? Lang.t(Network.error-id, []) : "";
+    // shown under the row, why it failed or why it can't be connected to
+    property <string> note: root.error != "" ? root.error
+        : root.net.security == Security.unsupported ? Lang.t("page-internet-security-unsupported", []) : "";
+    // the security and signal strength the icons show, for screen readers
+    property <string> info: Lang.t("page-internet-network-info", [
+        { key: "security", value: Lang.t(
+            root.net.security == Security.open ? "page-internet-security-open"
+            : root.net.security == Security.password ? "page-internet-security-password"
+            : root.net.security == Security.enterprise ? "page-internet-security-enterprise"
+            : "page-internet-security-unsupported", []) },
+        { key: "bars", value: root.net.strength },
+    ]);
     // whether this row's button had focus before it was rebuilt, see `Network.focus-ssid`
     property <bool> wants-focus: Network.focus-ssid == root.net.ssid;
 
@@ -101,8 +120,21 @@ component NetworkRow inherits VerticalLayout {
             text: root.net.ssid;
         }
 
-        VerticalLayout {
+        LockCell {
             layout-order: Dir.order(2);
+
+            if root.net.security != Security.open: Image {
+                source: @image-url("../../data/icons/lock-symbolic.svg");
+                width: parent.width;
+                height: self.width;
+                colorize: Tokens.color-muted-foreground;
+                // the connect button says it, see `info`
+                accessible-role: none;
+            }
+        }
+
+        VerticalLayout {
+            layout-order: Dir.order(3);
             alignment: center;
             horizontal-stretch: 0;
 
@@ -113,7 +145,7 @@ component NetworkRow inherits VerticalLayout {
         }
 
         StatusCell {
-            layout-order: Dir.order(3);
+            layout-order: Dir.order(4);
 
             // stacked, so the hidden button takes no room
             Rectangle {
@@ -130,7 +162,7 @@ component NetworkRow inherits VerticalLayout {
                     // forward, which points left for right-to-left languages
                     icon: Lang.rtl ? LucidePaths.arrow-left : LucidePaths.arrow-right;
                     label: Lang.t("page-internet-connect-to", [{ key: "ssid", value: root.net.ssid }]);
-                    description: root.error;
+                    description: root.error != "" ? root.error + "\n" + root.info : root.info;
                     busy: Network.connecting-ssid == root.net.ssid;
                     enabled: !root.net.connected && Network.connecting-ssid == ""
                         && root.net.security != Security.unsupported;
@@ -147,9 +179,9 @@ component NetworkRow inherits VerticalLayout {
         }
     }
 
-    if root.error != "": TdnText {
-        text: root.error;
-        color: Tokens.color-destructive;
+    if root.note != "": TdnText {
+        text: root.note;
+        color: root.error != "" ? Tokens.color-destructive : Tokens.color-muted-foreground;
         horizontal-alignment: Dir.text-start;
         wrap: word-wrap;
         font-size: 0.9 * Tokens.text-rem;
@@ -162,6 +194,11 @@ export component NetworkPage inherits TdnPage {
     intercept-next: !Network.online;
     next-intercepted => { Network.offline-prompt = true; }
     forward-focus: device-name;
+
+    // the wi-fi adapter is there, but its radio is off, so there's nothing to list
+    property <bool> radio-off: Network.wifi-available && (!Network.wifi-enabled || !Network.wifi-hardware-enabled);
+    // the networks can be listed
+    property <bool> wifi: Network.wifi-available && !root.radio-off;
 
     HorizontalLayout {
         spacing: 1.5rem;
@@ -258,8 +295,13 @@ export component NetworkPage inherits TdnPage {
                             text: Lang.t("page-internet-wired", []);
                         }
 
-                        VerticalLayout {
+                        // where the wi-fi rows have their lock
+                        LockCell {
                             layout-order: Dir.order(2);
+                        }
+
+                        VerticalLayout {
+                            layout-order: Dir.order(3);
                             alignment: center;
                             horizontal-stretch: 0;
                             IpSettingsButton {
@@ -269,7 +311,7 @@ export component NetworkPage inherits TdnPage {
                         }
 
                         StatusCell {
-                            layout-order: Dir.order(3);
+                            layout-order: Dir.order(4);
 
                             TdnStatusIcon {
                                 ok: Network.wired;
@@ -287,14 +329,38 @@ export component NetworkPage inherits TdnPage {
                         wrap: word-wrap;
                     }
 
-                    if Network.wifi-available && Network.networks.length == 0: TdnText {
+                    if root.radio-off: VerticalLayout {
+                        vertical-stretch: 1;
+                        alignment: start;
+                        spacing: 0.75rem;
+
+                        TdnText {
+                            // only the switch or key can turn it back on
+                            text: Lang.t(Network.wifi-hardware-enabled ? "page-internet-wifi-off" : "page-internet-wifi-off-hardware", []);
+                            color: Tokens.color-muted-foreground;
+                            horizontal-alignment: Dir.text-start;
+                            wrap: word-wrap;
+                        }
+
+                        if Network.wifi-hardware-enabled: HorizontalLayout {
+                            alignment: Dir.start;
+
+                            TdnBtn {
+                                text: Lang.t("page-internet-wifi-enable", []);
+                                min-size: 1.9rem;
+                                clicked => { Network.enable-wifi(); }
+                            }
+                        }
+                    }
+
+                    if root.wifi && Network.networks.length == 0: TdnText {
                         vertical-stretch: 1;
                         text: Network.scanning ? Lang.t("page-internet-scanning", []) : Lang.t("page-internet-no-networks", []);
                         color: Tokens.color-muted-foreground;
                         wrap: word-wrap;
                     }
 
-                    if Network.wifi-available && Network.networks.length > 0: ScrollView {
+                    if root.wifi && Network.networks.length > 0: ScrollView {
                         vertical-stretch: 1;
 
                         VerticalLayout {
@@ -307,7 +373,7 @@ export component NetworkPage inherits TdnPage {
                         }
                     }
 
-                    if Network.wifi-available: HorizontalLayout {
+                    if root.wifi: HorizontalLayout {
                         alignment: center;
                         spacing: 0.5rem;
 

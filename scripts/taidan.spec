@@ -32,11 +32,12 @@ Requires:       systemd-udev
 Requires:       kbd
 Requires:       procps-ng
 Requires:       bash
-Requires:       (dnf5 and dnf5-command(copr))
+# config-manager enables the repos asked for in the settings
+Requires:       (dnf5 and dnf5-command(copr) and dnf5-command(config-manager))
 Requires:       flatpak
 # homectl needs systemd-homed running when the distro config sets systemd_homed
 Recommends:     systemd-homed
-# lspci, to find GPUs and Broadcom chips that need drivers
+# lspci, to find the NVIDIA GPU's chip
 Requires:       pciutils
 # dbus-send, to tell KWin to reload the keyboard layout
 Requires:       dbus-tools
@@ -129,4 +130,9 @@ DESTDIR=%buildroot ./scripts/install.sh
 %{_datadir}/taidan/session-config/
 
 %files default-configs
+# installable without taidan, e.g. alongside another distro's configs
+%dir %{_datadir}/taidan/
 %{_datadir}/taidan/tweaks/
+
+%changelog
+%autochangelog

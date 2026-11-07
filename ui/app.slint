@@ -85,13 +85,18 @@ export component AppWindow inherits Window {
         else if pagenum == error-page { error.focus(); }
     }
     changed pagenum => {
+        Modal.page = pagenum;
+        Network.page-changed();
         focus-page();
         if pagenum == 7 { Tz.refresh(); }
         // with the time zone page skipped, the summary still shows the system's
         if pagenum == summary-page && Tz.current.id == "" { Tz.refresh(); }
         if pagenum == 8 { Network.refresh(); }
     }
-    init => { focus-page(); }
+    init => {
+        Modal.page = pagenum;
+        focus-page();
+    }
 
     // apply the text options here, `Tokens` can't be set from the global
     property <bool> larger-text: A11y.larger-text;
@@ -99,10 +104,24 @@ export component AppWindow inherits Window {
     property <bool> reduce-motion: A11y.reduce-motion;
     changed reduce-motion => { Tokens.reduce-motion = reduce-motion; }
 
-    // back to the page when a dialog closes
+    // back to whatever opened a dialog when it closes (`DialogOpener`), or else to the page
     property <bool> dialog-open: Modal.open;
     changed dialog-open => {
-        if !dialog-open { focus-page(); }
+        if dialog-open {
+            Modal.returned = false;
+        } else {
+            refocus.running = true;
+        }
+    }
+    // a moment later, so the opener's own `changed` has run, whichever order they go in
+    refocus := Timer {
+        interval: 0ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            if !Modal.returned { focus-page(); }
+            Modal.returned = false;
+        }
     }
 
     // leave the installing page once the installation ends

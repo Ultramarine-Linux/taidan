@@ -67,6 +67,18 @@ fn cmdline_has_debug_shell(cmdline: &str) -> bool {
 }
 
 fn init_actions(_ui: slint::Weak<impl slint::ComponentHandle + 'static>, actions: &Actions<'_>) {
+    actions.on_power_off(|| {
+        if crate::install::is_dev_session() {
+            tracing::warn!("Dev session: not powering off");
+            return;
+        }
+        // as root, which logind lets through the unit's inhibitor
+        std::thread::spawn(|| {
+            if let Err(e) = crate::RT.block_on(libtaidan::root("systemctl", ["poweroff"])) {
+                tracing::error!(?e, "cannot power off");
+            }
+        });
+    });
     actions.on_open_terminal(|| {
         // wait on a separate thread so the UI keeps running while the terminal is open
         std::thread::spawn(|| {
@@ -76,7 +88,11 @@ fn init_actions(_ui: slint::Weak<impl slint::ComponentHandle + 'static>, actions
             }
             let status = std::process::Command::new("pkexec")
                 .args(["--user", "root", "env"])
-                .args(std::env::vars().map(|(k, v)| format!("{k}={v}")))
+                .args(std::env::vars_os().map(|(mut k, v)| {
+                    k.push("=");
+                    k.push(v);
+                    k
+                }))
                 .args(["xdg-terminal-exec", "--", "sh", "-c"])
                 .arg("echo 'Taidan has detected Alt+Shift+T. A terminal with superuser privilege is opened for debugging purposes. Only proceed if you know what you are doing, OTHERWISE YOU MAY RISK DATA LOSS OR CAUSE DAMAGES TO YOUR DEVICE. To exit the terminal, press Ctrl+D.' && sh")
                 .status();

@@ -2,7 +2,7 @@ import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Account } from "../account.slint";
 import { Camera } from "../camera.slint";
-import { TdnInput, TdnField, TdnText, TdnStyle, TdnBtn, TdnSpinner, TdnDialog, Modal } from "../components.slint";
+import { TdnInput, TdnField, TdnText, TdnStyle, TdnBtn, TdnSpinner, TdnDialog, Modal, DialogOpener } from "../components.slint";
 import { Card } from "../slintcn/components/card.slint";
 import { FocusRing } from "../slintcn/components/focus-ring.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
@@ -45,12 +45,18 @@ component IconButton inherits Rectangle {
 
     property <bool> pointer-focus;
 
+    // presses it, and if that opened a dialog, the focus comes back here once it closes
+    function press() {
+        root.clicked();
+        if !root.in-dialog { opener.opened(); }
+    }
+
     forward-focus: focus;
     accessible-role: button;
     accessible-label: root.label;
     accessible-checkable: !root.symbolic;
     accessible-checked: root.selected;
-    accessible-action-default => { if root.enabled { root.clicked(); } }
+    accessible-action-default => { if root.enabled { root.press(); } }
 
     width: 3.1rem;
     height: self.width;
@@ -90,11 +96,15 @@ component IconButton inherits Rectangle {
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == " " || event.text == Key.Return {
-                if !event.repeat { root.clicked(); }
+                if !event.repeat { root.press(); }
                 return accept;
             }
             reject
         }
+    }
+
+    opener := DialogOpener {
+        restore => { focus.focus(); }
     }
 
     area := TouchArea {
@@ -103,7 +113,7 @@ component IconButton inherits Rectangle {
         pointer-event(ev) => {
             if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
         }
-        clicked => { root.clicked(); }
+        clicked => { root.press(); }
     }
 
     if focus.has-focus && !root.pointer-focus: FocusRing {
@@ -134,7 +144,9 @@ component IconPicker inherits VerticalLayout {
         UserIcon { }
 
         // once an icon and a username are chosen, preview the account instead of the hint
-        if Account.avatar-id != "" && Account.username-valid: VerticalLayout {
+        // `username-error` rather than `username-valid`, so it doesn't flicker while the
+        // background check runs
+        if Account.avatar-id != "" && Account.username != "" && Account.username-error == "": VerticalLayout {
             layout-order: Dir.order(1);
             alignment: center;
 
@@ -154,7 +166,7 @@ component IconPicker inherits VerticalLayout {
             }
         }
 
-        if Account.avatar-id == "" || !Account.username-valid: VerticalLayout {
+        if Account.avatar-id == "" || Account.username == "" || Account.username-error != "": VerticalLayout {
             layout-order: Dir.order(1);
             alignment: center;
 
@@ -277,7 +289,7 @@ export component CameraDialog inherits TdnDialog {
 export component WhoAreYouPage inherits TdnPage {
     pageid: "whoareyou";
     step_i: 0;
-    can-next: Account.username-valid;
+    can-next: Account.username-valid && Account.fullname-valid;
     forward-focus: nameinput;
 
     HorizontalLayout {
@@ -294,12 +306,14 @@ export component WhoAreYouPage inherits TdnPage {
             name-field := TdnField {
                 label: Lang.t("page-whoareyou-fullname", []);
                 help: Lang.t("page-whoareyou-fullname-desc", []);
+                error: Account.fullname-valid ? "" : Lang.t("page-whoareyou-error-fullname", []);
                 label-clicked => { nameinput.focus(); }
 
                 nameinput := TdnInput {
                     label: name-field.label;
                     description: name-field.description;
                     text <=> Account.fullname;
+                    invalid: !Account.fullname-valid;
                     edited(text) => {
                         if !Account.username-touched {
                             Account.username = Account.suggest-username(text, Account.username);
@@ -314,10 +328,10 @@ export component WhoAreYouPage inherits TdnPage {
             }
 
             username-field := TdnField {
-                property <bool> invalid: Account.username != "" && !Account.username-valid;
+                property <bool> invalid: Account.username != "" && Account.username-error != "";
                 label: Lang.t("page-whoareyou-username", []);
                 help: Lang.t("page-whoareyou-username-desc", []);
-                error: self.invalid ? Lang.t(Account.username-error(Account.username), []) : "";
+                error: self.invalid ? Lang.t(Account.username-error, []) : "";
                 label-clicked => { userinput.focus(); }
 
                 userinput := TdnInput {

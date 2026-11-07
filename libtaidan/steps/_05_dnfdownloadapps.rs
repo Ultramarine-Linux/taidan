@@ -59,13 +59,10 @@ impl super::Step for DnfDownloadApps {
         if cfg.taidan0.skip_dnf || settings.nointernet {
             return Ok(());
         }
-        let mut enable_repo = super::super::dnf::EnableRepo::new().await?;
-        // NOTE: we unfortunately cannot execute this in parallel because `enable_repo()` borrows
-        // `enable_repo` mutably, and it's impossible to mutate the object in parallel safely.
+        // one at a time, since each `dnf5 config-manager` rewrites the same config files
         for repo in &settings.actions[0] {
-            enable_repo.enable_repo(repo).await?;
+            super::super::dnf::enable_repo(repo).await?;
         }
-        enable_repo.save().await?;
         for copr in &settings.actions[4] {
             crate::pkexec("root", "dnf5", &["copr", "enable", "-y", copr]).await?;
         }

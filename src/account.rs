@@ -1,9 +1,51 @@
 //! user account details (full name, username, password)
 
-/// whether the new user can be called `s`: well-formed, not too long, and not a system account or
-/// an existing user or group (unless this install already created it)
-fn valid_username(s: &str) -> bool {
-    libtaidan::passwd::username_problem(s).is_none()
+use libtaidan::passwd::UsernameProblem;
+
+/// fluent id of the message for `problem`
+const fn username_error(problem: Option<UsernameProblem>) -> &'static str {
+    match problem {
+        None => "",
+        Some(UsernameProblem::Taken) => "page-whoareyou-error-taken",
+        Some(UsernameProblem::TooLong) => "page-whoareyou-error-long",
+        Some(UsernameProblem::Invalid) => "page-whoareyou-error",
+    }
+}
+
+/// whether the full name has none of the characters that would cut it short in the GECOS field.
+/// The install would replace them, but then the login screen wouldn't show what the user typed
+fn valid_fullname(s: &str) -> bool {
+    !s.chars().any(libtaidan::passwd::gecos_separator)
+}
+
+/// starts the thread that looks up whether usernames are taken, which goes through NSS and maybe
+/// `lastlog2`, too slow for the UI thread. It only checks the latest username sent and drops a
+/// result once the username has changed again
+fn spawn_username_checker(
+    ui: slint::Weak<crate::ui::AppWindow>,
+) -> std::sync::mpsc::Sender<String> {
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
+    std::thread::spawn(move || {
+        while let Ok(mut name) = rx.recv() {
+            // skip the ones typed while the last check ran
+            while let Ok(newer) = rx.try_recv() {
+                name = newer;
+            }
+            let taken = libtaidan::passwd::username_problem(&name).is_some();
+            let posted = ui.upgrade_in_event_loop(move |ui| {
+                use slint::ComponentHandle;
+                let account = ui.global::<crate::ui::Account<'_>>();
+                if account.get_username() == name.as_str() {
+                    account.set_checked_username(name.into());
+                    account.set_checked_taken(taken);
+                }
+            });
+            if posted.is_err() {
+                break;
+            }
+        }
+    });
+    tx
 }
 
 /// suggest a username from the full name: the first word if usable, otherwise the last
@@ -30,16 +72,18 @@ fn derive_username(fullname: &str) -> Option<String> {
 
 pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, account: &crate::ui::Account<'_>) {
     use slint::ComponentHandle;
-    account.on_valid_username(|s| valid_username(&s));
-    account.on_username_error(|s| {
-        use libtaidan::passwd::UsernameProblem;
-        match libtaidan::passwd::username_problem(&s) {
-            Some(UsernameProblem::Taken) => "page-whoareyou-error-taken",
-            Some(UsernameProblem::TooLong) => "page-whoareyou-error-long",
-            Some(UsernameProblem::Invalid) | None => "page-whoareyou-error",
-        }
-        .into()
+    account.on_username_syntax_error(|s| {
+        username_error(libtaidan::passwd::username_syntax_problem(&s)).into()
     });
+    let checker = spawn_username_checker(ui.clone());
+    account.on_check_username(move |s| {
+        // a name that's wrong anyway needs no lookup, `username-error` already says why
+        if libtaidan::passwd::username_syntax_problem(&s).is_none() {
+            _ = checker.send(s.into());
+        }
+    });
+    account.on_valid_fullname(|s| valid_fullname(&s));
+    account.on_long_password(|s| s.len() > libtaidan::passwd::PASSWORD_MAX_LEN);
     account.on_suggest_username(|fullname, current| {
         derive_username(&fullname).map_or(current, Into::into)
     });
@@ -51,7 +95,7 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, account: &crate::ui:
         let account = ui.global::<crate::ui::Account<'_>>();
         let mut settings = crate::SETTINGS.write();
         settings.username = account.get_username().into();
-        // `:` and newlines would break the passwd entry
+        // `:`, `,` and newlines would break the passwd entry
         let fullname = libtaidan::passwd::sanitize_fullname(&account.get_fullname());
         settings.fullname = if fullname.is_empty() { settings.username.clone() } else { fullname };
         settings.passwd = account.get_password().as_str().into();
@@ -62,7 +106,11 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, account: &crate::ui:
 
 #[cfg(test)]
 mod tests {
-    use super::{derive_username, valid_username};
+    use super::{derive_username, valid_fullname};
+
+    fn valid_username(s: &str) -> bool {
+        libtaidan::passwd::username_problem(s).is_none()
+    }
 
     #[test]
     fn empty_input_clears_username() {
@@ -91,9 +139,19 @@ mod tests {
         assert!(!valid_username(""));
         assert!(!valid_username("1alice"));
         assert!(!valid_username("Alice"));
-        assert!(!valid_username(&"a".repeat(33)));
+        assert!(valid_username(&"a".repeat(31)));
+        assert!(!valid_username(&"a".repeat(32)));
         assert!(!valid_username("root"));
         assert!(!valid_username("taidan"));
+    }
+
+    #[test]
+    fn fullname_validation() {
+        assert!(valid_fullname("John Smith Jr."));
+        assert!(valid_fullname("Zoë 山田"));
+        assert!(!valid_fullname("John Smith, Jr."));
+        assert!(!valid_fullname("a:b"));
+        assert!(!valid_fullname("a\nb"));
     }
 
     #[test]

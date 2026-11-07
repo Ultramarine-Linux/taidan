@@ -52,8 +52,10 @@ export global Tokens {
         Theme.mode == ThemeMode.light ? Palette.neutral-100 : Palette.neutral-800;
     out property <color> color-muted:
         Theme.mode == ThemeMode.light ? Palette.neutral-100 : Palette.neutral-800;
+    // darker than neutral-500 in light mode so muted text stays above 4.5:1 on cards and their
+    // hover tint
     out property <color> color-muted-foreground:
-        Theme.mode == ThemeMode.light ? Palette.neutral-500 : Palette.neutral-400;
+        Theme.mode == ThemeMode.light ? #616161 : Palette.neutral-400;
     // darker in light mode so red text stays above 4.5:1 on the background and on its tint
     out property <color> color-destructive:
         Theme.mode == ThemeMode.light ? Palette.red-700 : Palette.red-400;

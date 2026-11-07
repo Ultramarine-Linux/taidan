@@ -263,13 +263,6 @@ pub fn wrapper() -> Vec<std::ffi::OsString> {
     vec!["/bin/sh".into(), "-c".into(), r#". "$0" && exec "$@""#.into(), env_file().into()]
 }
 
-/// a client that goes through the current proxy
-pub(crate) fn client() -> reqwest::Client {
-    get()
-        .and_then(|p| p.client().inspect_err(|e| tracing::warn!(?e, "invalid proxy")).ok())
-        .unwrap_or_else(|| crate::prelude::REQWEST_CLIENT.clone())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

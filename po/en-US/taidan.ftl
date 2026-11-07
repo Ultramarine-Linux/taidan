@@ -134,7 +134,9 @@ page-whoareyou-camera-error = Can't use the camera:
 # .error: multiline, explanation pops out if invalid username
 page-whoareyou-error = Username must start with lowercase letters and must only contain lowercase letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
 page-whoareyou-error-taken = That username is already used on this system. Pick another one.
-page-whoareyou-error-long = Usernames can be at most 32 characters long.
+page-whoareyou-error-long = Usernames can be at most 31 characters long.
+# shown under the name field if it has a comma or colon, which would cut the name short on the login screen
+page-whoareyou-error-fullname = Names can't contain commas or colons.
 
 ## [Password]
 
@@ -147,6 +149,8 @@ page-password-pw = Password
 page-password-rp = Repeat Password
 # shown when the repeated password differs
 page-password-mismatch = Passwords don't match.
+# shown when the password is over 511 bytes, the most the system can store
+page-password-long = This password is too long. Try a shorter one.
 # accessible name of the button that shows/hides the password
 page-password-show = Show password
 # .tip*: advice shown next to the password fields
@@ -186,6 +190,17 @@ page-internet-refresh = Refresh
 page-internet-scanning = Searching…
 page-internet-no-wifi = No Wi-Fi adapter was found. You can still connect with a cable.
 page-internet-no-networks = No Wi-Fi networks found.
+page-internet-wifi-off = Wi-Fi is turned off.
+page-internet-wifi-off-hardware = Wi-Fi is turned off with a switch or key on this device. Turn it on there to see networks.
+# btn, shown with page-internet-wifi-off
+page-internet-wifi-enable = Turn On Wi-Fi
+# how a wi-fi network is secured, for screen readers and under networks that can't be used
+page-internet-security-open = Open network
+page-internet-security-password = Secured with a password
+page-internet-security-enterprise = Secured with an organization login
+page-internet-security-unsupported = Uses old WEP security, which isn't supported
+# for screen readers, $security: one of the page-internet-security-* strings, $bars: signal strength from 0 to 3
+page-internet-network-info = { $security }, signal strength { $bars } of 3
 page-internet-wired = Wired Connection
 # shown next to the wired connection when no cable is plugged in
 page-internet-unplugged = Not Connected
@@ -414,6 +429,8 @@ page-error-retry = Retry
 page-error-offline = Continue Offline
 # btn (back to the summary page to change settings before retrying)
 page-error-back = Go Back
+# btn, the setup starts over on the next boot
+page-error-poweroff = Power Off
 
 ## [Tweaks in Ultramarine]
 

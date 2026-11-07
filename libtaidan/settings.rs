@@ -31,9 +31,9 @@ pub struct Settings {
     /// whether to download updates to install on the next restart, on unless turned off
     #[serde(default = "yes")]
     pub download_updates: bool,
-    /// whether apps may ask GeoClue for the device's location, on unless turned off
-    #[serde(default = "yes")]
-    pub location: bool,
+    /// whether apps may ask GeoClue for the device's location, [`None`] to leave GeoClue as the
+    /// distro has it, when the location page is skipped
+    pub location: Option<bool>,
     /// accessibility options, carried over to the new user
     pub a11y: crate::a11y::A11y,
 
@@ -163,7 +163,7 @@ mod tests {
         assert!(restored.nointernet);
         assert!(restored.timezone.is_empty());
         assert!(restored.locale.is_empty());
-        assert!(restored.location);
+        assert_eq!(restored.location, None);
         assert_eq!(restored.a11y, crate::a11y::A11y::default());
         assert_eq!(restored.tweaks.ids(), None);
         assert!(restored.passwd.expose_secret().is_empty());
@@ -179,6 +179,10 @@ mod tests {
         // ones that never picked any turn them all off
         let restored: Settings = serde_json::from_value(serde_json::json!({})).unwrap();
         assert_eq!(restored.tweaks.ids(), Some(&[][..]));
-        assert!(restored.location);
+        assert_eq!(restored.location, None);
+        // from when it was a plain `bool`
+        let restored: Settings =
+            serde_json::from_value(serde_json::json!({ "location": false })).unwrap();
+        assert_eq!(restored.location, Some(false));
     }
 }

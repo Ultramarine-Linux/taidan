@@ -72,6 +72,10 @@ export global Network {
     in property <NetState> state;
     // whether there is a wi-fi adapter
     in property <bool> wifi-available: true;
+    // whether its radio is on, and whether a switch or key on the device turned it off, which
+    // only that switch can undo
+    in property <bool> wifi-enabled: true;
+    in property <bool> wifi-hardware-enabled: true;
     // whether there is an ethernet adapter, and whether it's connected
     in property <bool> ethernet;
     in property <bool> wired;
@@ -151,6 +155,8 @@ export global Network {
     callback browse(dir: string, pac: bool, all: bool);
 
     callback refresh();
+    // turns the wi-fi radio on, when it was turned off in software
+    callback enable-wifi();
     // `password` is empty for open or saved networks
     callback connect(ssid: string, password: string);
     callback connect-enterprise(login: EnterpriseLogin);
@@ -169,4 +175,6 @@ export global Network {
     callback save-ip(ssid: string, ip: IpSettings);
     // writes the device name and whether setup should go without internet to the settings
     callback save(offline: bool);
+    // any page change, so a connection that fails later doesn't pop a dialog over another page
+    callback page-changed();
 }

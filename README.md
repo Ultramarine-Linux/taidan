@@ -24,8 +24,8 @@ kwriteconfig6
 shadow-utils
 systemd and systemd-udev
 kbd and procps-ng [chvt and pkill for the session]
-bash, util-linux-script
-dnf5 and dnf5-command(copr)
+bash, util-linux [runuser and lastlog2]
+dnf5, dnf5-command(copr) and dnf5-command(config-manager)
 flatpak
 xdg-terminal-exec [the debug terminal, see Testing]
 umcli [tweaks, through taidan-default-configs]

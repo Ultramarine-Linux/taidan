@@ -5,9 +5,9 @@ import { Icon } from "slintcn/components/icon.slint";
 import { LucidePaths } from "slintcn/components/lucide-paths.slint";
 import { Cfg } from "cfg.slint";
 import { Lang, Dir } from "lang.slint";
-import { Modal } from "modal.slint";
+import { Modal, DialogOpener } from "modal.slint";
 import { Appearance } from "appearance.slint";
-export { Modal, Dir }
+export { Modal, DialogOpener, Dir }
 import { Card } from "slintcn/components/card.slint";
 
 export global TdnStyle {
@@ -61,11 +61,17 @@ export component TdnBtn inherits Rectangle {
 
     property <bool> pointer-focus;
 
+    // presses it, and if that opened a dialog, the focus comes back here once it closes
+    function press() {
+        root.clicked();
+        if !root.in-dialog { opener.opened(); }
+    }
+
     forward-focus: focus;
     accessible-role: button;
     accessible-label: root.text;
     accessible-enabled: root.enabled;
-    accessible-action-default => { if root.enabled { root.clicked(); } }
+    accessible-action-default => { if root.enabled { root.press(); } }
 
     // sizes are given in layout units, but buttons are drawn at text size, see `Tokens.text-scale`
     min-height: root.min-size * Tokens.text-scale;
@@ -88,11 +94,15 @@ export component TdnBtn inherits Rectangle {
             // a held key repeats, which would go on to press whatever gets the focus next, like
             // Confirm on the summary
             if event.text == Key.Return || event.text == " " {
-                if !event.repeat { root.clicked(); }
+                if !event.repeat { root.press(); }
                 return accept;
             }
             reject
         }
+    }
+
+    opener := DialogOpener {
+        restore => { focus.focus(); }
     }
 
     HorizontalLayout {
@@ -141,7 +151,7 @@ export component TdnBtn inherits Rectangle {
         pointer-event(ev) => {
             if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
         }
-        clicked => { root.clicked(); }
+        clicked => { root.press(); }
     }
 
     if focus.has-focus && !root.pointer-focus: FocusRing {
@@ -788,7 +798,13 @@ export component TdnIconButton inherits Rectangle {
     accessible-label: root.label;
     accessible-description: root.description;
     accessible-enabled: root.active;
-    accessible-action-default => { if root.active { root.clicked(); } }
+    accessible-action-default => { if root.active { root.press(); } }
+
+    // presses it, and if that opened a dialog, the focus comes back here once it closes
+    function press() {
+        root.clicked();
+        if !root.in-dialog { opener.opened(); }
+    }
 
     // drawn at text size, like buttons, see `Tokens.text-scale`
     width: self.height;
@@ -807,11 +823,15 @@ export component TdnIconButton inherits Rectangle {
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == Key.Return || event.text == " " {
-                if !event.repeat && root.active { root.clicked(); }
+                if !event.repeat && root.active { root.press(); }
                 return accept;
             }
             reject
         }
+    }
+
+    opener := DialogOpener {
+        restore => { focus.focus(); }
     }
 
     if root.busy: TdnSpinner {
@@ -830,7 +850,7 @@ export component TdnIconButton inherits Rectangle {
         pointer-event(ev) => {
             if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
         }
-        clicked => { root.clicked(); }
+        clicked => { root.press(); }
     }
 
     if focus.has-focus && !root.pointer-focus: FocusRing {

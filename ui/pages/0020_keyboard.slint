@@ -1,7 +1,7 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir, Keymap } from "../lang.slint";
 import { ListView, ScrollView } from "std-widgets.slint";
-import { TdnInput, TdnListRow, TdnText, Modal } from "../components.slint";
+import { TdnInput, TdnListRow, TdnText, Modal, DialogOpener } from "../components.slint";
 import { Icon } from "../slintcn/components/icon.slint";
 import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
 import { FocusRing } from "../slintcn/components/focus-ring.slint";
@@ -16,10 +16,16 @@ component ImsRow inherits Rectangle {
     property <bool> pointer-focus;
     property <string> value: Ims.enabled == "" ? Lang.t("page-keyboard-ims-none", []) : Ims.enabled;
 
+    // opens the dialog, and the focus comes back here once it closes
+    function open() {
+        Ims.open = true;
+        opener.opened();
+    }
+
     forward-focus: focus;
     accessible-role: button;
     accessible-label: Lang.t("page-keyboard-ims", []) + ", " + root.value;
-    accessible-action-default => { Ims.open = true; }
+    accessible-action-default => { root.open(); }
 
     vertical-stretch: 0;
     height: 2.75rem;
@@ -34,11 +40,15 @@ component ImsRow inherits Rectangle {
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == Key.Return || event.text == " " {
-                if !event.repeat { Ims.open = true; }
+                if !event.repeat { root.open(); }
                 return accept;
             }
             reject
         }
+    }
+
+    opener := DialogOpener {
+        restore => { focus.focus(); }
     }
 
     HorizontalLayout {
@@ -83,7 +93,7 @@ component ImsRow inherits Rectangle {
         pointer-event(ev) => {
             if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
         }
-        clicked => { Ims.open = true; }
+        clicked => { root.open(); }
     }
 
     if focus.has-focus && !root.pointer-focus: FocusRing {

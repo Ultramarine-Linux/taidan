@@ -6,6 +6,8 @@ use std::{
 
 use tokio::io::AsyncWriteExt;
 
+use crate::err::{Res, TaidanErrHelper};
+
 pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
     let tweaks = Tweak::list()
         .inspect_err(|err| tracing::error!(?err, "cannot list tweaks"))
@@ -39,6 +41,9 @@ pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
 /// ```
 ///
 /// The ID of a tweak is determined by the directory name (`my_tweak`, `other_tweak`).
+///
+/// `up 1` turns the tweak on. `up 0` turns it back off, and only runs for a tweak an earlier,
+/// unfinished attempt turned on (see [`ON_RECORD`]) that the user has since turned off.
 ///
 /// The `tweak.toml` file is optional, and so are all of its fields:
 /// - `ftl_name` (alias `name`): the fluent ID for the name of the tweak, defaults to `<id>-name`
@@ -187,12 +192,12 @@ impl Tweak {
         self.path.file_name().unwrap()
     }
 
-    /// Run `up` with the serialized `settings`, failures are logged
+    /// Run `up` with the serialized `settings`, whether it succeeded. Failures are logged
     ///
     /// Expects `pkexec` to be available.
     // not the settings, which have the proxy in them, and its password
     #[tracing::instrument(skip(settings))]
-    pub async fn run(&self, settings: &[u8], on: bool) {
+    pub async fn run(&self, settings: &[u8], on: bool) -> bool {
         // `pkexec` clears the environment, and tweaks may download things too
         let cmd = tokio::process::Command::new("pkexec")
             .args(["--user", "root", "env"])
@@ -203,7 +208,10 @@ impl Tweak {
             .spawn();
         let mut cmd = match cmd {
             Ok(cmd) => cmd,
-            Err(err) => return tracing::error!(?err, "cannot run pkexec"),
+            Err(err) => {
+                tracing::error!(?err, "cannot run pkexec");
+                return false;
+            }
         };
         if let Some(mut stdin) = cmd.stdin.take()
             && let Err(err) = stdin.write_all(settings).await
@@ -212,11 +220,66 @@ impl Tweak {
             tracing::debug!(?err, "cannot pass the settings to `up`");
         }
         match cmd.wait().await {
-            Ok(x) if x.success() => {}
-            Ok(x) => tracing::error!(rc=?x.code(), "process failed with non-zero exit code"),
-            Err(err) => tracing::error!(?err, "waiting for the `up` process failed"),
+            Ok(x) if x.success() => true,
+            Ok(x) => {
+                tracing::error!(rc=?x.code(), "process failed with non-zero exit code");
+                false
+            }
+            Err(err) => {
+                tracing::error!(?err, "waiting for the `up` process failed");
+                false
+            }
         }
     }
+}
+
+/// ids of the tweaks an unfinished install turned on, one per line, so a retry with one of them
+/// turned off can turn it off again. Removed once the install finishes, from then on they're the
+/// user's
+pub const ON_RECORD: &str = "/var/lib/taidan/tweaks-on";
+
+/// what [`ON_RECORD`] says, empty if there's none
+#[must_use]
+pub fn recorded_on() -> Vec<String> {
+    std::fs::read_to_string(ON_RECORD)
+        .map(|s| s.lines().filter(|l| !l.is_empty()).map(str::to_owned).collect())
+        .unwrap_or_default()
+}
+
+/// writes `ids` to [`ON_RECORD`], world-readable since the OOBE reads it as its own user, or
+/// removes it when there are none
+///
+/// # Errors
+/// Cannot write or remove the file.
+pub async fn record_on(ids: &[String]) -> Res<()> {
+    if ids.is_empty() {
+        return clear_on_record().await;
+    }
+    let mut args = vec![
+        "-c",
+        r#"
+            f=$1
+            shift
+            mkdir -p "$(dirname "$f")"
+            printf '%s\n' "$@" > "$f"
+            chmod 644 "$f"
+        "#,
+        "sh",
+        ON_RECORD,
+    ];
+    args.extend(ids.iter().map(String::as_str));
+    crate::root("sh", args).await.wrap_msg("cannot record the tweaks turned on")
+}
+
+/// removes [`ON_RECORD`], if it's there
+///
+/// # Errors
+/// Cannot remove the file.
+pub async fn clear_on_record() -> Res<()> {
+    if !tokio::fs::try_exists(ON_RECORD).await.unwrap_or(true) {
+        return Ok(());
+    }
+    crate::root("rm", ["-f", ON_RECORD]).await.wrap_msg("cannot remove the tweaks record")
 }
 
 /// The x86-64 microarchitecture level of the running CPU, or 0 on other architectures.

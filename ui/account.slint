@@ -18,20 +18,44 @@ export global Account {
     // set once the user types a username themselves, so we stop suggesting one from the full name
     in-out property <bool> username-touched;
 
-    out property <bool> username-valid: valid-username(username);
-    out property <bool> password-valid: password != "" && password == password-repeat;
+    // the username the background check last finished for, and whether it's taken
+    in-out property <string> checked-username;
+    in-out property <bool> checked-taken;
+    // fluent id of the message explaining why `username` can't be used, empty if it can or the
+    // background check hasn't finished
+    out property <string> username-error: username-syntax-error(username) != ""
+        ? username-syntax-error(username)
+        : checked-username == username && checked-taken ? "page-whoareyou-error-taken" : "";
+    out property <bool> username-valid: username-error == "" && checked-username == username;
+    out property <bool> fullname-valid: valid-fullname(fullname);
+    out property <bool> password-too-long: long-password(password);
+    out property <bool> password-valid: password != "" && password == password-repeat && !password-too-long;
 
-    pure callback valid-username(username: string) -> bool;
-    // fluent id of the message explaining why `username` can't be used
-    pure callback username-error(username: string) -> string;
+    changed username => { check-username(username); }
+
+    // fluent id of what's wrong with `username` apart from it being taken, empty if nothing.
+    // Cheap, so it runs on every keystroke
+    pure callback username-syntax-error(username: string) -> string;
+    // looks up whether `username` is taken in the background, then sets `checked-username` and
+    // `checked-taken`
+    callback check-username(username: string);
+    // whether `fullname` has nothing that would cut it short in the passwd entry
+    pure callback valid-fullname(fullname: string) -> bool;
+    // whether `password` is longer than the system can hash
+    pure callback long-password(password: string) -> bool;
     // username suggested by the full name, or `current` if none can be derived
     pure callback suggest-username(fullname: string, current: string) -> string;
     // what to call the user: their first name, else their username
     pure callback first-name(fullname: string, username: string) -> string;
     callback save();
 
-    valid-username(username) => username != "";
-    username-error(username) => "page-whoareyou-error";
+    username-syntax-error(username) => username != "" ? "" : "page-whoareyou-error";
+    check-username(username) => {
+        checked-username = username;
+        checked-taken = false;
+    }
+    valid-fullname(fullname) => true;
+    long-password(password) => false;
     suggest-username(fullname, current) => current;
     first-name(fullname, username) => fullname != "" ? fullname : username;
 }

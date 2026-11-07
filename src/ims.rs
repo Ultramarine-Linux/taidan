@@ -11,6 +11,11 @@ fn imf() -> libtaidan::i18n::I18nImf {
 }
 
 fn items() -> Vec<ImItem> {
+    // what `skip_pages = ["inputmethod"]` did before the page became part of the keyboard page,
+    // with no items the keyboard page and summary show none and none are set up
+    if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::InputMethod) {
+        return vec![];
+    }
     let imf = imf();
     (libtaidan::i18n::IMS.entries())
         .flat_map(|(lang, ims)| {

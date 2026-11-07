@@ -3700,7 +3700,6 @@ dependencies = [
  "enum_dispatch",
  "futures",
  "itertools 0.15.0",
- "memchr",
  "phf 0.14.0",
  "regex",
  "reqwest",

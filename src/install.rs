@@ -133,7 +133,10 @@ fn start(ui: &slint::Weak<AppWindow>) {
     install.set_updates_ready(false);
     install.set_stage_count(i32::try_from(Stage::all().len()).expect("too many stages"));
     crate::SETTINGS.write().install_codecs_drivers = app.global::<Drivers<'_>>().get_install();
-    crate::SETTINGS.write().location = app.global::<Location<'_>>().get_enabled();
+    // a skipped location page leaves GeoClue as the distro has it
+    crate::SETTINGS.write().location =
+        (!crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Location))
+            .then(|| app.global::<Location<'_>>().get_enabled());
     crate::SETTINGS.write().download_updates = install.get_download_updates();
     // what the theme page shows, unless it's skipped, then the distro's default stays
     crate::SETTINGS.write().dark_mode =
@@ -147,11 +150,6 @@ fn start(ui: &slint::Weak<AppWindow>) {
     if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Language) {
         crate::SETTINGS.write().locale.clear();
     }
-    // the input methods the keyboard page and summary show, even the ones that only followed the
-    // UI language, since the locale they came from may have just been cleared
-    let ims = crate::ims::enabled(&app.global());
-    crate::SETTINGS.write().ims = ims;
-    crate::SETTINGS.write().ims_picked = true;
     // `Network.save` only runs from the network page. With it skipped the device name stays empty,
     // so the system keeps its hostname as when the name is left blank. Nobody chose to go offline
     // either, so go by the connection right now, as the summary does. Leaving `nointernet` off on
@@ -161,6 +159,11 @@ fn start(ui: &slint::Weak<AppWindow>) {
         crate::SETTINGS.write().nointernet = !online;
     }
     let mut settings = crate::SETTINGS.read().clone();
+    // the input methods the keyboard page and summary show, even the ones that only followed the
+    // UI language, since the locale they came from may have just been cleared. Only on this
+    // attempt's copy, so they keep following the language if it changes before a retry
+    settings.ims = crate::ims::enabled(&app.global());
+    settings.ims_picked = true;
     // the rest only goes on this attempt's copy. `SETTINGS.nointernet` stays what the network page
     // chose, so a later retry gets the online steps back once the connection is back
     if !online && !settings.nointernet {
@@ -188,6 +191,10 @@ fn start(ui: &slint::Weak<AppWindow>) {
             move |msg| on_install_msg(&ui, msg)
         };
         let error = run_install(&mut settings, &callback);
+        if error.is_none() {
+            *APPLIED_A11Y.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+                Some((settings.username.clone(), settings.a11y));
+        }
         let used_internet = !settings.nointernet;
         let set = ui.upgrade_in_event_loop(move |ui| {
             let install = ui.global::<Install<'_>>();
@@ -205,6 +212,30 @@ fn start(ui: &slint::Weak<AppWindow>) {
     });
 }
 
+/// the user the installation made and the accessibility options it gave them, which may have
+/// changed on the installing or done page since
+static APPLIED_A11Y: std::sync::Mutex<Option<(String, libtaidan::a11y::A11y)>> =
+    std::sync::Mutex::new(None);
+
+/// the accessibility options as they are now, if they changed since the installation carried them
+/// over to the user
+async fn reapply_a11y() {
+    let applied = APPLIED_A11Y.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+    let Some((username, applied)) = applied else { return };
+    let a11y = crate::SETTINGS.read().a11y;
+    if a11y == applied {
+        return;
+    }
+    let cfg = match backend_cfg() {
+        Ok(cfg) => cfg,
+        Err(e) => return tracing::warn!(?e, "cannot convert the config"),
+    };
+    let settings = libtaidan::settings::Settings { username, a11y, ..Default::default() };
+    if let Err(e) = libtaidan::a11y::reapply_to_user(&settings, &cfg, applied).await {
+        tracing::warn!(?e, "cannot carry over the accessibility settings");
+    }
+}
+
 /// whether [`finish`] has started
 static FINISHING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -213,6 +244,7 @@ async fn finish(reboot: bool) {
     if is_dev_session() {
         tracing::warn!(reboot, "Dev session: not marking the system configured, nor rebooting");
     } else {
+        reapply_a11y().await;
         // libtaidan did these at the end of the installation already, this only makes sure. Both
         // succeed when there's nothing left to do
         if let Err(e) = libtaidan::root("rm", ["-rf", "/var/.unconfigured", "/.unconfigured"]).await

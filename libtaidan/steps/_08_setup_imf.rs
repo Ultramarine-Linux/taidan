@@ -13,25 +13,45 @@ impl super::Step for SetupImf {
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        // the input methods weren't installed without dnf
-        if settings.ims.is_empty() || settings.nointernet || cfg.taidan0.skip_dnf {
+        // written into the skeleton the home was created from, see `write_to_skel`
+        if settings.ims.is_empty() || cfg.taidan0.systemd_homed {
             return Ok(());
         }
+        let Some(settings) = &with_installed_ims(settings, cfg).await else { return Ok(()) };
         if let Err(e) = match settings.imf {
-            i18n::I18nImf::IBus if cfg.taidan0.systemd_homed => {
-                // the home isn't mounted, and dconf's database can't go in the skeleton
-                tracing::warn!("cannot set up IBus for a systemd-homed user, skipping");
-                Ok(())
-            }
             i18n::I18nImf::IBus => write_ibus_profile(settings).await,
-            // written into the skeleton the home was created from, see `write_fcitx5_to_skel`
-            i18n::I18nImf::Fcitx5 if cfg.taidan0.systemd_homed => Ok(()),
             i18n::I18nImf::Fcitx5 => write_fcitx5_profile(settings).await,
         } {
             tracing::warn!(?e, "cannot setup IMFs");
         }
         Ok(())
     }
+}
+
+/// `settings` with only the input methods that are installed, when they couldn't be installed
+/// here (offline or without dnf) but the image may have them, [`None`] if that leaves none
+async fn with_installed_ims(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+) -> Option<crate::settings::Settings> {
+    if !settings.nointernet && !cfg.taidan0.skip_dnf {
+        return (!settings.ims.is_empty()).then(|| settings.clone());
+    }
+    let mut ims = vec![];
+    for name in &settings.ims {
+        let im = i18n::find_im(name);
+        let pkg = match settings.imf {
+            i18n::I18nImf::Fcitx5 => im.and_then(|im| im.fcitx5_pkg),
+            i18n::I18nImf::IBus => im.and_then(|im| im.ibus_pkg),
+        };
+        let Some(pkg) = pkg else { continue };
+        match tokio::process::Command::new("rpm").args(["-q", "--quiet", pkg]).status().await {
+            Ok(status) if status.success() => ims.push(name.clone()),
+            Ok(_) => tracing::info!(name, pkg, "input method isn't installed, not setting it up"),
+            Err(e) => tracing::warn!(?e, "cannot run rpm"),
+        }
+    }
+    (!ims.is_empty()).then(|| crate::settings::Settings { ims, ..settings.clone() })
 }
 
 /// `kwriteconfig6` arguments, after `--file`, that select Fcitx5 as KWin's input method
@@ -145,22 +165,22 @@ async fn write_fcitx5_profile(settings: &crate::settings::Settings) -> Res<()> {
     Ok(())
 }
 
-/// writes the Fcitx5 config into `skel`, a copy of `/etc/skel` the new user's home is made from,
-/// for systemd-homed, where the home isn't mounted when [`SetupImf`] runs
+/// writes the input method config into `skel`, a copy of `/etc/skel` the new user's home is made
+/// from, for systemd-homed, where the home isn't mounted when [`SetupImf`] runs
 ///
 /// # Errors
 /// - cannot write the files
-pub async fn write_fcitx5_to_skel(
+pub async fn write_to_skel(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
     skel: &std::path::Path,
 ) -> Res<bool> {
-    if settings.ims.is_empty()
-        || settings.nointernet
-        || cfg.taidan0.skip_dnf
-        || !settings.imf.is_fcitx5()
-    {
+    if settings.ims.is_empty() {
         return Ok(false);
+    }
+    let Some(settings) = &with_installed_ims(settings, cfg).await else { return Ok(false) };
+    if settings.imf.is_ibus() {
+        return write_ibus_to_skel(settings, skel).await;
     }
     let config = skel.join(".config");
     tokio::fs::create_dir_all(config.join("fcitx5")).await.map_err(Err::Io)?;
@@ -208,6 +228,25 @@ fn ibus_dconf_script(
         dconf write /desktop/ibus/general/preload-engines \"[{order}]\" && \
         dconf write /org/gnome/desktop/input-sources/sources \"[{sources}]\""
     ))
+}
+
+/// [`ibus_dconf_script`] into the dconf database in `skel`, through a D-Bus of its own like the
+/// theme's `gsettings`
+async fn write_ibus_to_skel(
+    settings: &crate::settings::Settings,
+    skel: &std::path::Path,
+) -> Res<bool> {
+    let Some(script) = ibus_dconf_script(settings) else { return Ok(false) };
+    tokio::fs::create_dir_all(skel.join(".config")).await.map_err(Err::Io)?;
+    let cmd = ["dbus-run-session", "--", "bash", "-c", &script].map(str::to_owned).to_vec();
+    let env = crate::a11y::in_home(skel, cmd);
+    let env = env.iter().map(String::as_str).collect::<Vec<_>>();
+    // not worth losing the rest of the skeleton over
+    if let Err(e) = super::acmd("env", &env).await {
+        tracing::warn!(?e, "cannot set the IBus engines");
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 async fn write_ibus_profile(settings: &crate::settings::Settings) -> Res<()> {

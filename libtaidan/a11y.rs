@@ -130,6 +130,24 @@ impl A11y {
         ]
     }
 
+    /// every entry [`Self::user_entries`] can write, deleted so the defaults apply, for undoing
+    /// options that were carried over before they were turned off
+    fn reset_entries() -> Vec<Entry> {
+        let all = Self {
+            screen_reader: true,
+            zoom: true,
+            sticky_keys: true,
+            slow_keys: true,
+            bounce_keys: true,
+            dwell_click: true,
+            larger_text: true,
+            legible_font: true,
+            reduce_motion: true,
+            color_filter: 1,
+        };
+        all.user_entries().into_iter().map(|e| Entry { value: None, bool: false, ..e }).collect()
+    }
+
     /// everything to write for the new user, nothing when no option is on so their config stays
     /// untouched
     #[must_use]
@@ -235,6 +253,11 @@ impl A11y {
         if *self == Self::default() {
             return vec![];
         }
+        self.all_desktop_commands(edition)
+    }
+
+    /// [`Self::desktop_commands`], even when no option is on, which resets them all
+    fn all_desktop_commands(&self, edition: &str) -> Vec<Vec<String>> {
         if crate::theme::uses_xfconf(edition) {
             return self.xfconf_commands();
         }
@@ -325,14 +348,23 @@ impl A11y {
     }
 }
 
-/// [`A11y::desktop_commands`] if there's a tool on this system to run them
-fn desktop_commands(settings: &crate::settings::Settings, edition: &str) -> Vec<Vec<String>> {
+/// [`A11y::desktop_commands`] if there's a tool on this system to run them, all of them with
+/// `reset` to undo options that were turned off
+fn desktop_commands(
+    settings: &crate::settings::Settings,
+    edition: &str,
+    reset: bool,
+) -> Vec<Vec<String>> {
     let tool = if crate::theme::uses_xfconf(edition) { XFCONF } else { GSETTINGS };
     if !std::path::Path::new(tool).exists() {
         tracing::info!(tool, "not found; skipping accessibility settings");
         return vec![];
     }
-    settings.a11y.desktop_commands(edition)
+    if reset {
+        settings.a11y.all_desktop_commands(edition)
+    } else {
+        settings.a11y.desktop_commands(edition)
+    }
 }
 
 /// writes the options into the new user's config, so their session starts with them
@@ -349,6 +381,36 @@ pub async fn apply_to_user(
     if cfg.taidan0.systemd_homed || settings.a11y == A11y::default() {
         return Ok(());
     }
+    write_to_home(settings, cfg, None).await
+}
+
+/// [`apply_to_user`] again if the options changed since `applied` were, e.g. on the installing
+/// page, undoing the ones turned off since
+///
+/// # Errors
+/// - cannot find the user's home directory
+pub async fn reapply_to_user(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    applied: A11y,
+) -> Res<()> {
+    if settings.a11y == applied {
+        return Ok(());
+    }
+    if cfg.taidan0.systemd_homed {
+        // its home is locked once it's created, and needs the user's password to open
+        tracing::warn!("cannot change a systemd-homed user's accessibility settings, skipping");
+        return Ok(());
+    }
+    write_to_home(settings, cfg, Some(applied)).await
+}
+
+/// writes the options into the user's home, undoing the ones in `applied` that are off now
+async fn write_to_home(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    applied: Option<A11y>,
+) -> Res<()> {
     let home = home_of(&settings.username).await?;
     // as the user, so the files they get are theirs
     let as_user = |cmd: &[String]| {
@@ -358,7 +420,9 @@ pub async fn apply_to_user(
     };
     if is_plasma() {
         let config = home.join(".config");
-        for entry in settings.a11y.user_entries() {
+        let mut entries = if applied.is_some() { A11y::reset_entries() } else { vec![] };
+        entries.extend(settings.a11y.user_entries());
+        for entry in entries {
             let mut cmd = vec!["kwriteconfig6".to_owned()];
             cmd.extend(entry.kwriteconfig_args(&config.join(entry.file).to_string_lossy()));
             if let Err(e) = crate::root("runuser", as_user(&cmd)).await {
@@ -367,7 +431,7 @@ pub async fn apply_to_user(
         }
         return Ok(());
     }
-    for cmd in desktop_commands(settings, &cfg.edition) {
+    for cmd in desktop_commands(settings, &cfg.edition, applied.is_some()) {
         let mut env = vec!["env".to_owned()];
         env.extend(in_home(&home, cmd));
         if let Err(e) = crate::root("runuser", as_user(&env)).await {
@@ -388,6 +452,12 @@ pub async fn apply_to_user(
         };
         if let Err(e) = res {
             tracing::warn!(?e, "cannot make Orca start at login");
+        }
+    } else if applied.is_some_and(|a| a.needs_orca_autostart(&cfg.edition)) {
+        let path = home.join(ORCA_AUTOSTART_PATH).to_string_lossy().into_owned();
+        let rm = as_user(&["rm".to_owned(), "-f".to_owned(), path]);
+        if let Err(e) = crate::root("runuser", rm).await {
+            tracing::warn!(?e, "cannot stop Orca starting at login");
         }
     }
     Ok(())
@@ -418,7 +488,7 @@ pub async fn write_to_skel(
         }
         return Ok(true);
     }
-    for cmd in desktop_commands(settings, &cfg.edition) {
+    for cmd in desktop_commands(settings, &cfg.edition, false) {
         let env = in_home(skel, cmd);
         let env = env.iter().map(String::as_str).collect_vec();
         if let Err(e) = crate::steps::acmd("env", &env).await {
@@ -463,6 +533,20 @@ mod tests {
     #[test]
     fn nothing_on_writes_nothing() {
         assert!(A11y::default().user_entries().is_empty());
+    }
+
+    #[test]
+    fn reset_deletes_every_entry() {
+        let reset = A11y::reset_entries();
+        assert!(reset.iter().all(|e| e.value.is_none()));
+        let fonts = A11y { larger_text: true, ..A11y::default() }.user_entries();
+        for entry in fonts {
+            assert!(
+                reset
+                    .iter()
+                    .any(|r| (r.file, r.group, r.key) == (entry.file, entry.group, entry.key))
+            );
+        }
     }
 
     #[test]

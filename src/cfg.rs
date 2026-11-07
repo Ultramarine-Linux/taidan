@@ -48,6 +48,8 @@ pub enum SkipPage {
     Drivers,
     /// not a page anymore, but the tweaks button on the summary page
     Tweaks,
+    /// not a page anymore either, but the keyboard page's input methods, so none are set up
+    InputMethod,
 }
 
 /// index of the last page that Next and Back go through (the summary), as in `ui/app.slint`
@@ -67,7 +69,8 @@ impl SkipPage {
             "location" => Self::Location,
             "drivers" | "codecs" => Self::Drivers,
             "tweaks" => Self::Tweaks,
-            "devicename" | "analytics" | "crashreport" | "inputmethod" => {
+            "inputmethod" | "ims" => Self::InputMethod,
+            "devicename" | "analytics" | "crashreport" => {
                 return Err("this page no longer exists");
             }
             // the install can't create the account without these
@@ -90,7 +93,7 @@ impl SkipPage {
             Self::Network => 8,
             Self::Location => 9,
             Self::Drivers => 10,
-            Self::Tweaks => return None,
+            Self::Tweaks | Self::InputMethod => return None,
         })
     }
 }
@@ -177,6 +180,16 @@ impl Taidan0Config {
         if self.continue_if_user_exists {
             tracing::info!("taidan0.continue_if_user_exists detected");
         } else if user_already_exists() {
+            // an install that died between removing its user record and the markers would
+            // otherwise start the OOBE on every boot. On a thread, since this may run on `RT`
+            if libtaidan::marked_unconfigured() {
+                tracing::warn!("the system has a user but is still marked unconfigured, fixing");
+                let marked =
+                    std::thread::spawn(|| crate::RT.block_on(libtaidan::mark_configured()));
+                if marked.join().is_err() {
+                    tracing::error!("marking the system configured panicked");
+                }
+            }
             tracing::warn!("taidan0.continue_if_user_exists is false, exiting");
             std::process::exit(0);
         }
@@ -322,10 +335,14 @@ mod tests {
 
     #[test]
     fn skip_pages_accepts_old_names() {
-        let cfg: Config =
-            basic_toml::from_str(r#"skip_pages = ["codecs", "internet", "Theme", "nope"]"#)
-                .unwrap();
-        assert_eq!(cfg.skip_pages, [SkipPage::Drivers, SkipPage::Network, SkipPage::Theme]);
+        let cfg: Config = basic_toml::from_str(
+            r#"skip_pages = ["codecs", "internet", "Theme", "inputmethod", "nope"]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            cfg.skip_pages,
+            [SkipPage::Drivers, SkipPage::Network, SkipPage::Theme, SkipPage::InputMethod]
+        );
         // not swallowed by the flattened `ui` map
         assert!(!cfg.ui.contains_key("skip_pages"));
     }

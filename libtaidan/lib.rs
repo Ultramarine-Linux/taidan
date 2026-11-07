@@ -82,6 +82,10 @@ pub async fn start_install(
     // if the record stays, since a machine that leaves the OOBE with it could later have the
     // account and its home removed by a rerun
     clear_record_retrying().await?;
+    // the tweaks are the user's now too, a later rerun shouldn't undo them
+    if let Err(e) = tweaks::clear_on_record().await {
+        tracing::warn!(?e, "cannot remove the tweaks record");
+    }
     // right away rather than when the user leaves the last page, or a machine that dies on it
     // would boot into the OOBE again with the record gone and the user still there
     mark_configured().await;
@@ -106,24 +110,6 @@ async fn clear_record_retrying() -> Res<()> {
 
 #[allow(clippy::arithmetic_side_effects)]
 mod parseutil {
-    use crate::prelude::*;
-
-    /// # Errors
-    /// - wait for `output` failed…?
-    /// - process exited with non-zero error code
-    pub async fn wait_for(s: &'static str, output: &mut tokio::process::Child) -> Res<()> {
-        let status = output
-            .wait()
-            .await
-            .map_err(Err::_fail_to_run(s))
-            .wrap_message(|_| format!("waiting for `{s}` failed"))?;
-        if status.success() {
-            Ok(())
-        } else {
-            Err(Err::Message(format!("`{s}` failed with status: {status}")))
-        }
-    }
-
     /// # Panics
     /// - cannot convert bytes to `&str`
     /// - cannot parse to `u32`
@@ -147,11 +133,13 @@ where
     let as_root = user == "root";
     let mut cmd = tokio::process::Command::new("pkexec");
     cmd.args(["--user", user, "env"])
-        .args(
-            std::env::vars()
-                .filter(|(k, _)| !as_root || is_locale_var(k))
-                .map(|(k, v)| format!("{k}={v}")),
-        )
+        // `vars_os`, as `vars` panics on a variable that isn't UTF-8
+        .args(std::env::vars_os().filter(|(k, _)| !as_root || is_locale_var(k)).map(|(k, v)| {
+            let mut kv = k;
+            kv.push("=");
+            kv.push(v);
+            kv
+        }))
         // other users can't read the file the proxy is passed in, and nothing run as them
         // downloads anything
         .args(if as_root { proxy::wrapper() } else { vec![] })
@@ -160,8 +148,9 @@ where
     cmd
 }
 
-fn is_locale_var(key: &str) -> bool {
-    key == "LANG" || key == "LANGUAGE" || key.starts_with("LC_")
+fn is_locale_var(key: &std::ffi::OsStr) -> bool {
+    let key = key.as_encoded_bytes();
+    key == b"LANG" || key == b"LANGUAGE" || key.starts_with(b"LC_")
 }
 
 /// runs `cmd`, with `input` on its stdin if there's any, and returns its stdout
@@ -270,4 +259,10 @@ pub async fn mark_configured() {
     if let Err(e) = root("systemctl", ["disable", "taidan-initial-setup-reconfiguration"]).await {
         tracing::error!(?e, "cannot disable taidan-initial-setup-reconfiguration.service");
     }
+}
+
+/// whether the files that start the OOBE on boot are still there, see [`mark_configured`]
+#[must_use]
+pub fn marked_unconfigured() -> bool {
+    ["/var/.unconfigured", "/.unconfigured"].iter().any(|m| std::path::Path::new(m).exists())
 }

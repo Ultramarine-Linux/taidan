@@ -10,4 +10,39 @@ import { Ims } from "ims.slint";
 // `A11yContent`
 export global Modal {
     out property <bool> open: Camera.open || Network.password-ssid != "" || Network.hidden-open || Network.enterprise-open || Network.offline-prompt || Network.proxy-open || Network.ip-open || Tweaks.open || Ims.open || A11y.open || A11y.more-open;
+    // the page being shown, kept in sync by `AppWindow`, so an opener only takes the focus back
+    // on the page it opened the dialog from
+    in-out property <int> page;
+    // set by a `DialogOpener` that took the focus back when the dialog closed, otherwise
+    // `AppWindow` gives it to the page
+    in-out property <bool> returned;
+}
+
+// gives the keyboard focus back to the control that opened a dialog once it closes, as Slint drops
+// it with the dialog. Put one in the control, call `opened()` right after opening the dialog, and
+// focus the control in `restore`
+export component DialogOpener {
+    callback restore();
+
+    // the page the dialog was opened from, -1 while this didn't open the one that's open
+    property <int> opened-on: -1;
+    property <bool> modal-open: Modal.open;
+
+    public function opened() {
+        if Modal.open { root.opened-on = Modal.page; }
+    }
+
+    changed modal-open => {
+        if !root.modal-open && root.opened-on >= 0 {
+            // not if the dialog went on to another page, like skipping the network one
+            if root.opened-on == Modal.page {
+                root.restore();
+                Modal.returned = true;
+            }
+            root.opened-on = -1;
+        }
+    }
+
+    width: 0;
+    height: 0;
 }

@@ -39,13 +39,30 @@ impl super::Step for SystemSetup {
     ) -> Res<()> {
         if let Some(ids) = settings.tweaks.ids() {
             let sett = serde_json::to_vec(settings)?;
+            // the ones an earlier attempt turned on, to turn off again if they aren't anymore
+            let was_on = crate::tweaks::recorded_on();
+            let mut now_on = vec![];
             for tweak in &*crate::tweaks::TWEAKS {
-                if settings.nointernet && tweak.needs_internet {
-                    tracing::info!(id = ?tweak.id(), "skipping tweak that needs the internet");
+                let id = tweak.id().to_string_lossy().into_owned();
+                let on = ids.contains(&id);
+                let earlier = was_on.contains(&id);
+                if on == earlier {
+                    if on {
+                        now_on.push(id);
+                    }
                     continue;
                 }
-                let on = ids.iter().any(|id| tweak.id() == id.as_str());
-                tweak.run(&sett, on).await;
+                if on && settings.nointernet && tweak.needs_internet {
+                    tracing::info!(id, "skipping tweak that needs the internet");
+                    continue;
+                }
+                // one that fails to turn off stays recorded, for the next attempt to try again
+                if tweak.run(&sett, on).await == on {
+                    now_on.push(id);
+                }
+            }
+            if let Err(e) = crate::tweaks::record_on(&now_on).await {
+                tracing::warn!(?e, "cannot record the tweaks turned on");
             }
         } else {
             tracing::warn!(
@@ -53,10 +70,13 @@ impl super::Step for SystemSetup {
             );
         }
         // GeoClue is D-Bus activated, so only a mask keeps apps from starting it. Unmasked when
-        // it's on, for a retry after an attempt with it off
-        let (verb, what) = if settings.location { ("unmask", "on") } else { ("mask", "off") };
-        if let Err(e) = crate::root("systemctl", [verb, "geoclue.service"]).await {
-            tracing::warn!(?e, "cannot turn {what} location services");
+        // it's on, for a retry after an attempt with it off. Left alone when the page was skipped,
+        // the distro may have masked it on purpose
+        if let Some(on) = settings.location {
+            let (verb, what) = if on { ("unmask", "on") } else { ("mask", "off") };
+            if let Err(e) = crate::root("systemctl", [verb, "geoclue.service"]).await {
+                tracing::warn!(?e, "cannot turn {what} location services");
+            }
         }
         if let Err(e) = crate::i18n::apply_keymap_to_user(settings, cfg).await {
             tracing::warn!(?e, "cannot carry over the keyboard layout");

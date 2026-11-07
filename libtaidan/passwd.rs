@@ -32,8 +32,8 @@ pub fn user_already_exists() -> bool {
     regular_user_in(BufReader::new(f), recorded.as_deref())
 }
 
-/// uids `useradd` gives regular users
-const REGULAR_UIDS: std::ops::Range<u32> = 1000..60000;
+/// uids `useradd` gives regular users, `UID_MIN` to `UID_MAX` in Fedora's `/etc/login.defs`
+const REGULAR_UIDS: std::ops::RangeInclusive<u32> = 1000..=60000;
 
 /// uids systemd-homed gives its users
 pub const HOMED_UIDS: std::ops::RangeInclusive<u32> = 60001..=60513;
@@ -188,11 +188,15 @@ pub async fn clear_record() -> Res<()> {
 /// would accept
 #[must_use]
 pub fn removable(username: &str, uid: u32) -> bool {
-    regular_uid(uid) && username_problem_with(username, |_| false, None).is_none()
+    regular_uid(uid) && username_syntax_problem(username).is_none()
 }
 
-/// the most `useradd` takes
-pub const USERNAME_MAX_LEN: usize = 32;
+/// the most `homectl create` takes (it must fit utmp's `ut_user`), one less than `useradd`
+pub const USERNAME_MAX_LEN: usize = 31;
+
+/// the longest password libxcrypt hashes, in bytes. `crypt` refuses `CRYPT_MAX_PASSPHRASE_SIZE`
+/// (512) and up
+pub const PASSWORD_MAX_LEN: usize = 511;
 
 /// names that are taken even if the system doesn't have them right now
 const RESERVED_USERNAMES: &[&str] = &["root", "taidan", "nobody"];
@@ -212,7 +216,15 @@ pub enum UsernameProblem {
     Taken,
 }
 
-/// what's wrong with `username` for the new user, if anything
+/// [`username_problem`] without looking up users and groups, so it's cheap enough to run on
+/// every keystroke. Only reserved names come out as [`UsernameProblem::Taken`]
+#[must_use]
+pub fn username_syntax_problem(username: &str) -> Option<UsernameProblem> {
+    username_problem_with(username, |_| false, None)
+}
+
+/// what's wrong with `username` for the new user, if anything. This looks up NSS and may run
+/// `lastlog2`, so keep it off the UI thread
 #[must_use]
 pub fn username_problem(username: &str) -> Option<UsernameProblem> {
     username_problem_with(
@@ -245,16 +257,25 @@ fn username_problem_with(
     None
 }
 
-/// `fullname` as a GECOS field: `:` separates passwd fields and control characters (newlines)
-/// would break the line, so they become spaces
+/// whether `c` can't go in a GECOS field as is: `:` separates passwd fields, `,` separates the
+/// GECOS subfields (KDE and AccountsService cut the name at it) and control characters (newlines)
+/// would break the line
+#[must_use]
+pub fn gecos_separator(c: char) -> bool {
+    matches!(c, ':' | ',') || c.is_control()
+}
+
+/// `fullname` as a GECOS field, with each [`gecos_separator`] turned into a space and runs of
+/// whitespace squeezed into one
 #[must_use]
 pub fn sanitize_fullname(fullname: &str) -> String {
     fullname
         .chars()
-        .map(|c| if c == ':' || c.is_control() { ' ' } else { c })
+        .map(|c| if gecos_separator(c) { ' ' } else { c })
         .collect::<String>()
-        .trim()
-        .to_owned()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[cfg(test)]
@@ -275,9 +296,9 @@ mod tests {
                 Some(UsernameProblem::Invalid)
             );
         }
-        assert_eq!(username_problem_with(&"a".repeat(32), nobody_exists, None), None);
+        assert_eq!(username_problem_with(&"a".repeat(31), nobody_exists, None), None);
         assert_eq!(
-            username_problem_with(&"a".repeat(33), nobody_exists, None),
+            username_problem_with(&"a".repeat(32), nobody_exists, None),
             Some(UsernameProblem::TooLong)
         );
     }
@@ -318,7 +339,7 @@ mod tests {
         assert!(!removable("alice", 0));
         assert!(!removable("alice", 999));
         assert!(!removable("alice", 65534));
-        assert!(!removable("alice", 60000));
+        assert!(removable("alice", 60000));
         assert!(removable("alice", 60001));
         assert!(removable("alice", 60513));
         assert!(!removable("alice", 60514));
@@ -384,5 +405,7 @@ mod tests {
         assert_eq!(sanitize_fullname("Alice Smith"), "Alice Smith");
         assert_eq!(sanitize_fullname("Alice:Smith\n"), "Alice Smith");
         assert_eq!(sanitize_fullname("a\nb\tc"), "a b c");
+        assert_eq!(sanitize_fullname("John Smith, Jr."), "John Smith Jr.");
+        assert_eq!(sanitize_fullname("Smith,John"), "Smith John");
     }
 }

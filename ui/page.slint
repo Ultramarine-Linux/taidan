@@ -44,8 +44,19 @@ export component TdnBasePg {
     width: 100%;
     height: 100%;
     x: index < current ? -self.width : (index > current ? self.width : 0);
-    // off-screen pages are hidden, so Tab can't reach their inputs
-    visible: active || (self.x > -self.width && self.x < self.width);
+    // off-screen pages are hidden, so Tab can't reach their inputs. Only the page that was shown
+    // slides out, the ones a jump passes over stay hidden, so a failed install doesn't flash the
+    // done page on its way to the error one
+    visible: active || (leaving && self.x > -self.width && self.x < self.width);
+
+    // whether this was the page shown before the current one
+    property <bool> leaving;
+    property <bool> was-active;
+    init => { root.was-active = root.active; }
+    changed current => {
+        root.leaving = root.was-active;
+        root.was-active = root.active;
+    }
 
     animate x {
         duration: Tokens.motion-base;
