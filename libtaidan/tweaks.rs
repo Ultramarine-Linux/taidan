@@ -45,6 +45,8 @@ pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
 /// - `ftl_desc` (alias `desc`): the fluent ID for the description of the tweak, defaults to `<id>-desc`
 /// - `x86_64_level`: the minimum x86-64 microarchitecture level (1 to 4) the tweak needs.
 ///   Tweaks that set it are hidden on CPUs below that level and on other architectures.
+/// - `needs_internet`: whether `up` downloads anything, e.g. packages. Such tweaks aren't run
+///   when setting up without internet, off by default
 #[derive(Clone, Debug, Default, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Tweak {
@@ -55,6 +57,7 @@ pub struct Tweak {
     #[serde(alias = "desc")]
     pub ftl_desc: String,
     pub x86_64_level: Option<u8>,
+    pub needs_internet: bool,
 }
 
 #[cfg(debug_assertions)]
@@ -293,6 +296,9 @@ mod tests {
         let dir = tweak_dir(Some("x86_64_level = 3\n"));
         let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
         assert_eq!(tweak.x86_64_level, Some(3));
+        assert!(!tweak.needs_internet);
+        let dir = tweak_dir(Some("needs_internet = true\n"));
+        assert!(Tweak::from_dir(dir.path().to_path_buf()).unwrap().needs_internet);
     }
 
     // a broken tweak.toml must not fall back to no CPU requirement

@@ -17,7 +17,6 @@ steps-sethostname = Naming Your Device…
 steps-settimezone = Setting Your Time Zone and Clock…
 steps-settheme = Applying Your Theme…
 steps-dnfdownloadupdate = Downloading System Update…
-steps-dnfinstallupdate = Installing System Update…
 steps-systemsetup = Setting Up Your System…
 steps-dnfdownloadapps = Downloading Apps…
 steps-dnfinstallapps = Installing Apps…
@@ -364,6 +363,8 @@ page-summary-network-none = Not Connected
 page-summary-timezone = { $place } ({ $offset })
 page-summary-software = Additional Software
 page-summary-software-none = No additional software will be installed.
+# toggle, downloads updates during setup to install on the next restart
+page-summary-updates = Download Updates
 # btn, opens the distribution's optional tweaks
 page-summary-tweaks = Advanced Tweaks
 # btn (next page), starts setting up the system
@@ -372,7 +373,12 @@ page-summary-confirm = Looks Good!
 ## [Done]
 
 page-done = All Done
-page-done-reboot = Reboot
+# btn, ends the setup and restarts, when the drivers need it
+page-done-reboot = Restart
+# btn, ends the setup and restarts to install the downloaded updates
+page-done-restart-update = Restart and Update
+page-done-updates = Updates are ready and will install the next time you restart
+page-done-updates-drivers = Your drivers need a restart, which will install updates
 # btn, ends the setup and shows the login screen, when no reboot is needed
 page-done-login = Log In
 

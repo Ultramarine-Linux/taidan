@@ -220,10 +220,6 @@ impl Drivers {
         Ok(Some(pkgs))
     }
 
-    async fn is_ostree() -> bool {
-        tokio::fs::try_exists("/ostree").await.unwrap_or_default()
-    }
-
     async fn setup_nvidia_ostree(pkgs: &[String]) -> Res<()> {
         let mut args = vec!["install", "-y"];
         args.extend(pkgs.iter().map(String::as_str));
@@ -242,7 +238,9 @@ impl Drivers {
         Ok(())
     }
 
-    /// the kernel that boots next, which may be newer than the running one after the updates
+    /// the kernel that boots next, which may be newer than the running one if an earlier attempt
+    /// or the image installed one. Updates from [`super::DownloadUpdates`] only install on the
+    /// restart, then akmods builds the module for their kernel while booting
     async fn next_kernel() -> Res<String> {
         // grubby reads the boot loader entries, which only root may
         let out = crate::root_output("grubby", ["--default-kernel"]).await;
@@ -288,7 +286,7 @@ impl Drivers {
         let Some(pkgs) = Self::list_nvidia_packages().await? else {
             return Ok(false);
         };
-        if Self::is_ostree().await {
+        if super::is_ostree().await {
             tracing::debug!("ostree detected");
             // the kmod is built inside the rpm-ostree transaction, which needs a reboot anyway
             Self::setup_nvidia_ostree(&pkgs).await?;

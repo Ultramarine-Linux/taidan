@@ -19,14 +19,13 @@ const fn stage_l10n_id(stage: Stage) -> &'static str {
         Stage::SetHostname(_) => "steps-sethostname",
         Stage::SetTimezone(_) => "steps-settimezone",
         Stage::SetTheme(_) => "steps-settheme",
-        Stage::DnfDownloadUpdate(_) => "steps-dnfdownloadupdate",
-        Stage::DnfInstallUpdate(_) => "steps-dnfinstallupdate",
         Stage::SystemSetup(_) => "steps-systemsetup",
         Stage::DnfDownloadApps(_) => "steps-dnfdownloadapps",
         Stage::DnfInstallApps(_) => "steps-dnfinstallapps",
         Stage::DriversCodecs(_) => "steps-driverscodecs",
         Stage::SetupImf(_) => "steps-setupimf",
         Stage::SetLocale(_) => "steps-setlocale",
+        Stage::DownloadUpdates(_) => "steps-dnfdownloadupdate",
     }
 }
 
@@ -93,6 +92,10 @@ async fn simulate_install(
     if simulated_hw("nvidia") {
         callback.send(InstallMsg::NeedsReboot);
     }
+    // to see the done page with updates waiting
+    if std::env::var_os("TAIDAN_SIMULATE_UPDATES").is_some() {
+        callback.send(InstallMsg::UpdatesReady);
+    }
     callback.send(InstallMsg::Finish);
     Ok(())
 }
@@ -109,6 +112,7 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
             #[expect(clippy::cast_possible_truncation, reason = "a fraction, for display")]
             InstallMsg::StageProgress(frac) => install.set_stage_progress(frac as f32),
             InstallMsg::NeedsReboot => install.set_needs_reboot(true),
+            InstallMsg::UpdatesReady => install.set_updates_ready(true),
             InstallMsg::Finish => {}
         }
     });
@@ -126,9 +130,11 @@ fn start(ui: &slint::Weak<AppWindow>) {
     install.set_state(InstallState::Running);
     install.set_error("".into());
     install.set_needs_reboot(false);
+    install.set_updates_ready(false);
     install.set_stage_count(i32::try_from(Stage::all().len()).expect("too many stages"));
     crate::SETTINGS.write().install_codecs_drivers = app.global::<Drivers<'_>>().get_install();
     crate::SETTINGS.write().location = app.global::<Location<'_>>().get_enabled();
+    crate::SETTINGS.write().download_updates = install.get_download_updates();
     // what the theme page shows, unless it's skipped, then the distro's default stays
     crate::SETTINGS.write().dark_mode =
         (!crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Theme))
@@ -231,12 +237,17 @@ fn reset(ui: &slint::Weak<AppWindow>) {
     install.set_used_internet(false);
     install.set_force_offline(false);
     install.set_needs_reboot(false);
+    install.set_updates_ready(false);
     install.set_stage_id("".into());
     install.set_stage_num(0);
     install.set_stage_progress(-1.0);
 }
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
+    // dnf can't install to rpm-ostree systems, and distros that skip dnf don't want it run
+    install.set_can_download_updates(
+        !crate::CFG.taidan0.skip_dnf && !std::path::Path::new("/ostree").exists(),
+    );
     install.on_start({
         let ui = ui.clone();
         move || start(&ui)

@@ -55,7 +55,7 @@ impl super::Step for UserAdd {
 async fn set_avatar(settings: &crate::settings::Settings) -> Res<()> {
     let Some(avatar) = &settings.avatar else { return Ok(()) };
     let icon = format!("/var/lib/AccountsService/icons/{}", settings.username);
-    super::super::root(
+    super::root(
         "install",
         [std::ffi::OsStr::new("-Dm644"), avatar.as_os_str(), icon.as_ref()],
     )
@@ -66,7 +66,7 @@ async fn set_avatar(settings: &crate::settings::Settings) -> Res<()> {
         .await
         .map_err(Err::Io)?;
     let dest = format!("/var/lib/AccountsService/users/{}", settings.username);
-    super::super::root("install", [std::ffi::OsStr::new("-Dm600"), user.as_os_str(), dest.as_ref()])
+    super::root("install", [std::ffi::OsStr::new("-Dm600"), user.as_os_str(), dest.as_ref()])
         .await
 }
 

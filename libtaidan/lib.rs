@@ -28,6 +28,8 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 pub enum InstallMsg {
     UpdStage(steps::Stage),
     NeedsReboot,
+    /// updates were downloaded and install on the next restart
+    UpdatesReady,
     Finish,
     StageProgress(f64),
 }

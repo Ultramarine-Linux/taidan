@@ -28,6 +28,9 @@ pub struct Settings {
     pub avatar: Option<std::path::PathBuf>,
 
     pub install_codecs_drivers: bool,
+    /// whether to download updates to install on the next restart, on unless turned off
+    #[serde(default = "yes")]
+    pub download_updates: bool,
     /// whether apps may ask GeoClue for the device's location, on unless turned off
     #[serde(default = "yes")]
     pub location: bool,

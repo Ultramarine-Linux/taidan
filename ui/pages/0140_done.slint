@@ -24,26 +24,55 @@ export component DonePage inherits TdnBasePg {
             padding-bottom: 1.5rem;
             spacing: 2rem;
 
-            TdnText {
-                text: Lang.t("page-done", []);
-                font-size: 3 * Tokens.text-rem;
-                font-weight: 800;
-                horizontal-alignment: Dir.text-start;
+            VerticalLayout {
+                alignment: center;
                 horizontal-stretch: 1;
-                wrap: word-wrap;
+                spacing: 0.5rem;
+
+                TdnText {
+                    text: Lang.t("page-done", []);
+                    font-size: 3 * Tokens.text-rem;
+                    font-weight: 800;
+                    horizontal-alignment: Dir.text-start;
+                    wrap: word-wrap;
+                }
+
+                // so the next restart taking a while isn't a surprise
+                if Install.updates-ready: TdnText {
+                    text: Lang.t(Install.needs-reboot ? "page-done-updates-drivers" : "page-done-updates", []);
+                    color: Tokens.color-muted-foreground;
+                    horizontal-alignment: Dir.text-start;
+                    wrap: word-wrap;
+                }
             }
 
+            // centered vertically, a HorizontalLayout alone would stretch the buttons to the row's
+            // height
             VerticalLayout {
                 layout-order: Dir.order(1);
                 alignment: center;
                 horizontal-stretch: 0;
 
-                reboot := TdnBtn {
-                    enter-hint: true;
-                    background-color: TdnStyle.accent;
-                    foreground-color: TdnStyle.accent-foreground;
-                    text: Lang.t(Install.needs-reboot ? "page-done-reboot" : "page-done-login", []);
-                    clicked => { Install.finish(Install.needs-reboot); }
+                HorizontalLayout {
+                    spacing: 0.75rem;
+
+                    // logging in comes first, updating can wait for whenever the user restarts
+                    if !Install.needs-reboot && Install.updates-ready: TdnBtn {
+                        text: Lang.t("page-done-restart-update", []);
+                        clicked => { Install.finish(true); }
+                    }
+
+                    reboot := TdnBtn {
+                        layout-order: Dir.order(1);
+                        enter-hint: true;
+                        background-color: TdnStyle.accent;
+                        foreground-color: TdnStyle.accent-foreground;
+                        text: Lang.t(
+                            !Install.needs-reboot ? "page-done-login"
+                            : Install.updates-ready ? "page-done-restart-update"
+                            : "page-done-reboot", []);
+                        clicked => { Install.finish(Install.needs-reboot); }
+                    }
                 }
             }
         }

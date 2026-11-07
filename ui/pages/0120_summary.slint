@@ -1,12 +1,12 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Account } from "../account.slint";
-import { Drivers } from "../install.slint";
+import { Drivers, Install } from "../install.slint";
 import { Network, NetState } from "../network.slint";
 import { Tz } from "../timezone.slint";
 import { Tweaks } from "../tweaks.slint";
 import { Cfg } from "../cfg.slint";
-import { TdnText, TdnStyle, TdnBtn } from "../components.slint";
+import { TdnText, TdnStyle, TdnBtn, TdnToggleRow } from "../components.slint";
 import { DriverList, DriverRow } from "0100_drivers.slint";
 import { UserIcon } from "0040_whoareyou.slint";
 import { Card } from "../slintcn/components/card.slint";
@@ -145,20 +145,23 @@ export component SummaryPage inherits TdnPage {
                 }
             }
 
+            // the card takes up the height the page has left, so what's under it stays at the bottom
             VerticalLayout {
                 layout-order: Dir.order(1);
-                alignment: start;
                 horizontal-stretch: 1;
                 spacing: 0.75rem;
 
                 SectionTitle {
+                    vertical-stretch: 0;
                     text: Lang.t("page-summary-software", []);
                 }
 
                 Card {
+                    vertical-stretch: 1;
                     card-radius: md;
 
                     VerticalLayout {
+                        alignment: start;
                         padding: 0.75rem;
 
                         spacing: 0.5rem;
@@ -179,8 +182,17 @@ export component SummaryPage inherits TdnPage {
                     }
                 }
 
+                // installed on the next restart, so only when there's internet to download them with
+                if Install.can-download-updates && Network.online: TdnToggleRow {
+                    vertical-stretch: 0;
+                    text: Lang.t("page-summary-updates", []);
+                    checked: Install.download-updates;
+                    toggled(on) => { Install.download-updates = on; }
+                }
+
                 // only when the distro ships tweaks
                 if Tweaks.items.length > 0 && !Cfg.skip-tweaks: HorizontalLayout {
+                    vertical-stretch: 0;
                     alignment: Dir.start;
 
                     TdnBtn {

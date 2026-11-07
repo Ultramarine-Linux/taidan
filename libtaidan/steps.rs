@@ -1,7 +1,5 @@
 mod _00_useradd;
 mod _01_settheme;
-mod _02_dnfdownloadupdate;
-mod _03_dnfinstallupdate;
 mod _04_systemsetup;
 mod _05_dnfdownloadapps;
 mod _06_dnfinstallapps;
@@ -10,18 +8,23 @@ mod _08_setup_imf;
 mod _09_sethostname;
 mod _10_settimezone;
 mod _11_setlocale;
+mod _12_downloadupdates;
 
 use crate::prelude::*;
 
 pub use _07_drivers_codecs::{Hardware, detect_hardware};
 
 use crate::steps::{
-    _00_useradd::UserAdd, _01_settheme::SetTheme, _02_dnfdownloadupdate::DnfDownloadUpdate,
-    _03_dnfinstallupdate::DnfInstallUpdate, _04_systemsetup::SystemSetup,
+    _00_useradd::UserAdd, _01_settheme::SetTheme, _04_systemsetup::SystemSetup,
     _05_dnfdownloadapps::DnfDownloadApps, _06_dnfinstallapps::DnfInstallApps,
     _07_drivers_codecs::DriversCodecs, _08_setup_imf::SetupImf, _09_sethostname::SetHostname,
-    _10_settimezone::SetTimezone, _11_setlocale::SetLocale,
+    _10_settimezone::SetTimezone, _11_setlocale::SetLocale, _12_downloadupdates::DownloadUpdates,
 };
+
+/// whether this is an rpm-ostree system, which dnf can't install to
+pub(crate) async fn is_ostree() -> bool {
+    tokio::fs::try_exists("/ostree").await.unwrap_or_default()
+}
 
 #[allow(async_fn_in_trait, clippy::unused_async)]
 #[enum_dispatch::enum_dispatch(Stage)]
@@ -43,7 +46,7 @@ pub trait Step {
     }
 }
 
-pub const NUM_STAGES: usize = 12;
+pub const NUM_STAGES: usize = 11;
 
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone, Copy, Debug)]
@@ -52,14 +55,13 @@ pub enum Stage {
     SetHostname,
     SetTimezone,
     SetTheme,
-    DnfDownloadUpdate,
-    DnfInstallUpdate,
     SystemSetup,
     DnfDownloadApps,
     DnfInstallApps,
     DriversCodecs,
     SetupImf,
     SetLocale,
+    DownloadUpdates,
 }
 
 impl Stage {
@@ -67,10 +69,7 @@ impl Stage {
     pub const fn is_dnf(&self) -> bool {
         matches!(
             self,
-            Self::DnfDownloadUpdate(_)
-                | Self::DnfInstallUpdate(_)
-                | Self::DnfDownloadApps(_)
-                | Self::DnfInstallApps(_)
+            Self::DnfDownloadApps(_) | Self::DnfInstallApps(_) | Self::DownloadUpdates(_)
         )
     }
     #[must_use]
@@ -80,14 +79,13 @@ impl Stage {
             Self::SetHostname(SetHostname),
             Self::SetTimezone(SetTimezone),
             Self::SetTheme(SetTheme),
-            Self::DnfDownloadUpdate(DnfDownloadUpdate),
-            Self::DnfInstallUpdate(DnfInstallUpdate),
             Self::SystemSetup(SystemSetup),
             Self::DnfDownloadApps(DnfDownloadApps),
             Self::DnfInstallApps(DnfInstallApps),
             Self::DriversCodecs(DriversCodecs),
             Self::SetupImf(SetupImf),
             Self::SetLocale(SetLocale),
+            Self::DownloadUpdates(DownloadUpdates),
         ]
     }
 }
@@ -105,14 +103,13 @@ impl From<Stage> for u8 {
             Stage::SetHostname(_) => 1,
             Stage::SetTimezone(_) => 2,
             Stage::SetTheme(_) => 3,
-            Stage::DnfDownloadUpdate(_) => 4,
-            Stage::DnfInstallUpdate(_) => 5,
-            Stage::SystemSetup(_) => 6,
-            Stage::DnfDownloadApps(_) => 7,
-            Stage::DnfInstallApps(_) => 8,
-            Stage::DriversCodecs(_) => 9,
-            Stage::SetupImf(_) => 10,
-            Stage::SetLocale(_) => 11,
+            Stage::SystemSetup(_) => 4,
+            Stage::DnfDownloadApps(_) => 5,
+            Stage::DnfInstallApps(_) => 6,
+            Stage::DriversCodecs(_) => 7,
+            Stage::SetupImf(_) => 8,
+            Stage::SetLocale(_) => 9,
+            Stage::DownloadUpdates(_) => 10,
         }
     }
 }

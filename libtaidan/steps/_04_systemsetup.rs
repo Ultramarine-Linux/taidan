@@ -40,6 +40,10 @@ impl super::Step for SystemSetup {
         if let Some(ids) = settings.tweaks.ids() {
             let sett = serde_json::to_vec(settings)?;
             for tweak in &*crate::tweaks::TWEAKS {
+                if settings.nointernet && tweak.needs_internet {
+                    tracing::info!(id = ?tweak.id(), "skipping tweak that needs the internet");
+                    continue;
+                }
                 let on = ids.iter().any(|id| tweak.id() == id.as_str());
                 tweak.run(&sett, on).await;
             }
@@ -95,7 +99,7 @@ fn langpack_candidates(locale: &str) -> Vec<String> {
 
 /// which of `pkgs` the repositories have
 async fn available(pkgs: &[String]) -> Res<Vec<String>> {
-    // as root, to use the metadata the system update just downloaded
+    // as root, to use the system's metadata cache rather than downloading one for this user
     let out = tokio::process::Command::new("pkexec")
         .args(["--user", "root", "env"])
         .args(crate::proxy::wrapper())
