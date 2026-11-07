@@ -12,20 +12,44 @@ Before=getty-pre.target
 Before=display-manager.service
 Conflicts=plymouth-quit-wait.service initial-setup-text.service initial-setup-graphical.service initial-setup.service
 ConditionKernelCommandLine=!rd.live.image
+# also here, not only on the reconfiguration trigger: units it pulls in with Requires= still start
+# when its conditions fail, so without these the OOBE would run on every boot it's enabled
+ConditionPathExists=|/var/.unconfigured
+ConditionPathExists=|/.unconfigured
 
 [Service]
 Type=oneshot
 TimeoutSec=0
 RemainAfterExit=no
+# the taidan user's home, /usr/lib/taidan, isn't writable, so the session (KWin, Taidan and
+# kwriteconfig6 changing KWin's config for accessibility and the keymap) keeps its config here.
+# It's gone when the unit stops, so every run starts from /usr/share/taidan/session-config.
+RuntimeDirectory=taidan
+RuntimeDirectoryMode=0700
+Environment=XDG_CONFIG_HOME=%t/taidan/config
+Environment=XDG_CACHE_HOME=%t/taidan/cache
+Environment=XDG_DATA_HOME=%t/taidan/data
+Environment=XDG_STATE_HOME=%t/taidan/state
 ExecStartPre=-/bin/plymouth quit
 ExecStartPre=+sh -c "exec chvt 7"
+ExecStartPre=cp -rT /usr/share/taidan/session-config %t/taidan/config
+# the polkit rules that let the OOBE run things as root only exist while this unit runs. /run is
+# a tmpfs, so they're also gone if the machine goes down mid-setup. polkitd watches the directory,
+# but the reload makes them apply right away even if /run/polkit-1/rules.d didn't exist yet.
+ExecStartPre=+install -Dpm644 /usr/share/taidan/polkit/100-taidan.rules -t /run/polkit-1/rules.d/
+ExecStartPre=-+systemctl try-reload-or-restart polkit.service
+# not `shutdown`: logind refuses the power key while that's blocked, and that left holding the
+# button down as the only way out. Shutting down stops this unit first, like any other.
+# start-taidan runs the KWin session and restarts it if taidan crashes.
 ExecStart=systemd-inhibit \
  --who="taidan" \
- --what=handle-lid-switch:sleep:shutdown \
+ --what=handle-lid-switch:sleep \
  --why="Taidan Initial Setup is running" \
  --mode=block \
- dbus-run-session kwin_wayland --no-lockscreen 'sh /usr/libexec/start-taidan'
+ sh /usr/libexec/start-taidan
 ExecStopPost=+sh -c "exec chvt 1"
+ExecStopPost=+rm -f /run/polkit-1/rules.d/100-taidan.rules
+ExecStopPost=-+systemctl try-reload-or-restart polkit.service
 StandardOutput=append:/var/log/taidan.stdout.log
 StandardError=append:/var/log/taidan.stderr.log
 User=taidan

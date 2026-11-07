@@ -1,0 +1,80 @@
+import { Tokens } from "../slintcn/theme/tokens.slint";
+import { TdnBasePg, TdnHero } from "../page.slint";
+import { Lang, Dir } from "../lang.slint";
+import { Cfg } from "../cfg.slint";
+import { Install } from "../install.slint";
+import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
+
+export component DonePage inherits TdnBasePg {
+    forward-focus: reboot;
+
+    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is
+    VerticalLayout {
+        accessible-role: groupbox;
+        accessible-label: Lang.t("page-done", []);
+
+        TdnHero {
+            vertical-stretch: 1;
+        }
+
+        HorizontalLayout {
+            padding-left: 1.75rem;
+            padding-right: 1.75rem;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+            spacing: 2rem;
+
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                spacing: 0.5rem;
+
+                TdnText {
+                    text: Lang.t("page-done", []);
+                    font-size: 3 * Tokens.text-rem;
+                    font-weight: 800;
+                    horizontal-alignment: Dir.text-start;
+                    wrap: word-wrap;
+                }
+
+                // so the next restart taking a while isn't a surprise
+                if Install.updates-ready: TdnText {
+                    text: Lang.t(Install.needs-reboot ? "page-done-updates-drivers" : "page-done-updates", []);
+                    color: Tokens.color-muted-foreground;
+                    horizontal-alignment: Dir.text-start;
+                    wrap: word-wrap;
+                }
+            }
+
+            // centered vertically, a HorizontalLayout alone would stretch the buttons to the row's
+            // height
+            VerticalLayout {
+                layout-order: Dir.order(1);
+                alignment: center;
+                horizontal-stretch: 0;
+
+                HorizontalLayout {
+                    spacing: 0.75rem;
+
+                    // logging in comes first, updating can wait for whenever the user restarts
+                    if !Install.needs-reboot && Install.updates-ready: TdnBtn {
+                        text: Lang.t("page-done-restart-update", []);
+                        clicked => { Install.finish(true); }
+                    }
+
+                    reboot := TdnBtn {
+                        layout-order: Dir.order(1);
+                        enter-hint: true;
+                        background-color: TdnStyle.accent;
+                        foreground-color: TdnStyle.accent-foreground;
+                        text: Lang.t(
+                            !Install.needs-reboot ? "page-done-login"
+                            : Install.updates-ready ? "page-done-restart-update"
+                            : "page-done-reboot", []);
+                        clicked => { Install.finish(Install.needs-reboot); }
+                    }
+                }
+            }
+        }
+    }
+}

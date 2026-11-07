@@ -3,28 +3,45 @@
 > 🎵 _[**チョウチン少女** - Green wisteria](https://www.youtube.com/watch?v=1-wL7bb_l-o)_
 
 Taidan is a GUI Out-Of-Box-Experience (OOBE) and Welcome App for Ultramarine
-Linux, written in Rust and the [Helium] toolkit.
+Linux, written in Rust and the [Slint] toolkit.
 
 ## 📦 Dependencies
 
 For an up-to-date list, see `scripts/taidan.spec`.
 
 ```
-libhelium
+kwin, dbus-daemon, swaybg [the OOBE session]
+polkit [running the setup as root]
+fontconfig
+vercel-geist-fonts, atkinson-hyperlegible-next-fonts and atkinson-hyperlegible-mono-fonts
+orca [screen reader]
+libxkbcommon, wayland and EGL libraries [loaded at runtime by Slint]
+NetworkManager
+cog [browser for captive portals]
+tzdata [time zones]
 gsettings or (plasma-apply-colorscheme and kwriteconfig6)
+kwriteconfig6
 shadow-utils
-systemd-udev [for systemd-timesyncd.service]
-sh
-dnf5 and dnf5-command(copr)
+systemd and systemd-udev
+kbd and procps-ng [chvt and pkill for the session]
+bash, util-linux [runuser and lastlog2]
+dnf5, dnf5-command(copr) and dnf5-command(config-manager)
 flatpak
-xkeyboard-config [for /usr/share/X11/xkb/rules/evdev.lst]
+xdg-terminal-exec [the debug terminal, see Testing]
+umcli [tweaks, through taidan-default-configs]
+chrony and grubby [recommended, the clock and NVIDIA drivers]
 ```
 
 ### 🛠️ Build Dependencies
 
 ```
 pkgconfig(openssl)
-pkgconfig(libhelium-1)
+pkgconfig(fontconfig)
+pkgconfig(libxcrypt)
+pkgconfig(icu-i18n)
+clang
+glibc-all-langpacks [for `localedef --list-archive`]
+xkeyboard-config [for /usr/share/X11/xkb/rules/evdev.lst]
 ```
 
 ## tdnx
@@ -43,6 +60,15 @@ cargo build --release -p tdnx --no-default-features --features server-oobe
 ```sh
 TAIDAN_LOG=trace cargo r
 ```
+
+- `TAIDAN_SIMULATE_HW=nvidia,broadcom-wifi,broadcom-bluetooth` (or `all`) pretends that
+  hardware is present, to see the drivers list (with `nvidia`, the simulated install asks for a
+  reboot)
+- `TAIDAN_SIMULATE_ERROR=1` makes the simulated install fail halfway
+- `TAIDAN_SIMULATE_UPDATES=1` pretends updates were downloaded, to see the done page's restart button
+
+To debug the OOBE on a real machine, boot with `taidan.debug_shell` on the kernel command line,
+then press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> to open a root terminal.
 
 ## 📃 License
 
@@ -70,8 +96,33 @@ Taidan reads an optional configuration file at `/etc/taidan.toml`:
 
 ```toml
 edition = "plasma"
-skip_pages = ["theme", "browser"] # maybe you don't want taidan to setup themes / install a browser
+skip_pages = ["location", "drivers"] # hide pages you don't want, see `SkipPage` in src/cfg.rs for the names
 org = "Fyra Labs"
 ```
 
-[Helium]: https://developer.fyralabs.com/helium/hig
+### Branding
+
+Other distros can swap Ultramarine's look out from the same file. Every key is optional.
+Colors follow `#rrggbb` or `#aarrggbb`.
+
+```toml
+logo = "/usr/share/pixmaps/my-distro.svg"  # header and window icon
+font = "Inter"                             # needs to be installed, Geist if unset
+accent_color = "#00078f"                   # main buttons and selections, light mode
+accent_color_dark = "#4a56e2"              # the same in dark mode
+accent_foreground_color = "#ffffff"        # text and icons on the accent
+accent_foreground_color_dark = "#ffffff"   # dark mode, accent_foreground_color if unset
+
+[welcome]
+t0 = "My Distro 42"                        # caption on the picture beside the pages, none if unset
+t0_color = "#ffffff"                       # caption color
+t1_color = "#ffffff"                       # Taidan version color, only shown in dev sessions
+hero_image = "/usr/share/backgrounds/my-distro.png"       # the picture, light mode
+hero_image_dark = "/usr/share/backgrounds/my-distro-dark.png"
+```
+
+The picture falls back to `/usr/share/backgrounds/default.png` (or `default-dark.png`), then to
+Ultramarine's. The distro name comes from `NAME=` in `/etc/os-release`. Choosing the legible font in
+the accessibility settings always uses Atkinson Hyperlegible Next instead of `font`.
+
+[Slint]: https://slint.dev

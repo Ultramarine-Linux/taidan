@@ -1,0 +1,131 @@
+import { TdnBasePg, TdnHeader } from "../page.slint";
+import { Lang, Dir } from "../lang.slint";
+import { Install } from "../install.slint";
+import { Actions } from "../actions.slint";
+import { Modal } from "../modal.slint";
+import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
+import { ScrollView } from "std-widgets.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+
+export component ErrorPage inherits TdnBasePg {
+    forward-focus: retry;
+
+    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is, and
+    // what went wrong, when the focus lands on Retry
+    VerticalLayout {
+        accessible-role: groupbox;
+        accessible-label: Lang.t("page-error", []);
+        accessible-description: Install.error == "" ? Lang.t("page-error-desc", [])
+            : Lang.t("page-error-desc", []) + "\n\n" + Install.error;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        padding-top: 1rem;
+        padding-bottom: 1.5rem;
+        spacing: 1.25rem;
+
+        TdnHeader {
+            step_i: 3;
+        }
+
+        HorizontalLayout {
+            spacing: 1rem;
+
+            Image {
+                source: @image-url("../../data/icons/dialog-error-symbolic.svg");
+                colorize: Tokens.color-destructive;
+                width: 2.75rem;
+                accessible-role: none;
+            }
+
+            VerticalLayout {
+                layout-order: Dir.order(1);
+                alignment: center;
+
+                TdnText {
+                    text: Lang.t("page-error", []);
+                    font-size: 1.75 * Tokens.text-rem;
+                    font-weight: 500;
+                    horizontal-alignment: Dir.text-start;
+                }
+
+                TdnText {
+                    text: Lang.t("page-error-desc", []);
+                    color: Tokens.color-muted-foreground;
+                    horizontal-alignment: Dir.text-start;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+            border-radius: Tokens.radius-md;
+            border-width: 1px;
+            border-color: Tokens.color-border-hairline;
+            background: Tokens.color-card;
+
+            ScrollView {
+                // selectable so details can be copied into a bug report
+                TextInput {
+                    x: 0.75rem;
+                    y: 0.75rem;
+                    width: parent.width - 1.5rem;
+                    enabled: !Modal.open;
+                    read-only: true;
+                    single-line: false;
+                    wrap: word-wrap;
+                    text: Install.error;
+                    font-family: "monospace";
+                    accessible-label: Lang.t("page-error-details", []);
+                    font-size: Tokens.typography-body-sm-size;
+                    color: Tokens.color-foreground;
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: space-between;
+
+            // no way to leave the OOBE from here, the system isn't set up. Powering off keeps the
+            // recovery record, so the next boot starts over
+            HorizontalLayout {
+                spacing: 0.5rem;
+
+                TdnBtn {
+                    text: Lang.t("page-error-back", []);
+                    clicked => { root.prev_page(); }
+                }
+
+                TdnBtn {
+                    layout-order: Dir.order(1);
+                    text: Lang.t("page-error-poweroff", []);
+                    clicked => { Actions.power-off(); }
+                }
+            }
+
+            HorizontalLayout {
+                layout-order: Dir.order(1);
+                spacing: 0.5rem;
+
+                // the way out when an online step keeps failing, e.g. a broken mirror, without
+                // having to unplug the network
+                if Install.used-internet: TdnBtn {
+                    text: Lang.t("page-error-offline", []);
+                    clicked => {
+                        Install.force-offline = true;
+                        root.next_page();
+                    }
+                }
+
+                retry := TdnBtn {
+                    layout-order: Dir.order(1);
+                    text: Lang.t("page-error-retry", []);
+                    enter-hint: true;
+                    background-color: TdnStyle.accent;
+                    foreground-color: TdnStyle.accent-foreground;
+                    clicked => { root.next_page(); }
+                }
+            }
+        }
+    }
+}

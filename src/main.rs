@@ -1,23 +1,32 @@
 #![warn(rust_2018_idioms)]
-pub mod backend;
+pub mod a11y;
+pub mod account;
+pub mod avatar;
 pub mod cfg;
+pub mod ims;
+pub mod install;
+pub mod l10n;
 pub mod macros;
-pub mod pages;
+pub mod network;
 pub mod prelude;
+pub mod screen;
+pub mod theme;
+pub mod timezone;
+pub mod tweaks;
 pub mod ui;
 
 use std::sync::LazyLock;
 
 use crate::prelude::*;
-use gtk::glib::translate::FromGlibPtrNone;
 use i18n_embed::LanguageLoader;
 use parking_lot::RwLock;
-use relm4::{
-    Component, ComponentController, ComponentParts, ComponentSender, RelmApp, SimpleComponent,
-};
+use sentry::integrations::tracing::{BreadcrumbLayer, ErrorLayer, LogLayer, SpanLayer};
+use tracing::Level;
+use tracing_subscriber::filter::{LevelFilter, filter_fn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 const APPID: &str = "com.fyralabs.Taidan";
+#[cfg(not(debug_assertions))]
 const SENTRY_LINK: &str =
     "https://26f566a221c052a686581b9170c2c9e6@o271654.ingest.us.sentry.io/4510401485799427";
 static LOCALE_SOLVER: LazyLock<poly_l10n::LocaleFallbackSolver> = LazyLock::new(Default::default);
@@ -34,213 +43,25 @@ pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     tracing::debug!("Populated cfg::Config (turn on `trace` to see body)");
     cfg
 });
-pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::SharedState::new();
 /// Language Loader
-pub static LL: std::sync::LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
-    std::sync::LazyLock::new(|| RwLock::new(handle_l10n()));
+pub static LL: LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
+    LazyLock::new(|| RwLock::new(handle_l10n()));
+
+pub static SETTINGS: LazyLock<RwLock<libtaidan::settings::Settings>> =
+    LazyLock::new(Default::default);
+
+/// runtime for `libtaidan`'s async system calls, so they never block the UI thread
+pub static RT: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("cannot create tokio runtime")
+});
 
 #[derive(rust_embed::RustEmbed)]
 #[folder = "po/"]
 #[exclude = "en-owo/*.ftl"]
 struct Localizations;
-
-generate_pages!(Page AppModel AppMsg:
-    00: Language,
-    01: Welcome,
-    02: Keyboard,
-    03: DeviceName,
-    04: WhoAreYou,
-    05: Password,
-    06: Internet,
-    07: Analytics,
-    08: CrashReport,
-    09: Tweaks,
-    10: Codecs,
-    11: InputMethod,
-    12: Theme,
-    13: Installing,
-    14: Finish,
-    15: Error,
-);
-
-#[derive(Debug, Clone)]
-pub enum NavAction {
-    GoTo(Page),
-    Next,
-    Back,
-    Quit,
-}
-
-#[derive(Debug)]
-pub enum AppMsg {
-    Nav(NavAction),
-    InstallError(String),
-    Update,
-    Quit,
-}
-
-#[allow(clippy::str_to_string)]
-#[relm4::component(pub)]
-impl SimpleComponent for AppModel {
-    type Init = ();
-
-    type Input = AppMsg;
-    type Output = ();
-
-    view! {
-        libhelium::ApplicationWindow {
-            set_title: Some(&t!("page-welcome", distro = CFG.distro.clone())),
-            set_default_width: 800,
-            set_default_height: 700,
-            set_vexpand: true,
-            set_align: gtk::Align::Fill,
-
-            #[wrap(Some)]
-            set_child = &gtk::Box {
-                set_vexpand: true,
-                set_align: gtk::Align::Fill,
-                set_orientation: gtk::Orientation::Vertical,
-
-                #[transition = "SlideLeftRight"]
-                #[name = "stack"]
-                match model.page {
-                    Page::Language => *model.language_page.widget(),
-                    Page::Welcome => *model.welcome_page.widget(),
-                    Page::Keyboard => *model.keyboard_page.widget(),
-                    Page::DeviceName => *model.device_name_page.widget(),
-                    Page::WhoAreYou => *model.who_are_you_page.widget(),
-                    Page::Password => *model.password_page.widget(),
-                    Page::Internet => *model.internet_page.widget(),
-                    Page::Analytics => *model.analytics_page.widget(),
-                    Page::CrashReport => *model.crash_report_page.widget(),
-                    Page::Tweaks => *model.tweaks_page.widget(),
-                    Page::Codecs => *model.codecs_page.widget(),
-                    Page::InputMethod => *model.input_method_page.widget(),
-                    Page::Theme => *model.theme_page.widget(),
-                    Page::Installing => *model.installing_page.widget(),
-                    Page::Finish => *model.finish_page.widget(),
-                    Page::Error => *model.error_page.widget(),
-                }
-            }
-        }
-    }
-
-    // Initialize the UI.
-    fn init(
-        (): Self::Init,
-        root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
-        // TODO: make libhelium force this
-        let display = gtk::gdk::Display::default().unwrap();
-        let settings = gtk::Settings::for_display(&display);
-        settings.set_gtk_icon_theme_name(Some("Hydrogen"));
-        let theme = gtk::IconTheme::for_display(&display);
-        theme.add_resource_path("/com/fyralabs/Taidan/icons/symbolic/actions");
-        SETTINGS.subscribe(sender.input_sender(), |_| AppMsg::Update);
-
-        let model = Self::_default(sender);
-
-        let widgets = view_output!();
-
-        widgets.stack.set_vexpand(true);
-
-        ComponentParts { model, widgets }
-    }
-
-    fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>) {
-        tracing::trace!(?message, "AppModel: Received message");
-        match message {
-            AppMsg::Nav(NavAction::Next)
-                if self.page == Page::Password && SETTINGS.read().skipconfig =>
-            {
-                self.page = Page::Installing;
-                self.run_install(sender, backend::start_simple_install);
-            }
-            AppMsg::Nav(NavAction::Next)
-                if self.page == Page::Theme && SETTINGS.read().nointernet =>
-            {
-                self.page = Page::Installing;
-                self.run_install(sender, backend::start_install);
-            }
-            AppMsg::Nav(NavAction::GoTo(page)) => {
-                self.page = page;
-                if page == Page::Installing {
-                    self.run_install(sender, backend::start_install);
-                }
-            }
-            AppMsg::Nav(NavAction::Quit) => {
-                let ss = sender.clone();
-                sender.oneshot_command(async move {
-                    if let Err(e) = backend::pkexec("root", "rm", &["-rf", "/var/.unconfigured", "/.unconfigured"]).await
-                    {
-                        tracing::error!(?e, "cannot remove /var/.unconfigured and/or /.unconfigured; exiting anyway");
-                    } else {
-                        tracing::debug!("removed /var/.unconfigured and/or /.unconfigured");
-                    }
-                    if let Err(e) = backend::pkexec("root", "systemctl", &["disable", "taidan-initial-setup-reconfiguration"]).await
-                    {
-                        tracing::error!(?e, "cannot disable taidan-initial-setup-reconfiguration.service; exiting anyway");
-                    } else {
-                        tracing::debug!("disabled taidan-initial-setup-reconfiguration.service");
-                    }
-
-                    ss.input(AppMsg::Quit);
-                });
-            }
-            AppMsg::Nav(NavAction::Next) => {
-                while {
-                    self.page =
-                        usize::from(self.page).wrapping_add(1).try_into().unwrap_or(self.page);
-                    !self.get_page_widget().is_visible() // hack in generate_pages
-                } {}
-                if self.page == Page::Installing {
-                    self.run_install(sender, backend::start_install);
-                }
-            }
-            AppMsg::Nav(NavAction::Back) => {
-                while {
-                    self.page =
-                        usize::from(self.page).wrapping_sub(1).try_into().unwrap_or(self.page);
-                    !self.get_page_widget().is_visible()
-                } {}
-            }
-            AppMsg::InstallError(msg) => {
-                self.page = Page::Error;
-                self.error_page
-                    .sender()
-                    .send(pages::ErrorPageMsg::Receive(msg))
-                    .expect("sender dropped?");
-            }
-            AppMsg::Update => {}
-            AppMsg::Quit => {
-                relm4::main_application().quit();
-            }
-        }
-        // BUG: labels don't update without this?
-        self.welcome_page.sender().send(pages::_01_welcome::WelcomePageMsg::Update).unwrap();
-    }
-}
-
-type Sd = relm4::Sender<pages::InstallingPageMsg>;
-impl AppModel {
-    #[allow(clippy::needless_pass_by_value)]
-    fn run_install<Fut, F>(&self, sender: ComponentSender<Self>, f: F)
-    where
-        Fut: std::future::Future<Output = color_eyre::Result<()>> + Send,
-        F: Fn(backend::settings::Settings, Sd) -> Fut + Send + 'static,
-    {
-        let inst_sender = self.installing_page.sender().clone();
-        let (ss, sett) = (sender.clone(), SETTINGS.read().clone());
-        sender.oneshot_command(async move {
-            if let Err(e) = f(sett, inst_sender).await {
-                sentry::capture_message(&format!("{e:?}"), sentry::Level::Error);
-                sentry_eyre::capture_report(&e);
-                ss.input(AppMsg::InstallError(strip_ansi_escapes::strip_str(format!("{e:?}"))));
-            }
-        });
-    }
-}
 
 fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
     use i18n_embed::{LanguageLoader, fluent::fluent_language_loader};
@@ -263,26 +84,8 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
 fn main() {
     let _guard = setup_logs_and_install_panic_hook();
     std::sync::LazyLock::force(&LL);
-    // FIXME: temp hack to set nointernet to true here (should be default value), please refactor
-    SETTINGS.write().nointernet = true;
 
-    gtk::gio::resources_register_include!("icons.gresource").unwrap();
-
-    // SAFETY: placeholder
-    let color =
-        unsafe {
-            libhelium::RGBColor::from_glib_none(std::ptr::from_mut(
-                &mut libhelium::ffi::HeRGBColor { r: 0.0, g: 7.0, b: 143.0 },
-            ))
-        };
-    let app = libhelium::Application::builder()
-        .application_id(APPID)
-        .flags(gtk::gio::ApplicationFlags::default())
-        .default_accent_color(&color)
-        .build();
-
-    tracing::debug!("Starting Taidan");
-    RelmApp::from_app(app).run::<AppModel>(());
+    ui::run();
 }
 
 pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
@@ -302,31 +105,33 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 /// - cannot create taidan tempdir
 #[allow(clippy::cognitive_complexity)]
 fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
+    #[cfg(not(debug_assertions))]
     let sentry_guard = sentry::init((
         SENTRY_LINK,
-        sentry::ClientOptions::new()
-            .maybe_release(sentry::release_name!())
-            // Capture user IPs and potentially sensitive headers when using HTTP server integrations
-            // see https://docs.sentry.io/platforms/rust/data-management/data-collected for more info
-            .send_default_pii(true)
-            .enable_logs(true),
+        sentry::ClientOptions::new().maybe_release(sentry::release_name!()),
     ));
+    #[cfg(debug_assertions)]
+    let sentry_guard = ();
     color_eyre::install().expect("install color_eyre");
     let file_appender = tracing_appender::rolling::never(&*TEMP_DIR, "taidan.log");
     let (non_blocking, tracing_guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::registry()
         .with(fmt::layer().pretty())
-        .with(sentry::integrations::tracing::layer())
+        .with(SpanLayer::new().with_filter(LevelFilter::INFO))
+        .with(BreadcrumbLayer::new().with_filter(filter_fn(|metadata| {
+            matches!(*metadata.level(), Level::WARN | Level::INFO)
+        })))
+        .with(ErrorLayer::new().with_filter(LevelFilter::ERROR))
+        .with(LogLayer::new().with_filter(LevelFilter::INFO))
         .with(
             EnvFilter::builder()
-                .with_default_directive(tracing::level_filters::LevelFilter::DEBUG.into())
+                .with_default_directive(LevelFilter::DEBUG.into())
                 .with_env_var("TAIDAN_LOG")
                 .from_env_lossy(),
         )
         .with(tracing_journald::layer().unwrap().with_syslog_identifier("taidan".to_owned()))
         .with(fmt::layer().with_writer(non_blocking).with_ansi(false).compact())
-        .with(tracing_error::ErrorLayer::default())
         .init();
 
     if cfg!(debug_assertions) {

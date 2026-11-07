@@ -1,0 +1,13 @@
+[package]
+name = "taidan_ui"
+version.workspace = true
+edition = "2024"
+description = "Taidan's Slint UI, compiled apart from the rest so Rust-only changes don't rebuild it"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+slint = { workspace = true }
+
+[build-dependencies]
+slint-build = "1.18.1"

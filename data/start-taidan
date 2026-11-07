@@ -1,14 +1,38 @@
 #!/usr/bin/sh
+# started by taidan-initial-setup.service. Runs the OOBE in its own KWin session, and starts that
+# again (a few times) if taidan or KWin crashes before the setup is done, instead of falling through
+# to the display manager with a half-set-up system. A clean exit, or one after the setup removed the
+# markers, ends it.
 
-# create "home dir"
-mkdir -p /usr/lib/
-cp -r /etc/skel /usr/lib/
+status_file="${RUNTIME_DIRECTORY:-/run/taidan}/exit-status"
 
-xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/http' &
-xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/https' &
+# inside the KWin session
+if [ "$1" = session ]; then
+	swaybg -i /usr/share/backgrounds/default.png -m fill -c '#113344' >/dev/null 2>&1 &
+	TAIDAN_LOG=trace /usr/bin/taidan
+	echo $? >"$status_file"
+	pkill kwin_wayland
+	exit 0
+fi
 
-swaybg -i /usr/share/backgrounds/default.png -m fill -c '#113344' >/dev/null 2>&1 &
-nm-applet &
-TAIDAN_LOG=trace /usr/bin/taidan
+unconfigured() {
+	[ -e /.unconfigured ] || [ -e /var/.unconfigured ]
+}
 
-pkill kwin_wayland
+restarts=0
+while :; do
+	rm -f "$status_file"
+	dbus-run-session kwin_wayland --no-lockscreen 'sh /usr/libexec/start-taidan session'
+	status=$(cat "$status_file" 2>/dev/null)
+	if [ "$status" = 0 ] || ! unconfigured; then
+		exit 0
+	fi
+	# no status means KWin went down before taidan exited
+	if [ "$restarts" -ge 3 ]; then
+		echo "taidan keeps failing (exit status ${status:-none}), giving up" >&2
+		exit 1
+	fi
+	restarts=$((restarts + 1))
+	echo "taidan exited before the setup was done (exit status ${status:-none}), restarting" >&2
+	sleep 1
+done

@@ -2,14 +2,80 @@ name: Rust
 permissions:
   contents: read
   security-events: write
+  packages: read
 
 on:
+  # pull requests are covered by pull_request, so a push to their branch doesn't run this twice
   push:
+    branches: ["main"]
   pull_request:
 
 jobs:
   rust:
     uses: FyraLabs/actions/.github/workflows/rust.yml@main
     with:
+      # the same build deps for both, clippy builds the crates too
+      clippy-pre: |
+        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
+      clippy-cargo-flags: --workspace --exclude tdnx --all-targets
+      clippy-cache: true
       test-pre: |
-        dnf install -y openssl-devel libhelium-devel gtk4-devel 'pkgconfig(glib-2.0)' 'pkgconfig(libattr)' 'pkgconfig(gnome-desktop-4)' clang-devel perl-FindBin gcc make clang
+        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
+      # every crate's tests, taidan's are in the binary
+      test-cargo-flags: --workspace
+      test-cache: true
+
+  # the reusable workflow's clippy only covers the default features, and tdnx's backends can't be
+  # built together
+  tdnx:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: ghcr.io/fyralabs/ci:f44
+    strategy:
+      fail-fast: false
+      matrix:
+        feature: [server-oobe, desktop-install]
+    steps:
+      - name: Install build deps
+        run: dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: stable
+          components: clippy
+      - name: Cache Rust dependencies and build artifacts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ~/.cargo/git/checkouts/
+            target/
+          # per backend, they build different crates and would keep overwriting each other's cache
+          key: ${{ runner.os }}-clippy-cargo-tdnx-${{ matrix.feature }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-clippy-cargo-tdnx-${{ matrix.feature }}-
+      - name: Install clippy-sarif
+        run: cargo install clippy-sarif sarif-fmt
+      - name: Clippy
+        # bash for pipefail, so clippy failing fails the step and not just sarif-fmt
+        shell: bash
+        run: >
+          cargo clippy -p tdnx --features ${{ matrix.feature }} --all-targets
+          --message-format=json -- --no-deps -D warnings
+          | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
+      - name: Upload clippy results
+        # also when clippy found something, which is when they matter
+        if: success() || failure()
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: rust-clippy-results.sarif
+          # a category per backend, code scanning keeps one set of results per category
+          category: clippy-tdnx-${{ matrix.feature }}

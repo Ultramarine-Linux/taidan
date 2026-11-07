@@ -1,0 +1,513 @@
+import { TdnBasePg } from "../page.slint";
+import { Lang, Dir } from "../lang.slint";
+import { A11y } from "../a11y.slint";
+import { Modal } from "../modal.slint";
+import { TdnText, TdnBtn, TdnStyle, TdnToggleRow, TdnDialog, TdnField, TdnSelect } from "../components.slint";
+import { FocusRing } from "../slintcn/components/focus-ring.slint";
+import { Icon } from "../slintcn/components/icon.slint";
+import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+import { ScrollView } from "std-widgets.slint";
+
+// icons from Lucide (https://lucide.dev), ISC license
+global A11yIcons {
+    out property <string> ear: "M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0 M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4";
+    out property <string> zoom-in: "M3 11a8 8 0 1 0 16 0a8 8 0 1 0-16 0 M21 21l-4.35-4.35 M11 8v6 M8 11h6";
+    // the keys are short dashes rather than Lucide's dots, `Icon` has no round line caps
+    out property <string> keyboard: "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M5.5 8h1.5 M9.5 8h1.5 M13.5 8h1.5 M17.5 8h1.5 M7.5 12h1.5 M11.5 12h1.5 M15.5 12h1.5 M7 16h10";
+}
+
+// a big square button that turns a feature on or off
+component A11yTile inherits Rectangle {
+    in property <string> icon;
+    in property <string> text;
+    // set it from what `toggled` changes, so it keeps following the setting when something else
+    // (Meta+Alt+S for the screen reader) changes it
+    in property <bool> checked;
+    // whether this is part of a dialog, see `Modal`
+    in property <bool> in-dialog;
+    callback toggled(bool);
+
+    property <bool> pointer-focus;
+
+    function toggle() {
+        root.toggled(!root.checked);
+    }
+
+    forward-focus: focus;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-action-default => { root.toggle(); }
+
+    border-radius: Tokens.radius-lg;
+    border-width: root.checked ? 2px : 1px;
+    border-color: root.checked ? TdnStyle.accent : Tokens.color-border-hairline;
+    background: Tokens.color-card;
+    animate border-color { duration: Tokens.motion-fast; }
+
+    // the tints are layers that fade in, animating between the opaque card color and a
+    // translucent one would dip through the page color on the way
+    Rectangle {
+        border-radius: root.border-radius;
+        background: TdnStyle.accent;
+        opacity: root.checked ? 0.15 : 0;
+        animate opacity { duration: Tokens.motion-fast; }
+    }
+
+    Rectangle {
+        border-radius: root.border-radius;
+        background: Tokens.color-foreground;
+        opacity: area.pressed ? 0.1 : area.has-hover ? 0.05 : 0;
+        animate opacity { duration: Tokens.motion-fast; easing: ease-out; }
+    }
+
+    focus := FocusScope {
+        enabled: Modal.open == root.in-dialog;
+        key-pressed(event) => {
+            root.pointer-focus = false;
+            if event.text == Key.Return || event.text == " " {
+                if !event.repeat { root.toggle(); }
+                return accept;
+            }
+            reject
+        }
+    }
+
+    VerticalLayout {
+        padding: 0.75rem;
+        spacing: 0.75rem;
+        alignment: center;
+
+        HorizontalLayout {
+            alignment: center;
+
+            Icon {
+                commands: root.icon;
+                width: 4rem;
+                height: self.width;
+                size: self.width;
+                tint: root.checked ? TdnStyle.accent : Tokens.color-foreground;
+                stroke-width: 2px;
+            }
+        }
+
+        TdnText {
+            text: root.text;
+            font-size: 1.2 * Tokens.text-rem;
+            wrap: word-wrap;
+        }
+    }
+
+    // a check in the corner, so it isn't only the color that says it's on
+    if root.checked: Rectangle {
+        x: Dir.x(parent.width - self.width - 0.5rem, self.width, parent.width);
+        y: 0.5rem;
+        width: 1.4rem;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: TdnStyle.accent;
+
+        Icon {
+            commands: LucidePaths.check;
+            size: parent.width * 0.65;
+            tint: TdnStyle.accent-foreground;
+            stroke-width: 3px;
+        }
+    }
+
+    area := TouchArea {
+        mouse-cursor: pointer;
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
+        }
+        clicked => { root.toggle(); }
+    }
+
+    if focus.has-focus && !root.pointer-focus: FocusRing {
+        host-width: parent.width;
+        host-height: parent.height;
+    }
+}
+
+// the page's content, shared by the first page and the one the header button opens
+component A11yContent inherits VerticalLayout {
+    in property <bool> in-dialog;
+    // text of the button at the bottom right, Next or Done
+    in property <string> next-text;
+    callback next;
+
+    // whether "More Options" was opened from here, so its button gets the focus back when it
+    // closes, cleared by the page once it's left
+    in-out property <bool> opened-more;
+
+    public function focus-first() {
+        if root.opened-more { more.focus(); } else { screen-reader.focus(); }
+    }
+
+    // "More Options" opens a dialog over this one, which takes the keyboard until it closes, so
+    // Tab can't reach this content behind it
+    property <bool> interactive-dialog: root.in-dialog && !A11y.more-open;
+    property <bool> more-open: A11y.more-open;
+    changed more-open => {
+        if !self.more-open && root.opened-more { more.focus(); }
+    }
+
+    padding-left: 2rem;
+    padding-right: 2rem;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+    spacing: 1rem;
+
+    TdnText {
+        text: Lang.t("page-accessibility", []);
+        font-size: 2.5 * Tokens.text-rem;
+        font-weight: 500;
+        wrap: word-wrap;
+    }
+
+    Rectangle { vertical-stretch: 1; }
+
+    TdnText {
+        text: Lang.t("page-accessibility-desc", []);
+        font-size: 1.3 * Tokens.text-rem;
+        wrap: word-wrap;
+    }
+
+    HorizontalLayout {
+        spacing: 1.5rem;
+        alignment: center;
+
+        screen-reader := A11yTile {
+            width: 10rem;
+            height: self.width;
+            in-dialog: root.interactive-dialog;
+            icon: A11yIcons.ear;
+            text: Lang.t("page-accessibility-screen-reader", []);
+            checked: A11y.screen-reader;
+            toggled(on) => {
+                A11y.screen-reader = on;
+                A11y.changed();
+            }
+        }
+
+        A11yTile {
+            layout-order: Dir.order(1);
+            width: 10rem;
+            height: self.width;
+            in-dialog: root.interactive-dialog;
+            icon: A11yIcons.zoom-in;
+            text: Lang.t("page-accessibility-zoom", []);
+            checked: A11y.zoom;
+            toggled(on) => {
+                A11y.zoom = on;
+                A11y.changed();
+            }
+        }
+
+        A11yTile {
+            layout-order: Dir.order(2);
+            width: 10rem;
+            height: self.width;
+            in-dialog: root.interactive-dialog;
+            icon: A11yIcons.keyboard;
+            text: Lang.t("page-accessibility-sticky-keys", []);
+            checked: A11y.sticky-keys;
+            toggled(on) => {
+                A11y.sticky-keys = on;
+                A11y.changed();
+            }
+        }
+    }
+
+    // the header button drawn next to the hint, which names it in words for screen readers and
+    // so a translation doesn't need to fit around a picture
+    HorizontalLayout {
+        spacing: 0.6rem;
+        alignment: center;
+
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+
+            Rectangle {
+                width: 1.75rem * Tokens.text-scale;
+                height: self.width;
+                border-radius: Tokens.radius-md;
+                background: Tokens.color-primary;
+                accessible-role: none;
+
+                Image {
+                    source: @image-url("../../data/icons/settings-accessibility-symbolic.svg");
+                    colorize: Tokens.color-primary-foreground;
+                    width: 1rem * Tokens.text-scale;
+                    accessible-role: none;
+                }
+            }
+        }
+
+        TdnText {
+            layout-order: Dir.order(1);
+            text: Lang.t("page-accessibility-hint", []);
+            font-size: 1.2 * Tokens.text-rem;
+            horizontal-alignment: Dir.text-start;
+            wrap: word-wrap;
+            min-width: 0;
+        }
+    }
+
+    Rectangle { vertical-stretch: 1; }
+
+    HorizontalLayout {
+        alignment: space-between;
+
+        more := TdnBtn {
+            in-dialog: root.interactive-dialog;
+            outline: true;
+            text: Lang.t("page-accessibility-more", []);
+            foreground-color: Tokens.color-foreground;
+            clicked => {
+                root.opened-more = true;
+                A11y.more-open = true;
+            }
+        }
+
+        TdnBtn {
+            layout-order: Dir.order(1);
+            in-dialog: root.interactive-dialog;
+            text: root.next-text;
+            enter-hint: true;
+            background-color: TdnStyle.accent;
+            foreground-color: TdnStyle.accent-foreground;
+            clicked => { root.next(); }
+        }
+    }
+}
+
+// the first page, before the language, so the rest of the setup can be done with these on
+export component AccessibilityPage inherits TdnBasePg {
+    pageid: "accessibility";
+    forward-focus: focus;
+
+    changed active => {
+        if !self.active { content.opened-more = false; }
+    }
+
+    // Enter goes on, unless a tile or button has focus and takes it first
+    focus := FocusScope {
+        enabled: !Modal.open;
+        // focused when the page is shown, and when the window refocuses the page after a dialog
+        // closes, the content takes it from here
+        focus-gained(reason) => {
+            if reason == FocusReason.programmatic { content.focus-first(); }
+        }
+        key-pressed(event) => {
+            if event.text == Key.Return && !Modal.open {
+                if !event.repeat { root.next_page(); }
+                return accept;
+            }
+            reject
+        }
+
+        init => { content.focus-first(); }
+
+        content := A11yContent {
+            width: parent.width;
+            height: parent.height;
+            next-text: Lang.t("next", []);
+            next => { root.next_page(); }
+        }
+    }
+}
+
+// the same page over everything else, opened with the header button
+export component AccessibilityDialog inherits Rectangle {
+    background: Tokens.color-background;
+
+    // keeps clicks from reaching the page underneath
+    TouchArea { }
+
+    FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape && !A11y.more-open {
+                A11y.open = false;
+                return accept;
+            }
+            reject
+        }
+
+        content := A11yContent {
+            width: parent.width;
+            height: parent.height;
+            in-dialog: true;
+            next-text: Lang.t("page-accessibility-done", []);
+            // read when the focus moves into it, as on the page
+            accessible-role: groupbox;
+            accessible-label: Lang.t("page-accessibility", []);
+            next => { A11y.open = false; }
+        }
+    }
+
+    init => { content.focus-first(); }
+}
+
+// a switch with a description underneath, in the dialog
+component OptionRow inherits VerticalLayout {
+    in property <string> text;
+    in property <string> desc;
+    in property <bool> checked;
+    callback toggled(bool);
+    // Enter, which closes the dialog like Done
+    callback accepted();
+
+    spacing: 0.4rem;
+
+    TdnToggleRow {
+        in-dialog: true;
+        text: root.text;
+        checked: root.checked;
+        toggled(on) => { root.toggled(on); }
+        accepted => { root.accepted(); }
+    }
+
+    TdnText {
+        text: root.desc;
+        color: Tokens.color-muted-foreground;
+        font-size: Tokens.typography-body-sm-size;
+        horizontal-alignment: Dir.text-start;
+        wrap: word-wrap;
+    }
+}
+
+// the options beyond the three on the page
+export component A11yMoreDialog inherits TdnDialog {
+    title: Lang.t("page-accessibility-more", []);
+    dialog-width: 26rem;
+    dismissed => { A11y.more-open = false; }
+
+    scroll := ScrollView {
+        // as tall as the list, the dialog shrinks it to fit the window and it scrolls
+        preferred-height: list-end.y;
+        content-width: self.visible-width;
+        content-height: list-end.y;
+        horizontal-scrollbar-policy: always-off;
+
+        list := VerticalLayout {
+            width: scroll.visible-width;
+            height: self.preferred-height;
+            alignment: start;
+            spacing: 1rem;
+            // room for the focus rings and the scrollbar
+            padding-left: Tokens.focus-ring-offset + Tokens.focus-ring-width;
+            padding-top: self.padding-left;
+            padding-right: 0.9rem;
+
+            OptionRow {
+                text: Lang.t("page-accessibility-larger-text", []);
+                desc: Lang.t("page-accessibility-larger-text-desc", []);
+                checked: A11y.larger-text;
+                accepted => { root.dismissed(); }
+                toggled(on) => {
+                    A11y.larger-text = on;
+                    A11y.changed();
+                }
+            }
+
+            OptionRow {
+                text: Lang.t("page-accessibility-legible-font", []);
+                desc: Lang.t("page-accessibility-legible-font-desc", []);
+                checked: A11y.legible-font;
+                accepted => { root.dismissed(); }
+                toggled(on) => {
+                    A11y.legible-font = on;
+                    A11y.changed();
+                }
+            }
+
+            OptionRow {
+                text: Lang.t("page-accessibility-reduce-motion", []);
+                desc: Lang.t("page-accessibility-reduce-motion-desc", []);
+                checked: A11y.reduce-motion;
+                accepted => { root.dismissed(); }
+                toggled(on) => {
+                    A11y.reduce-motion = on;
+                    A11y.changed();
+                }
+            }
+
+            OptionRow {
+                text: Lang.t("page-accessibility-slow-keys", []);
+                desc: Lang.t("page-accessibility-slow-keys-desc", []);
+                checked: A11y.slow-keys;
+                accepted => { root.dismissed(); }
+                toggled(on) => {
+                    A11y.slow-keys = on;
+                    A11y.changed();
+                }
+            }
+
+            OptionRow {
+                text: Lang.t("page-accessibility-bounce-keys", []);
+                desc: Lang.t("page-accessibility-bounce-keys-desc", []);
+                checked: A11y.bounce-keys;
+                accepted => { root.dismissed(); }
+                toggled(on) => {
+                    A11y.bounce-keys = on;
+                    A11y.changed();
+                }
+            }
+
+            OptionRow {
+                text: Lang.t("page-accessibility-dwell-click", []);
+                desc: Lang.t("page-accessibility-dwell-click-desc", []);
+                checked: A11y.dwell-click;
+                accepted => { root.dismissed(); }
+                toggled(on) => {
+                    A11y.dwell-click = on;
+                    A11y.changed();
+                }
+            }
+
+            TdnField {
+                label: Lang.t("page-accessibility-color-filter", []);
+                label-clicked => { filter.focus(); }
+
+                filter := TdnSelect {
+                    in-dialog: true;
+                    label: Lang.t("page-accessibility-color-filter", []);
+                    options: [
+                        Lang.t("page-accessibility-color-filter-none", []),
+                        Lang.t("page-accessibility-color-filter-protanopia", []),
+                        Lang.t("page-accessibility-color-filter-deuteranopia", []),
+                        Lang.t("page-accessibility-color-filter-tritanopia", []),
+                        Lang.t("page-accessibility-color-filter-monochrome", []),
+                    ];
+                    index: A11y.color-filter;
+                    changed(i) => {
+                        A11y.color-filter = i;
+                        A11y.changed();
+                    }
+                }
+            }
+
+            // wrapped descriptions make the list's preferred height too short, see the 802.1X dialog
+            list-end := Rectangle { height: 0; }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: Dir.end;
+
+        done := TdnBtn {
+            in-dialog: true;
+            text: Lang.t("page-accessibility-done", []);
+            enter-hint: true;
+            background-color: TdnStyle.accent;
+            foreground-color: TdnStyle.accent-foreground;
+            clicked => { root.dismissed(); }
+        }
+    }
+
+    init => { done.focus(); }
+}

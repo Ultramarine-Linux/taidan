@@ -1,0 +1,82 @@
+export struct FluentArg {
+    key: string,
+    value: string,
+}
+
+export struct Language {
+    locale: string,
+    native_name: string,
+}
+
+export struct KeymapVariant { id: string, name: string }
+
+export struct Keymap {
+    id: string,
+    name: string,
+    variants: [KeymapVariant],
+}
+
+export global Lang {
+    in-out property <Language> current_language;
+    // whether the language is written right to left, set from Rust along with the translations
+    in-out property <bool> rtl;
+    // filtered by `filter_languages`
+    in property <[Language]> languages;
+    callback filter_languages(query: string);
+    // load the translations *before* changing `current_language`, so bindings that
+    // re-evaluate on the change (e.g. during layout) already see the new language
+    public function select(lang: Language) {
+        set_lang(lang);
+        current_language = lang;
+    }
+    public pure function t(id: string, args: [FluentArg]) -> string {
+        _t(id, args, current_language);
+    }
+    pure callback _t(id: string, args: [FluentArg], current_language: Language) -> string;
+    _t(id, args, current_language) => "t(" + id + ")";
+    // a time zone's city with its region, "Toronto, Canada", or only the city
+    public pure function place(city: string, region: string) -> string {
+        region == "" ? city : t("page-timezone-place", [{ key: "city", value: city }, { key: "region", value: region }])
+    }
+    callback set_lang(lang: Language);
+    public pure function name(lang: Language) -> string {
+        _name(lang, current_language);
+    }
+    pure callback _name(lang: Language, current_language: Language) -> string;
+    _name(lang, current_language) => "Lang.name(" + lang.locale + ")";
+
+    // filtered by `filter_keymaps`
+    in property <[Keymap]> keymaps;
+    callback filter_keymaps(query: string);
+    // variants of `current_keymap`, filtered by `filter_variants`
+    in property <[KeymapVariant]> variants;
+    callback filter_variants(query: string);
+    in property <Keymap> current_keymap;
+    // `id` is empty for the layout's default variant
+    in property <KeymapVariant> current_variant;
+    // selecting also applies the keymap to the system
+    callback select_keymap(keymap: Keymap);
+    callback select_variant(variant: KeymapVariant);
+}
+
+// left and right as the language reads, so text and rows mirror for right-to-left languages.
+// Slint 1.18 has no layout direction, and `horizontal-alignment: start` is always the left
+export global Dir {
+    // where lines start and end, for `horizontal-alignment`
+    out property <TextHorizontalAlignment> text-start: Lang.rtl ? TextHorizontalAlignment.right : TextHorizontalAlignment.left;
+    out property <TextHorizontalAlignment> text-end: Lang.rtl ? TextHorizontalAlignment.left : TextHorizontalAlignment.right;
+    // for the `alignment` of a `HorizontalLayout`
+    out property <LayoutAlignment> start: Lang.rtl ? LayoutAlignment.end : LayoutAlignment.start;
+    out property <LayoutAlignment> end: Lang.rtl ? LayoutAlignment.start : LayoutAlignment.end;
+
+    // `layout-order` for the `i`th child of a `HorizontalLayout`, which reverses the row for
+    // right-to-left languages. The first child can leave it out, as it's 0 either way.
+    public pure function order(i: int) -> int {
+        Lang.rtl ? -i : i
+    }
+
+    // the `x` of something `width` wide that is `offset` from the start edge of its parent
+    public pure function x(offset: length, width: length, parent-width: length) -> length {
+        Lang.rtl ? parent-width - offset - width : offset
+    }
+}

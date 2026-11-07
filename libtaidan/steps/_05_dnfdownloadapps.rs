@@ -4,7 +4,7 @@ use crate::{i18n::I18nImf, prelude::*};
 pub struct DnfDownloadApps;
 impl super::Step for DnfDownloadApps {
     #[allow(clippy::indexing_slicing)]
-    #[tracing::instrument]
+    #[tracing::instrument(skip(settings))]
     async fn pre<C: crate::Callback>(
         &self,
         settings: &mut crate::settings::Settings,
@@ -14,8 +14,11 @@ impl super::Step for DnfDownloadApps {
         if cfg.taidan0.skip_dnf || settings.nointernet {
             return Ok(());
         }
-        settings.actions[1]
-            .extend(super::_07_drivers_codecs::Codecs::codecs().iter().map(ToString::to_string));
+        if settings.install_codecs_drivers {
+            settings.actions[1].extend(
+                super::_07_drivers_codecs::Codecs::codecs().iter().map(ToString::to_string),
+            );
+        }
 
         if !settings.ims.is_empty() {
             let pkgs: &[&str] = match settings.imf {
@@ -45,7 +48,7 @@ impl super::Step for DnfDownloadApps {
         Ok(())
     }
 
-    #[tracing::instrument(skip(callback))]
+    #[tracing::instrument(skip(settings, callback))]
 
     async fn run<C: crate::Callback>(
         &self,
@@ -56,13 +59,10 @@ impl super::Step for DnfDownloadApps {
         if cfg.taidan0.skip_dnf || settings.nointernet {
             return Ok(());
         }
-        let mut enable_repo = super::super::dnf::EnableRepo::new().await?;
-        // NOTE: we unfortunately cannot execute this in parallel because `enable_repo()` borrows
-        // `enable_repo` mutably, and it's impossible to mutate the object in parallel safely.
+        // one at a time, since each `dnf5 config-manager` rewrites the same config files
         for repo in &settings.actions[0] {
-            enable_repo.enable_repo(repo).await?;
+            super::super::dnf::enable_repo(repo).await?;
         }
-        enable_repo.save().await?;
         for copr in &settings.actions[4] {
             crate::pkexec("root", "dnf5", &["copr", "enable", "-y", copr]).await?;
         }

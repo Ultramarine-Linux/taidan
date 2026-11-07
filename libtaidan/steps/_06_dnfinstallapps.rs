@@ -2,7 +2,7 @@ use crate::prelude::*;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DnfInstallApps;
 impl super::Step for DnfInstallApps {
-    #[tracing::instrument(skip(sender))]
+    #[tracing::instrument(skip(settings, sender))]
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,

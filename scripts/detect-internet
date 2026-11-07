@@ -1,2 +1,0 @@
-#!/bin/bash
-ping -c 1 -W 20 1.1.1.1 > /dev/null 2>&1

@@ -1,0 +1,48 @@
+# seeded into the OOBE session's own config by taidan-initial-setup.service, so nothing can close
+# Taidan (start-taidan then stops the session and boots to the login screen with no user), or open
+# something running as the taidan user, which can pkexec anything
+#
+# KWin's own are `action=current,default,name`, see initShortcut() in KWin's src/useractions.cpp.
+# Alt+Tab stays, to get back from the captive portal browser.
+[kwin]
+Kill Window=none,Meta+Ctrl+Esc,Kill Window
+Show Desktop=none,Meta+D,Peek at Desktop
+Window Close=none,Alt+F4,Close Window
+Window Minimize=none,Meta+PgDown,Minimize Window
+Window Operations Menu=none,Alt+F3,Window Menu
+
+# apps launched from /usr/share/kglobalaccel/*.desktop, `_launch` is the app itself and the rest
+# are its desktop actions. The screen reader toggle stays.
+[services][org.kde.dolphin.desktop]
+_launch=none
+
+[services][org.kde.konsole.desktop]
+_launch=none
+
+# Meta+P, the display switcher could turn off the only screen showing the OOBE
+[services][org.kde.kscreen.desktop]
+_launch=none
+ShowOSD=none
+
+[services][org.kde.krunner.desktop]
+_launch=none
+RunClipboard=none
+
+[services][org.kde.plasma-systemmonitor.desktop]
+_launch=none
+
+[services][org.kde.plasma.emojier.desktop]
+_launch=none
+
+[services][org.kde.spectacle.desktop]
+_launch=none
+ActiveWindowScreenShot=none
+FullScreenScreenShot=none
+RecordRegion=none
+RecordScreen=none
+RecordWindow=none
+RectangularRegionScreenShot=none
+WindowUnderCursorScreenShot=none
+
+[services][systemsettings.desktop]
+_launch=none

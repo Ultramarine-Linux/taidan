@@ -1,0 +1,16 @@
+// taking the user icon with the webcam, driven from Rust (`src/avatar.rs`)
+export global Camera {
+    // whether there is a camera to open
+    in property <bool> available;
+    // whether the camera dialog is shown
+    in property <bool> open;
+    // latest preview frame, empty until the camera starts
+    in property <image> frame;
+    // why the camera can't be used, if it can't
+    in property <string> error;
+
+    callback start();
+    callback stop();
+    // takes the photo, uses it as `Account.avatar`, and closes the camera
+    callback capture();
+}

@@ -6,17 +6,19 @@ use crate::prelude::*;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SetupImf;
 impl super::Step for SetupImf {
-    #[tracing::instrument]
+    #[tracing::instrument(skip(settings))]
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        if settings.ims.is_empty() || settings.nointernet {
+        // written into the skeleton the home was created from, see `write_to_skel`
+        if settings.ims.is_empty() || cfg.taidan0.systemd_homed {
             return Ok(());
         }
-        if let Err(e) = match cfg.i18n.imf {
+        let Some(settings) = &with_installed_ims(settings, cfg).await else { return Ok(()) };
+        if let Err(e) = match settings.imf {
             i18n::I18nImf::IBus => write_ibus_profile(settings).await,
             i18n::I18nImf::Fcitx5 => write_fcitx5_profile(settings).await,
         } {
@@ -26,105 +28,100 @@ impl super::Step for SetupImf {
     }
 }
 
-// kwinrc config for selecting fcitx5 as the virtual input
-const KWINRC_FCITX5: &[u8] = b"
-[Wayland]
-InputMethod[$e]=/usr/share/applications/fcitx5-wayland-launcher.desktop
-VirtualKeyboardEnabled=true
-";
+/// `settings` with only the input methods that are installed, when they couldn't be installed
+/// here (offline or without dnf) but the image may have them, [`None`] if that leaves none
+async fn with_installed_ims(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+) -> Option<crate::settings::Settings> {
+    if !settings.nointernet && !cfg.taidan0.skip_dnf {
+        return (!settings.ims.is_empty()).then(|| settings.clone());
+    }
+    let mut ims = vec![];
+    for name in &settings.ims {
+        let im = i18n::find_im(name);
+        let pkg = match settings.imf {
+            i18n::I18nImf::Fcitx5 => im.and_then(|im| im.fcitx5_pkg),
+            i18n::I18nImf::IBus => im.and_then(|im| im.ibus_pkg),
+        };
+        let Some(pkg) = pkg else { continue };
+        match tokio::process::Command::new("rpm").args(["-q", "--quiet", pkg]).status().await {
+            Ok(status) if status.success() => ims.push(name.clone()),
+            Ok(_) => tracing::info!(name, pkg, "input method isn't installed, not setting it up"),
+            Err(e) => tracing::warn!(?e, "cannot run rpm"),
+        }
+    }
+    (!ims.is_empty()).then(|| crate::settings::Settings { ims, ..settings.clone() })
+}
 
-async fn write_fcitx5_profile(
-    crate::settings::Settings {
-        username,
-        ims,
-        kb_layout,
-        kb_variant,
-        ..
-    }: &crate::settings::Settings,
-) -> Res<()> {
-    let default_group_name = "Default".to_string(); // FIXME: this should be configurable? (was t!("default"))
-    crate::pkexec(username, "mkdir", &["-p", &format!("/home/{username}/.config/fcitx5/")])
-        .await
-        .wrap_msg("cannot create ~/.config/fcitx5/")?;
+/// `kwriteconfig6` arguments, after `--file`, that select Fcitx5 as KWin's input method
+/// https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg?ref_type=heads
+const KWINRC_FCITX5: [[&str; 6]; 2] = [
+    [
+        "--group",
+        "Wayland",
+        "--key",
+        "InputMethod",
+        "--",
+        "/usr/share/applications/fcitx5-wayland-launcher.desktop",
+    ],
+    ["--group", "Wayland", "--key", "VirtualKeyboardEnabled", "--type=bool", "true"],
+];
 
-    let profile_path = format!("/home/{username}/.config/fcitx5/profile");
-    let mut p = tokio::process::Command::new("pkexec")
-        .args(["--user", username, "tee"])
-        .args(["-a", &profile_path])
-        .stdin(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| Err::FailToRunProgram("pkexec", e))?;
-    let mut buf = vec![];
-    buf.extend_from_slice(
-        format!(
+/// `~/.config/fcitx5/profile` with the keyboard layout and the chosen input methods
+fn fcitx5_profile(
+    crate::settings::Settings { ims, kb_layout, kb_variant, .. }: &crate::settings::Settings,
+) -> String {
+    let default_group_name = "Default"; // FIXME: this should be configurable? (was t!("default"))
+    let var = kb_variant.as_ref().map(|variant| format!("-{variant}")).unwrap_or_default();
+    let mut buf = format!(
+        "\
+            [Groups/0]\n\
+            # Group Name\n\
+            Name={default_group_name}\n\
+            # Layout\n\
+            Default Layout={kb_layout}{var}\n\
+            # Default Input Method\n\
+            DefaultIM=keyboard-{kb_layout}{var}\n\n\
+            [Groups/0/Items/0]\n\
+            # Name\n\
+            Name=keyboard-{kb_layout}{var}\n\
+            # Layout\n\
+            Layout=\n\n\
+        ",
+    );
+
+    let refs = ims.iter().filter_map(|im| i18n::find_im(im)?.fcitx5_ref);
+    for (i, im) in refs.enumerate() {
+        buf.push_str(&format!(
             "\
-                [Groups/0]\n\
-                # Group Name\n\
-                Name={default_group_name}\n\
-                # Layout\n\
-                Default Layout={kb_layout}{var}\n\
-                # Default Input Method\n\
-                DefaultIM=keyboard-{kb_layout}{var}\n\n\
-                [Groups/0/Items/0]\n\
+                [Groups/0/Items/{}]\n\
                 # Name\n\
-                Name=keyboard-{kb_layout}{var}\n\
+                Name={im}\n\
                 # Layout\n\
                 Layout=\n\n\
             ",
-            var = &kb_variant.as_ref().map(|variant| format!("-{variant}")).unwrap_or_default(),
-        )
-        .as_bytes(),
-    );
-
-    for (i, im) in ims.iter().enumerate() {
-        buf.extend_from_slice(
-            format!(
-                "\
-                    [Groups/0/Items/{}]\n\
-                    # Name\n\
-                    Name={}\n\
-                    # Layout\n\
-                    Layout=\n\n\
-                ",
-                i + 1,
-                i18n::str_to_im(&im).fcitx5_ref.unwrap()
-            )
-            .as_bytes(),
-        );
+            i + 1,
+        ));
     }
 
-    buf.extend_from_slice(format!("[GroupOrder]\n0={default_group_name}\n").as_bytes());
+    buf.push_str(&format!("[GroupOrder]\n0={default_group_name}\n"));
+    buf
+}
 
-    (p.stdin.as_mut().unwrap().write_all(&buf).await.map_err(Err::Io))
-        .wrap_msg("cannot write to pkexec tee stdin")?;
-    p.stdin.take().unwrap(); // drop the stream
-
-    let p = (p.wait_with_output().await)
-        .map_err(|e| Err::FailToRunProgram("pkexec", e))
-        .wrap_msg("cannot tee")?;
-
-    if !p.status.success() {
-        return Err(Err::ProgramFail {
-            name: "pkexec (tee)",
-            output: String::from_utf8_lossy(&p.stderr).to_string(),
-            rc: p.status.code(),
-        })
-        .wrap_message(|_| format!("failed to write to ~/.config/fcitx5/profile"));
-    }
-
-    // https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg?ref_type=heads
-    let kwinrc_path = format!("/home/{username}/.config/kwinrc");
+/// writes `content` to `path` as `user`, replacing what was there, so the file is theirs
+async fn write_as(user: &str, path: &str, content: &[u8]) -> Res<()> {
     let mut p = tokio::process::Command::new("pkexec")
-        .args(["--user", username, "tee"])
-        .args(["-a", &kwinrc_path])
+        .args(["--user", user, "tee", "--", path])
         .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| Err::FailToRunProgram("pkexec", e))?;
-    (p.stdin.as_mut().unwrap().write_all(KWINRC_FCITX5).await.map_err(Err::Io))
-        .wrap_msg("cannot write to pkexec tee stdin")?;
-    p.stdin.take().unwrap(); // drop the stream
+    if let Some(mut stdin) = p.stdin.take() {
+        (stdin.write_all(content).await.map_err(Err::Io))
+            .wrap_msg("cannot write to pkexec tee stdin")?;
+    }
 
     let p = (p.wait_with_output().await)
         .map_err(|e| Err::FailToRunProgram("pkexec", e))
@@ -136,43 +133,129 @@ async fn write_fcitx5_profile(
             output: String::from_utf8_lossy(&p.stderr).to_string(),
             rc: p.status.code(),
         })
-        .wrap_message(|_| format!("failed to write to ~/.config/kwinrc"));
+        .wrap_message(|_| format!("failed to write to {path}"));
     }
-
     Ok(())
 }
 
-async fn write_ibus_profile(
-    crate::settings::Settings { username, ims, .. }: &crate::settings::Settings,
-) -> Res<()> {
-    if ims.is_empty() {
+async fn write_fcitx5_profile(settings: &crate::settings::Settings) -> Res<()> {
+    let username = &settings.username;
+    let config = crate::a11y::home_of(username).await?.join(".config");
+    let fcitx5 = config.join("fcitx5");
+    crate::pkexec(username, "mkdir", [std::ffi::OsStr::new("-p"), fcitx5.as_os_str()])
+        .await
+        .wrap_msg("cannot create ~/.config/fcitx5/")?;
+
+    let profile_path = fcitx5.join("profile");
+    write_as(username, &profile_path.to_string_lossy(), fcitx5_profile(settings).as_bytes())
+        .await?;
+
+    // KWin is only the user's compositor on Plasma
+    if !crate::a11y::is_plasma() {
         return Ok(());
     }
+    let kwinrc = config.join("kwinrc");
+    let kwinrc = kwinrc.to_string_lossy();
+    for entry in KWINRC_FCITX5 {
+        // as the user, so the file they get is theirs
+        let mut args = vec!["-u", username, "--", "kwriteconfig6", "--file", &kwinrc];
+        args.extend(entry);
+        crate::root("runuser", &args).await.wrap_msg("cannot select Fcitx5 in kwinrc")?;
+    }
+    Ok(())
+}
 
-    let engines = ims
-        .iter()
-        .map(|s| format!("'{}'", i18n::str_to_im(s).ibus_ref.unwrap()))
+/// writes the input method config into `skel`, a copy of `/etc/skel` the new user's home is made
+/// from, for systemd-homed, where the home isn't mounted when [`SetupImf`] runs
+///
+/// # Errors
+/// - cannot write the files
+pub async fn write_to_skel(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    skel: &std::path::Path,
+) -> Res<bool> {
+    if settings.ims.is_empty() {
+        return Ok(false);
+    }
+    let Some(settings) = &with_installed_ims(settings, cfg).await else { return Ok(false) };
+    if settings.imf.is_ibus() {
+        return write_ibus_to_skel(settings, skel).await;
+    }
+    let config = skel.join(".config");
+    tokio::fs::create_dir_all(config.join("fcitx5")).await.map_err(Err::Io)?;
+    tokio::fs::write(config.join("fcitx5/profile"), fcitx5_profile(settings))
+        .await
+        .map_err(Err::Io)?;
+    if crate::a11y::is_plasma() {
+        let kwinrc = config.join("kwinrc");
+        let kwinrc = kwinrc.to_string_lossy();
+        for entry in KWINRC_FCITX5 {
+            let mut args = vec!["--file", &*kwinrc];
+            args.extend(entry);
+            super::acmd("kwriteconfig6", &args).await?;
+        }
+    }
+    Ok(true)
+}
+
+/// the `dconf write`s, joined for `bash -c`, that hand IBus the chosen engines, [`None`] if none of
+/// them have an IBus engine. IBus reads `preload-engines`, but GNOME (and Budgie) drive IBus from
+/// their own `input-sources`, ignoring it, so the engines go in there too after the layout
+fn ibus_dconf_script(
+    crate::settings::Settings { ims, kb_layout, kb_variant, .. }: &crate::settings::Settings,
+) -> Option<String> {
+    let engines: Vec<_> = ims.iter().filter_map(|s| i18n::find_im(s)?.ibus_ref).collect();
+    if engines.is_empty() {
+        return None;
+    }
+    let order = engines.iter().map(|r| format!("'{r}'")).collect::<Vec<_>>().join(", ");
+
+    // without an xkb source first GNOME would type through an IBus engine all the time
+    let layout = if kb_layout.is_empty() { "us" } else { kb_layout };
+    let xkb = match kb_variant.as_deref().filter(|v| !v.is_empty()) {
+        Some(variant) => format!("{layout}+{variant}"),
+        None => layout.to_owned(),
+    };
+    let sources = std::iter::once(format!("('xkb', '{xkb}')"))
+        .chain(engines.iter().map(|r| format!("('ibus', '{r}')")))
         .collect::<Vec<_>>()
         .join(", ");
 
-    // Use dbus-launch to run dconf commands as the target user
-    let dbus_args = format!(
+    Some(format!(
         "dconf write /desktop/ibus/general/use-system-keyboard-layout true && \
-        dconf write /desktop/ibus/general/engines-order \"[{engines}]\" && \
-        dconf write /desktop/ibus/general/preload-engines \"[{engines}]\""
-    );
+        dconf write /desktop/ibus/general/engines-order \"[{order}]\" && \
+        dconf write /desktop/ibus/general/preload-engines \"[{order}]\" && \
+        dconf write /org/gnome/desktop/input-sources/sources \"[{sources}]\""
+    ))
+}
+
+/// [`ibus_dconf_script`] into the dconf database in `skel`, through a D-Bus of its own like the
+/// theme's `gsettings`
+async fn write_ibus_to_skel(
+    settings: &crate::settings::Settings,
+    skel: &std::path::Path,
+) -> Res<bool> {
+    let Some(script) = ibus_dconf_script(settings) else { return Ok(false) };
+    tokio::fs::create_dir_all(skel.join(".config")).await.map_err(Err::Io)?;
+    let cmd = ["dbus-run-session", "--", "bash", "-c", &script].map(str::to_owned).to_vec();
+    let env = crate::a11y::in_home(skel, cmd);
+    let env = env.iter().map(String::as_str).collect::<Vec<_>>();
+    // not worth losing the rest of the skeleton over
+    if let Err(e) = super::acmd("env", &env).await {
+        tracing::warn!(?e, "cannot set the IBus engines");
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+async fn write_ibus_profile(settings: &crate::settings::Settings) -> Res<()> {
+    let username = &settings.username;
+    // dconf writes through its D-Bus service, which a bus of its own starts
+    let Some(dbus_args) = ibus_dconf_script(settings) else { return Ok(()) };
 
     let p = tokio::process::Command::new("pkexec")
-        .args([
-            "--user",
-            username,
-            "dbus-launch",
-            "--sh-syntax",
-            "--exit-with-session",
-            "bash",
-            "-c",
-            &dbus_args,
-        ])
+        .args(["--user", username, "dbus-run-session", "--", "bash", "-c", &dbus_args])
         .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| Err::FailToRunProgram("pkexec", e))
@@ -180,16 +263,64 @@ async fn write_ibus_profile(
 
     let p = (p.wait_with_output().await)
         .map_err(|e| Err::FailToRunProgram("pkexec", e))
-        .wrap_msg("cannot run dbus-launch with pkexec")?;
+        .wrap_msg("cannot run dbus-run-session with pkexec")?;
 
     if !p.status.success() {
         return Err(Err::ProgramFail {
-            name: "pkexec (tee)",
+            name: "pkexec (dbus-run-session)",
             output: String::from_utf8_lossy(&p.stderr).to_string(),
             rc: p.status.code(),
         })
-        .wrap_message(|_| format!("failed to write to ~/.config/kwinrc"));
+        .wrap_msg("failed to set the IBus engines");
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn profile_lists_ims() {
+        let settings = crate::settings::Settings {
+            kb_layout: "us".into(),
+            ims: vec!["Pinyin".into(), "bogus".into(), "Mozc".into()],
+            ..Default::default()
+        };
+        let profile = fcitx5_profile(&settings);
+        assert!(profile.contains("Default Layout=us\n"));
+        assert!(profile.contains("[Groups/0/Items/1]\n# Name\nName=pinyin\n"));
+        assert!(profile.contains("[Groups/0/Items/2]\n# Name\nName=mozc\n"));
+        assert!(!profile.contains("Items/3"));
+    }
+
+    #[test]
+    fn ibus_engines_go_to_gnome_input_sources() {
+        let settings = crate::settings::Settings {
+            kb_layout: "de".into(),
+            kb_variant: Some("nodeadkeys".into()),
+            ims: vec!["Pinyin".into(), "bogus".into(), "Mozc".into()],
+            ..Default::default()
+        };
+        let script = ibus_dconf_script(&settings).unwrap();
+        let refs: Vec<_> = ["Pinyin", "Mozc"]
+            .iter()
+            .map(|im| i18n::find_im(im).unwrap().ibus_ref.unwrap())
+            .collect();
+        let sources = format!(
+            "/org/gnome/desktop/input-sources/sources \"[('xkb', 'de+nodeadkeys'), ('ibus', '{}'), ('ibus', '{}')]\"",
+            refs[0], refs[1],
+        );
+        assert!(script.contains(&sources), "{script}");
+        let preload = format!("preload-engines \"['{}', '{}']\"", refs[0], refs[1]);
+        assert!(script.contains(&preload), "{script}");
+    }
+
+    #[test]
+    fn no_ibus_engines_writes_nothing() {
+        let settings =
+            crate::settings::Settings { ims: vec!["bogus".into()], ..Default::default() };
+        assert!(ibus_dconf_script(&settings).is_none());
+    }
 }

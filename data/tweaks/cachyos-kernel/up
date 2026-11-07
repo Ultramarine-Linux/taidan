@@ -1,6 +1,9 @@
 #!/bin/sh
-# vi: ft=sh noet ci pi sts=0 sw=2 ts=2
+# $1 is 1 to turn the tweak on and 0 to turn it back off, the settings are on stdin as JSON.
+# Taidan only runs it with 0 when an earlier, unfinished attempt turned it on
 
-if [[ $1 -eq 1 ]]; then 
-	um tweaks enable cachyos-kernel
+if [ "$1" = 1 ]; then
+	um tweaks enable -y cachyos-kernel
+else
+	um tweaks disable -y cachyos-kernel
 fi

@@ -1,0 +1,8 @@
+# seeded into the OOBE session's own config by taidan-initial-setup.service, the accessibility page
+# writes the rest
+
+[Plugins]
+# both show every window with a close button, from Meta+W, Meta+G, Ctrl+F9, the top left corner
+# or a touchpad swipe
+overviewEnabled=false
+windowviewEnabled=false

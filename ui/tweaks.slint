@@ -1,0 +1,19 @@
+export struct TweakItem {
+    id: string,
+    // translation ids
+    name: string,
+    desc: string,
+    on: bool,
+}
+
+// distro tweaks from /usr/share/taidan/tweaks, driven from Rust (`src/tweaks.rs`)
+export global Tweaks {
+    in property <[TweakItem]> items;
+    // translation ids of the names of the ones turned on, for the summary
+    in property <[string]> enabled-names;
+    // whether the dialog is open, from the summary page
+    in-out property <bool> open;
+
+    // turns a tweak on or off, which goes straight to the settings
+    callback set(index: int, on: bool);
+}

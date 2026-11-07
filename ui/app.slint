@@ -1,0 +1,335 @@
+import { AccessibilityPage, AccessibilityDialog, A11yMoreDialog } from "pages/0005_accessibility.slint";
+import { A11y } from "a11y.slint";
+import { WelcomePage } from "pages/0030_welcome.slint";
+import { ThemePage } from "pages/0035_theme.slint";
+import { Lang } from "lang.slint";
+import { Cfg } from "cfg.slint";
+import { Account } from "account.slint";
+import { Step, StepHdl } from "page.slint";
+import { LanguagePage } from "pages/0010_language.slint";
+import { Theme, Tokens } from "slintcn/theme/tokens.slint";
+import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
+import { Camera } from "camera.slint";
+import { KeyboardPage } from "pages/0020_keyboard.slint";
+import { PasswordPage } from "pages/0050_password.slint";
+import { NetworkPage, PasswordDialog, EnterpriseDialog, HiddenDialog, OfflineDialog, ProxyDialog, IpDialog } from "pages/0060_network.slint";
+import { Network, NetState } from "network.slint";
+import { TimezonePage } from "pages/0055_timezone.slint";
+import { Tz } from "timezone.slint";
+import { LocationPage } from "pages/0070_location.slint";
+import { DriversPage } from "pages/0100_drivers.slint";
+import { TweaksDialog } from "pages/0110_tweaks.slint";
+import { Tweaks } from "tweaks.slint";
+import { SummaryPage } from "pages/0120_summary.slint";
+import { InstallingPage } from "pages/0130_installing.slint";
+import { DonePage } from "pages/0140_done.slint";
+import { ErrorPage } from "pages/0150_error.slint";
+import { Install, InstallState, Drivers, Location } from "install.slint";
+import { TdnText, TdnBtn, Modal } from "components.slint";
+import { Actions } from "actions.slint";
+import { Appearance } from "appearance.slint";
+import { ImsDialog } from "pages/0025_ims.slint";
+import { Ims } from "ims.slint";
+export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y, Appearance, Ims }
+
+export component AppWindow inherits Window {
+    // set from Rust to the first page not in `skip_pages`, Next and Back skip those too
+    // (`Cfg.next-page` and `Cfg.prev-page`)
+    in-out property <int> pagenum: 0;
+    title: Lang.t("window-title", [{ key: "distro", value: Cfg.distro }]);
+    // set from Rust, dev runs keep the title bar to move and close the window
+    in property <bool> framed: false;
+    no-frame: !self.framed;
+    icon: Cfg.distro_icon();
+    background: Tokens.color-background;
+    // from the `vercel-geist-fonts` package unless `font` in /etc/taidan.toml names the distro's,
+    // scripts the font lacks (CJK, …) fall back to system fonts. Atkinson Hyperlegible Next is from
+    // `atkinson-hyperlegible-next-fonts` and wins over both, since someone asked for it
+    default-font-family: A11y.legible-font ? "Atkinson Hyperlegible Next" : Cfg.get_string("font", "Geist");
+    // shown as a standalone window in the middle of the kiosk session, the designs are 600×500 and
+    // `Tokens.scale` fits that to the screen (`src/screen.rs`), the size is locked to keep it 6:5
+    preferred-width: 600 * Tokens.unit;
+    preferred-height: 500 * Tokens.unit;
+    // set from Rust, `Tokens` itself isn't exported as its easings can't be
+    in-out property <float> ui-scale <=> Tokens.scale;
+    min-width: self.preferred-width;
+    max-width: self.preferred-width;
+    min-height: self.preferred-height;
+    max-height: self.preferred-height;
+    // the designs use 14px and all `rem` sizes derive from this
+    default-font-size: 14 * Tokens.unit;
+
+    property <int> summary-page: 11;
+    // pages that are jumped to, rather than reached with Next and Back
+    property <int> installing-page: 12;
+    property <int> done-page: 13;
+    property <int> error-page: 14;
+
+    // move keyboard focus to the page being shown, unless a dialog has it
+    function focus-page() {
+        if Modal.open { return; }
+        if pagenum == 0 { accessibility.focus(); }
+        else if pagenum == 1 { language.focus(); }
+        else if pagenum == 2 { keyboard.focus(); }
+        else if pagenum == 3 { welcome.focus(); }
+        else if pagenum == 4 { theme.focus-picked(); }
+        else if pagenum == 5 { whoareyou.focus(); }
+        else if pagenum == 6 { password.focus(); }
+        else if pagenum == 7 { timezone.focus(); }
+        else if pagenum == 8 { network.focus(); }
+        else if pagenum == 9 { location.focus(); }
+        else if pagenum == 10 { drivers.focus(); }
+        else if pagenum == summary-page { summary.focus(); }
+        else if pagenum == installing-page { installing.focus(); }
+        else if pagenum == done-page { done.focus(); }
+        else if pagenum == error-page { error.focus(); }
+    }
+    changed pagenum => {
+        Modal.page = pagenum;
+        Network.page-changed();
+        focus-page();
+        if pagenum == 7 { Tz.refresh(); }
+        // with the time zone page skipped, the summary still shows the system's
+        if pagenum == summary-page && Tz.current.id == "" { Tz.refresh(); }
+        if pagenum == 8 { Network.refresh(); }
+    }
+    init => {
+        Modal.page = pagenum;
+        focus-page();
+    }
+
+    // apply the text options here, `Tokens` can't be set from the global
+    property <bool> larger-text: A11y.larger-text;
+    changed larger-text => { Tokens.text-scale = larger-text ? 1.0 : 0.875; }
+    property <bool> reduce-motion: A11y.reduce-motion;
+    changed reduce-motion => { Tokens.reduce-motion = reduce-motion; }
+
+    // back to whatever opened a dialog when it closes (`DialogOpener`), or else to the page
+    property <bool> dialog-open: Modal.open;
+    changed dialog-open => {
+        if dialog-open {
+            Modal.returned = false;
+        } else {
+            refocus.running = true;
+        }
+    }
+    // a moment later, so the opener's own `changed` has run, whichever order they go in
+    refocus := Timer {
+        interval: 0ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            if !Modal.returned { focus-page(); }
+            Modal.returned = false;
+        }
+    }
+
+    // leave the installing page once the installation ends
+    property <InstallState> install-state: Install.state;
+    changed install-state => {
+        if install-state == InstallState.done { pagenum = done-page; }
+        else if install-state == InstallState.failed { pagenum = error-page; }
+    }
+
+    MenuBar {
+        visible: false;
+        Menu {
+            MenuItem {
+                title: Lang.t("menu-open-terminal", []);
+                activated => { Actions.open-terminal(); }
+                shortcut: @keys(Alt + Shift + T);
+            }
+            // the same as Plasma's, for anyone who can't find the screen reader tile
+            MenuItem {
+                title: Lang.t("menu-toggle-screen-reader", []);
+                activated => {
+                    A11y.screen-reader = !A11y.screen-reader;
+                    A11y.changed();
+                }
+                shortcut: @keys(Meta + Alt + S);
+            }
+        }
+    }
+
+    accessibility := AccessibilityPage {
+        index: 0;
+        current: pagenum;
+        next_page => { pagenum = Cfg.next-page(pagenum); }
+    }
+
+    language := LanguagePage {
+        index: 1;
+        current: pagenum;
+        next_page => { pagenum = Cfg.next-page(pagenum); }
+    }
+
+    keyboard := KeyboardPage {
+        index: 2;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
+    }
+
+    welcome := WelcomePage {
+        index: 3;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
+    }
+
+    theme := ThemePage {
+        index: 4;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
+    }
+
+    whoareyou := WhoAreYouPage {
+        index: 5;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => {
+            Account.save();
+            pagenum = Cfg.next-page(pagenum);
+        }
+    }
+
+    password := PasswordPage {
+        index: 6;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => {
+            Account.save();
+            pagenum = Cfg.next-page(pagenum);
+        }
+    }
+
+    timezone := TimezonePage {
+        index: 7;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => {
+            Tz.save();
+            pagenum = Cfg.next-page(pagenum);
+        }
+    }
+
+    network := NetworkPage {
+        index: 8;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => {
+            Network.save(!Network.online);
+            pagenum = Cfg.next-page(pagenum);
+        }
+    }
+
+    location := LocationPage {
+        index: 9;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
+    }
+
+    drivers := DriversPage {
+        index: 10;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => { pagenum = Cfg.next-page(pagenum); }
+    }
+
+    summary := SummaryPage {
+        index: summary-page;
+        current: pagenum;
+        prev_page => { pagenum = Cfg.prev-page(pagenum); }
+        next_page => {
+            Install.start();
+            pagenum = installing-page;
+        }
+    }
+
+    installing := InstallingPage {
+        index: installing-page;
+        current: pagenum;
+    }
+
+    done := DonePage {
+        index: done-page;
+        current: pagenum;
+    }
+
+    error := ErrorPage {
+        index: error-page;
+        current: pagenum;
+        // back to the summary, to change what made it fail before trying again
+        prev_page => {
+            Install.reset();
+            pagenum = summary-page;
+        }
+        // the retry button
+        next_page => {
+            Install.start();
+            pagenum = installing-page;
+        }
+    }
+
+    if Camera.open: CameraDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.password-ssid != "": PasswordDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.hidden-open: HiddenDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.enterprise-open: EnterpriseDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.proxy-open: ProxyDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.ip-open: IpDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Tweaks.open: TweaksDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Ims.open: ImsDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if Network.offline-prompt: OfflineDialog {
+        width: 100%;
+        height: 100%;
+        skipped => {
+            Network.offline-prompt = false;
+            Network.save(true);
+            pagenum = Cfg.next-page(pagenum);
+        }
+    }
+
+    if A11y.open: AccessibilityDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if A11y.more-open: A11yMoreDialog {
+        width: 100%;
+        height: 100%;
+    }
+}

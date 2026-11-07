@@ -10,19 +10,24 @@ static NVIDIA_PREFIXES: std::sync::LazyLock<std::collections::HashMap<&str, &str
             ("NV", "unsupported"),
             ("MCP", "unsupported"),
             ("G7", "unsupported"),
-            ("G8", "340xx"),
+            // 340xx isn't packaged by RPM Fusion anymore
+            ("G8", "unsupported"),
             // wtf this goes from like 8000 to 100 series
-            ("G9", "340xx"),
+            ("G9", "unsupported"),
             // finally, a sane naming scheme
             // Tesla GPUs
-            ("GT", "340xx"),
+            ("GT", "unsupported"),
             // Fermi GPUs, in case you like burning your house down
             ("GF", "390xx"),
             // Kepler GPUs
             // now we're finally up to the modern era
             ("GK", "470xx"),
-            // The rest should be supported by the latest driver, at least as of
-            // late 2023
+            // Maxwell, Pascal and Volta, dropped in the 590 driver
+            ("GM", "580xx"),
+            ("GP", "580xx"),
+            ("GV", "580xx"),
+            // Turing and newer should be supported by the latest driver, at least as of
+            // late 2026
         ]
         .into_iter()
         .collect()
@@ -35,21 +40,28 @@ pub struct Drivers;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Codecs;
 impl super::Step for DriversCodecs {
-    #[tracing::instrument]
+    #[tracing::instrument(skip(settings, sender))]
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,
         cfg: &crate::cfg::Config,
-        _: &C,
+        sender: &C,
     ) -> Res<()> {
         if !settings.install_codecs_drivers || settings.nointernet {
             return Ok(());
         }
-        if let Err(e) = Drivers::setup_nvidia().await {
-            tracing::warn!(?e, "cannot setup nvidia drivers");
+        let pci = pci_devices().await;
+        let mut needs_reboot = false;
+        match Drivers::setup_nvidia(cfg, &pci).await {
+            Ok(built) => needs_reboot |= built,
+            Err(e) => tracing::warn!(?e, "cannot setup nvidia drivers"),
         }
-        if let Err(e) = Drivers::setup_broadcom().await {
-            tracing::warn!(?e, "cannot setup broadcom drivers");
+        match Drivers::setup_broadcom(cfg, &pci).await {
+            Ok(built) => needs_reboot |= built,
+            Err(e) => tracing::warn!(?e, "cannot setup broadcom drivers"),
+        }
+        if needs_reboot {
+            sender.send(crate::InstallMsg::NeedsReboot);
         }
         // FIXME: refactor this to somewhere else not in this file
         // also this is done inside `_05_dnfdownloadapps.rs`
@@ -58,11 +70,223 @@ impl super::Step for DriversCodecs {
     }
 }
 
+/// hardware that needs extra drivers, as installed by [`DriversCodecs`]
+#[derive(Clone, Copy, Debug, Default)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct Hardware {
+    pub nvidia: bool,
+    pub broadcom_wifi: bool,
+    pub broadcom_bluetooth: bool,
+}
+
+/// detect hardware that [`DriversCodecs`] would install drivers for
+pub async fn detect_hardware() -> Hardware {
+    let pci = pci_devices().await;
+    Hardware {
+        nvidia: has_nvidia_gpu(&pci),
+        broadcom_wifi: has_wl_only_wifi(&pci),
+        broadcom_bluetooth: has_broadcom_bluetooth(&pci, &usb_interfaces().await),
+    }
+}
+
+const PCI_VENDOR_NVIDIA: u16 = 0x10de;
+const PCI_VENDOR_BROADCOM: u16 = 0x14e4;
+
+/// Broadcom Wi-Fi chips that only `wl` (`broadcom-wl`) can drive on Fedora.
+///
+/// This is `wl`'s device list minus the chips `brcmsmac` handles (4727, 0576, 4353, 4357),
+/// which work out of the box with linux-firmware. The b43 chips stay in, since Fedora doesn't
+/// ship the proprietary b43 firmware they need. Newer chips are `brcmfmac`'s and aren't
+/// supported by `wl` at all. See <https://wiki.debian.org/wl>.
+const WL_ONLY_DEVICES: &[u16] = &[
+    0x4311, 0x4312, // BCM4311
+    0x4315, // BCM4312
+    0x4328, 0x4329, 0x432a, // BCM4321
+    0x432b, 0x432c, 0x432d, // BCM4322
+    0x4358, // BCM43227
+    0x4359, // BCM43228
+    0x4365, // BCM43142
+    0x4331, // BCM4331
+    0x43b1, // BCM4352
+    0x43a0, 0x4360, // BCM4360
+];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PciDevice {
+    vendor: u16,
+    device: u16,
+    /// class, subclass and prog-if, e.g. `0x030000` for a VGA controller
+    class: u32,
+}
+
+impl PciDevice {
+    /// read a device from its directory in `/sys/bus/pci/devices`
+    async fn read(dir: &std::path::Path) -> Option<Self> {
+        let read = async |name| {
+            let s = tokio::fs::read_to_string(dir.join(name)).await.ok()?;
+            u32::from_str_radix(s.trim().trim_start_matches("0x"), 16).ok()
+        };
+        Some(Self {
+            vendor: read("vendor").await?.try_into().ok()?,
+            device: read("device").await?.try_into().ok()?,
+            class: read("class").await?,
+        })
+    }
+
+    /// a display controller that the NVIDIA driver drives, i.e. VGA or 3D, but not e.g. the
+    /// HDMI audio function or an nForce chipset
+    const fn is_nvidia_gpu(self) -> bool {
+        self.vendor == PCI_VENDOR_NVIDIA && matches!(self.class >> 8, 0x0300 | 0x0302)
+    }
+}
+
+/// every PCI device in sysfs, or none if it can't be read
+async fn pci_devices() -> Vec<PciDevice> {
+    let mut dir = match tokio::fs::read_dir("/sys/bus/pci/devices").await {
+        Ok(dir) => dir,
+        Err(e) => {
+            tracing::warn!(?e, "cannot list PCI devices");
+            return vec![];
+        }
+    };
+    let mut devices = vec![];
+    while let Ok(Some(entry)) = dir.next_entry().await {
+        match PciDevice::read(&entry.path()).await {
+            Some(dev) => devices.push(dev),
+            None => tracing::debug!(path = ?entry.path(), "cannot read PCI device"),
+        }
+    }
+    devices
+}
+
+fn has_nvidia_gpu(pci: &[PciDevice]) -> bool {
+    pci.iter().any(|d| d.is_nvidia_gpu())
+}
+
+fn has_wl_only_wifi(pci: &[PciDevice]) -> bool {
+    pci.iter().any(|d| d.vendor == PCI_VENDOR_BROADCOM && WL_ONLY_DEVICES.contains(&d.device))
+}
+
+/// USB vendors whose vendor-specific Bluetooth interfaces are Broadcom chips that need patchram
+/// firmware (`broadcom-bt-firmware`), Broadcom's own and the rebrands. From the
+/// `BTUSB_BCM_PATCHRAM` entries in the kernel's `drivers/bluetooth/btusb_main.c`. Apple's are
+/// left out, `btusb` doesn't load firmware for them
+const BCM_PATCHRAM_USB_VENDORS: &[u16] = &[
+    0x0a5c, // Broadcom
+    0x0489, // Foxconn / Hon Hai
+    0x04ca, // Lite-On
+    0x050d, // Belkin
+    0x0930, // Toshiba
+    0x0b05, // ASUS
+    0x0bb4, // HTC
+    0x105b, // Foxconn / Lenovo
+    0x13d3, // IMC Networks
+    0x413c, // Dell
+];
+
+/// a USB interface, e.g. `1-4:1.0` in `/sys/bus/usb/devices`, with its device's ids
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct UsbInterface {
+    vendor: u16,
+    product: u16,
+    /// class, subclass and protocol
+    class: [u8; 3],
+}
+
+impl UsbInterface {
+    /// read the interface `name` from `devices`, `None` if it isn't one
+    async fn read(devices: &std::path::Path, name: &str) -> Option<Self> {
+        let (device, _) = name.split_once(':')?;
+        let intf = devices.join(name);
+        let device = devices.join(device);
+        let read = async |path: std::path::PathBuf| {
+            let s = tokio::fs::read_to_string(path).await.ok()?;
+            u16::from_str_radix(s.trim(), 16).ok()
+        };
+        let class = async |name| u8::try_from(read(intf.join(name)).await?).ok();
+        Some(Self {
+            vendor: read(device.join("idVendor")).await?,
+            product: read(device.join("idProduct")).await?,
+            class: [
+                class("bInterfaceClass").await?,
+                class("bInterfaceSubClass").await?,
+                class("bInterfaceProtocol").await?,
+            ],
+        })
+    }
+
+    /// matches `btusb`'s Broadcom patchram entries
+    fn is_broadcom_bluetooth(self) -> bool {
+        // Broadcom BCM20702B0 (Dynex/Insignia), the one listed by its product id
+        (self.vendor == 0x19ff && self.product == 0x0239)
+            || (BCM_PATCHRAM_USB_VENDORS.contains(&self.vendor) && self.class == [0xff, 0x01, 0x01])
+    }
+}
+
+/// every USB interface in sysfs, or none if it can't be read
+async fn usb_interfaces() -> Vec<UsbInterface> {
+    let devices = std::path::Path::new("/sys/bus/usb/devices");
+    let mut dir = match tokio::fs::read_dir(devices).await {
+        Ok(dir) => dir,
+        Err(e) => {
+            tracing::warn!(?e, "cannot list USB devices");
+            return vec![];
+        }
+    };
+    let mut interfaces = vec![];
+    while let Ok(Some(entry)) = dir.next_entry().await {
+        // devices and hubs have no `:` in their names, they're read through their interfaces
+        if let Some(intf) = UsbInterface::read(devices, &entry.file_name().to_string_lossy()).await
+        {
+            interfaces.push(intf);
+        }
+    }
+    interfaces
+}
+
+/// a Broadcom Bluetooth controller that needs `broadcom-bt-firmware`, usually over USB, but a
+/// few are PCI
+fn has_broadcom_bluetooth(pci: &[PciDevice], usb: &[UsbInterface]) -> bool {
+    // 0x0d11 is a Bluetooth controller
+    pci.iter().any(|d| d.vendor == PCI_VENDOR_BROADCOM && d.class >> 8 == 0x0d11)
+        || usb.iter().any(|i| i.is_broadcom_bluetooth())
+}
+
 // NOTE: added during `_05_dnfdownloadapps.rs`
 impl Codecs {
     pub const fn codecs() -> &'static [&'static str] {
         &["@multimedia"]
     }
+}
+
+/// how [`install_pkgs`] installed packages
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Installed {
+    /// with dnf, so akmods builds kmods on the running system
+    Dnf,
+    /// layered with rpm-ostree, which builds kmods in the transaction and needs a reboot
+    Ostree,
+    /// not at all, since the config skips dnf on a non-atomic system
+    Skipped,
+}
+
+/// install packages with rpm-ostree on atomic systems, or dnf unless the config skips it
+async fn install_pkgs(cfg: &crate::cfg::Config, pkgs: &[&str]) -> Res<Installed> {
+    if super::is_ostree().await {
+        // idempotent, so a retried install doesn't fail on packages it already layered
+        let mut args = vec!["install", "-y", "--idempotent"];
+        args.extend_from_slice(pkgs);
+        root("rpm-ostree", &args).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
+        return Ok(Installed::Ostree);
+    }
+    if cfg.taidan0.skip_dnf {
+        tracing::info!(?pkgs, "skip_dnf is set, not installing driver packages");
+        return Ok(Installed::Skipped);
+    }
+    let mut args = vec!["in", "-y", "--allowerasing", "--best"];
+    args.extend_from_slice(pkgs);
+    root("dnf", &args).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
+    Ok(Installed::Dnf)
 }
 
 impl Drivers {
@@ -76,24 +300,26 @@ impl Drivers {
         "latest"
     }
 
-    async fn check_nvidia_gpu() -> bool {
-        Command::new("sh")
-            .args(["-c", "lspci | grep -q -i NVIDIA"])
-            .status()
-            .await
-            .is_ok_and(|s| s.success())
-    }
-
     async fn get_nvidia_chipset() -> Res<String> {
-        Ok(String::from_utf8_lossy(&Command::new("sh").arg("-c").arg("lspci | grep -i NVIDIA | head -n 1 | cut -d ':' -f 3 | cut -d '[' -f 1 | sed -e 's/^[[:space:]]*//'").stdout(std::process::Stdio::piped()).output().await.map_err(|e| Err::FailToRunProgram("sh", e)).wrap_msg("cannot detect nvidia chipset")?.stdout.rsplit(|&c| c == b' ').next().expect("malformatted output from shell").to_vec()).to_string())
+        let out = Command::new("lspci")
+            .output()
+            .await
+            .map_err(|e| Err::FailToRunProgram("lspci", e))
+            .wrap_msg("cannot detect nvidia chipset")?;
+        Ok(nvidia_chipset(&String::from_utf8_lossy(&out.stdout)).unwrap_or_default().to_owned())
     }
 
     ///    Returns a list of Nvidia packages to install
-    async fn list_nvidia_packages() -> Res<Vec<String>> {
+    ///
+    /// Returns `None` if no packaged driver supports the GPU.
+    async fn list_nvidia_packages() -> Res<Option<Vec<String>>> {
         let mut pkgs = vec!["nvidia-gpu-firmware".into(), "libva-nvidia-driver".into()];
         let chipset = Self::get_nvidia_chipset().await?;
         match Self::get_nvidia_driver(&chipset) {
-            "unsupported" => (),
+            "unsupported" => {
+                tracing::info!(chipset, "Nvidia GPU is too old for any packaged driver");
+                return Ok(None);
+            }
             // TODO: nvidia-driver
             "latest" => pkgs.extend_from_slice(&[
                 "akmod-nvidia".into(),
@@ -106,107 +332,259 @@ impl Drivers {
                 format!("xorg-x11-drv-nvidia-{v}-cuda"),
             ]),
         }
-        Ok(pkgs)
+        Ok(Some(pkgs))
     }
 
-    async fn is_ostree() -> bool {
-        tokio::fs::try_exists("/ostree").await.unwrap_or_default()
-    }
-
-    async fn setup_nvidia_ostree() -> Res<()> {
-        let pkgs = Self::list_nvidia_packages().await?;
-        let mut args = vec!["install", "-y"];
-        args.extend(pkgs.iter().map(String::as_str));
-        root("rpm-ostree", &args).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
+    async fn setup_nvidia_kargs() -> Res<()> {
+        // append-if-missing so a retry doesn't duplicate kargs. rpm-ostree exits 0 on no changes
         root(
             "rpm-ostree",
             &[
                 "kargs",
-                "--append=rd.driver.blacklist=nouveau",
-                "--append=modprobe.blacklist=nouveau",
-                "--append=nvidia-drm.modeset=1",
-                "initcall_blacklist=simpledrm_platform_driver_init",
+                "--append-if-missing=rd.driver.blacklist=nouveau",
+                "--append-if-missing=modprobe.blacklist=nouveau",
+                "--append-if-missing=nvidia-drm.modeset=1",
+                "--append-if-missing=initcall_blacklist=simpledrm_platform_driver_init",
             ],
         )
         .await?;
         Ok(())
     }
 
-    async fn setup_nvidia() -> Res<()> {
+    /// the kernel that boots next, which may be newer than the running one if an earlier attempt
+    /// or the image installed one. Updates from [`super::DownloadUpdates`] only install on the
+    /// restart, then akmods builds the module for their kernel while booting
+    async fn next_kernel() -> Res<String> {
+        // grubby reads the boot loader entries, which only root may
+        let out = crate::root_output("grubby", ["--default-kernel"]).await;
+        if let Ok(out) = &out
+            && let Some(kver) = out.trim().strip_prefix("/boot/vmlinuz-")
+        {
+            return Ok(kver.to_owned());
+        }
+        tracing::warn!(?out, "cannot get the default kernel from grubby, using the running one");
+        let kver = tokio::fs::read_to_string("/proc/sys/kernel/osrelease")
+            .await
+            .map_err(|e| Err::Message(format!("cannot read kernel version: {e}")))?;
+        Ok(kver.trim().to_owned())
+    }
+
+    /// Waits for akmods to build the given kernel module, then checks that it's there.
+    ///
+    /// The akmod's `%posttrans` starts a build in the background, a second `akmods` waits on its
+    /// lock and skips kmods that are already up to date, so this also builds it if that didn't.
+    async fn kmod_built(module: &str) -> Res<bool> {
+        let kver = Self::next_kernel().await?;
+        tracing::info!(kver, module, "Waiting for akmods to build the kernel module");
+        if let Err(e) = root("akmods", ["--kernels", &kver]).await {
+            tracing::warn!(?e, "akmods failed");
+        }
+        Ok(Command::new("modinfo")
+            .args(["-k", &kver, "-n", module])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .await
+            .is_ok_and(|s| s.success()))
+    }
+
+    /// Returns whether the kernel module is ready, so a reboot would load it.
+    async fn setup_nvidia(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<bool> {
         tracing::info!("Setting up Nvidia drivers");
         let primary_gpu = std::env::var("STELLAR_OPTION").is_ok_and(|x| x == "1");
-        if !Self::check_nvidia_gpu().await {
+        if !has_nvidia_gpu(pci) {
             tracing::info!("No Nvidia GPU detected");
-            return Ok(());
+            return Ok(false);
         }
-        if Self::is_ostree().await {
-            tracing::debug!("ostree detected");
-            return Self::setup_nvidia_ostree().await;
+        let Some(pkgs) = Self::list_nvidia_packages().await? else {
+            return Ok(false);
+        };
+        let pkgs: Vec<_> = pkgs.iter().map(String::as_str).collect();
+        match install_pkgs(cfg, &pkgs).await? {
+            Installed::Dnf => {}
+            Installed::Skipped => return Ok(false),
+            Installed::Ostree => {
+                // the kmod is built inside the rpm-ostree transaction, which needs a reboot anyway
+                Self::setup_nvidia_kargs().await?;
+                return Ok(true);
+            }
         }
-
-        let pkgs = Self::list_nvidia_packages().await?;
-        let mut args = vec!["in", "-y", "--allowerasing", "--best"];
-        args.extend(pkgs.iter().map(String::as_str));
-        root("dnf", &args).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
 
         if primary_gpu {
             root(
                 "sh",
-                &[r#"
+                &[
+                    "-c",
+                    r#"
                     cp -p /usr/share/X11/xorg.conf.d/nvidia.conf /etc/X11/xorg.conf.d/nvidia.conf
                     sed -i '10i\\\tOption "PrimaryGPU" "yes"' /etc/X11/xorg.conf.d/nvidia.conf
-                "#],
+                "#,
+                ],
             )
             .await
             .wrap_msg("cannot set nvidia as primary gpu")?;
         }
 
-        Ok(())
-    }
-
-    async fn check_boardcom_wifi() -> bool {
-        Command::new("sh")
-            .arg("-c")
-            .arg("lspci | grep -q -i Network | grep -q -i Broadcom")
-            .status()
-            .await
-            .is_ok_and(|s| s.success())
-    }
-    async fn check_boardcom_bluetooth() -> bool {
-        Command::new("sh")
-            .arg("-c")
-            .arg("lspci | grep -q -i Bluetooth| grep -q -i Broadcom")
-            .status()
-            .await
-            .is_ok_and(|s| s.success())
-    }
-
-    async fn setup_broadcom() -> Res<()> {
-        if Self::check_boardcom_wifi().await {
-            tracing::info!("Setting up broadcom wifi drivers");
-            root("dnf", &["in", "-y", "broadcom-wl", "akmod-wl"])
-                .await
-                .wrap_msg("fail to install broadcom wifi drivers")?;
+        let built = Self::kmod_built("nvidia").await?;
+        if !built {
+            tracing::warn!("Nvidia kernel module isn't built, not asking for a reboot");
         }
-        if Self::check_boardcom_bluetooth().await {
+        Ok(built)
+    }
+
+    /// Returns whether a reboot would load the drivers, i.e. the `wl` kernel module is ready or
+    /// rpm-ostree layered the packages.
+    async fn setup_broadcom(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<bool> {
+        let mut built = false;
+        if has_wl_only_wifi(pci) {
+            tracing::info!("Setting up broadcom wifi drivers");
+            // broadcom-wl blacklists the in-kernel drivers, so wl only takes over after a reboot
+            built = match install_pkgs(cfg, &["broadcom-wl", "akmod-wl"])
+                .await
+                .wrap_msg("fail to install broadcom wifi drivers")?
+            {
+                Installed::Dnf => Self::kmod_built("wl").await?,
+                // built inside the rpm-ostree transaction
+                Installed::Ostree => true,
+                Installed::Skipped => false,
+            };
+            if !built {
+                tracing::warn!("wl kernel module isn't built, not asking for a reboot");
+            }
+        }
+        if has_broadcom_bluetooth(pci, &usb_interfaces().await) {
             tracing::info!("Setting up broadcom bluetooth drivers");
-            root("dnf", &["in", "-y", "broadcom-bt-firmware"])
+            let installed = install_pkgs(cfg, &["broadcom-bt-firmware"])
                 .await
                 .wrap_msg("fail to install broadcom bluetooth drivers")?;
+            // layered packages only show up after a reboot
+            built |= installed == Installed::Ostree;
         }
-        Ok(())
+        Ok(built)
     }
+}
+
+/// the chip of the first NVIDIA GPU in `lspci`'s output, e.g. `GA106` from
+/// `01:00.0 VGA compatible controller: NVIDIA Corporation GA106 [GeForce RTX 3060] (rev a1)`
+fn nvidia_chipset(lspci: &str) -> Option<&str> {
+    lspci
+        .lines()
+        .filter(|l| l.contains("VGA compatible controller") || l.contains("3D controller"))
+        .filter_map(|l| l.split_once(": ")?.1.strip_prefix("NVIDIA Corporation "))
+        .find_map(|desc| desc.split_whitespace().next())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nvidia_chipset_from_lspci() {
+        let lspci = "\
+00:02.0 VGA compatible controller: Intel Corporation Alder Lake-P GT2 [Iris Xe Graphics] (rev 0c)
+01:00.1 Audio device: NVIDIA Corporation GA106 High Definition Audio Controller (rev a1)
+01:00.0 3D controller: NVIDIA Corporation GA106M [GeForce RTX 3060 Mobile / Max-Q] (rev a1)
+";
+        assert_eq!(nvidia_chipset(lspci), Some("GA106M"));
+        let lspci = "01:00.0 VGA compatible controller: NVIDIA Corporation GK208B [GeForce GT 710] (rev a1)";
+        assert_eq!(nvidia_chipset(lspci), Some("GK208B"));
+        assert_eq!(Drivers::get_nvidia_driver(nvidia_chipset(lspci).unwrap()), "470xx");
+        assert_eq!(
+            nvidia_chipset("00:02.0 VGA compatible controller: Intel Corporation UHD"),
+            None
+        );
+    }
+
     #[test]
     fn test_get_nvidia_driver() {
         assert_eq!(Drivers::get_nvidia_driver("NV34"), "unsupported");
         assert_eq!(Drivers::get_nvidia_driver("GK104"), "470xx");
-        assert_eq!(Drivers::get_nvidia_driver("GP108"), "latest");
         assert_eq!(Drivers::get_nvidia_driver("GK208"), "470xx");
-        assert_eq!(Drivers::get_nvidia_driver("GT218"), "340xx");
+        assert_eq!(Drivers::get_nvidia_driver("GT218"), "unsupported");
+        assert_eq!(Drivers::get_nvidia_driver("GM107"), "580xx");
+        assert_eq!(Drivers::get_nvidia_driver("GP108"), "580xx");
+        assert_eq!(Drivers::get_nvidia_driver("GV100"), "580xx");
+        assert_eq!(Drivers::get_nvidia_driver("TU116"), "latest");
+        assert_eq!(Drivers::get_nvidia_driver("GA106M"), "latest");
+        assert_eq!(Drivers::get_nvidia_driver("AD104"), "latest");
+    }
+
+    const fn dev(vendor: u16, device: u16, class: u32) -> PciDevice {
+        PciDevice { vendor, device, class }
+    }
+
+    #[test]
+    fn nvidia_gpu_by_class() {
+        // nForce chipset bits and the HDMI audio function aren't GPUs
+        let nforce = [dev(0x10de, 0x0aa2, 0x0c0500), dev(0x10de, 0x0ab4, 0x060100)];
+        assert!(!has_nvidia_gpu(&nforce));
+        assert!(!has_nvidia_gpu(&[dev(0x10de, 0x228e, 0x040300)]));
+        // VGA, and 3D for laptop dGPUs
+        assert!(has_nvidia_gpu(&[dev(0x10de, 0x2503, 0x030000)]));
+        assert!(has_nvidia_gpu(&[dev(0x10de, 0x2520, 0x030200)]));
+        // an Intel iGPU isn't one either
+        assert!(!has_nvidia_gpu(&[dev(0x8086, 0x46a6, 0x030000)]));
+    }
+
+    #[test]
+    fn wl_only_broadcom_wifi() {
+        // BCM4360 and BCM4352 need wl
+        assert!(has_wl_only_wifi(&[dev(0x14e4, 0x43a0, 0x028000)]));
+        assert!(has_wl_only_wifi(&[dev(0x14e4, 0x43b1, 0x028000)]));
+        // BCM4313 is brcmsmac's, BCM4350 and BCM43602 are brcmfmac's
+        assert!(!has_wl_only_wifi(&[dev(0x14e4, 0x4727, 0x028000)]));
+        assert!(!has_wl_only_wifi(&[dev(0x14e4, 0x43a3, 0x028000)]));
+        assert!(!has_wl_only_wifi(&[dev(0x14e4, 0x43ba, 0x028000)]));
+        // a non-Broadcom device with a matching id
+        assert!(!has_wl_only_wifi(&[dev(0x8086, 0x4360, 0x028000)]));
+    }
+
+    const fn usb(vendor: u16, product: u16, class: [u8; 3]) -> UsbInterface {
+        UsbInterface { vendor, product, class }
+    }
+
+    #[test]
+    fn broadcom_bluetooth() {
+        // BCM20702A0 and a Dell rebrand
+        assert!(has_broadcom_bluetooth(&[], &[usb(0x0a5c, 0x21e8, [0xff, 0x01, 0x01])]));
+        assert!(has_broadcom_bluetooth(&[], &[usb(0x413c, 0x8197, [0xff, 0x01, 0x01])]));
+        assert!(has_broadcom_bluetooth(&[], &[usb(0x19ff, 0x0239, [0xe0, 0x01, 0x01])]));
+        // a Foxconn MediaTek one is a standard Bluetooth interface, and Apple's need no firmware
+        assert!(!has_broadcom_bluetooth(&[], &[usb(0x0489, 0xe0cd, [0xe0, 0x01, 0x01])]));
+        assert!(!has_broadcom_bluetooth(&[], &[usb(0x05ac, 0x828f, [0xff, 0x01, 0x01])]));
+        // the Broadcom Wi-Fi function isn't it
+        assert!(!has_broadcom_bluetooth(&[dev(0x14e4, 0x43a0, 0x028000)], &[]));
+        assert!(has_broadcom_bluetooth(&[dev(0x14e4, 0x4359, 0x0d1100)], &[]));
+    }
+
+    #[tokio::test]
+    async fn reads_sysfs_usb_interface() {
+        let dir = std::env::temp_dir().join(format!("taidan-usb-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("1-4:1.0")).unwrap();
+        std::fs::create_dir_all(dir.join("1-4")).unwrap();
+        std::fs::write(dir.join("1-4/idVendor"), "0a5c\n").unwrap();
+        std::fs::write(dir.join("1-4/idProduct"), "21e8\n").unwrap();
+        for (name, val) in
+            [("bInterfaceClass", "ff"), ("bInterfaceSubClass", "01"), ("bInterfaceProtocol", "01")]
+        {
+            std::fs::write(dir.join("1-4:1.0").join(name), format!("{val}\n")).unwrap();
+        }
+        let read = UsbInterface::read(&dir, "1-4:1.0").await;
+        let device = UsbInterface::read(&dir, "1-4").await;
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(read, Some(usb(0x0a5c, 0x21e8, [0xff, 0x01, 0x01])));
+        assert_eq!(device, None);
+    }
+
+    #[tokio::test]
+    async fn reads_sysfs_pci_device() {
+        let dir = std::env::temp_dir().join(format!("taidan-pci-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("vendor"), "0x10de\n").unwrap();
+        std::fs::write(dir.join("device"), "0x2503\n").unwrap();
+        std::fs::write(dir.join("class"), "0x030000\n").unwrap();
+        let read = PciDevice::read(&dir).await;
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(read, Some(dev(0x10de, 0x2503, 0x030000)));
     }
 }
