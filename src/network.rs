@@ -831,10 +831,28 @@ fn is_pkcs12(path: &str) -> bool {
     ext.eq_ignore_ascii_case("p12") || ext.eq_ignore_ascii_case("pfx")
 }
 
+/// what the certificate files of a network start with
+/// its name for people to recognize plus the SSID in hex, so two SSIDs that read the same as a
+/// hostname (e.g. `Café`, `Caf` or `東京`, `大阪`) don't overwrite each other's certs
+fn cert_name(wired: bool, ssid: &str) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    if wired {
+        return "wired".to_owned();
+    }
+    let hex: String = ssid
+        .bytes()
+        .flat_map(|b| [DIGITS[usize::from(b >> 4)], DIGITS[usize::from(b & 0xf)]])
+        .map(char::from)
+        .collect();
+    match derive_hostname(ssid) {
+        readable if readable.is_empty() => format!("wifi-{hex}"),
+        readable => format!("{readable}-{hex}"),
+    }
+}
+
 /// copies the files `login` uses to [`CERT_DIR`], readable only by root, and points it at them
 fn install_certs(login: &mut EnterpriseLogin) -> Result<(), Failure> {
-    let name = derive_hostname(if login.wired { "wired" } else { login.ssid.as_str() });
-    let name = if name.is_empty() { "network".to_owned() } else { name };
+    let name = cert_name(login.wired, &login.ssid);
     let files = [
         ("ca", &mut login.ca_cert),
         ("client", &mut login.client_cert),
@@ -1362,6 +1380,21 @@ fn close_portal() {
     }
 }
 
+/// the hostname for the device name `name`, see [`derive_hostname`]. If nothing in `name` is
+/// usable, e.g. it's all Japanese, it's `username-pc` so a name still changes the hostname. An
+/// empty `name` stays empty, which keeps the system's existing name
+fn device_hostname(name: &str, username: &str) -> String {
+    if name.trim().is_empty() {
+        return String::new();
+    }
+    let hostname = derive_hostname(name);
+    if !hostname.is_empty() {
+        return hostname;
+    }
+    let user = derive_hostname(username);
+    if user.is_empty() { String::new() } else { derive_hostname(&format!("{user}-pc")) }
+}
+
 /// a hostname for `name`: lowercase letters, digits and dashes, or empty if there are none
 fn derive_hostname(name: &str) -> String {
     let mut out = String::new();
@@ -1678,6 +1711,41 @@ fn init_connect(
     });
 }
 
+/// clears every busy flag once the network worker is gone, showing the work that was going on as
+/// failed. without it a connect, proxy check or IP dialog would spin until the app is restarted
+fn stop_busy(net: &Network<'_>) {
+    let ssid = net.get_connecting_ssid();
+    if !ssid.is_empty() {
+        net.set_connecting_ssid("".into());
+        net.set_error_ssid(ssid);
+        net.set_error_id(FAILED.into());
+    }
+    if net.get_enterprise_busy() {
+        net.set_enterprise_busy(false);
+        net.set_enterprise_error_id(FAILED.into());
+    }
+    if net.get_proxy_busy() {
+        net.set_proxy_busy(false);
+        net.set_proxy_error_id(PROXY_FAILED.into());
+    }
+    if net.get_ip_busy() || net.get_ip_loading() {
+        net.set_ip_busy(false);
+        net.set_ip_loading(false);
+        net.set_ip_error_id(FAILED_IP.into());
+    }
+    net.set_portal_open(false);
+}
+
+/// runs [`stop_busy`] when the network worker's thread ends, returning or panicking
+struct WorkerGone(slint::Weak<AppWindow>);
+
+impl Drop for WorkerGone {
+    fn drop(&mut self) {
+        tracing::error!("network worker stopped");
+        push(&self.0, stop_busy);
+    }
+}
+
 /// marks `ssid` as connecting right away, not once the worker gets to it after a scan, so a second
 /// click or Enter doesn't queue another connect that drops the first one. False if one is going
 /// already
@@ -1713,12 +1781,22 @@ fn init_portal(
     net.on_close_portal(move || send(Cmd::ClosePortal));
 }
 
-pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
+/// starts the network worker's thread, which takes commands from the returned sender
+fn spawn_worker(ui: &slint::Weak<AppWindow>) -> mpsc::Sender<Cmd> {
     let (tx, rx) = mpsc::channel();
-    let worker_ui = ui.clone();
-    std::thread::spawn(move || worker(&worker_ui, &rx));
+    let ui = ui.clone();
+    std::thread::spawn(move || {
+        // also when it panics, so the dialogs don't spin forever
+        let _guard = WorkerGone(ui.clone());
+        worker(&ui, &rx);
+    });
+    tx
+}
+
+pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
+    let tx = spawn_worker(ui);
     net.set_persist_offline_btn(crate::CFG.taidan0.persist_no_internet_btn);
-    net.on_derive_hostname(|name| derive_hostname(&name).into());
+    net.on_derive_hostname(|name, username| device_hostname(&name, &username).into());
     net.on_realm(|username| realm(&username).into());
     net.on_is_pkcs12(|path| is_pkcs12(&path));
     net.on_file_name(|path| {
@@ -1730,9 +1808,14 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
         let ui = ui.clone();
         move |dir, pac, all| browse(&ui, &dir, pac, all)
     });
-    let send = move |cmd| {
-        if let Err(e) = tx.send(cmd) {
-            tracing::error!(?e, "network worker is gone");
+    let send = {
+        let ui = ui.clone();
+        move |cmd| {
+            if let Err(e) = tx.send(cmd) {
+                tracing::error!(?e, "network worker is gone");
+                // the callback set its busy flag already, and nothing is left to clear it
+                push(&ui, stop_busy);
+            }
         }
     };
     net.on_refresh({
@@ -1821,6 +1904,22 @@ mod tests {
         assert_eq!(derive_hostname("Jane's Laptop"), "janes-laptop");
         assert_eq!(derive_hostname("  -- My  PC 2! "), "my-pc-2");
         assert_eq!(derive_hostname("ノートパソコン"), "");
+        assert_eq!(device_hostname("Jane's Laptop", "jane"), "janes-laptop");
+        assert_eq!(device_hostname("ノートパソコン", "taro"), "taro-pc");
+        assert_eq!(device_hostname("ノートパソコン", "taro_y"), "taro-y-pc");
+        // empty keeps the system's hostname, with or without a username yet
+        assert_eq!(device_hostname("  ", "taro"), "");
+        assert_eq!(device_hostname("ノートパソコン", ""), "");
+    }
+
+    #[test]
+    fn cert_names_are_unique() {
+        assert_eq!(cert_name(true, "ignored"), "wired");
+        assert_eq!(cert_name(false, "Home"), "home-486f6d65");
+        // the same as a hostname, but not as files
+        assert_ne!(cert_name(false, "Café"), cert_name(false, "Caf"));
+        assert_ne!(cert_name(false, "東京"), cert_name(false, "大阪"));
+        assert_eq!(cert_name(false, "東京"), "wifi-e69db1e4baac");
     }
 
     #[test]

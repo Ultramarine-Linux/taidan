@@ -1,3 +1,5 @@
+import { Account } from "account.slint";
+
 export enum Security { open, password, enterprise, unsupported }
 
 // what a hidden network is secured with, as picked in its dialog
@@ -121,11 +123,12 @@ export global Network {
     // reaching the internet, directly or through the proxy, which NetworkManager can't check
     out property <bool> online: state == NetState.online || (proxy-url != "" && state != NetState.offline && state != NetState.connecting);
 
-    // pretty name for this device, and the hostname derived from it
+    // pretty name for this device, and the hostname derived from it, or from the username if the
+    // name has nothing a hostname can use (e.g. it's all Japanese)
     in-out property <string> device-name;
-    out property <string> hostname: derive-hostname(device-name);
-    pure callback derive-hostname(name: string) -> string;
-    derive-hostname(name) => name;
+    out property <string> hostname: derive-hostname(device-name, Account.username);
+    pure callback derive-hostname(name: string, username: string) -> string;
+    derive-hostname(name, username) => name;
     // the part of a username after the `@`
     pure callback realm(username: string) -> string;
     realm(username) => "";
