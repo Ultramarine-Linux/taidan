@@ -313,6 +313,10 @@ struct Nm {
     portal_open: bool,
     /// when `NetworkManager` last checked connectivity for the portal browser
     portal_checked: Option<Instant>,
+    /// whether the internet wasn't fully working at some point since the portal browser opened.
+    /// It's only closed on its own once that changes, since it's also there for portals
+    /// `NetworkManager` misses, where it already says the internet works
+    portal_offline: bool,
     /// when the scan the user asked for should be done
     scanning_until: Option<Instant>,
 }
@@ -332,6 +336,7 @@ impl Nm {
             last: None,
             portal_open: false,
             portal_checked: None,
+            portal_offline: false,
             scanning_until: None,
         })
     }
@@ -1181,6 +1186,7 @@ impl Nm {
                 tracing::info!(uri, "Opened the captive portal browser");
                 *portal() = Some(child);
                 self.portal_checked = None;
+                self.portal_offline = self.manager.connectivity() != Ok(CONNECTIVITY_FULL);
                 true
             }
             Err(e) => {
@@ -1223,7 +1229,12 @@ impl Nm {
                 self.manager.state().is_ok_and(|s| s == STATE_CONNECTED_GLOBAL)
             }
         };
-        if online && open {
+        if !online {
+            self.portal_offline = true;
+        }
+        // opened by hand while `NetworkManager` already said the internet works, so it isn't
+        // closed until the internet stops and comes back
+        if online && open && self.portal_offline {
             tracing::info!("Online, closing the captive portal browser");
             close_portal();
         }
