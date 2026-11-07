@@ -90,6 +90,7 @@ tracing-subscriber = { workspace = true }
 uzers = "0.12.2"
 v4l = "0.14.0"
 zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking-api"] }
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 
 [lints.clippy]
 # cargo = { level = "warn", priority = -1 }

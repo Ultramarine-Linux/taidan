@@ -45,6 +45,12 @@ export global Drivers {
     in property <bool> nvidia;
     in property <bool> broadcom-wifi;
     in property <bool> broadcom-bluetooth;
+    // Secure Boot keeps the NVIDIA or Broadcom Wi-Fi driver from loading, so they aren't
+    // installed, and the drivers page shows how to set them up instead
+    in property <bool> secure-boot;
+    // a QR code to `secure-boot-url`
+    in property <image> secure-boot-qr;
+    in property <string> secure-boot-url;
     // false when the distro skips dnf (`taidan0.skip_dnf`), which is how codecs get installed
     in property <bool> codecs: true;
     // whether to install drivers and codecs

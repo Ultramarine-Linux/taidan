@@ -90,8 +90,24 @@ fn without_user(msg: &str, user: &str) -> String {
     re.replace_all(&once, "${1}<user>${2}").into_owned()
 }
 
+/// how to enroll a key for drivers under Secure Boot, see `Drivers.secure-boot`
+const SECURE_BOOT_URL: &str = "https://fyra.to/secure-boot";
+
+/// a QR code for `url`, [`None`] if it can't be made
+fn qr_code(url: &str) -> Option<slint::Image> {
+    let svg = qrcode::QrCode::new(url)
+        .inspect_err(|e| tracing::error!(?e, "cannot make QR code"))
+        .ok()?
+        .render::<qrcode::render::svg::Color<'_>>()
+        .quiet_zone(true)
+        .build();
+    slint::Image::load_from_svg_data(svg.as_bytes())
+        .inspect_err(|e| tracing::error!(?e, "cannot load QR code"))
+        .ok()
+}
+
 /// whether `TAIDAN_SIMULATE_HW` pretends `name` is present, a comma-separated list of `nvidia`,
-/// `broadcom-wifi`, `broadcom-bluetooth`, or `all`
+/// `broadcom-wifi`, `broadcom-bluetooth`, `secure-boot` (that it blocks the drivers), or `all`
 fn simulated_hw(name: &str) -> bool {
     std::env::var("TAIDAN_SIMULATE_HW")
         .is_ok_and(|sim| sim.split(',').any(|s| s.trim() == name || s.trim() == "all"))
@@ -376,6 +392,9 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
             hw.nvidia |= simulated_hw("nvidia");
             hw.broadcom_wifi |= simulated_hw("broadcom-wifi");
             hw.broadcom_bluetooth |= simulated_hw("broadcom-bluetooth");
+            // only matters with drivers it blocks, as on real hardware
+            hw.secure_boot_blocks |=
+                simulated_hw("secure-boot") && (hw.nvidia || hw.broadcom_wifi);
             tracing::debug!(?hw, "Simulated hardware (TAIDAN_SIMULATE_HW)");
         }
         let set = ui.upgrade_in_event_loop(move |ui| {
@@ -383,6 +402,13 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
             drivers.set_nvidia(hw.nvidia);
             drivers.set_broadcom_wifi(hw.broadcom_wifi);
             drivers.set_broadcom_bluetooth(hw.broadcom_bluetooth);
+            if hw.secure_boot_blocks {
+                drivers.set_secure_boot_url(SECURE_BOOT_URL.into());
+                if let Some(qr) = qr_code(SECURE_BOOT_URL) {
+                    drivers.set_secure_boot_qr(qr);
+                }
+                drivers.set_secure_boot(true);
+            }
         });
         if let Err(e) = set {
             tracing::error!(?e, "cannot set detected hardware");
@@ -393,6 +419,12 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn secure_boot_qr_code() {
+        let qr = qr_code(SECURE_BOOT_URL).unwrap();
+        assert!(qr.size().width > 0);
+    }
 
     #[test]
     fn user_left_out_of_reports() {

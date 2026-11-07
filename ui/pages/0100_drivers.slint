@@ -51,13 +51,13 @@ export component DriverList inherits VerticalLayout {
     }
 
     if Drivers.nvidia: DriverRow {
-        dimmed: root.optional-dimmed;
+        dimmed: root.optional-dimmed || Drivers.secure-boot;
         icon: @image-url("../../data/icons/application-x-firmware-symbolic.svg");
         text: Lang.t("page-drivers-nvidia", []);
     }
 
     if Drivers.broadcom-wifi: DriverRow {
-        dimmed: root.optional-dimmed;
+        dimmed: root.optional-dimmed || Drivers.secure-boot;
         icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
         text: Lang.t("page-drivers-broadcom-wifi", []);
     }
@@ -102,6 +102,47 @@ export component DriversPage inherits TdnPage {
                 checked: Drivers.install;
                 toggled(on) => { Drivers.install = on; }
                 accepted => { root.try-next(); }
+            }
+
+            // only when drivers Secure Boot blocks were detected and are wanted
+            if Drivers.secure-boot && Drivers.install && (Drivers.nvidia || Drivers.broadcom-wifi): HorizontalLayout {
+                spacing: 1rem;
+
+                // dark on light whatever the theme, which scanners read best
+                Rectangle {
+                    width: 6rem;
+                    height: self.width;
+                    background: white;
+                    border-radius: Tokens.radius-sm;
+
+                    Image {
+                        source: Drivers.secure-boot-qr;
+                        width: parent.width;
+                        height: parent.height;
+                        image-rendering: pixelated;
+                        accessible-role: image;
+                        accessible-label: Drivers.secure-boot-url;
+                    }
+                }
+
+                VerticalLayout {
+                    layout-order: Dir.order(1);
+                    alignment: center;
+                    spacing: 0.4rem;
+
+                    TdnText {
+                        text: Lang.t("page-drivers-secure-boot", []);
+                        horizontal-alignment: Dir.text-start;
+                        wrap: word-wrap;
+                    }
+
+                    TdnText {
+                        text: Drivers.secure-boot-url;
+                        color: Tokens.color-muted-foreground;
+                        horizontal-alignment: Dir.text-start;
+                        wrap: word-wrap;
+                    }
+                }
             }
         }
 

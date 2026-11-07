@@ -325,7 +325,13 @@ const FAILED_IP: Failure = "page-internet-ip-error";
 const PROXY_INVALID: Failure = "page-internet-proxy-invalid";
 const PROXY_FAILED: Failure = "page-internet-proxy-error";
 /// the browser for logging in to captive portals, a `WPE WebKit` shell
-const PORTAL_BROWSER: &str = "cog";
+const PORTAL_BROWSER: &str = "/usr/bin/cog";
+/// the user it runs as. Not taidan, which may run anything as root while the OOBE runs, so a page
+/// the network serves that gets past `WebKit` can't. `taidan-initial-setup.service` makes the user
+/// and removes it once the OOBE is done
+const PORTAL_USER: &str = "taidan-portal";
+/// the systemd unit it runs in, so taidan can stop it although it's another user's
+const PORTAL_UNIT: &str = "taidan-portal.service";
 /// checked through the proxy if `NetworkManager` has no connectivity check URI of its own
 const CHECK_URI: &str = "http://fedoraproject.org/static/hotspot.txt";
 
@@ -1307,21 +1313,8 @@ impl Nm {
         let uri = (self.manager.connectivity_check_uri().ok())
             .filter(|uri| !uri.is_empty())
             .unwrap_or_else(|| CHECK_URI.to_owned());
-        let mut cmd = std::process::Command::new(PORTAL_BROWSER);
-        // the `wl` platform needs `EGL_WL_bind_wayland_display`, which Mesa 25.2+ only has with
-        // `legacy-wayland` and Fedora doesn't build that (https://github.com/Igalia/cog/issues/776),
-        // `gtk4` is native Wayland too, and its window has a close button
-        cmd.args(["--platform", "gtk4"]);
-        // through the environment rather than `--proxy`, since anyone can read a command's
-        // arguments and the URL may carry a password. WebKit then uses GLib's default proxy
-        // resolver, and the libproxy one reads `http_proxy` and friends. GNOME's would go by its
-        // own settings instead, so it's picked explicitly
-        if let Some(proxy) =
-            proxy.and_then(|(url, bypass)| libtaidan::proxy::Proxy::new(&url, &bypass))
-        {
-            cmd.envs(proxy.vars()).env("GIO_USE_PROXY_RESOLVER", "libproxy");
-        }
-        match cmd.arg(&uri).spawn() {
+        let Some(mut cmd) = portal_command(proxy) else { return false };
+        match cmd.args(["--", PORTAL_BROWSER, "--platform", "gtk4", &uri]).spawn() {
             Ok(child) => {
                 tracing::info!(uri, "Opened the captive portal browser");
                 *portal() = Some(child);
@@ -1608,29 +1601,103 @@ fn parse_mac(s: &str) -> Option<Vec<u8>> {
         .filter(|b| b.len() == 6)
 }
 
-/// asks the portal browser to quit, so it can shut down its web process too, and kills it if it
-/// hasn't within a couple of seconds
+/// `systemd-run`, run as root, starting the portal browser as [`PORTAL_USER`] in [`PORTAL_UNIT`],
+/// what's left is `--` and the browser's command. It waits for the browser to quit, so
+/// [`Nm::check_portal`] can tell. [`None`] if the browser can't be given the session's display
+fn portal_command(proxy: Option<(String, String)>) -> Option<std::process::Command> {
+    let runtime = std::env::var("XDG_RUNTIME_DIR").ok().filter(|d| d.starts_with('/'))?;
+    let display = std::env::var("WAYLAND_DISPLAY").ok().filter(|d| !d.is_empty())?;
+    let socket = if display.starts_with('/') { display } else { format!("{runtime}/{display}") };
+    // the session's own files are only taidan's, the browser may get to the display and no more
+    for (perms, path) in [("x", runtime.as_str()), ("rw", socket.as_str())] {
+        let acl = format!("u:{PORTAL_USER}:{perms}");
+        match std::process::Command::new("setfacl").args(["-m", &acl, "--", path]).status() {
+            Ok(status) if status.success() => {}
+            res => {
+                tracing::error!(?res, path, "cannot let the portal browser use the display");
+                return None;
+            }
+        }
+    }
+    // a crashed taidan's may still be there, it can't be started again while it is
+    if let Err(e) = stop_portal_unit() {
+        tracing::debug!(?e, "no earlier portal browser to stop");
+    }
+    let home = format!("/run/{PORTAL_USER}");
+    let mut cmd = std::process::Command::new("pkexec");
+    cmd.args(["--user", "root", "systemd-run", "--quiet", "--wait", "--collect"])
+        .arg(format!("--unit={PORTAL_UNIT}"))
+        .arg(format!("--uid={PORTAL_USER}"))
+        .arg(format!("--property=RuntimeDirectory={PORTAL_USER}"))
+        .args([
+            "--property=NoNewPrivileges=yes",
+            "--property=PrivateTmp=yes",
+            "--property=ProtectHome=yes",
+            "--property=ProtectSystem=full",
+        ])
+        .arg(format!("--setenv=WAYLAND_DISPLAY={socket}"))
+        .arg(format!("--setenv=XDG_RUNTIME_DIR={home}"))
+        .arg(format!("--setenv=HOME={home}"));
+    if let Ok(lang) = std::env::var("LANG") {
+        cmd.arg(format!("--setenv=LANG={lang}"));
+    }
+    // through a file rather than `--setenv`, since anyone can read a command's arguments and the
+    // URL may carry a password. WebKit then uses GLib's default proxy resolver, and the libproxy
+    // one reads `http_proxy` and friends. GNOME's would go by its own settings instead, so it's
+    // picked explicitly
+    if let Some(proxy) = proxy.and_then(|(url, bypass)| libtaidan::proxy::Proxy::new(&url, &bypass))
+    {
+        let file = crate::TEMP_DIR.join("portal-proxy.env");
+        let mut vars = String::new();
+        for (key, value) in proxy.vars().into_iter().chain([("GIO_USE_PROXY_RESOLVER", "libproxy")])
+        {
+            // quoted for systemd, the URL has no control characters
+            let value = value.replace('\\', "\\\\").replace('"', "\\\"");
+            vars.extend([key, "=\"", &value, "\"\n"]);
+        }
+        let written = {
+            use std::{io::Write, os::unix::fs::OpenOptionsExt};
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&file)
+                .and_then(|mut f| f.write_all(vars.as_bytes()))
+        };
+        match written {
+            // read by systemd, as root
+            Ok(()) => _ = cmd.arg(format!("--property=EnvironmentFile={}", file.display())),
+            Err(e) => tracing::error!(?e, "cannot pass the proxy to the portal browser"),
+        }
+    }
+    Some(cmd)
+}
+
+/// `systemctl stop` for [`PORTAL_UNIT`], on a thread of its own, as this may run inside
+/// [`crate::RT`] already, e.g. from `install::finish`
+fn stop_portal_unit() -> libtaidan::prelude::Res<()> {
+    std::thread::spawn(|| crate::RT.block_on(libtaidan::root("systemctl", ["stop", PORTAL_UNIT])))
+        .join()
+        .unwrap_or_else(|_| Err(libtaidan::prelude::Err::Msg("stopping the portal panicked")))
+}
+
+/// stops the portal browser, which would outlive taidan otherwise. Through systemd, it's another
+/// user's and only root could signal it
 fn close_portal() {
     let Some(mut child) = portal().take() else { return };
-    let Ok(pid) = libc::pid_t::try_from(child.id()) else { return };
-    // SAFETY: `pid` is our own child, which isn't reaped until `wait()` below, so the id can't
-    // have been reused by another process
-    if unsafe { libc::kill(pid, libc::SIGTERM) } == 0 {
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while Instant::now() < deadline {
-            if !matches!(child.try_wait(), Ok(None)) {
-                return;
-            }
-            std::thread::sleep(Duration::from_millis(50));
+    if let Err(e) = stop_portal_unit() {
+        tracing::warn!(?e, "cannot stop the captive portal browser");
+    }
+    // `systemd-run --wait` ends with the unit
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        if !matches!(child.try_wait(), Ok(None)) {
+            return;
         }
-        tracing::warn!("captive portal browser didn't quit, killing it");
+        std::thread::sleep(Duration::from_millis(50));
     }
-    if let Err(e) = child.kill() {
-        tracing::debug!(?e, "captive portal browser already gone");
-    }
-    if let Err(e) = child.wait() {
-        tracing::debug!(?e, "cannot reap the captive portal browser");
-    }
+    tracing::warn!("systemd-run didn't end with the captive portal browser");
 }
 
 /// the hostname for the device name `name`, see [`derive_hostname`]. If nothing in `name` is

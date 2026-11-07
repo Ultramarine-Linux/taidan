@@ -21,11 +21,10 @@ static NVIDIA_PREFIXES: std::sync::LazyLock<std::collections::HashMap<&str, &str
             // finally, a sane naming scheme
             // Tesla GPUs
             ("GT", "unsupported"),
-            // Fermi GPUs, in case you like burning your house down
-            ("GF", "390xx"),
-            // Kepler GPUs
-            // now we're finally up to the modern era
-            ("GK", "470xx"),
+            // Fermi and Kepler, 390xx and 470xx have no GBM, which the Wayland-only desktops need,
+            // so they stay on nouveau
+            ("GF", "unsupported"),
+            ("GK", "unsupported"),
             // Maxwell, Pascal and Volta, dropped in the 590 driver
             ("GM", "580xx"),
             ("GP", "580xx"),
@@ -78,18 +77,28 @@ impl super::Step for DriversCodecs {
 #[derive(Clone, Copy, Debug, Default)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Hardware {
+    /// an NVIDIA GPU a packaged driver supports
     pub nvidia: bool,
     pub broadcom_wifi: bool,
     pub broadcom_bluetooth: bool,
+    /// Secure Boot keeps the NVIDIA or Broadcom Wi-Fi driver from loading, so they aren't
+    /// installed, see `Drivers::kmods_would_load`
+    pub secure_boot_blocks: bool,
 }
 
 /// detect hardware that [`DriversCodecs`] would install drivers for
 pub async fn detect_hardware() -> Hardware {
     let pci = pci_devices().await;
+    let nvidia = has_nvidia_gpu(&pci)
+        && Drivers::get_nvidia_chipset()
+            .await
+            .is_ok_and(|chipset| Drivers::get_nvidia_driver(&chipset) != "unsupported");
+    let broadcom_wifi = has_wl_only_wifi(&pci);
     Hardware {
-        nvidia: has_nvidia_gpu(&pci),
-        broadcom_wifi: has_wl_only_wifi(&pci),
+        nvidia,
+        broadcom_wifi,
         broadcom_bluetooth: has_broadcom_bluetooth(&pci, &usb_interfaces().await),
+        secure_boot_blocks: (nvidia || broadcom_wifi) && !Drivers::kmods_would_load().await,
     }
 }
 
@@ -559,7 +568,7 @@ mod tests {
         assert_eq!(nvidia_chipset(lspci), Some("GA106M"));
         let lspci = "01:00.0 VGA compatible controller: NVIDIA Corporation GK208B [GeForce GT 710] (rev a1)";
         assert_eq!(nvidia_chipset(lspci), Some("GK208B"));
-        assert_eq!(Drivers::get_nvidia_driver(nvidia_chipset(lspci).unwrap()), "470xx");
+        assert_eq!(Drivers::get_nvidia_driver(nvidia_chipset(lspci).unwrap()), "unsupported");
         assert_eq!(Drivers::get_nvidia_driver("C51"), "unsupported");
         assert_eq!(
             nvidia_chipset("00:02.0 VGA compatible controller: Intel Corporation UHD"),
@@ -570,8 +579,8 @@ mod tests {
     #[test]
     fn test_get_nvidia_driver() {
         assert_eq!(Drivers::get_nvidia_driver("NV34"), "unsupported");
-        assert_eq!(Drivers::get_nvidia_driver("GK104"), "470xx");
-        assert_eq!(Drivers::get_nvidia_driver("GK208"), "470xx");
+        assert_eq!(Drivers::get_nvidia_driver("GK104"), "unsupported");
+        assert_eq!(Drivers::get_nvidia_driver("GF108"), "unsupported");
         assert_eq!(Drivers::get_nvidia_driver("GT218"), "unsupported");
         assert_eq!(Drivers::get_nvidia_driver("GM107"), "580xx");
         assert_eq!(Drivers::get_nvidia_driver("GP108"), "580xx");

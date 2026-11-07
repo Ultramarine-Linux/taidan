@@ -44,6 +44,8 @@ Requires:       dbus-tools
 # network page, over its D-Bus API, and the browser for captive portals
 Requires:       NetworkManager
 Requires:       cog
+# setfacl, which lets the captive portal browser's user use the session's display
+Requires:       acl
 # time zone page: /usr/share/zoneinfo/zone1970.tab and the zones themselves
 Requires:       tzdata
 # keeps the clock right, `timedatectl set-ntp`

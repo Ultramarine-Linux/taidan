@@ -388,6 +388,8 @@ page-drivers-broadcom-wifi = Broadcom WiFi
 page-drivers-broadcom-bluetooth = Broadcom Bluetooth
 page-drivers-builtin = Built-in Drivers
 page-drivers-codecs = Multimedia Codecs
+# next to a QR code to a guide, when Secure Boot keeps the NVIDIA or Broadcom WiFi driver from being installed
+page-drivers-secure-boot = Secure Boot is on, so these drivers can't be installed yet. Scan the code to learn how to set them up.
 
 ## [Summary]
 

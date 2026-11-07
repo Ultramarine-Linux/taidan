@@ -19,6 +19,40 @@ unconfigured() {
 	[ -e /.unconfigured ] || [ -e /var/.unconfigured ]
 }
 
+# root processes in this session, which taidan started through pkexec (dnf, flatpak, tweaks…).
+# Its children don't go down with it, and would race the next attempt. pkexec keeps the cgroup,
+# and nothing else here runs as root
+leftovers() {
+	cgroup=$(sed -n 's/^0:://p' /proc/self/cgroup)
+	while read -r pid; do
+		[ "$(stat -c %u "/proc/$pid" 2>/dev/null)" = 0 ] && echo "$pid"
+	done <"/sys/fs/cgroup$cgroup/cgroup.procs"
+	return 0
+}
+
+# asks them to stop, rpm finishes the transaction it's in first, and kills what's left after a
+# few minutes
+stop_leftovers() {
+	# the captive portal browser runs in a unit of its own
+	pkexec systemctl stop taidan-portal.service 2>/dev/null
+	pids=$(leftovers)
+	[ -n "$pids" ] || return 0
+	echo "stopping what the last taidan left running: $(echo $pids)" >&2
+	# shellcheck disable=SC2086
+	pkexec kill -TERM $pids
+	waited=0
+	while [ -n "$(leftovers)" ] && [ "$waited" -lt 300 ]; do
+		sleep 1
+		waited=$((waited + 1))
+	done
+	pids=$(leftovers)
+	if [ -n "$pids" ]; then
+		echo "killing what didn't stop: $(echo $pids)" >&2
+		# shellcheck disable=SC2086
+		pkexec kill -KILL $pids
+	fi
+}
+
 restarts=0
 while :; do
 	rm -f "$status_file"
@@ -30,9 +64,11 @@ while :; do
 	# no status means KWin went down before taidan exited
 	if [ "$restarts" -ge 3 ]; then
 		echo "taidan keeps failing (exit status ${status:-none}), giving up" >&2
+		stop_leftovers
 		exit 1
 	fi
 	restarts=$((restarts + 1))
 	echo "taidan exited before the setup was done (exit status ${status:-none}), restarting" >&2
+	stop_leftovers
 	sleep 1
 done
