@@ -29,22 +29,12 @@ const PLASMA: &str = "/usr/bin/plasma-apply-colorscheme";
 const GSETTINGS: &str = "/usr/bin/gsettings";
 const XFCONF: &str = "/usr/bin/xfconf-query";
 
-/// `gsettings set org.gnome.desktop.interface <key> <value>`, through a D-Bus of its own since
-/// dconf writes through its service
 fn gsettings(key: &str, value: &str) -> Vec<String> {
-    ["dbus-run-session", "--", "gsettings", "set", "org.gnome.desktop.interface", key, value]
-        .map(str::to_owned)
-        .to_vec()
+    crate::a11y::gsettings("org.gnome.desktop.interface", key, Some(value))
 }
 
-/// `xfconf-query` setting a string, through a D-Bus of its own like [`gsettings`]. `-n` creates
-/// the property in case the defaults don't have it
 fn xfconf(channel: &str, property: &str, value: &str) -> Vec<String> {
-    ["dbus-run-session", "--", "xfconf-query", "-c", channel, "-p", property]
-        .into_iter()
-        .chain(["-n", "-t", "string", "-s", value])
-        .map(str::to_owned)
-        .collect()
+    crate::a11y::xfconf(channel, property, "string", Some(value))
 }
 
 /// the commands that switch the config under `HOME` to `dark` or light, with the accent if the
@@ -94,18 +84,8 @@ fn env_args(
     edition: &str,
 ) -> Vec<Vec<String>> {
     let Some(dark) = settings.dark_mode else { return vec![] };
-    (commands(dark, settings.accent, edition).into_iter())
-        .map(|cmd| {
-            let mut args = vec![
-                // not the OOBE session's bus, or its KWin and apps would hear about the change
-                "-u".to_owned(),
-                "DBUS_SESSION_BUS_ADDRESS".to_owned(),
-                format!("HOME={}", home.display()),
-                format!("XDG_CONFIG_HOME={}", home.join(".config").display()),
-            ];
-            args.extend(cmd);
-            args
-        })
+    commands(dark, settings.accent, edition).into_iter()
+        .map(|cmd| crate::a11y::in_home(home, cmd))
         .collect()
 }
 

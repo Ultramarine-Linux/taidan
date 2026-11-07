@@ -204,7 +204,7 @@ async fn stage_skel(
             let to = skel.to_string_lossy();
             super::acmd("cp", &["-rT", "--no-preserve=ownership", "/etc/skel", &to]).await?;
         }
-        let a11y = crate::a11y::write_to_skel(settings, &skel).await?;
+        let a11y = crate::a11y::write_to_skel(settings, cfg, &skel).await?;
         let imf = super::_08_setup_imf::write_fcitx5_to_skel(settings, cfg, &skel).await?;
         let theme = super::_01_settheme::write_to_skel(settings, cfg, &skel).await?;
         let keymap = crate::i18n::write_keymap_to_skel(settings, &skel).await?;
