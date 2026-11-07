@@ -84,7 +84,8 @@ fn env_args(
     edition: &str,
 ) -> Vec<Vec<String>> {
     let Some(dark) = settings.dark_mode else { return vec![] };
-    commands(dark, settings.accent, edition).into_iter()
+    commands(dark, settings.accent, edition)
+        .into_iter()
         .map(|cmd| crate::a11y::in_home(home, cmd))
         .collect()
 }
