@@ -49,9 +49,6 @@ impl Config {
     }
 
     /// Populate the [`Config`] struct.
-    ///
-    /// # Panics
-    /// If there are any missing information, the function will immediately panic.
     #[tracing::instrument]
     pub fn populate(&mut self) {
         self.taidan0.check();
@@ -59,32 +56,69 @@ impl Config {
         tracing::trace!("Populated config: {self:#?}");
     }
 
-    /// the distro name, and the edition unless the config sets it, from `/etc/os-release`
-    ///
-    /// # Panics
-    /// `/etc/os-release` can't be read or has no `NAME=` or `VARIANT_ID=`.
+    /// the distro name, and the edition unless the config sets it, from os-release
     pub fn read_os_release(&mut self) {
-        let file = std::fs::read_to_string("/etc/os-release").expect("Cannot read /etc/os-release");
-        let name = file
-            .split('\n')
-            .find_map(|line| line.strip_prefix("NAME="))
-            .expect("Cannot find NAME=… in /etc/os-release");
-        name.strip_prefix('"')
-            .and_then(|name| name.strip_suffix('"'))
-            .unwrap_or(name)
-            .clone_into(&mut self.distro);
-
+        let (name, variant_id) = os_release();
+        self.distro = name;
         if self.edition.is_empty() {
-            let edition = file
-                .split('\n')
-                .find_map(|line| line.strip_prefix("VARIANT_ID="))
-                .expect("Cannot find VARIANT_ID=… in /etc/os-release");
-            edition
-                .strip_prefix('"')
-                .and_then(|name| name.strip_suffix('"'))
-                .unwrap_or(edition)
-                .clone_into(&mut self.edition);
+            self.edition = variant_id;
         }
+    }
+}
+
+/// `NAME=` and `VARIANT_ID=` from `/etc/os-release`, or `/usr/lib/os-release` as os-release(5) says
+#[must_use]
+pub fn os_release() -> (String, String) {
+    let file = ["/etc/os-release", "/usr/lib/os-release"]
+        .into_iter()
+        .find_map(|path| std::fs::read_to_string(path).ok())
+        .unwrap_or_else(|| {
+            tracing::warn!("cannot read os-release");
+            String::new()
+        });
+    parse_os_release(&file)
+}
+
+/// `NAME=` and `VARIANT_ID=` from the contents of os-release(5)
+///
+/// missing keys get the defaults from os-release(5): `Linux` for `NAME=` and `""` for `VARIANT_ID=`
+#[must_use]
+pub fn parse_os_release(file: &str) -> (String, String) {
+    let get = |key: &str| {
+        let value =
+            file.lines().find_map(|line| line.trim().strip_prefix(key)?.strip_prefix('='))?;
+        let value = (value.strip_prefix('"').and_then(|v| v.strip_suffix('"')))
+            .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
+            .unwrap_or(value);
+        Some(value.to_owned())
+    };
+    let name = get("NAME").unwrap_or_else(|| {
+        tracing::warn!("no NAME= in os-release, using Linux");
+        "Linux".to_owned()
+    });
+    let variant_id = get("VARIANT_ID").unwrap_or_else(|| {
+        tracing::warn!("no VARIANT_ID= in os-release");
+        String::new()
+    });
+    (name, variant_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_os_release;
+
+    #[test]
+    fn os_release_fields() {
+        let file = "NAME=\"Ultramarine Linux\"\nPRETTY_NAME=\"x\"\nVARIANT_ID=flagship\n";
+        assert_eq!(parse_os_release(file), ("Ultramarine Linux".into(), "flagship".into()));
+        assert_eq!(parse_os_release("NAME='Arch Linux'\n"), ("Arch Linux".into(), String::new()));
+    }
+
+    #[test]
+    fn os_release_defaults() {
+        assert_eq!(parse_os_release(""), ("Linux".into(), String::new()));
+        // PRETTY_NAME= and VARIANT= must not match NAME= or VARIANT_ID=
+        assert_eq!(parse_os_release("PRETTY_NAME=x\nVARIANT=y\n"), ("Linux".into(), String::new()));
     }
 }
 

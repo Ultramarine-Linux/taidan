@@ -146,33 +146,13 @@ impl Config {
     }
 
     /// Populate the [`Config`] struct.
-    ///
-    /// # Panics
-    /// If there are any missing information, the function will immediately panic.
     #[tracing::instrument]
     pub fn populate(&mut self) {
         self.taidan0.check();
-        // distro
-        let file = std::fs::read_to_string("/etc/os-release").expect("Cannot read /etc/os-release");
-        let name = file
-            .split('\n')
-            .find_map(|line| line.strip_prefix("NAME="))
-            .expect("Cannot find NAME=… in /etc/os-release");
-        name.strip_prefix('"')
-            .and_then(|name| name.strip_suffix('"'))
-            .unwrap_or(name)
-            .clone_into(&mut self.distro);
-
+        let (name, variant_id) = libtaidan::cfg::os_release();
+        self.distro = name;
         if self.edition.is_empty() {
-            let edition = file
-                .split('\n')
-                .find_map(|line| line.strip_prefix("VARIANT_ID="))
-                .expect("Cannot find VARIANT_ID=… in /etc/os-release");
-            edition
-                .strip_prefix('"')
-                .and_then(|name| name.strip_suffix('"'))
-                .unwrap_or(edition)
-                .clone_into(&mut self.edition);
+            self.edition = variant_id;
         }
 
         tracing::trace!("Populated config: {self:#?}");
