@@ -95,6 +95,7 @@ This package contains the default configuration files for Taidan.
 
 %build
 %{cargo_license_online} > LICENSE.dependencies
+%cargo_license_summary_online
 
 %install
 %cargo_install
