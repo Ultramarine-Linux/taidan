@@ -11,7 +11,9 @@ export component KeyboardPage inherits TdnPage {
     forward-focus: search-layout;
 
     property <length> row-height: 2.25rem;
-    // rows moved to with the arrow keys, -1 until the user does so
+    // rows moved to with the arrow keys, -1 until the user does so. They're only highlighted, Enter
+    // or a click applies them, since applying a layout changes what typing in the search does
+    // (e.g. Cyrillic after passing Russian)
     property <int> layout-cursor: -1;
     // 0 is the "Default" row, `n` is `Lang.variants[n - 1]`
     property <int> variant-cursor: -1;
@@ -46,7 +48,6 @@ export component KeyboardPage inherits TdnPage {
             layout-cursor = current-layout-row;
         }
         layout-cursor = max(0, min(Lang.keymaps.length - 1, layout-cursor + delta));
-        select-keymap(Lang.keymaps[layout-cursor]);
         let top = layout-cursor * row-height;
         if top < -layouts.content-y {
             layouts.content-y = -top;
@@ -64,7 +65,7 @@ export component KeyboardPage inherits TdnPage {
                 variant-cursor = current-variant-row + 1;
             }
         }
-        select-variant(max(0, min(Lang.variants.length, variant-cursor + delta)));
+        variant-cursor = max(0, min(Lang.variants.length, variant-cursor + delta));
         let top = variant-cursor * row-height;
         if top < -variants.content-y {
             variants.content-y = -top;
@@ -112,16 +113,22 @@ export component KeyboardPage inherits TdnPage {
                 search-layout := TdnInput {
                     placeholder: Lang.t("page-keyboard-search-layout", []);
                     icon: @image-url("../../data/icons/system-search-symbolic.svg");
-                    // the arrow keys pick a layout while the focus stays here, so screen readers
-                    // hear about it from the description changing
-                    description: root.first-layout-match ? Lang.keymaps[0].name : Lang.current_keymap.name;
+                    // the arrow keys move through the layouts while the focus stays here, so screen
+                    // readers hear about it from the description changing
+                    description: root.layout-cursor >= 0 && root.layout-cursor < Lang.keymaps.length
+                        ? Lang.keymaps[root.layout-cursor].name
+                        : root.first-layout-match ? Lang.keymaps[0].name : Lang.current_keymap.name;
                     edited(text) => {
                         layout-cursor = -1;
                         layouts.content-y = 0;
                         Lang.filter_keymaps(text);
                     }
                     accepted => {
-                        if root.first-layout-match { select-keymap(Lang.keymaps[0]); }
+                        if root.layout-cursor >= 0 && root.layout-cursor < Lang.keymaps.length {
+                            select-keymap(Lang.keymaps[root.layout-cursor]);
+                        } else if root.first-layout-match {
+                            select-keymap(Lang.keymaps[0]);
+                        }
                         search-variant.focus();
                     }
                     key-pressed(event) => {
@@ -139,7 +146,7 @@ export component KeyboardPage inherits TdnPage {
                         text: keymap.name;
                         secondary: keymap.id;
                         selected: keymap.id == Lang.current_keymap.id;
-                        highlighted: i == 0 && root.first-layout-match;
+                        highlighted: i == root.layout-cursor || (i == 0 && root.first-layout-match);
                         clicked => {
                             layout-cursor = i;
                             select-keymap(keymap);
@@ -162,13 +169,21 @@ export component KeyboardPage inherits TdnPage {
                 search-variant := TdnInput {
                     placeholder: Lang.t("page-keyboard-search-variant", []);
                     icon: @image-url("../../data/icons/system-search-symbolic.svg");
-                    description: Lang.current_variant.id == "" ? Lang.t("default", []) : Lang.current_variant.name;
+                    description: root.variant-cursor == 0 ? Lang.t("default", [])
+                        : root.variant-cursor > 0 && root.variant-cursor <= Lang.variants.length
+                        ? Lang.variants[root.variant-cursor - 1].name
+                        : Lang.current_variant.id == "" ? Lang.t("default", []) : Lang.current_variant.name;
                     edited(text) => {
                         variant-cursor = -1;
                         variants.content-y = 0;
                         Lang.filter_variants(text);
                     }
-                    accepted => { root.try-next(); }
+                    accepted => {
+                        if root.variant-cursor >= 0 && root.variant-cursor <= Lang.variants.length {
+                            select-variant(root.variant-cursor);
+                        }
+                        root.try-next();
+                    }
                     key-pressed(event) => {
                         if event.text == Key.DownArrow { move-variant-cursor(1); return accept; }
                         if event.text == Key.UpArrow { move-variant-cursor(-1); return accept; }
@@ -186,6 +201,7 @@ export component KeyboardPage inherits TdnPage {
                             height: row-height;
                             text: Lang.t("default", []);
                             selected: Lang.current_variant.id == "";
+                            highlighted: root.variant-cursor == 0;
                             clicked => { select-variant(0); }
                         }
 
@@ -193,6 +209,7 @@ export component KeyboardPage inherits TdnPage {
                             height: row-height;
                             text: variant.name;
                             selected: variant.id == Lang.current_variant.id;
+                            highlighted: root.variant-cursor == i + 1;
                             clicked => { select-variant(i + 1); }
                         }
                     }
