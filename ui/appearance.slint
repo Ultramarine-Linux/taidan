@@ -1,7 +1,10 @@
 export struct AccentItem {
     // GNOME's `accent-color` name, also the end of its translation id, `page-theme-accent-<id>`
     id: string,
+    // the color itself, for the swatch
     color: color,
+    // darkened just enough that white text on it passes WCAG AA, for buttons and other fills
+    fill: color,
 }
 
 // the accent color for the new user, driven from Rust (`src/theme.rs`)

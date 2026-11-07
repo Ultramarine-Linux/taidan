@@ -14,12 +14,12 @@ export global TdnStyle {
     // the accent picked on the theme page, so it shows right away like dark mode does, otherwise
     // the distro's, lightened in dark mode so it still reads on a dark background
     out property <brush> accent: Appearance.accent >= 0 && Appearance.accent < Appearance.accents.length
-        ? Appearance.accents[Appearance.accent].color
+        ? Appearance.accents[Appearance.accent].fill
         : Theme.mode == ThemeMode.dark
         ? Cfg.get_brush("accent_color_dark", #4a56e2)
         : Cfg.get_brush("accent_color", #00078f);
     // text and icons on the accent, for distros with a light one. The picked accents all take
-    // white, as in libadwaita
+    // white, as in libadwaita, which their fills are darkened for
     out property <color> accent-foreground: Appearance.accent >= 0 ? white
         : Theme.mode == ThemeMode.dark
         ? Cfg.get_color("accent_foreground_color_dark", Cfg.get_color("accent_foreground_color", white))
