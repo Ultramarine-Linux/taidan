@@ -251,14 +251,15 @@ impl Drivers {
     }
 
     async fn setup_nvidia_kargs() -> Res<()> {
+        // append-if-missing so a retry doesn't duplicate kargs. rpm-ostree exits 0 on no changes
         root(
             "rpm-ostree",
             &[
                 "kargs",
-                "--append=rd.driver.blacklist=nouveau",
-                "--append=modprobe.blacklist=nouveau",
-                "--append=nvidia-drm.modeset=1",
-                "--append=initcall_blacklist=simpledrm_platform_driver_init",
+                "--append-if-missing=rd.driver.blacklist=nouveau",
+                "--append-if-missing=modprobe.blacklist=nouveau",
+                "--append-if-missing=nvidia-drm.modeset=1",
+                "--append-if-missing=initcall_blacklist=simpledrm_platform_driver_init",
             ],
         )
         .await?;
