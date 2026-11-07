@@ -84,6 +84,9 @@ export global Network {
     // translation id of why the last connection failed, for `error-ssid`
     in property <string> error-id;
     in property <string> error-ssid;
+    // the network whose row button last had keyboard focus, so the row can take it back when it's
+    // rebuilt, for example when it moves to the top after connecting
+    in-out property <string> focus-ssid;
     // shows "I Don't Have Internet" even when online, from `taidan0.persist_no_internet_btn`
     in property <bool> persist-offline-btn;
 

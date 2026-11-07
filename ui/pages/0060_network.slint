@@ -37,8 +37,15 @@ component NameCell inherits TdnText {
     overflow: elide;
 }
 
-component NetworkRow inherits HorizontalLayout {
+component NetworkRow inherits VerticalLayout {
     in property <WifiNetwork> net;
+
+    // why connecting to it from the list failed, which has no dialog of its own to show it in
+    property <string> error: Network.error-ssid == root.net.ssid && Network.error-id != ""
+        && Network.password-ssid == "" && !Network.enterprise-open && !Network.hidden-open
+        ? Lang.t(Network.error-id, []) : "";
+    // whether this row's button had focus before it was rebuilt, see `Network.focus-ssid`
+    property <bool> wants-focus: Network.focus-ssid == root.net.ssid;
 
     // starts connecting, asking for a password or login first if one is needed
     function connect() {
@@ -54,55 +61,98 @@ component NetworkRow inherits HorizontalLayout {
         }
     }
 
-    height: 2.6rem;
-    spacing: 0.6rem;
-    padding-left: 0.25rem;
-    padding-right: 0.25rem;
-
-    VerticalLayout {
-        alignment: center;
-        horizontal-stretch: 0;
-
-        TdnWifiIcon {
-            strength: root.net.strength;
+    // gives focus back after the connect button was swapped for the status icon, or the row was
+    // rebuilt when the list reordered
+    function refocus() {
+        if !root.wants-focus { return; }
+        if root.net.connected {
+            // connected rows have no connect button to come back to
+            Network.focus-ssid = "";
+            ip-btn.focus();
+        } else {
+            connect-btn.focus();
         }
     }
 
-    NameCell {
-        layout-order: Dir.order(1);
-        text: root.net.ssid;
-    }
+    init => { root.refocus(); }
+    changed wants-focus => { root.refocus(); }
+    changed connected => { root.refocus(); }
 
-    VerticalLayout {
-        layout-order: Dir.order(2);
-        alignment: center;
-        horizontal-stretch: 0;
+    // only for `changed` above, since a struct field can't be watched directly
+    property <bool> connected: root.net.connected;
 
-        IpSettingsButton {
-            name: root.net.ssid;
-            clicked => { Network.open-ip(root.net.ssid); }
-        }
-    }
+    HorizontalLayout {
+        height: 2.6rem;
+        spacing: 0.6rem;
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
 
-    StatusCell {
-        layout-order: Dir.order(3);
-
-        if root.net.connected: TdnStatusIcon {
-            label: Lang.t("page-internet-connected", []);
-        }
-
-        if !root.net.connected && Network.connecting-ssid == root.net.ssid: HorizontalLayout {
+        VerticalLayout {
             alignment: center;
-            TdnSpinner { width: 1.1rem; }
+            horizontal-stretch: 0;
+
+            TdnWifiIcon {
+                strength: root.net.strength;
+            }
         }
 
-        if !root.net.connected && Network.connecting-ssid != root.net.ssid: TdnIconButton {
-            // forward, which points left for right-to-left languages
-            icon: Lang.rtl ? LucidePaths.arrow-left : LucidePaths.arrow-right;
-            label: Lang.t("page-internet-connect-to", [{ key: "ssid", value: root.net.ssid }]);
-            enabled: Network.connecting-ssid == "" && root.net.security != Security.unsupported;
-            clicked => { root.connect(); }
+        NameCell {
+            layout-order: Dir.order(1);
+            text: root.net.ssid;
         }
+
+        VerticalLayout {
+            layout-order: Dir.order(2);
+            alignment: center;
+            horizontal-stretch: 0;
+
+            ip-btn := IpSettingsButton {
+                name: root.net.ssid;
+                clicked => { Network.open-ip(root.net.ssid); }
+            }
+        }
+
+        StatusCell {
+            layout-order: Dir.order(3);
+
+            // stacked, so the hidden button takes no room
+            Rectangle {
+                height: 1.6rem * Tokens.text-scale;
+
+                if root.net.connected: TdnStatusIcon {
+                    label: Lang.t("page-internet-connected", []);
+                }
+
+                // one button through the whole attempt, which turns into a spinner, so keyboard and
+                // screen reader focus stay on it
+                connect-btn := TdnIconButton {
+                    visible: !root.net.connected;
+                    // forward, which points left for right-to-left languages
+                    icon: Lang.rtl ? LucidePaths.arrow-left : LucidePaths.arrow-right;
+                    label: Lang.t("page-internet-connect-to", [{ key: "ssid", value: root.net.ssid }]);
+                    description: root.error;
+                    busy: Network.connecting-ssid == root.net.ssid;
+                    enabled: !root.net.connected && Network.connecting-ssid == ""
+                        && root.net.security != Security.unsupported;
+                    clicked => { root.connect(); }
+                    changed has-focus => {
+                        if self.has-focus {
+                            Network.focus-ssid = root.net.ssid;
+                        } else if Network.focus-ssid == root.net.ssid && !root.net.connected {
+                            Network.focus-ssid = "";
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if root.error != "": TdnText {
+        text: root.error;
+        color: Tokens.color-destructive;
+        horizontal-alignment: Dir.text-start;
+        wrap: word-wrap;
+        font-size: 0.9 * Tokens.text-rem;
     }
 }
 
@@ -307,7 +357,12 @@ export component PasswordDialog inherits TdnDialog {
     property <bool> busy: Network.connecting-ssid == Network.password-ssid;
 
     title: Lang.t("page-internet-connect-to", [{ key: "ssid", value: Network.password-ssid }]);
-    dismissed => { Network.password-ssid = ""; }
+    // the error was this dialog's, so it shouldn't be left under the network's row
+    dismissed => {
+        Network.password-ssid = "";
+        Network.error-id = "";
+        Network.error-ssid = "";
+    }
 
     function submit() {
         if !root.busy && pw.text != "" {
@@ -377,7 +432,11 @@ export component HiddenDialog inherits TdnDialog {
     property <bool> complete: root.ssid != "" && (!root.needs-password || root.password.character-count >= 8);
 
     title: Lang.t("page-internet-hidden-title", []);
-    dismissed => { Network.hidden-open = false; }
+    dismissed => {
+        Network.hidden-open = false;
+        Network.error-id = "";
+        Network.error-ssid = "";
+    }
 
     function submit() {
         if root.busy || !root.complete { return; }
@@ -718,6 +777,8 @@ export component EnterpriseDialog inherits TdnDialog {
             root.stop-picking();
         } else {
             Network.enterprise-open = false;
+            Network.error-id = "";
+            Network.error-ssid = "";
         }
     }
 

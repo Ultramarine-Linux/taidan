@@ -771,49 +771,62 @@ export component TdnIconButton inherits Rectangle {
     // what it does, for screen readers
     in property <string> label;
     in property <bool> enabled: true;
+    // shows a spinner and ignores presses, but keeps keyboard focus, unlike `enabled`
+    in property <bool> busy;
+    // more about it, such as why the last try failed, for screen readers
+    in property <string> description;
     // whether this is part of a dialog, see `Modal`
     in property <bool> in-dialog;
+    out property <bool> has-focus: focus.has-focus;
     callback clicked;
 
     property <bool> pointer-focus;
+    property <bool> active: root.enabled && !root.busy;
 
     forward-focus: focus;
     accessible-role: button;
     accessible-label: root.label;
-    accessible-enabled: root.enabled;
-    accessible-action-default => { if root.enabled { root.clicked(); } }
+    accessible-description: root.description;
+    accessible-enabled: root.active;
+    accessible-action-default => { if root.active { root.clicked(); } }
 
     // drawn at text size, like buttons, see `Tokens.text-scale`
     width: self.height;
     height: 1.6rem * Tokens.text-scale;
     border-radius: Tokens.radius-sm;
-    background: !root.enabled ? TdnStyle.accent.transparentize(0.92)
+    background: root.busy ? transparent
+        : !root.enabled ? TdnStyle.accent.transparentize(0.92)
         : area.pressed ? TdnStyle.accent.transparentize(0.6)
         : area.has-hover ? TdnStyle.accent.transparentize(0.75)
         : TdnStyle.accent.transparentize(0.85);
     animate background { duration: Tokens.motion-fast; }
 
+    // stays enabled while busy, since disabling the focused item drops focus
     focus := FocusScope {
-        enabled: root.enabled && Modal.open == root.in-dialog;
+        enabled: (root.enabled || root.busy) && Modal.open == root.in-dialog;
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == Key.Return || event.text == " " {
-                if !event.repeat { root.clicked(); }
+                if !event.repeat && root.active { root.clicked(); }
                 return accept;
             }
             reject
         }
     }
 
-    Icon {
+    if root.busy: TdnSpinner {
+        width: parent.height * 0.7;
+    }
+
+    if !root.busy: Icon {
         commands: root.icon;
         size: parent.height * 0.6;
         tint: root.enabled ? TdnStyle.accent : Tokens.color-muted-foreground;
     }
 
     area := TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: root.enabled ? pointer : default;
+        enabled: root.active;
+        mouse-cursor: root.active ? pointer : default;
         pointer-event(ev) => {
             if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
         }
