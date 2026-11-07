@@ -270,6 +270,9 @@ struct State {
     system: Option<String>,
     /// set once the user picks one, so changing the language no longer changes it
     touched: bool,
+    /// whether to guess from the language's country when the system has no zone. Off when the
+    /// timezone page is skipped, since nothing saves the guess and the system keeps its zone
+    guess: bool,
     query: String,
 }
 
@@ -302,8 +305,12 @@ fn refresh(ui: &AppWindow, state: &State) {
     let id = if state.touched {
         tz.get_current().id.to_string()
     } else {
-        suggest(&state.zones, state.system.as_deref(), &locale(ui))
-            .unwrap_or_else(|| UTC.to_owned())
+        let suggested = if state.guess {
+            suggest(&state.zones, state.system.as_deref(), &locale(ui))
+        } else {
+            state.system.clone()
+        };
+        suggested.unwrap_or_else(|| UTC.to_owned())
     };
     select(ui, &id);
 }
@@ -328,6 +335,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tz: &Tz<'_>) {
         on_map,
         system,
         touched: false,
+        guess: !crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Timezone),
         query: String::new(),
     }));
     tz.on_refresh({

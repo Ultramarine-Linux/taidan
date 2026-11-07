@@ -133,9 +133,15 @@ fn start(ui: &slint::Weak<AppWindow>) {
     crate::SETTINGS.write().dark_mode =
         (!crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Theme))
             .then(|| app.global::<Theme<'_>>().get_mode() == ThemeMode::Dark);
-    // `Network.save` only runs from the network page. With it skipped nobody chose to go offline,
-    // so go by the connection right now, as the summary does. Leaving `nointernet` off on an
-    // offline machine makes the dnf steps fail.
+    // like the theme, a skipped language page keeps the distro's system locale. The UI language
+    // only comes from the system's then anyway, or is English if it's one we don't have
+    if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Language) {
+        crate::SETTINGS.write().locale.clear();
+    }
+    // `Network.save` only runs from the network page. With it skipped the device name stays empty,
+    // so the system keeps its hostname as when the name is left blank. Nobody chose to go offline
+    // either, so go by the connection right now, as the summary does. Leaving `nointernet` off on
+    // an offline machine makes the dnf steps fail.
     let online = app.global::<Network<'_>>().get_online();
     if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Network) {
         crate::SETTINGS.write().nointernet = !online;
