@@ -352,7 +352,7 @@ impl I18nCfg {
     /// Fcitx5 everywhere else
     #[must_use]
     pub fn imf(&self, edition: &str) -> I18nImf {
-        self.imf.unwrap_or(if edition.eq_ignore_ascii_case("gnome") {
+        self.imf.unwrap_or(if crate::cfg::desktop(edition) == "gnome" {
             I18nImf::IBus
         } else {
             I18nImf::Fcitx5
@@ -422,6 +422,7 @@ mod tests {
     fn imf_default() {
         let cfg = I18nCfg::default();
         assert_eq!(cfg.imf("gnome"), I18nImf::IBus);
+        assert_eq!(cfg.imf("atomic-gnome"), I18nImf::IBus);
         assert_eq!(cfg.imf("plasma"), I18nImf::Fcitx5);
         assert_eq!(cfg.imf(""), I18nImf::Fcitx5);
         let cfg = I18nCfg { imf: Some(I18nImf::IBus) };

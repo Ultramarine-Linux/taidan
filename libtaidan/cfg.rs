@@ -103,14 +103,29 @@ pub fn parse_os_release(file: &str) -> (String, String) {
     (name, variant_id)
 }
 
+/// the desktop an edition (`VARIANT_ID`) runs, lowercase, the same for its atomic image:
+/// `atomic-gnome` is `gnome`
+#[must_use]
+pub fn desktop(edition: &str) -> String {
+    let edition = edition.to_ascii_lowercase();
+    edition.strip_prefix("atomic-").map(str::to_owned).unwrap_or(edition)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::parse_os_release;
+    use super::{desktop, parse_os_release};
+
+    #[test]
+    fn desktops() {
+        assert_eq!(desktop("budgie"), "budgie");
+        assert_eq!(desktop("atomic-GNOME"), "gnome");
+        assert_eq!(desktop(""), "");
+    }
 
     #[test]
     fn os_release_fields() {
-        let file = "NAME=\"Ultramarine Linux\"\nPRETTY_NAME=\"x\"\nVARIANT_ID=flagship\n";
-        assert_eq!(parse_os_release(file), ("Ultramarine Linux".into(), "flagship".into()));
+        let file = "NAME=\"Ultramarine Linux\"\nPRETTY_NAME=\"x\"\nVARIANT_ID=budgie\n";
+        assert_eq!(parse_os_release(file), ("Ultramarine Linux".into(), "budgie".into()));
         assert_eq!(parse_os_release("NAME='Arch Linux'\n"), ("Arch Linux".into(), String::new()));
     }
 

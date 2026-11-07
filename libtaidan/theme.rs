@@ -71,7 +71,7 @@ impl Accent {
 /// and libadwaita apps) and Plasma. Budgie and Xfce use GTK 3 themes that ignore `accent-color`
 #[must_use]
 pub fn accent_supported(edition: &str) -> bool {
-    ["gnome", "plasma", "kde"].iter().any(|e| edition.eq_ignore_ascii_case(e))
+    matches!(crate::cfg::desktop(edition).as_str(), "gnome" | "plasma" | "kde")
 }
 
 /// the GTK and icon themes that go with light or dark mode, and Xfce's window manager theme
@@ -90,12 +90,12 @@ pub struct Themes {
 /// rather than `Papirus-Light`
 #[must_use]
 pub fn themes(edition: &str, dark: bool) -> Option<Themes> {
-    Some(match edition.to_ascii_lowercase().as_str() {
+    Some(match crate::cfg::desktop(edition).as_str() {
         "gnome" => {
             Themes { gtk: if dark { "Adwaita-dark" } else { "Adwaita" }, icons: None, wm: None }
         }
         // as Ultramarine's budgie-filesystem gschema override has them for dark
-        "budgie" | "flagship" => Themes {
+        "budgie" => Themes {
             gtk: if dark { "Fluent-round-Dark" } else { "Fluent-round-Light" },
             icons: Some(if dark { "Fluent-dark" } else { "Fluent" }),
             wm: None,
@@ -113,7 +113,7 @@ pub fn themes(edition: &str, dark: bool) -> Option<Themes> {
 /// whether the edition reads its themes from xfconf rather than `gsettings`
 #[must_use]
 pub fn uses_xfconf(edition: &str) -> bool {
-    edition.eq_ignore_ascii_case("xfce")
+    crate::cfg::desktop(edition) == "xfce"
 }
 
 #[cfg(test)]
@@ -134,14 +134,15 @@ mod tests {
     fn accent_only_where_it_works() {
         assert!(accent_supported("gnome"));
         assert!(accent_supported("Plasma"));
-        assert!(!accent_supported("flagship"));
+        assert!(!accent_supported("budgie"));
+        assert!(accent_supported("atomic-gnome"));
         assert!(!accent_supported("xfce"));
         assert!(!accent_supported(""));
     }
 
     #[test]
     fn themes_per_edition() {
-        let budgie = themes("flagship", true).unwrap();
+        let budgie = themes("atomic-budgie", true).unwrap();
         assert_eq!((budgie.gtk, budgie.icons), ("Fluent-round-Dark", Some("Fluent-dark")));
         let budgie = themes("budgie", false).unwrap();
         assert_eq!((budgie.gtk, budgie.icons), ("Fluent-round-Light", Some("Fluent")));
