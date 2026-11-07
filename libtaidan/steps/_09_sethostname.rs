@@ -3,7 +3,7 @@ use crate::prelude::*;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SetHostname;
 impl super::Step for SetHostname {
-    #[tracing::instrument]
+    #[tracing::instrument(skip(settings))]
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,

@@ -3,7 +3,7 @@ use crate::prelude::*;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DnfInstallUpdate;
 impl super::Step for DnfInstallUpdate {
-    #[tracing::instrument]
+    #[tracing::instrument(skip(settings))]
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,

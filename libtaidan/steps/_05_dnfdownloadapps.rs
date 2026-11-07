@@ -4,7 +4,7 @@ use crate::{i18n::I18nImf, prelude::*};
 pub struct DnfDownloadApps;
 impl super::Step for DnfDownloadApps {
     #[allow(clippy::indexing_slicing)]
-    #[tracing::instrument]
+    #[tracing::instrument(skip(settings))]
     async fn pre<C: crate::Callback>(
         &self,
         settings: &mut crate::settings::Settings,
@@ -48,7 +48,7 @@ impl super::Step for DnfDownloadApps {
         Ok(())
     }
 
-    #[tracing::instrument(skip(callback))]
+    #[tracing::instrument(skip(settings, callback))]
 
     async fn run<C: crate::Callback>(
         &self,

@@ -5,7 +5,7 @@ use crate::prelude::*;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct UserAdd;
 impl super::Step for UserAdd {
-    #[tracing::instrument]
+    #[tracing::instrument(skip(settings))]
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,

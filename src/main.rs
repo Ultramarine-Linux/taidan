@@ -106,11 +106,7 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
     #[cfg(not(debug_assertions))]
     let sentry_guard = sentry::init((
         SENTRY_LINK,
-        sentry::ClientOptions::new()
-            .maybe_release(sentry::release_name!())
-            // Capture user IPs and potentially sensitive headers when using HTTP server integrations
-            // see https://docs.sentry.io/platforms/rust/data-management/data-collected for more info
-            .send_default_pii(true),
+        sentry::ClientOptions::new().maybe_release(sentry::release_name!()),
     ));
     #[cfg(debug_assertions)]
     let sentry_guard = ();

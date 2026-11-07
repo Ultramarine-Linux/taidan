@@ -4,7 +4,7 @@ use crate::prelude::*;
 pub struct SystemSetup;
 impl super::Step for SystemSetup {
     /// adds the language pack for the user's language to the apps to install
-    #[tracing::instrument]
+    #[tracing::instrument(skip(settings))]
     async fn pre<C: crate::Callback>(
         &self,
         settings: &mut crate::settings::Settings,

@@ -51,7 +51,7 @@ impl<F: Fn(InstallMsg)> Callback for F {
 /// # Errors
 ///
 /// Stage failures are propagated.
-#[tracing::instrument(skip(callback))]
+#[tracing::instrument(skip(settings, callback))]
 pub async fn start_install(
     settings: &mut settings::Settings,
     cfg: &cfg::Config,

@@ -35,7 +35,7 @@ pub struct Drivers;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Codecs;
 impl super::Step for DriversCodecs {
-    #[tracing::instrument(skip(sender))]
+    #[tracing::instrument(skip(settings, sender))]
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,

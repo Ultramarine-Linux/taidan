@@ -4,7 +4,7 @@ use crate::prelude::*;
 pub struct SetLocale;
 impl super::Step for SetLocale {
     /// after the apps, so the language pack, and with it the locale, is installed
-    #[tracing::instrument]
+    #[tracing::instrument(skip(settings))]
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,
