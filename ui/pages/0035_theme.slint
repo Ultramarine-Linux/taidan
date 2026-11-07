@@ -8,6 +8,8 @@ import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
 import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
 import { Palette } from "../slintcn/theme/palette.slint";
 import { Palette as StdPalette } from "std-widgets.slint";
+import { Appearance } from "../appearance.slint";
+import { FocusRing } from "../slintcn/components/focus-ring.slint";
 
 // the wallpaper with a window on it, in light or dark, picked like a radio button
 component ThemeTile inherits Rectangle {
@@ -155,6 +157,97 @@ component ThemeTile inherits Rectangle {
     }
 }
 
+// the accent colors as a row of swatches, a radio group with one Tab stop, where Left and Right
+// pick the next one as they read
+component AccentRow inherits Rectangle {
+    // Enter, to go on with the picked one
+    callback accepted();
+
+    property <length> size: 1.75rem;
+    property <bool> pointer-focus;
+
+    function move(delta: int) {
+        let step = Lang.rtl ? -delta : delta;
+        if Appearance.accent < 0 {
+            Appearance.accent = step > 0 ? 0 : Appearance.accents.length - 1;
+        } else {
+            Appearance.accent = Math.mod(Appearance.accent + step, Appearance.accents.length);
+        }
+    }
+
+    forward-focus: focus;
+    accessible-role: radio-group;
+    accessible-label: Lang.t("page-theme-accent", []);
+
+    focus := FocusScope {
+        enabled: !Modal.open;
+        key-pressed(event) => {
+            root.pointer-focus = false;
+            if event.text == Key.LeftArrow { root.move(-1); return accept; }
+            if event.text == Key.RightArrow { root.move(1); return accept; }
+            if event.text == " " {
+                if !event.repeat && Appearance.accent < 0 { Appearance.accent = 0; }
+                return accept;
+            }
+            if event.text == Key.Return {
+                if !event.repeat { root.accepted(); }
+                return accept;
+            }
+            reject
+        }
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 0.75rem;
+
+        for accent[i] in Appearance.accents: swatch := Rectangle {
+            property <bool> checked: i == Appearance.accent;
+
+            layout-order: Dir.order(i);
+            width: root.size;
+            height: root.size;
+            accessible-role: radio-button;
+            accessible-label: Lang.t("page-theme-accent-" + accent.id, []);
+            accessible-checkable: true;
+            accessible-checked: self.checked;
+            accessible-action-default => { Appearance.accent = i; }
+
+            Rectangle {
+                border-radius: self.width / 2;
+                background: accent.color;
+            }
+
+            // a check, so it isn't only the color that says which one it is
+            if swatch.checked: Icon {
+                commands: LucidePaths.check;
+                size: root.size * 0.55;
+                tint: white;
+                stroke-width: 3px;
+            }
+
+            TouchArea {
+                mouse-cursor: pointer;
+                pointer-event(ev) => {
+                    if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
+                }
+                clicked => {
+                    Appearance.accent = i;
+                    focus.focus();
+                }
+            }
+
+            // on the picked one, or the first while none is
+            if focus.has-focus && !root.pointer-focus
+                && (swatch.checked || (Appearance.accent < 0 && i == 0)): FocusRing {
+                host-width: swatch.width;
+                host-height: swatch.height;
+                radius: swatch.width / 2 + self.offset;
+            }
+        }
+    }
+}
+
 // light or dark mode, for the new user and for the rest of the setup, which switches as soon as
 // one is picked
 export component ThemePage inherits TdnPage {
@@ -174,10 +267,11 @@ export component ThemePage inherits TdnPage {
         if root.dark { dark-tile.focus(); } else { light-tile.focus(); }
     }
 
-    // the tiles at their own height, in the middle of the page
+    // the tiles at their own height, in the middle of the page, the accents under them
     VerticalLayout {
         vertical-stretch: 1;
         alignment: center;
+        spacing: 2rem;
 
         HorizontalLayout {
             alignment: center;
@@ -212,5 +306,21 @@ export component ThemePage inherits TdnPage {
                 }
             }
         }
+
+        if Appearance.accents.length > 0: VerticalLayout {
+            spacing: 0.75rem;
+
+            TdnText {
+                text: Lang.t("page-theme-accent", []);
+                horizontal-alignment: center;
+                font-weight: Tokens.typography-weight-medium;
+                accessible-role: none;
+            }
+
+            AccentRow {
+                accepted => { root.try-next(); }
+            }
+        }
     }
 }
+

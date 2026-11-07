@@ -1,0 +1,13 @@
+export struct AccentItem {
+    // GNOME's `accent-color` name, also the end of its translation id, `page-theme-accent-<id>`
+    id: string,
+    color: color,
+}
+
+// the accent color for the new user, driven from Rust (`src/theme.rs`)
+export global Appearance {
+    // empty where the desktop doesn't follow an accent color, then there's no picker
+    in property <[AccentItem]> accents;
+    // index into `accents`, -1 keeps the distro's default
+    in-out property <int> accent: -1;
+}

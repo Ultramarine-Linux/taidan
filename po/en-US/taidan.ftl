@@ -8,6 +8,10 @@ next = Next
 cancel = Cancel
 # btn (skip anything)
 skip = Skip
+# btn (close a dialog after making changes in it)
+done = Done
+# window title, read out by screen readers and shown in window switchers
+window-title = { $distro } Setup
 # hidden menu entry for the Alt+Shift+T debug terminal, read out by screen readers
 menu-open-terminal = Open Terminal
 # hidden menu entry for the Meta+Alt+S shortcut, read out by screen readers
@@ -97,6 +101,11 @@ page-keyboard = Keyboard Layout
 # .search*: search field placeholder
 page-keyboard-search-layout = Search keyboard layouts…
 page-keyboard-search-variant = Search keyboard variants…
+# input methods (IMEs), for languages typed with more than a keyboard layout, e.g. Chinese
+page-keyboard-ims = Input Methods
+# what page-keyboard-ims shows when none are turned on, as in "Input Methods: None"
+page-keyboard-ims-none = None
+page-keyboard-ims-desc = For typing languages that need more than a keyboard layout, like Chinese, Japanese, or Korean. You can change these anytime in Settings.
 
 ## [Device Name]
 ## [Username]
@@ -309,6 +318,18 @@ page-tweaks-done = Done
 page-theme = Choose Your Theme
 page-theme-light = Light
 page-theme-dark = Dark
+# the row of accent color swatches under the light and dark choices
+page-theme-accent = Accent Color
+# accent color names, read out by screen readers for each swatch
+page-theme-accent-blue = Blue
+page-theme-accent-teal = Teal
+page-theme-accent-green = Green
+page-theme-accent-yellow = Yellow
+page-theme-accent-orange = Orange
+page-theme-accent-red = Red
+page-theme-accent-pink = Pink
+page-theme-accent-purple = Purple
+page-theme-accent-slate = Slate
 
 ## [Browser Selection]
 

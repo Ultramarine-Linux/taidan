@@ -22,6 +22,8 @@ pub fn run() {
     crate::network::initialize_ui(&ui.as_weak(), &ui.global());
     crate::timezone::initialize_ui(&ui.as_weak(), &ui.global());
     crate::tweaks::initialize_ui(&ui.as_weak(), &ui.global());
+    crate::theme::initialize_ui(&ui.global());
+    crate::ims::initialize_ui(&ui.as_weak(), &ui.global());
     crate::a11y::initialize_ui(&ui.as_weak(), &ui.global());
     init_actions(ui.as_weak(), &ui.global());
     ui.set_pagenum(crate::cfg::first_page());

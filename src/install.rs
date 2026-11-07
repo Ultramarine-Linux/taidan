@@ -139,6 +139,9 @@ fn start(ui: &slint::Weak<AppWindow>) {
     crate::SETTINGS.write().dark_mode =
         (!crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Theme))
             .then(|| app.global::<Theme<'_>>().get_mode() == ThemeMode::Dark);
+    // with the mode only, a skipped theme page keeps the distro's accent too
+    let accent = crate::SETTINGS.read().dark_mode.and_then(|_| crate::theme::picked(&app.global()));
+    crate::SETTINGS.write().accent = accent;
     // like the theme, a skipped language page keeps the distro's system locale. The UI language
     // only comes from the system's then anyway, or is English if it's one we don't have
     if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Language) {

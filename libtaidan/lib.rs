@@ -11,6 +11,7 @@ pub mod proxy;
 pub mod server_setup;
 pub mod settings;
 pub mod steps;
+pub mod theme;
 pub mod time;
 pub mod tweaks;
 

@@ -55,19 +55,15 @@ impl super::Step for UserAdd {
 async fn set_avatar(settings: &crate::settings::Settings) -> Res<()> {
     let Some(avatar) = &settings.avatar else { return Ok(()) };
     let icon = format!("/var/lib/AccountsService/icons/{}", settings.username);
-    super::root(
-        "install",
-        [std::ffi::OsStr::new("-Dm644"), avatar.as_os_str(), icon.as_ref()],
-    )
-    .await?;
+    super::root("install", [std::ffi::OsStr::new("-Dm644"), avatar.as_os_str(), icon.as_ref()])
+        .await?;
     // a new user has no settings there yet, so this doesn't overwrite anything of theirs
     let user = crate::TEMP_DIR.join("accountsservice-user");
     tokio::fs::write(&user, format!("[User]\nIcon={icon}\nSystemAccount=false\n"))
         .await
         .map_err(Err::Io)?;
     let dest = format!("/var/lib/AccountsService/users/{}", settings.username);
-    super::root("install", [std::ffi::OsStr::new("-Dm600"), user.as_os_str(), dest.as_ref()])
-        .await
+    super::root("install", [std::ffi::OsStr::new("-Dm600"), user.as_os_str(), dest.as_ref()]).await
 }
 
 fn hash_password(settings: &crate::settings::Settings) -> Res<String> {
@@ -176,7 +172,7 @@ async fn stage_skel(
         }
         let a11y = crate::a11y::write_to_skel(settings, &skel).await?;
         let imf = super::_08_setup_imf::write_fcitx5_to_skel(settings, cfg, &skel).await?;
-        let theme = super::_01_settheme::write_to_skel(settings, &skel).await?;
+        let theme = super::_01_settheme::write_to_skel(settings, cfg, &skel).await?;
         let keymap = crate::i18n::write_keymap_to_skel(settings, &skel).await?;
         Ok::<_, Err>(a11y || imf || theme || keymap)
     };

@@ -150,11 +150,11 @@ pub fn default_ims(locale: &str, imf: I18nImf) -> Vec<String> {
         .collect()
 }
 
-/// sets the input method framework from the config, and the input methods from the locale if
-/// none were picked, dropping any the framework doesn't have
+/// sets the input method framework from the config, and the input methods from the locale if the
+/// user didn't pick any, dropping any the framework doesn't have
 pub fn fill_settings(settings: &mut crate::settings::Settings, cfg: &crate::cfg::Config) {
     settings.imf = cfg.i18n.imf(&cfg.edition);
-    if settings.ims.is_empty() {
+    if settings.ims.is_empty() && !settings.ims_picked {
         settings.ims = default_ims(&settings.locale, settings.imf);
     }
     let imf = settings.imf;
@@ -446,5 +446,14 @@ mod tests {
             crate::cfg::Config { i18n: I18nCfg { imf: Some(I18nImf::IBus) }, ..Default::default() };
         fill_settings(&mut settings, &cfg);
         assert_eq!(settings.ims, ["Pinyin"]);
+
+        // turning them all off means none, not the locale's
+        let mut settings = crate::settings::Settings {
+            locale: "ja_JP.UTF-8".into(),
+            ims_picked: true,
+            ..Default::default()
+        };
+        fill_settings(&mut settings, &crate::cfg::Config::default());
+        assert!(settings.ims.is_empty());
     }
 }

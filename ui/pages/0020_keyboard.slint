@@ -1,9 +1,97 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir, Keymap } from "../lang.slint";
 import { ListView, ScrollView } from "std-widgets.slint";
-import { TdnInput, TdnListRow } from "../components.slint";
+import { TdnInput, TdnListRow, TdnText, Modal } from "../components.slint";
+import { Icon } from "../slintcn/components/icon.slint";
+import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
+import { FocusRing } from "../slintcn/components/focus-ring.slint";
+import { Ims } from "../ims.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
 import { Card } from "../slintcn/components/card.slint";
 import { Separator } from "../slintcn/components/separator.slint";
+
+// a row like the toggles elsewhere that says which input methods are on and opens the dialog to
+// change them
+component ImsRow inherits Rectangle {
+    property <bool> pointer-focus;
+    property <string> value: Ims.enabled == "" ? Lang.t("page-keyboard-ims-none", []) : Ims.enabled;
+
+    forward-focus: focus;
+    accessible-role: button;
+    accessible-label: Lang.t("page-keyboard-ims", []) + ", " + root.value;
+    accessible-action-default => { Ims.open = true; }
+
+    vertical-stretch: 0;
+    height: 2.75rem;
+    border-radius: Tokens.radius-lg;
+    border-width: 1px;
+    border-color: Tokens.color-border-hairline-strong;
+    background: area.has-hover ? Tokens.color-accent : Tokens.color-card;
+    animate background { duration: Tokens.motion-fast; }
+
+    focus := FocusScope {
+        enabled: !Modal.open;
+        key-pressed(event) => {
+            root.pointer-focus = false;
+            if event.text == Key.Return || event.text == " " {
+                if !event.repeat { Ims.open = true; }
+                return accept;
+            }
+            reject
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 1rem;
+        padding-right: 0.75rem;
+        spacing: 0.5rem;
+
+        TdnText {
+            text: Lang.t("page-keyboard-ims", []);
+            horizontal-alignment: Dir.text-start;
+            horizontal-stretch: 0;
+            font-weight: Tokens.typography-weight-medium;
+            accessible-role: none;
+        }
+
+        TdnText {
+            layout-order: Dir.order(1);
+            text: root.value;
+            horizontal-alignment: Dir.text-end;
+            horizontal-stretch: 1;
+            overflow: elide;
+            color: Tokens.color-muted-foreground;
+            accessible-role: none;
+        }
+
+        // points the way the language reads
+        VerticalLayout {
+            layout-order: Dir.order(2);
+            alignment: center;
+
+            Icon {
+                commands: Lang.rtl ? LucidePaths.chevron-left : LucidePaths.chevron-right;
+                size: 1.1rem;
+                tint: Tokens.color-muted-foreground;
+                stroke-width: 2px;
+            }
+        }
+    }
+
+    area := TouchArea {
+        mouse-cursor: pointer;
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
+        }
+        clicked => { Ims.open = true; }
+    }
+
+    if focus.has-focus && !root.pointer-focus: FocusRing {
+        host-width: parent.width;
+        host-height: parent.height;
+        radius: Tokens.radius-lg + self.offset;
+    }
+}
 
 export component KeyboardPage inherits TdnPage {
     pageid: "keyboard";
@@ -217,4 +305,7 @@ export component KeyboardPage inherits TdnPage {
             }
         }
     }
+
+    // only where the distro's input method framework has any
+    if Ims.items.length > 0: ImsRow { }
 }

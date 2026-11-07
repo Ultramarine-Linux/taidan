@@ -26,10 +26,9 @@ impl super::Step for DownloadUpdates {
             }
             return Ok(());
         }
-        let downloaded = super::super::dnf::handle_dnf(callback, |dnf| {
-            dnf.args(["upgrade", "--offline", "-y"])
-        })
-        .await;
+        let downloaded =
+            super::super::dnf::handle_dnf(callback, |dnf| dnf.args(["upgrade", "--offline", "-y"]))
+                .await;
         if let Err(e) = downloaded {
             tracing::warn!(?e, "cannot download updates, leaving them for later");
             return Ok(());

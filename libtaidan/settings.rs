@@ -39,11 +39,19 @@ pub struct Settings {
 
     /// dark (`true`) or light mode for the new user, [`None`] to keep the distro's default
     pub dark_mode: Option<bool>,
+    /// accent color for the new user, only applied along with [`Self::dark_mode`] and on desktops
+    /// that follow one, see [`crate::theme::accent_supported`]
+    pub accent: Option<crate::theme::Accent>,
 
     /// for networks that only reach the internet through a proxy
     pub proxy: Option<crate::proxy::Proxy>,
 
+    /// input methods to set up, filled from [`Self::locale`] when empty unless
+    /// [`Self::ims_picked`]
     pub ims: Vec<String>,
+    /// whether the user picked [`Self::ims`] themselves, so an empty list means none rather than
+    /// the ones that go with the locale
+    pub ims_picked: bool,
     pub imf: crate::i18n::I18nImf,
 
     pub actions: [Vec<String>; crate::cfg::ACTION_TYPES],

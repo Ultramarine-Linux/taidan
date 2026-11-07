@@ -6,16 +6,22 @@ import { LucidePaths } from "slintcn/components/lucide-paths.slint";
 import { Cfg } from "cfg.slint";
 import { Lang, Dir } from "lang.slint";
 import { Modal } from "modal.slint";
+import { Appearance } from "appearance.slint";
 export { Modal, Dir }
 import { Card } from "slintcn/components/card.slint";
 
 export global TdnStyle {
-    // the distro accent, lightened in dark mode so it still reads on a dark background
-    out property <brush> accent: Theme.mode == ThemeMode.dark
+    // the accent picked on the theme page, so it shows right away like dark mode does, otherwise
+    // the distro's, lightened in dark mode so it still reads on a dark background
+    out property <brush> accent: Appearance.accent >= 0 && Appearance.accent < Appearance.accents.length
+        ? Appearance.accents[Appearance.accent].color
+        : Theme.mode == ThemeMode.dark
         ? Cfg.get_brush("accent_color_dark", #4a56e2)
         : Cfg.get_brush("accent_color", #00078f);
-    // text and icons on the accent, for distros with a light one
-    out property <color> accent-foreground: Theme.mode == ThemeMode.dark
+    // text and icons on the accent, for distros with a light one. The picked accents all take
+    // white, as in libadwaita
+    out property <color> accent-foreground: Appearance.accent >= 0 ? white
+        : Theme.mode == ThemeMode.dark
         ? Cfg.get_color("accent_foreground_color_dark", Cfg.get_color("accent_foreground_color", white))
         : Cfg.get_color("accent_foreground_color", white);
 }
@@ -34,7 +40,8 @@ export component TdnBtn inherits Rectangle {
     in property <string> text;
     in property <image> icon;
     in property <brush> background-color: Tokens.color-primary;
-    in property <color> foreground-color: Tokens.color-primary-foreground;
+    // outline buttons have no fill, so their text is the page's
+    in property <color> foreground-color: root.outline ? Tokens.color-foreground : Tokens.color-primary-foreground;
     in property <length> font-size: Tokens.typography-body-size;
     in property <bool> enabled: true;
     // horizontal space between the edge and the content

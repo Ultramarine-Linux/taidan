@@ -5,6 +5,7 @@ import { Drivers, Install } from "../install.slint";
 import { Network, NetState } from "../network.slint";
 import { Tz } from "../timezone.slint";
 import { Tweaks } from "../tweaks.slint";
+import { Ims } from "../ims.slint";
 import { Cfg } from "../cfg.slint";
 import { TdnText, TdnStyle, TdnBtn, TdnToggleRow } from "../components.slint";
 import { DriverList, DriverRow } from "0100_drivers.slint";
@@ -125,6 +126,12 @@ export component SummaryPage inherits TdnPage {
                     icon: @image-url("../../data/icons/input-keyboard-symbolic.svg");
                     label: Lang.t("page-keyboard", []);
                     value: Lang.current_variant.id == "" ? Lang.current_keymap.name : Lang.current_variant.name;
+                }
+
+                if Ims.enabled != "": InfoRow {
+                    icon: @image-url("../../data/icons/input-keyboard-symbolic.svg");
+                    label: Lang.t("page-keyboard-ims", []);
+                    value: Ims.enabled;
                 }
 
                 InfoRow {

@@ -279,6 +279,7 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
             // before `current_language` changes, like the translations, see `Lang.select`
             if let Some(ui) = ui.upgrade() {
                 ui.global::<crate::ui::Lang<'_>>().set_rtl(is_rtl(&lang.locale));
+                crate::ims::follow_locale(&ui);
             }
             ui.upgrade_in_event_loop(|ui| ui.window().request_redraw()).expect("event loop err");
         }
