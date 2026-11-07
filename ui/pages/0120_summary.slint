@@ -7,6 +7,7 @@ import { Tz } from "../timezone.slint";
 import { Tweaks } from "../tweaks.slint";
 import { Ims } from "../ims.slint";
 import { Cfg } from "../cfg.slint";
+import { Modal } from "../modal.slint";
 import { TdnText, TdnStyle, TdnBtn, TdnToggleRow } from "../components.slint";
 import { DriverList, DriverRow } from "0100_drivers.slint";
 import { UserIcon } from "0040_whoareyou.slint";
@@ -65,6 +66,7 @@ export component SummaryPage inherits TdnPage {
     forward-focus: review;
 
     review := FocusScope {
+        enabled: !Modal.open;
         // a named group, or screen readers skip the FocusScope and say nothing when it's focused
         accessible-role: groupbox;
         accessible-label: root.name;

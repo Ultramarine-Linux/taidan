@@ -2,6 +2,7 @@ import { TdnBasePg, TdnHeader } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
 import { Install } from "../install.slint";
+import { Modal } from "../modal.slint";
 import { TdnText, TdnSpinner } from "../components.slint";
 import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
 
@@ -40,6 +41,7 @@ export component InstallingPage inherits TdnBasePg {
         }
 
         status := FocusScope {
+            enabled: !Modal.open;
             accessible-role: progress-indicator;
             accessible-label: Lang.t("page-installing-configuring", []);
             accessible-value: root.stage;

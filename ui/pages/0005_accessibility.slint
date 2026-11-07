@@ -296,6 +296,7 @@ export component AccessibilityPage inherits TdnBasePg {
 
     // Enter goes on, unless a tile or button has focus and takes it first
     focus := FocusScope {
+        enabled: !Modal.open;
         // focused when the page is shown, and when the window refocuses the page after a dialog
         // closes, the content takes it from here
         focus-gained(reason) => {
