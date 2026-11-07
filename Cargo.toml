@@ -54,6 +54,7 @@ keywords = ["oobe", "ultramarine", "linux"]
 basic-toml = "0.1.10"
 color-eyre = "0.6.5"
 fluent = "0.17.0"
+futures = { workspace = true }
 hex = "0.4.3"
 i18n-embed = { version = "0.16.0", features = [
     "desktop-requester",

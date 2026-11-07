@@ -4,6 +4,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+use futures::{FutureExt as _, StreamExt as _};
 use slint::{ComponentHandle, Model as _};
 use zbus::blocking::Connection;
 use zbus::proxy::{CacheProperties, Defaults};
@@ -496,14 +497,42 @@ impl Nm {
         }
     }
 
-    /// waits for `active` to come up on `dev`, showing the state meanwhile
-    fn wait(&mut self, active: &ObjectPath<'_>, dev: &ObjectPath<'_>) -> Result<(), Failure> {
+    /// state changes of `dev`, taken before activating so none are missed. A failed connection
+    /// only stays in the failed state for a moment before the device moves on to disconnected,
+    /// which forgets the reason, so polling the state hardly ever sees why it failed
+    fn watch(&self, dev: &ObjectPath<'_>) -> Option<zbus::proxy::SignalStream<'static>> {
+        let dev = self.at::<nm::Device<'_>>(dev).ok()?;
+        zbus::block_on(dev.inner().inner().receive_signal("StateChanged"))
+            .inspect_err(|e| tracing::warn!(?e, "cannot watch the device state"))
+            .ok()
+    }
+
+    /// waits for `active` to come up on `dev`, showing the state meanwhile. `watch` is from
+    /// [`Self::watch`] on `dev`
+    fn wait(
+        &mut self,
+        active: &ObjectPath<'_>,
+        dev: &ObjectPath<'_>,
+        mut watch: Option<zbus::proxy::SignalStream<'static>>,
+    ) -> Result<(), Failure> {
         let deadline = Instant::now() + CONNECT_TIMEOUT;
         let (active, dev) =
             (self.at::<nm::ActiveConnection<'_>>(active), self.at::<nm::Device<'_>>(dev));
         let mut reason = 0;
+        // the reason of the last failure seen, without blocking
+        let mut drain = |reason: &mut u32| {
+            let Some(watch) = &mut watch else { return };
+            while let Some(Some(msg)) = watch.next().now_or_never() {
+                if let Ok((DEVICE_STATE_FAILED, _, r)) = msg.body().deserialize::<(u32, u32, u32)>()
+                {
+                    *reason = r;
+                }
+            }
+        };
         let mut published = Instant::now();
         loop {
+            drain(&mut reason);
+            // in case the signal couldn't be subscribed to
             if let Ok(dev) = &dev
                 && dev.state().is_ok_and(|s| s == DEVICE_STATE_FAILED)
                 && let Ok((_, r)) = dev.state_reason()
@@ -526,6 +555,8 @@ impl Nm {
             }
             std::thread::sleep(Duration::from_millis(300));
         }
+        // the device fails before the active connection goes down, so it should be in by now
+        drain(&mut reason);
         if reason == 0
             && let Ok(dev) = &dev
         {
@@ -564,13 +595,14 @@ impl Nm {
         }
         let was_active = old.is_some() && self.active_on(&dev) == old;
         let root = ObjectPath::from_static_str_unchecked("/");
+        let watch = self.watch(&dev);
         let (conn, active) =
             self.manager.add_and_activate_connection(settings, &dev, &root).map_err(|e| {
                 let ssid = String::from_utf8_lossy(ssid);
                 tracing::error!(?e, %ssid, "cannot add connection");
                 FAILED
             })?;
-        let res = self.wait(&active, &dev);
+        let res = self.wait(&active, &dev, watch);
         if res.is_err() {
             self.delete(&conn);
             // go back to the network it was on before
@@ -595,11 +627,12 @@ impl Nm {
             && let Some(saved) = &saved
         {
             let root = ObjectPath::from_static_str_unchecked("/");
+            let watch = self.watch(&dev);
             let active = self.manager.activate_connection(saved, &dev, &root).map_err(|e| {
                 tracing::error!(?e, name, "cannot activate connection");
                 FAILED
             })?;
-            return self.wait(&active, &dev);
+            return self.wait(&active, &dev, watch);
         }
         let (key_mgmt, hidden) = match self.aps.iter().find(|ap| ap.ssid == ssid) {
             Some(ap) => (ap.key_mgmt, false),
@@ -1215,6 +1248,7 @@ impl Nm {
             }
         }
         let root = ObjectPath::from_static_str_unchecked("/");
+        let watch = self.watch(&dev);
         let (conn, active) = self
             .manager
             .add_and_activate_connection(enterprise_settings(login, &[], false), &dev, &root)
@@ -1222,7 +1256,7 @@ impl Nm {
                 tracing::error!(?e, "cannot add wired 802.1X connection");
                 FAILED
             })?;
-        let res = self.wait(&active, &dev);
+        let res = self.wait(&active, &dev, watch);
         if res.is_err() {
             self.delete(&conn);
         }
@@ -1300,11 +1334,12 @@ impl Nm {
     /// (re)connects `conn` on `dev`, so new settings take effect
     fn activate(&mut self, conn: &ObjectPath<'_>, dev: &ObjectPath<'_>) -> Result<(), Failure> {
         let root = ObjectPath::from_static_str_unchecked("/");
+        let watch = self.watch(dev);
         let active = self.manager.activate_connection(conn, dev, &root).map_err(|e| {
             tracing::error!(?e, "cannot activate connection");
             FAILED_IP
         })?;
-        self.wait(&active, dev)
+        self.wait(&active, dev, watch)
     }
 
     fn save_ip(&mut self, ssid: &str, ip: IpConfig) -> Result<(), Failure> {
