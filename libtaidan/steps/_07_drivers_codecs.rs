@@ -44,7 +44,7 @@ impl super::Step for DriversCodecs {
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,
-        _cfg: &crate::cfg::Config,
+        cfg: &crate::cfg::Config,
         sender: &C,
     ) -> Res<()> {
         if !settings.install_codecs_drivers || settings.nointernet {
@@ -52,11 +52,11 @@ impl super::Step for DriversCodecs {
         }
         let pci = pci_devices().await;
         let mut needs_reboot = false;
-        match Drivers::setup_nvidia(&pci).await {
+        match Drivers::setup_nvidia(cfg, &pci).await {
             Ok(built) => needs_reboot |= built,
             Err(e) => tracing::warn!(?e, "cannot setup nvidia drivers"),
         }
-        match Drivers::setup_broadcom(&pci).await {
+        match Drivers::setup_broadcom(cfg, &pci).await {
             Ok(built) => needs_reboot |= built,
             Err(e) => tracing::warn!(?e, "cannot setup broadcom drivers"),
         }
@@ -174,6 +174,36 @@ impl Codecs {
     }
 }
 
+/// how [`install_pkgs`] installed packages
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Installed {
+    /// with dnf, so akmods builds kmods on the running system
+    Dnf,
+    /// layered with rpm-ostree, which builds kmods in the transaction and needs a reboot
+    Ostree,
+    /// not at all, since the config skips dnf on a non-atomic system
+    Skipped,
+}
+
+/// install packages with rpm-ostree on atomic systems, or dnf unless the config skips it
+async fn install_pkgs(cfg: &crate::cfg::Config, pkgs: &[&str]) -> Res<Installed> {
+    if super::is_ostree().await {
+        // idempotent, so a retried install doesn't fail on packages it already layered
+        let mut args = vec!["install", "-y", "--idempotent"];
+        args.extend_from_slice(pkgs);
+        root("rpm-ostree", &args).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
+        return Ok(Installed::Ostree);
+    }
+    if cfg.taidan0.skip_dnf {
+        tracing::info!(?pkgs, "skip_dnf is set, not installing driver packages");
+        return Ok(Installed::Skipped);
+    }
+    let mut args = vec!["in", "-y", "--allowerasing", "--best"];
+    args.extend_from_slice(pkgs);
+    root("dnf", &args).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
+    Ok(Installed::Dnf)
+}
+
 impl Drivers {
     /// Returns the latest supported driver for the given chipset
     fn get_nvidia_driver(chipset: &str) -> &str {
@@ -220,10 +250,7 @@ impl Drivers {
         Ok(Some(pkgs))
     }
 
-    async fn setup_nvidia_ostree(pkgs: &[String]) -> Res<()> {
-        let mut args = vec!["install", "-y"];
-        args.extend(pkgs.iter().map(String::as_str));
-        root("rpm-ostree", &args).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
+    async fn setup_nvidia_kargs() -> Res<()> {
         root(
             "rpm-ostree",
             &[
@@ -276,7 +303,7 @@ impl Drivers {
     }
 
     /// Returns whether the kernel module is ready, so a reboot would load it.
-    async fn setup_nvidia(pci: &[PciDevice]) -> Res<bool> {
+    async fn setup_nvidia(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<bool> {
         tracing::info!("Setting up Nvidia drivers");
         let primary_gpu = std::env::var("STELLAR_OPTION").is_ok_and(|x| x == "1");
         if !has_nvidia_gpu(pci) {
@@ -286,16 +313,16 @@ impl Drivers {
         let Some(pkgs) = Self::list_nvidia_packages().await? else {
             return Ok(false);
         };
-        if super::is_ostree().await {
-            tracing::debug!("ostree detected");
-            // the kmod is built inside the rpm-ostree transaction, which needs a reboot anyway
-            Self::setup_nvidia_ostree(&pkgs).await?;
-            return Ok(true);
+        let pkgs: Vec<_> = pkgs.iter().map(String::as_str).collect();
+        match install_pkgs(cfg, &pkgs).await? {
+            Installed::Dnf => {}
+            Installed::Skipped => return Ok(false),
+            Installed::Ostree => {
+                // the kmod is built inside the rpm-ostree transaction, which needs a reboot anyway
+                Self::setup_nvidia_kargs().await?;
+                return Ok(true);
+            }
         }
-
-        let mut args = vec!["in", "-y", "--allowerasing", "--best"];
-        args.extend(pkgs.iter().map(String::as_str));
-        root("dnf", &args).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
 
         if primary_gpu {
             root(
@@ -328,25 +355,33 @@ impl Drivers {
             .is_ok_and(|s| s.success())
     }
 
-    /// Returns whether the `wl` kernel module is ready, so a reboot would load it.
-    async fn setup_broadcom(pci: &[PciDevice]) -> Res<bool> {
+    /// Returns whether a reboot would load the drivers, i.e. the `wl` kernel module is ready or
+    /// rpm-ostree layered the packages.
+    async fn setup_broadcom(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<bool> {
         let mut built = false;
         if has_wl_only_wifi(pci) {
             tracing::info!("Setting up broadcom wifi drivers");
-            root("dnf", &["in", "-y", "broadcom-wl", "akmod-wl"])
-                .await
-                .wrap_msg("fail to install broadcom wifi drivers")?;
             // broadcom-wl blacklists the in-kernel drivers, so wl only takes over after a reboot
-            built = Self::kmod_built("wl").await?;
+            built = match install_pkgs(cfg, &["broadcom-wl", "akmod-wl"])
+                .await
+                .wrap_msg("fail to install broadcom wifi drivers")?
+            {
+                Installed::Dnf => Self::kmod_built("wl").await?,
+                // built inside the rpm-ostree transaction
+                Installed::Ostree => true,
+                Installed::Skipped => false,
+            };
             if !built {
                 tracing::warn!("wl kernel module isn't built, not asking for a reboot");
             }
         }
         if Self::check_boardcom_bluetooth().await {
             tracing::info!("Setting up broadcom bluetooth drivers");
-            root("dnf", &["in", "-y", "broadcom-bt-firmware"])
+            let installed = install_pkgs(cfg, &["broadcom-bt-firmware"])
                 .await
                 .wrap_msg("fail to install broadcom bluetooth drivers")?;
+            // layered packages only show up after a reboot
+            built |= installed == Installed::Ostree;
         }
         Ok(built)
     }
