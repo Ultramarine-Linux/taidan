@@ -159,19 +159,22 @@ fn start(ui: &slint::Weak<AppWindow>) {
     let online = app.global::<Network<'_>>().get_online();
     if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Network) {
         crate::SETTINGS.write().nointernet = !online;
-    } else if !online && !crate::SETTINGS.read().nointernet {
+    }
+    let mut settings = crate::SETTINGS.read().clone();
+    // the rest only goes on this attempt's copy. `SETTINGS.nointernet` stays what the network page
+    // chose, so a later retry gets the online steps back once the connection is back
+    if !online && !settings.nointernet {
         // online when leaving the network page, but not anymore, e.g. on a retry after the
         // connection dropped
         tracing::warn!("The connection is gone since the network page, installing offline");
-        crate::SETTINGS.write().nointernet = true;
+        settings.nointernet = true;
     }
     // the error page's way out when an online step keeps failing. Skipping them all still leaves
     // a working system, just without updates and the extra software
     if install.get_force_offline() {
         tracing::warn!("Retrying without the online steps");
-        crate::SETTINGS.write().nointernet = true;
+        settings.nointernet = true;
     }
-    let mut settings = crate::SETTINGS.read().clone();
     // the password is in `SETTINGS` now, so drop the plaintext copies in the UI instead of keeping
     // them around for the rest of the session. Going back from the error page to its page means
     // typing it again, retrying from the summary keeps the saved one.
