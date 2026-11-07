@@ -179,25 +179,41 @@ pub async fn write_fcitx5_to_skel(
     Ok(true)
 }
 
-async fn write_ibus_profile(
-    crate::settings::Settings { username, ims, .. }: &crate::settings::Settings,
-) -> Res<()> {
-    let engines = ims
-        .iter()
-        .filter_map(|s| i18n::find_im(s)?.ibus_ref)
-        .map(|r| format!("'{r}'"))
+/// the `dconf write`s, joined for `bash -c`, that hand IBus the chosen engines, [`None`] if none of
+/// them have an IBus engine. IBus reads `preload-engines`, but GNOME (and Budgie) drive IBus from
+/// their own `input-sources`, ignoring it, so the engines go in there too after the layout
+fn ibus_dconf_script(
+    crate::settings::Settings { ims, kb_layout, kb_variant, .. }: &crate::settings::Settings,
+) -> Option<String> {
+    let engines: Vec<_> = ims.iter().filter_map(|s| i18n::find_im(s)?.ibus_ref).collect();
+    if engines.is_empty() {
+        return None;
+    }
+    let order = engines.iter().map(|r| format!("'{r}'")).collect::<Vec<_>>().join(", ");
+
+    // without an xkb source first GNOME would type through an IBus engine all the time
+    let layout = if kb_layout.is_empty() { "us" } else { kb_layout };
+    let xkb = match kb_variant.as_deref().filter(|v| !v.is_empty()) {
+        Some(variant) => format!("{layout}+{variant}"),
+        None => layout.to_owned(),
+    };
+    let sources = std::iter::once(format!("('xkb', '{xkb}')"))
+        .chain(engines.iter().map(|r| format!("('ibus', '{r}')")))
         .collect::<Vec<_>>()
         .join(", ");
-    if engines.is_empty() {
-        return Ok(());
-    }
 
-    // dconf writes through its D-Bus service, which a bus of its own starts
-    let dbus_args = format!(
+    Some(format!(
         "dconf write /desktop/ibus/general/use-system-keyboard-layout true && \
-        dconf write /desktop/ibus/general/engines-order \"[{engines}]\" && \
-        dconf write /desktop/ibus/general/preload-engines \"[{engines}]\""
-    );
+        dconf write /desktop/ibus/general/engines-order \"[{order}]\" && \
+        dconf write /desktop/ibus/general/preload-engines \"[{order}]\" && \
+        dconf write /org/gnome/desktop/input-sources/sources \"[{sources}]\""
+    ))
+}
+
+async fn write_ibus_profile(settings: &crate::settings::Settings) -> Res<()> {
+    let username = &settings.username;
+    // dconf writes through its D-Bus service, which a bus of its own starts
+    let Some(dbus_args) = ibus_dconf_script(settings) else { return Ok(()) };
 
     let p = tokio::process::Command::new("pkexec")
         .args(["--user", username, "dbus-run-session", "--", "bash", "-c", &dbus_args])
@@ -238,5 +254,34 @@ mod tests {
         assert!(profile.contains("[Groups/0/Items/1]\n# Name\nName=pinyin\n"));
         assert!(profile.contains("[Groups/0/Items/2]\n# Name\nName=mozc\n"));
         assert!(!profile.contains("Items/3"));
+    }
+
+    #[test]
+    fn ibus_engines_go_to_gnome_input_sources() {
+        let settings = crate::settings::Settings {
+            kb_layout: "de".into(),
+            kb_variant: Some("nodeadkeys".into()),
+            ims: vec!["Pinyin".into(), "bogus".into(), "Mozc".into()],
+            ..Default::default()
+        };
+        let script = ibus_dconf_script(&settings).unwrap();
+        let refs: Vec<_> = ["Pinyin", "Mozc"]
+            .iter()
+            .map(|im| i18n::find_im(im).unwrap().ibus_ref.unwrap())
+            .collect();
+        let sources = format!(
+            "/org/gnome/desktop/input-sources/sources \"[('xkb', 'de+nodeadkeys'), ('ibus', '{}'), ('ibus', '{}')]\"",
+            refs[0], refs[1],
+        );
+        assert!(script.contains(&sources), "{script}");
+        let preload = format!("preload-engines \"['{}', '{}']\"", refs[0], refs[1]);
+        assert!(script.contains(&preload), "{script}");
+    }
+
+    #[test]
+    fn no_ibus_engines_writes_nothing() {
+        let settings =
+            crate::settings::Settings { ims: vec!["bogus".into()], ..Default::default() };
+        assert!(ibus_dconf_script(&settings).is_none());
     }
 }
