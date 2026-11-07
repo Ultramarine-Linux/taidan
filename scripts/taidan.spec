@@ -101,6 +101,7 @@ This package contains the default configuration files for Taidan.
 %install
 %cargo_install
 DESTDIR=%buildroot ./scripts/install.sh
+install -d %buildroot%{_sharedstatedir}/taidan
 
 %post
 %systemd_post taidan-initial-setup.service taidan-initial-setup-reconfiguration.service
@@ -119,11 +120,13 @@ DESTDIR=%buildroot ./scripts/install.sh
 %{_libexecdir}/start-taidan
 %{_datadir}/taidan/polkit/
 %{_presetdir}/95-taidan.preset
-%{_sysconfdir}/pam.d/taidan
+%config(noreplace) %{_sysconfdir}/pam.d/taidan
 %{_sysusersdir}/taidan.conf
 %{_unitdir}/taidan-initial-setup.service
 %{_unitdir}/taidan-initial-setup-reconfiguration.service
 %dir %{_prefix}/lib/taidan/
+# the records of an unfinished install, see libtaidan's passwd.rs and tweaks.rs
+%dir %{_sharedstatedir}/taidan/
 %dir %{_datadir}/taidan/
 %{_datadir}/taidan/avatars/
 %{_datadir}/taidan/po/

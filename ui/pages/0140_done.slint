@@ -44,6 +44,14 @@ export component DonePage inherits TdnBasePg {
                     horizontal-alignment: Dir.text-start;
                     wrap: word-wrap;
                 }
+
+                if Install.reboot-failed: TdnText {
+                    text: Lang.t("page-done-reboot-failed", []);
+                    color: Tokens.color-destructive;
+                    horizontal-alignment: Dir.text-start;
+                    wrap: word-wrap;
+                    accessible-role: text;
+                }
             }
 
             // centered vertically, a HorizontalLayout alone would stretch the buttons to the row's
@@ -60,6 +68,12 @@ export component DonePage inherits TdnBasePg {
                     if !Install.needs-reboot && Install.updates-ready: TdnBtn {
                         text: Lang.t("page-done-restart-update", []);
                         clicked => { Install.finish(true); }
+                    }
+
+                    // a way out when restarting doesn't work
+                    if Install.needs-reboot && Install.reboot-failed: TdnBtn {
+                        text: Lang.t("page-done-login", []);
+                        clicked => { Install.finish(false); }
                     }
 
                     reboot := TdnBtn {

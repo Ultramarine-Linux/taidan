@@ -71,7 +71,9 @@ export component TdnBtn inherits Rectangle {
     accessible-role: button;
     accessible-label: root.text;
     accessible-enabled: root.enabled;
-    accessible-action-default => { if root.enabled { root.press(); } }
+    accessible-action-default => {
+        if root.enabled && Modal.open == root.in-dialog { root.press(); }
+    }
 
     // sizes are given in layout units, but buttons are drawn at text size, see `Tokens.text-scale`
     min-height: root.min-size * Tokens.text-scale;
@@ -89,6 +91,10 @@ export component TdnBtn inherits Rectangle {
 
     focus := FocusScope {
         enabled: root.enabled && Modal.open == root.in-dialog;
+        // a click set it, so it can be stale when Tab comes back here from elsewhere
+        focus-gained(reason) => {
+            if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
+        }
         key-pressed(event) => {
             root.pointer-focus = false;
             // a held key repeats, which would go on to press whatever gets the focus next, like
@@ -118,7 +124,10 @@ export component TdnBtn inherits Rectangle {
         }
 
         if root.text != "": TdnText {
+            layout-order: Dir.order(1);
             text: root.text;
+            // or a layout never shrinks it below its full width, and it can't elide
+            min-width: 0;
             overflow: elide;
             color: root.enabled ? root.foreground-color : root.foreground-color.transparentize(0.3);
             font-size: root.font-size;
@@ -126,6 +135,7 @@ export component TdnBtn inherits Rectangle {
         }
 
         if root.enter-hint: VerticalLayout {
+            layout-order: Dir.order(2);
             alignment: center;
             // a soft keycap, tinted from the text color so it works on any button color
             Rectangle {
@@ -202,6 +212,9 @@ export component TdnInput inherits Rectangle {
     property <bool> pointer-focus: false;
     property <bool> revealed: false;
     property <bool> reveal-pointer-focus: false;
+    // the page it's on is shown, leaving it hides a revealed password again
+    in property <bool> page-active: true;
+    changed page-active => { if !self.page-active { root.revealed = false; } }
     property <bool> has-icon: root.icon.width > 0;
 
     // the focused `TextInput` has no accessible role of its own, so screen readers land on
@@ -215,7 +228,7 @@ export component TdnInput inherits Rectangle {
     accessible-enabled: root.enabled;
     accessible-read-only: root.read-only;
     accessible-action-set-value(v) => {
-        if root.enabled && !root.read-only {
+        if root.enabled && !root.read-only && Modal.open == root.in-dialog {
             root.text = v;
             root.edited(v);
         }
@@ -283,7 +296,8 @@ export component TdnInput inherits Rectangle {
         init => { if (root.auto-focus) { self.focus(); } }
     }
 
-    if root.text == "": Text {
+    // not over text being composed with an input method, which isn't in `text` yet
+    if root.text == "" && input.preedit-text == "": Text {
         x: input.x;
         y: 0;
         width: input.width;
@@ -310,10 +324,16 @@ export component TdnInput inherits Rectangle {
         accessible-enabled: root.enabled;
         accessible-checkable: true;
         accessible-checked: root.revealed;
-        accessible-action-default => { if root.enabled { root.revealed = !root.revealed; } }
+        accessible-action-default => {
+            if root.enabled && Modal.open == root.in-dialog { root.revealed = !root.revealed; }
+        }
 
         reveal-focus := FocusScope {
             enabled: root.password && root.enabled && Modal.open == root.in-dialog;
+            // a click set it, so it can be stale when Tab comes back here from elsewhere
+            focus-gained(reason) => {
+                if reason == FocusReason.tab-navigation { root.reveal-pointer-focus = false; }
+            }
             key-pressed(event) => {
                 root.reveal-pointer-focus = false;
                 if event.text == Key.Return || event.text == " " {
@@ -380,7 +400,7 @@ export component TdnListRow inherits Rectangle {
     accessible-label: root.secondary == "" ? root.text : root.text + ", " + root.secondary;
     accessible-item-selectable: true;
     accessible-item-selected: root.selected;
-    accessible-action-default => { root.clicked(); }
+    accessible-action-default => { if Modal.open == root.in-dialog { root.clicked(); } }
 
     height: 2.25rem;
     border-radius: Tokens.radius-sm;
@@ -390,6 +410,10 @@ export component TdnListRow inherits Rectangle {
 
     focus := FocusScope {
         enabled: root.focusable && Modal.open == root.in-dialog;
+        // a click set it, so it can be stale when Tab comes back here from elsewhere
+        focus-gained(reason) => {
+            if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
+        }
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == Key.Return || event.text == " " {
@@ -408,6 +432,8 @@ export component TdnListRow inherits Rectangle {
         TdnText {
             text: root.text;
             horizontal-alignment: Dir.text-start;
+            // or a layout never shrinks it below its full width, and it can't elide
+            min-width: 0;
             overflow: elide;
             color: root.selected ? TdnStyle.accent-foreground : Tokens.color-foreground;
             accessible-role: none;
@@ -451,9 +477,19 @@ export component TdnSelect inherits Rectangle {
     // accessible name, as the visible label is usually a `TdnField`'s
     in property <string> label;
     callback changed(int);
+    // when it gets focus or opens, with where it is in the window, so a scrolling list can show it
+    callback focus-in(/* y */ length, /* height */ length);
 
     property <bool> open;
     property <bool> pointer-focus;
+    property <bool> has-focus: focus.has-focus;
+
+    changed has-focus => {
+        if self.has-focus { root.focus-in(root.absolute-position.y, root.height); }
+    }
+    changed open => {
+        if self.open { root.focus-in(root.absolute-position.y, root.height); }
+    }
 
     function pick(i: int) {
         if i >= 0 && i < root.options.length && i != root.index {
@@ -469,7 +505,9 @@ export component TdnSelect inherits Rectangle {
     accessible-enabled: root.enabled;
     accessible-expandable: true;
     accessible-expanded: root.open;
-    accessible-action-expand => { root.open = !root.open; }
+    accessible-action-expand => {
+        if root.enabled && Modal.open == root.in-dialog { root.open = !root.open; }
+    }
 
     VerticalLayout {
         spacing: 0.25rem;
@@ -484,6 +522,10 @@ export component TdnSelect inherits Rectangle {
 
             focus := FocusScope {
                 enabled: root.enabled && Modal.open == root.in-dialog;
+                // a click set it, so it can be stale when Tab comes back here from elsewhere
+                focus-gained(reason) => {
+                    if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
+                }
                 key-pressed(event) => {
                     root.pointer-focus = false;
                     if event.text == " " || event.text == Key.Return {
@@ -492,11 +534,18 @@ export component TdnSelect inherits Rectangle {
                     }
                     if event.text == Key.DownArrow { root.pick(root.index + 1); return accept; }
                     if event.text == Key.UpArrow { root.pick(root.index - 1); return accept; }
+                    if event.text == Key.Home { root.pick(0); return accept; }
+                    if event.text == Key.End { root.pick(root.options.length - 1); return accept; }
                     if event.text == Key.Escape && root.open {
                         root.open = false;
                         return accept;
                     }
                     reject
+                }
+                // tabbing away leaves the list open otherwise. Not on clicks, one on an option
+                // must still reach it
+                focus-lost(reason) => {
+                    if reason == FocusReason.tab-navigation { root.open = false; }
                 }
             }
 
@@ -545,7 +594,7 @@ export component TdnSelect inherits Rectangle {
             }
         }
 
-        if root.open: Rectangle {
+        if root.open && root.enabled: Rectangle {
             border-radius: Tokens.radius-md;
             border-width: 1px;
             border-color: Tokens.color-border-hairline-strong;
@@ -555,6 +604,7 @@ export component TdnSelect inherits Rectangle {
                 padding: 0.25rem;
 
                 for option[i] in root.options: TdnListRow {
+                    in-dialog: root.in-dialog;
                     text: option;
                     selected: i == root.index;
                     clicked => {
@@ -612,8 +662,15 @@ export component TdnToggleRow inherits Rectangle {
     callback accepted();
     // whether this is part of a dialog, see `Modal`
     in property <bool> in-dialog;
+    // when it gets focus, with where it is in the window, so a scrolling list can show it
+    callback focus-in(/* y */ length, /* height */ length);
 
     property <bool> pointer-focus;
+    property <bool> has-focus: focus.has-focus;
+
+    changed has-focus => {
+        if self.has-focus { root.focus-in(root.absolute-position.y, root.height); }
+    }
 
     function toggle() {
         root.toggled(!root.checked);
@@ -624,9 +681,10 @@ export component TdnToggleRow inherits Rectangle {
     accessible-label: root.text;
     accessible-checkable: true;
     accessible-checked: root.checked;
-    accessible-action-default => { root.toggle(); }
+    accessible-action-default => { if Modal.open == root.in-dialog { root.toggle(); } }
 
-    height: 3rem;
+    // taller when a long translation wraps
+    min-height: 3rem;
     border-radius: Tokens.radius-lg;
     border-width: 1px;
     border-color: Tokens.color-border-hairline-strong;
@@ -634,6 +692,10 @@ export component TdnToggleRow inherits Rectangle {
 
     focus := FocusScope {
         enabled: Modal.open == root.in-dialog;
+        // a click set it, so it can be stale when Tab comes back here from elsewhere
+        focus-gained(reason) => {
+            if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
+        }
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == " " {
@@ -651,12 +713,19 @@ export component TdnToggleRow inherits Rectangle {
     HorizontalLayout {
         padding-left: 0.85rem;
         padding-right: 0.85rem;
+        // room around a wrapped label
+        padding-top: 0.4rem;
+        padding-bottom: 0.4rem;
         spacing: 1rem;
 
         TdnText {
             text: root.text;
             horizontal-alignment: Dir.text-start;
+            vertical-alignment: center;
             font-weight: Tokens.typography-weight-medium;
+            wrap: word-wrap;
+            // or a layout never lets it be narrower than its whole text on one line
+            min-width: 0;
         }
 
         VerticalLayout {
@@ -798,7 +867,9 @@ export component TdnIconButton inherits Rectangle {
     accessible-label: root.label;
     accessible-description: root.description;
     accessible-enabled: root.active;
-    accessible-action-default => { if root.active { root.press(); } }
+    accessible-action-default => {
+        if root.active && Modal.open == root.in-dialog { root.press(); }
+    }
 
     // presses it, and if that opened a dialog, the focus comes back here once it closes
     function press() {
@@ -820,6 +891,10 @@ export component TdnIconButton inherits Rectangle {
     // stays enabled while busy, since disabling the focused item drops focus
     focus := FocusScope {
         enabled: (root.enabled || root.busy) && Modal.open == root.in-dialog;
+        // a click set it, so it can be stale when Tab comes back here from elsewhere
+        focus-gained(reason) => {
+            if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
+        }
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == Key.Return || event.text == " " {
@@ -893,6 +968,8 @@ export component TdnDialog inherits Rectangle {
     TouchArea { }
 
     FocusScope {
+        // keys bubble up to it, it needn't be a Tab stop
+        focus-on-tab-navigation: false;
         key-pressed(event) => {
             if event.text == Key.Escape {
                 root.dismissed();

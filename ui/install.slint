@@ -22,6 +22,8 @@ export global Install {
     in property <bool> updates-ready;
     // the failed installation had online steps, so it can be retried without them
     in property <bool> used-internet;
+    // restarting from the done page failed, it can be tried again
+    in property <bool> reboot-failed;
     // set by the error page to retry offline, e.g. when a mirror is broken. Cleared by `reset()`
     in-out property <bool> force-offline;
 

@@ -97,6 +97,10 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, account: &crate::ui:
         settings.username = account.get_username().into();
         // `:`, `,` and newlines would break the passwd entry
         let fullname = libtaidan::passwd::sanitize_fullname(&account.get_fullname());
+        // so the summary shows it as it's saved, not e.g. a blank line for one that's only spaces
+        if fullname != account.get_fullname().as_str() {
+            account.set_fullname(fullname.as_str().into());
+        }
         settings.fullname = if fullname.is_empty() { settings.username.clone() } else { fullname };
         settings.passwd = account.get_password().as_str().into();
         let avatar = account.get_avatar_id();

@@ -54,9 +54,12 @@ component IconButton inherits Rectangle {
     forward-focus: focus;
     accessible-role: button;
     accessible-label: root.label;
+    accessible-enabled: root.enabled;
     accessible-checkable: !root.symbolic;
     accessible-checked: root.selected;
-    accessible-action-default => { if root.enabled { root.press(); } }
+    accessible-action-default => {
+        if root.enabled && Modal.open == root.in-dialog { root.press(); }
+    }
 
     width: 3.1rem;
     height: self.width;
@@ -292,6 +295,18 @@ export component WhoAreYouPage inherits TdnPage {
     can-next: Account.username-valid && Account.fullname-valid;
     forward-focus: nameinput;
 
+    // Enter pressed while the username was still being checked, it goes on once that's done
+    property <bool> next-pending;
+    property <string> checked-for: Account.checked-username;
+    changed checked-for => {
+        if self.next-pending && self.active {
+            self.next-pending = false;
+            // does nothing if it turned out to be taken
+            self.try-next();
+        }
+    }
+    changed active => { if !self.active { self.next-pending = false; } }
+
     HorizontalLayout {
         spacing: 1rem;
 
@@ -315,6 +330,8 @@ export component WhoAreYouPage inherits TdnPage {
                     text <=> Account.fullname;
                     invalid: !Account.fullname-valid;
                     edited(text) => {
+                        // it may change the username a pending Next was for
+                        root.next-pending = false;
                         if !Account.username-touched {
                             Account.username = Account.suggest-username(text, Account.username);
                         }
@@ -340,8 +357,15 @@ export component WhoAreYouPage inherits TdnPage {
                     text <=> Account.username;
                     invalid: username-field.invalid;
                     // clearing the field hands it back to the suggestion from the full name
-                    edited(text) => { Account.username-touched = text != ""; }
-                    accepted => { root.try-next(); }
+                    edited(text) => {
+                        Account.username-touched = text != "";
+                        root.next-pending = false;
+                    }
+                    accepted => {
+                        root.next-pending = !root.can-next && Account.username-error == ""
+                            && Account.checked-username != Account.username;
+                        root.try-next();
+                    }
                 }
             }
         }

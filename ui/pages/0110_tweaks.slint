@@ -10,6 +10,21 @@ export component TweaksDialog inherits TdnDialog {
     dialog-width: 26rem;
     dismissed => { Tweaks.open = false; }
 
+    // keeps what has keyboard focus in view, Tab doesn't scroll on its own
+    function reveal(y: length, item-height: length) {
+        // with room for the focus ring around it
+        let ring = Tokens.focus-ring-offset + Tokens.focus-ring-width;
+        let height = item-height + 2 * ring;
+        let top = y - ring - scroll.absolute-position.y;
+        if top < 0 {
+            scroll.content-y = min(0, scroll.content-y - top);
+        } else if top + height > scroll.visible-height {
+            scroll.content-y = max(
+                scroll.visible-height - scroll.content-height,
+                scroll.content-y - (top + height - scroll.visible-height));
+        }
+    }
+
     TdnText {
         text: Lang.t("page-tweaks-desc", []);
         color: Tokens.color-muted-foreground;
@@ -42,6 +57,7 @@ export component TweaksDialog inherits TdnDialog {
                     text: Lang.t(tweak.name, []);
                     checked: tweak.on;
                     toggled(on) => { Tweaks.set(i, on); }
+                    focus-in(y, height) => { root.reveal(y, height); }
                     // Enter closes it like Done, Space toggles
                     accepted => { root.dismissed(); }
                 }

@@ -46,11 +46,34 @@ fn commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String
     if std::path::Path::new(PLASMA).exists() {
         // a `QGuiApplication`, so it needs a platform even though it shows nothing
         let scheme = if dark { "BreezeDark" } else { "BreezeLight" };
-        let mut cmd = vec!["QT_QPA_PLATFORM=offscreen", "plasma-apply-colorscheme", scheme];
+        let owned = |cmd: &[&str]| cmd.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
+        let kdeglobals = |key: &str, value: &str| {
+            owned(&[
+                "kwriteconfig6",
+                "--file",
+                "kdeglobals",
+                "--group",
+                "General",
+                "--key",
+                key,
+                value,
+            ])
+        };
+        cmds.push(owned(&["QT_QPA_PLATFORM=offscreen", "plasma-apply-colorscheme", scheme]));
+        // it does nothing when the scheme is already the default, which the look and feel's
+        // defaults may still override, so it's written down either way
+        cmds.push(kdeglobals("ColorScheme", scheme));
         if let Some(accent) = accent {
-            cmd.extend(["--accent-color", accent.hex()]);
+            // with `--accent-color`, it ignores a scheme given with it and reapplies the saved
+            // one, and it doesn't save the accent itself
+            cmds.push(owned(&[
+                "QT_QPA_PLATFORM=offscreen",
+                "plasma-apply-colorscheme",
+                "--accent-color",
+                accent.hex(),
+            ]));
+            cmds.push(kdeglobals("AccentColor", accent.hex()));
         }
-        cmds.push(cmd.into_iter().map(str::to_owned).collect());
     } else if std::path::Path::new(GSETTINGS).exists() {
         cmds.push(gsettings("color-scheme", if dark { "prefer-dark" } else { "default" }));
         if let Some(accent) = accent {
@@ -77,16 +100,18 @@ fn commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String
     cmds
 }
 
-/// `env` arguments for each of [`commands`], running them with `home` as the home directory
+/// `env` arguments running [`commands`] in one go with `home` as the home directory, none if
+/// there's nothing to run
 fn env_args(
     home: &std::path::Path,
     settings: &crate::settings::Settings,
     edition: &str,
 ) -> Vec<Vec<String>> {
     let Some(dark) = settings.dark_mode else { return vec![] };
-    commands(dark, settings.accent, edition)
-        .into_iter()
+    // in one go, see `one_session`
+    crate::a11y::one_session(commands(dark, settings.accent, edition))
         .map(|cmd| crate::a11y::in_home(home, cmd))
+        .into_iter()
         .collect()
 }
 

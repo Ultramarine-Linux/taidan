@@ -11,7 +11,7 @@ impl super::Step for DnfDownloadApps {
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        if cfg.taidan0.skip_dnf || settings.nointernet {
+        if settings.nointernet || !super::can_use_dnf(cfg).await {
             return Ok(());
         }
         if settings.install_codecs_drivers {
@@ -56,18 +56,29 @@ impl super::Step for DnfDownloadApps {
         cfg: &crate::cfg::Config,
         callback: &C,
     ) -> Res<()> {
-        if cfg.taidan0.skip_dnf || settings.nointernet {
+        if settings.nointernet {
             return Ok(());
         }
-        // one at a time, since each `dnf5 config-manager` rewrites the same config files
-        for repo in &settings.actions[0] {
-            super::super::dnf::enable_repo(repo).await?;
+        // flatpaks still work without dnf, everything else here needs it
+        let dnf = super::can_use_dnf(cfg).await;
+        if dnf {
+            // one at a time, since each `dnf5 config-manager` rewrites the same config files
+            for repo in &settings.actions[0] {
+                super::super::dnf::enable_repo(repo).await?;
+            }
+            for copr in &settings.actions[4] {
+                // it'd be an option
+                if copr.starts_with('-') {
+                    return Err(Err::Message(format!("invalid copr `{copr}`")));
+                }
+                crate::pkexec("root", "dnf5", &["copr", "enable", "-y", copr]).await?;
+            }
         }
-        for copr in &settings.actions[4] {
-            crate::pkexec("root", "dnf5", &["copr", "enable", "-y", copr]).await?;
-        }
+        // with `--skip-broken`, these are extras (codecs, input methods, the language pack), and
+        // RPM Fusion's `@multimedia` breaks for a while whenever it lags behind a Fedora update
+        let pkgs: &[String] = if dnf { &settings.actions[1] } else { &[] };
 
-        match (settings.actions[1].is_empty(), settings.actions[2].is_empty()) {
+        match (pkgs.is_empty(), settings.actions[2].is_empty()) {
             (true, true) => {}
             (true, false) => {
                 super::super::flatpak::handle_flatpak(callback, |flatpak| {
@@ -79,21 +90,21 @@ impl super::Step for DnfDownloadApps {
             }
             (false, true) => {
                 super::super::dnf::handle_dnf(callback, |dnf| {
-                    dnf.args(["in", "-y", "--downloadonly"]).args(&settings.actions[1])
+                    dnf.args(["in", "-y", "--skip-broken", "--downloadonly"]).args(pkgs)
                 })
                 .await?;
             }
             (false, false) => {
                 // run flatpak and dnf in parallel
                 // this should be safe, supposedly they don't affect each other
-                futures::future::try_join(
+                super::join_both(
                     super::super::flatpak::handle_flatpak(callback, |flatpak| {
                         flatpak
                             .args(["install", "-y", "--noninteractive", "--no-deploy"])
                             .args(&settings.actions[2])
                     }),
                     super::super::dnf::handle_dnf(callback, |dnf| {
-                        dnf.args(["in", "-y", "--downloadonly"]).args(&settings.actions[1])
+                        dnf.args(["in", "-y", "--skip-broken", "--downloadonly"]).args(pkgs)
                     }),
                 )
                 .await?;

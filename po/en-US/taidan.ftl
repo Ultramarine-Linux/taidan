@@ -101,6 +101,8 @@ page-keyboard = Keyboard Layout
 # .search*: search field placeholder
 page-keyboard-search-layout = Search keyboard layouts…
 page-keyboard-search-variant = Search keyboard variants…
+# shown under the layouts when one that can't type Latin letters is picked, e.g. Russian
+page-keyboard-latin-fallback = English (US) is added too, for typing names and passwords. Press Super+Space to switch between them.
 # input methods (IMEs), for languages typed with more than a keyboard layout, e.g. Chinese
 page-keyboard-ims = Input Methods
 # what page-keyboard-ims shows when none are turned on, as in "Input Methods: None"
@@ -415,6 +417,7 @@ page-done-reboot = Restart
 page-done-restart-update = Restart and Update
 page-done-updates = Updates are ready and will install the next time you restart
 page-done-updates-drivers = Your drivers need a restart, which will install updates
+page-done-reboot-failed = Couldn't restart. Try again, or restart from the login screen.
 # btn, ends the setup and shows the login screen, when no reboot is needed
 page-done-login = Log In
 

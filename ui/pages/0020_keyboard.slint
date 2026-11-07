@@ -25,7 +25,7 @@ component ImsRow inherits Rectangle {
     forward-focus: focus;
     accessible-role: button;
     accessible-label: Lang.t("page-keyboard-ims", []) + ", " + root.value;
-    accessible-action-default => { root.open(); }
+    accessible-action-default => { if !Modal.open { root.open(); } }
 
     vertical-stretch: 0;
     height: 2.75rem;
@@ -218,6 +218,9 @@ export component KeyboardPage inherits TdnPage {
                         : root.first-layout-match ? Lang.keymaps[0].name : Lang.current_keymap.name;
                     edited(text) => {
                         layout-cursor = -1;
+                        // filtering drops the rows without telling them, the ones still there
+                        // set it again
+                        root.current-layout-row = -1;
                         layouts.content-y = 0;
                         Lang.filter_keymaps(text);
                     }
@@ -273,6 +276,7 @@ export component KeyboardPage inherits TdnPage {
                         : Lang.current_variant.id == "" ? Lang.t("default", []) : Lang.current_variant.name;
                     edited(text) => {
                         variant-cursor = -1;
+                        root.current-variant-row = -1;
                         variants.content-y = 0;
                         Lang.filter_variants(text);
                     }
@@ -314,6 +318,14 @@ export component KeyboardPage inherits TdnPage {
                 }
             }
         }
+    }
+
+    if Lang.latin-fallback: TdnText {
+        text: Lang.t("page-keyboard-latin-fallback", []);
+        color: Tokens.color-muted-foreground;
+        horizontal-alignment: Dir.text-start;
+        wrap: word-wrap;
+        vertical-stretch: 0;
     }
 
     // only where the distro's input method framework has any

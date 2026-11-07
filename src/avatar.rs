@@ -135,14 +135,19 @@ thread_local! {
     static RUNNING: std::cell::RefCell<Option<Running>> = const { std::cell::RefCell::new(None) };
 }
 
-fn set_error(ui: &slint::Weak<AppWindow>, error: String) {
+/// shows `error`, unless the stream it's from was stopped by then, a newer one may be showing
+fn set_error(ui: &slint::Weak<AppWindow>, stop: Arc<AtomicBool>, error: String) {
     tracing::error!(error, "camera error");
-    _ = ui.upgrade_in_event_loop(move |ui| ui.global::<Camera<'_>>().set_error(error.into()));
+    _ = ui.upgrade_in_event_loop(move |ui| {
+        if !stop.load(Ordering::Relaxed) {
+            ui.global::<Camera<'_>>().set_error(error.into());
+        }
+    });
 }
 
 fn stream(
     ui: &slint::Weak<AppWindow>,
-    stop: &AtomicBool,
+    stop: &Arc<AtomicBool>,
     last: &Mutex<Option<image::RgbImage>>,
 ) -> std::io::Result<()> {
     let dev = find_camera().ok_or_else(|| std::io::Error::other("no camera found"))?;
@@ -182,8 +187,12 @@ fn stream(
         let Some(preview) = preview else { continue };
         in_flight.store(true, Ordering::Release);
         let done = Arc::clone(&in_flight);
+        let stopped = Arc::clone(stop);
         let sent = ui.upgrade_in_event_loop(move |ui| {
-            ui.global::<Camera<'_>>().set_frame(slint::Image::from_rgba8(preview));
+            // a stopped stream's frame would show in a newer one before it has any
+            if !stopped.load(Ordering::Relaxed) {
+                ui.global::<Camera<'_>>().set_frame(slint::Image::from_rgba8(preview));
+            }
             done.store(false, Ordering::Release);
         });
         if sent.is_err() {
@@ -207,10 +216,12 @@ fn start(ui: &slint::Weak<AppWindow>) {
     let ui = ui.clone();
     let previous = STREAM_THREAD.lock().ok().and_then(|mut t| t.take());
     let thread = std::thread::spawn(move || {
-        // the last stream lets go of the camera once it notices it's stopped, within `POLL_MS` or
-        // a frame, opening it before then fails as busy. Not forever, in case it's stuck
+        // the last stream lets go of the camera once it notices it's stopped, within `POLL_MS`,
+        // or `FIRST_FRAME_TIMEOUT` while it waits for its first frame. Opening it before then
+        // fails as busy. Not forever, in case it's stuck
         if let Some(previous) = previous {
-            for _ in 0..20 {
+            let tries = FIRST_FRAME_TIMEOUT.as_millis() / 50 + 20;
+            for _ in 0..tries {
                 if previous.is_finished() {
                     break;
                 }
@@ -218,7 +229,7 @@ fn start(ui: &slint::Weak<AppWindow>) {
             }
         }
         if let Err(e) = stream(&ui, &stop, &last) {
-            set_error(&ui, e.to_string());
+            set_error(&ui, stop, e.to_string());
         }
     });
     if let Ok(mut t) = STREAM_THREAD.lock() {
@@ -261,7 +272,13 @@ fn capture(ui: &slint::Weak<AppWindow>) {
             }
             stop(ui);
         }
-        Err(e) => set_error(ui, format!("cannot save photo: {e}")),
+        Err(e) => {
+            let error = format!("cannot save photo: {e}");
+            tracing::error!(error, "camera error");
+            if let Some(app) = ui.upgrade() {
+                app.global::<Camera<'_>>().set_error(error.into());
+            }
+        }
     }
 }
 

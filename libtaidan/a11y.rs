@@ -216,6 +216,63 @@ pub(crate) fn xfconf(channel: &str, property: &str, ty: &str, value: Option<&str
     cmd.into_iter().map(str::to_owned).collect()
 }
 
+/// runs the next `$1` arguments as a command, then the next after that, and so on, failing if any
+/// of them do. `eval` only ever sees `"${1}" "${2}"…`, never the arguments themselves
+const RUN_ALL: &str = r#"
+status=0
+while [ $# -gt 0 ]; do
+    n=$1
+    shift
+    c=
+    i=1
+    while [ "$i" -le "$n" ]; do
+        c="$c \"\${$i}\""
+        i=$((i + 1))
+    done
+    eval "$c" || status=1
+    shift "$n"
+done
+if [ -n "$TAIDAN_XFCONF_WAIT" ]; then sleep "$TAIDAN_XFCONF_WAIT"; fi
+exit "$status"
+"#;
+
+/// how long xfconfd waits before saving a change, it saves sooner when its D-Bus goes away, but
+/// `dbus-run-session` doesn't wait for that, and the next xfconfd could read the old file
+const XFCONFD_SAVE_DELAY: &str = "6";
+
+/// [`gsettings`] and [`xfconf`] commands run one after the other through a single D-Bus, so one
+/// dconf or xfconf daemon has them all, rather than one for each that may not have saved before
+/// the next reads its files. Other commands run as they are. [`None`] if there are none
+pub(crate) fn one_session(cmds: Vec<Vec<String>>) -> Option<Vec<String>> {
+    if cmds.is_empty() {
+        return None;
+    }
+    let mut xfconf = false;
+    let mut bus = false;
+    let mut args = vec![];
+    for cmd in cmds {
+        let cmd = match cmd.as_slice() {
+            [run, dashes, rest @ ..] if run == "dbus-run-session" && dashes == "--" => {
+                bus = true;
+                rest.to_vec()
+            }
+            _ => cmd,
+        };
+        xfconf |= cmd.first().is_some_and(|c| c == "xfconf-query");
+        // through `env`, for the variables some start with
+        args.push((cmd.len() + 1).to_string());
+        args.push("env".to_owned());
+        args.extend(cmd);
+    }
+    // a D-Bus only if one of them wanted it, it may not be installed otherwise
+    let mut out = if bus { vec!["dbus-run-session".to_owned(), "--".to_owned()] } else { vec![] };
+    out.push("env".to_owned());
+    out.push(format!("TAIDAN_XFCONF_WAIT={}", if xfconf { XFCONFD_SAVE_DELAY } else { "" }));
+    out.extend(["sh", "-c", RUN_ALL, "sh"].map(str::to_owned));
+    out.extend(args);
+    Some(out)
+}
+
 /// `env` arguments running `cmd` with `home` as the home directory
 pub(crate) fn in_home(home: &std::path::Path, cmd: Vec<String>) -> Vec<String> {
     let mut args = vec![
@@ -431,7 +488,7 @@ async fn write_to_home(
         }
         return Ok(());
     }
-    for cmd in desktop_commands(settings, &cfg.edition, applied.is_some()) {
+    if let Some(cmd) = one_session(desktop_commands(settings, &cfg.edition, applied.is_some())) {
         let mut env = vec!["env".to_owned()];
         env.extend(in_home(&home, cmd));
         if let Err(e) = crate::root("runuser", as_user(&env)).await {
@@ -488,7 +545,7 @@ pub async fn write_to_skel(
         }
         return Ok(true);
     }
-    for cmd in desktop_commands(settings, &cfg.edition, false) {
+    if let Some(cmd) = one_session(desktop_commands(settings, &cfg.edition, false)) {
         let env = in_home(skel, cmd);
         let env = env.iter().map(String::as_str).collect_vec();
         if let Err(e) = crate::steps::acmd("env", &env).await {
@@ -574,6 +631,37 @@ mod tests {
         );
         let fixed = legible.iter().find(|e| e.key == "fixed").unwrap();
         assert!(fixed.value.as_deref().unwrap().starts_with("Atkinson Hyperlegible Mono,12,"));
+    }
+
+    #[test]
+    fn one_session_runs_them_all() {
+        let cmd = |args: &[&str]| args.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
+        let dir = std::env::temp_dir().join(format!("taidan-one-session-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let out = dir.join("out");
+        let out_s = out.to_string_lossy().into_owned();
+        let all = one_session(vec![
+            cmd(&[
+                "dbus-run-session",
+                "--",
+                "sh",
+                "-c",
+                "printf '%s|' \"$@\" >> \"$0\"",
+                &out_s,
+                "a b",
+                "$(c)",
+                "'d'",
+            ]),
+            cmd(&["X=1", "sh", "-c", "printf '%s' \"$X\" >> \"$0\"", &out_s]),
+        ])
+        .unwrap();
+        // without the D-Bus around it, which the test machine may not have
+        assert_eq!(all[..3], ["dbus-run-session", "--", "env"]);
+        let status = std::process::Command::new(&all[2]).args(&all[3..]).status().unwrap();
+        assert!(status.success());
+        assert_eq!(std::fs::read_to_string(&out).unwrap(), "a b|$(c)|'d'|1");
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(one_session(vec![]).is_none());
     }
 
     #[test]

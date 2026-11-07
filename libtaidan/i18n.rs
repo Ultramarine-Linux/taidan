@@ -213,12 +213,149 @@ impl InputMethod {
     }
 }
 
+/// layouts whose default variant can't type ASCII, which usernames, passwords that work
+/// everywhere, and commands need
+const NON_LATIN: &[&str] = &[
+    "af", "am", "ara", "bd", "bg", "bt", "by", "eg", "et", "ge", "gn", "gr", "il", "in", "iq",
+    "ir", "kg", "kh", "kz", "la", "lk", "ma", "mk", "mm", "mn", "mv", "my", "np", "pk", "rs", "ru",
+    "sy", "th", "tj", "ua", "uz",
+];
+
+/// variants of [`NON_LATIN`] layouts that type Latin letters but don't say `latin` in their name
+const LATIN_VARIANTS: &[(&str, &str)] = &[
+    ("in", "eng"),
+    ("iq", "ku"),
+    ("iq", "ku_alt"),
+    ("iq", "ku_f"),
+    ("ir", "ku"),
+    ("ir", "ku_alt"),
+    ("ir", "ku_f"),
+    ("lk", "us"),
+    ("ma", "french"),
+    ("ma", "rif"),
+    ("ru", "ruchey_en"),
+    ("sy", "ku"),
+    ("sy", "ku_alt"),
+    ("sy", "ku_f"),
+    ("ua", "crh"),
+    ("ua", "crh_alt"),
+    ("ua", "crh_f"),
+];
+
+/// variants of other layouts that can't type ASCII, a variant ending in `*` stands for all that
+/// start with the rest
+const NON_LATIN_VARIANTS: &[(&str, &str)] = &[
+    ("br", "rus"),
+    ("ca", "ike"),
+    ("cn", "mon_*"),
+    ("cn", "tib"),
+    ("cn", "tib_asciinum"),
+    ("cn", "ug"),
+    ("cz", "rus"),
+    ("de", "ru"),
+    ("de", "ru-recom"),
+    ("de", "ru-translit"),
+    ("jp", "kana"),
+    ("jp", "kana86"),
+    ("pl", "ru_phonetic_dvorak"),
+    ("se", "rus"),
+    ("us", "chr"),
+    ("us", "rus"),
+];
+
+/// whether `layout` with `variant` (empty for the default one) can't type ASCII
+fn is_non_latin(layout: &str, variant: &str) -> bool {
+    if NON_LATIN.contains(&layout) {
+        return !variant.contains("latin") && !LATIN_VARIANTS.contains(&(layout, variant));
+    }
+    NON_LATIN_VARIANTS.iter().any(|&(l, v)| {
+        l == layout
+            && v.strip_suffix('*').map_or(v == variant, |prefix| variant.starts_with(prefix))
+    })
+}
+
+/// switches between the layouts of an [`XkbKeymap`] with a Latin one added, Super+Space as on
+/// GNOME, which does it with its own shortcut instead
+pub const LAYOUT_SWITCH: &str = "grp:win_space_toggle";
+
+/// the xkb layouts, variants and options for a picked layout, each comma-separated
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct XkbKeymap {
+    pub layouts: String,
+    pub variants: String,
+    pub options: String,
+}
+
+impl XkbKeymap {
+    /// `layout` and `variant`, with US English after it if it can't type ASCII, like Anaconda and
+    /// GNOME Initial Setup do, else the user couldn't type a username until they switch back
+    #[must_use]
+    pub fn new(layout: &str, variant: Option<&str>) -> Self {
+        let variant = variant.unwrap_or("");
+        if is_non_latin(layout, variant) {
+            Self {
+                layouts: format!("{layout},us"),
+                variants: format!("{variant},"),
+                options: LAYOUT_SWITCH.to_owned(),
+            }
+        } else {
+            Self {
+                layouts: layout.to_owned(),
+                variants: variant.to_owned(),
+                options: String::new(),
+            }
+        }
+    }
+
+    /// whether US English was added after the picked layout
+    #[must_use]
+    pub fn has_latin_fallback(&self) -> bool {
+        !self.options.is_empty()
+    }
+
+    /// `kwriteconfig6` arguments, after `--file`, for `kxkbrc`
+    fn kxkbrc_entries(&self) -> Vec<Vec<String>> {
+        let entry = |key: &str, rest: &[&str]| {
+            ["--group", "Layout", "--key", key].iter().chain(rest).map(|&s| s.to_owned()).collect()
+        };
+        let mut entries = vec![
+            entry("Use", &["--type=bool", "true"]),
+            entry("LayoutList", &["--", &self.layouts]),
+            entry("VariantList", &["--", &self.variants]),
+        ];
+        if self.has_latin_fallback() {
+            entries.push(entry("ResetOldOptions", &["--type=bool", "true"]));
+            entries.push(entry("Options", &["--", &self.options]));
+        }
+        entries
+    }
+
+    /// GNOME's `input-sources` entries, `('xkb', 'layout+variant')` for each layout
+    #[must_use]
+    pub fn gnome_sources(&self) -> Vec<String> {
+        self.layouts
+            .split(',')
+            .zip(self.variants.split(',').chain(std::iter::repeat("")))
+            .map(|(layout, variant)| {
+                let name = if variant.is_empty() {
+                    layout.to_owned()
+                } else {
+                    format!("{layout}+{variant}")
+                };
+                // a GVariant string, xkb names never need escaping but the settings may be odd
+                let name = name.replace('\\', "\\\\").replace('\'', "\\'");
+                format!("('xkb', '{name}')")
+            })
+            .collect()
+    }
+}
+
 async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<()> {
-    let args = ["--file", "kxkbrc", "--group", "Layout", "--key", "LayoutList", layout];
-    pkexec(user, "kwriteconfig6", &args).await?;
-    let variant = variant.unwrap_or("");
-    let args = ["--file", "kxkbrc", "--group", "Layout", "--key", "VariantList", variant];
-    pkexec(user, "kwriteconfig6", &args).await?;
+    for entry in XkbKeymap::new(layout, variant).kxkbrc_entries() {
+        let mut args = vec!["--file", "kxkbrc"];
+        args.extend(entry.iter().map(String::as_str));
+        pkexec(user, "kwriteconfig6", &args).await?;
+    }
     let args = [
         ["--session", "--type=signal"],
         ["--reply-timeout=100", "--reply-timeout=100"],
@@ -234,35 +371,30 @@ async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<
 async fn set_gsettings_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<()> {
     // gsettings describe org.gnome.desktop.input-sources sources
     // List of input source identifiers available. Each source is specified as a tuple of 2 strings. The first string is the type and can be one of “xkb” or “ibus”. For “xkb” sources the second string is “xkb_layout+xkb_variant” or just “xkb_layout” if a XKB variant isn’t needed. For “ibus” sources the second string is the IBus engine name. An empty list means that the X server’s current XKB layout and variant won’t be touched and IBus won’t be used.
-    let name = format!("{layout}{}", variant.map(|v| format!("+{v}")).unwrap_or_default());
+    let sources = XkbKeymap::new(layout, variant).gnome_sources().join(", ");
     let args = [
         ["DISPLAY=:0", "gsettings"],
         ["set", "org.gnome.desktop.input-sources"],
-        ["sources", &format!("[('xkb', '{name}')]")],
+        ["sources", &format!("[{sources}]")],
     ];
     pkexec(user, "env", &args.concat()).await?;
     Ok(())
 }
 
 async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> Res<()> {
-    let variant = variant.unwrap_or("");
-    let args = ["set-x11-keymap", layout, "", variant, ""];
+    let xkb = XkbKeymap::new(layout, variant);
+    let args = ["set-x11-keymap", &xkb.layouts, "", &xkb.variants, &xkb.options];
     root("localectl", &args).await?;
     Ok(())
 }
 
 /// `kwriteconfig6` arguments, after `--file`, that put the layout picked in `settings` into
 /// `kxkbrc`, [`None`] if there's no layout
-fn kxkbrc_entries(settings: &crate::settings::Settings) -> Option<[[&str; 6]; 3]> {
+fn kxkbrc_entries(settings: &crate::settings::Settings) -> Option<Vec<Vec<String>>> {
     if settings.kb_layout.is_empty() {
         return None;
     }
-    let variant = settings.kb_variant.as_deref().unwrap_or("");
-    Some([
-        ["--group", "Layout", "--key", "Use", "--type=bool", "true"],
-        ["--group", "Layout", "--key", "LayoutList", "--", &settings.kb_layout],
-        ["--group", "Layout", "--key", "VariantList", "--", variant],
-    ])
+    Some(XkbKeymap::new(&settings.kb_layout, settings.kb_variant.as_deref()).kxkbrc_entries())
 }
 
 /// writes the keyboard layout into the new user's `kxkbrc`, since KWin on Wayland doesn't fall
@@ -285,7 +417,7 @@ pub async fn apply_keymap_to_user(
     for entry in entries {
         // as the user, so the file they get is theirs
         let mut args = vec!["-u", &settings.username, "--", "kwriteconfig6", "--file", &file];
-        args.extend(entry);
+        args.extend(entry.iter().map(String::as_str));
         root("runuser", &args).await.wrap_msg("cannot write the keyboard layout")?;
     }
     Ok(())
@@ -309,7 +441,7 @@ pub async fn write_keymap_to_skel(
     let file = file.to_string_lossy();
     for entry in entries {
         let mut args = vec!["--file", &*file];
-        args.extend(entry);
+        args.extend(entry.iter().map(String::as_str));
         crate::steps::acmd("kwriteconfig6", &args).await?;
     }
     Ok(true)
@@ -317,7 +449,14 @@ pub async fn write_keymap_to_skel(
 
 #[allow(clippy::equatable_if_let)]
 #[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-pub async fn set_keymap(user: Option<&str>, layout: &str, variant: Option<&str>) -> Res<()> {
+/// applies the keymap to `user`'s session (the current user's for [`None`]), and to the system
+/// (locale1, which the login screen and console use) if `system`
+pub async fn set_keymap(
+    user: Option<&str>,
+    layout: &str,
+    variant: Option<&str>,
+    system: bool,
+) -> Res<()> {
     let current_user =
         uzers::get_current_username().ok_or(Err::Msg("can't get current username"))?;
     if current_user.as_encoded_bytes() != b"taidan" && cfg!(debug_assertions) {
@@ -325,7 +464,7 @@ pub async fn set_keymap(user: Option<&str>, layout: &str, variant: Option<&str>)
         tracing::warn!("Skipping set_keymap in debug mode without being `taidan` user");
         return Ok(());
     }
-    if let Ok(true) = tokio::fs::try_exists("/usr/bin/localectl").await {
+    if system && let Ok(true) = tokio::fs::try_exists("/usr/bin/localectl").await {
         set_localectl_keymap(layout, variant).await?;
     }
 
@@ -389,6 +528,26 @@ impl I18nImf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn latin_fallback() {
+        let ru = XkbKeymap::new("ru", None);
+        assert_eq!((ru.layouts.as_str(), ru.variants.as_str()), ("ru,us", ","));
+        assert_eq!(ru.options, LAYOUT_SWITCH);
+        assert_eq!(ru.gnome_sources(), ["('xkb', 'ru')", "('xkb', 'us')"]);
+        let rs = XkbKeymap::new("rs", Some("latin"));
+        assert_eq!((rs.layouts.as_str(), rs.options.as_str()), ("rs", ""));
+        let de = XkbKeymap::new("de", Some("nodeadkeys"));
+        assert!(!de.has_latin_fallback());
+        assert_eq!(de.gnome_sources(), ["('xkb', 'de+nodeadkeys')"]);
+        assert!(XkbKeymap::new("jp", Some("kana")).has_latin_fallback());
+        assert!(XkbKeymap::new("cn", Some("mon_trad")).has_latin_fallback());
+        assert!(!XkbKeymap::new("jp", None).has_latin_fallback());
+        assert!(!XkbKeymap::new("iq", Some("ku_f")).has_latin_fallback());
+        assert!(XkbKeymap::new("eg", None).has_latin_fallback());
+        let gr = XkbKeymap::new("gr", Some("polytonic"));
+        assert_eq!(gr.gnome_sources(), ["('xkb', 'gr+polytonic')", "('xkb', 'us')"]);
+    }
 
     #[test]
     fn ims_from_locale() {

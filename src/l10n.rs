@@ -89,11 +89,13 @@ fn posix_locale(lang: &str) -> Option<String> {
     Some(format!("{}.UTF-8", tag.replace('-', "_")))
 }
 
-/// switches the UI to `lang`, a BCP 47 tag, and keeps it for the installed system
+/// switches the UI to `lang`, a BCP 47 tag, and keeps it for the installed system. Returns the
+/// tag of the translation it got, which may be a fallback
 ///
 /// # Panics
 /// If the bundled translations can't be loaded.
-pub fn set_lang(lang: &str) {
+pub fn set_lang(lang: &str) -> String {
+    let mut shown = "en-US".to_owned();
     if let Ok(locale) = lang
         .split_once('.')
         .map_or(lang, |(left, _)| left)
@@ -113,11 +115,15 @@ pub fn set_lang(lang: &str) {
             locales.push("en-US".parse().unwrap());
         }
         loader.load_languages(&crate::Localizations, &locales).expect("fail to load languages");
+        if let Some(first) = locales.first() {
+            shown = first.to_string();
+        }
         *crate::LL.write() = loader;
         *PO_LOADER.write() = new_loader(locales);
     }
     // applied to the system by the installation's `SetLocale` step
     crate::SETTINGS.write().locale = posix_locale(lang).unwrap_or_default();
+    shown
 }
 
 /// whether `lang`, a BCP 47 tag, is written right to left, from the likely script of the language
@@ -153,7 +159,15 @@ fn display_hdl<T>(
                 .unwrap_or_else(|e| panic!("cannot parse locale {current_lang:?}: {e}"));
             assert_ne!(locale, icu::locale::Locale::UNKNOWN, "locale {current_lang:?} is unk");
 
+            // ICU's built-in data lacks names in many languages, those get English ones
             let fmt = dn::multi::LocaleDisplayNamesFormatter::try_new((&locale).into(), opt)
+                .or_else(|e| {
+                    tracing::debug!(?e, ?locale, "no display names, using English ones");
+                    dn::multi::LocaleDisplayNamesFormatter::try_new(
+                        icu::locale::locale!("en-US").into(),
+                        opt,
+                    )
+                })
                 .expect("cannot get hdl");
             let res = f(&fmt);
             *hdl = Some((current_lang.locale.to_string(), fmt));
@@ -164,26 +178,32 @@ fn display_hdl<T>(
 
 /// applies keymap changes on a worker thread, and only the newest request is applied, so scrolling
 /// through the layout list doesn't queue up a `localectl` call per row
-static KEYMAP_TX: LazyLock<std::sync::mpsc::Sender<(String, Option<String>)>> =
-    LazyLock::new(|| {
-        let (tx, rx) = std::sync::mpsc::channel::<(String, Option<String>)>();
-        std::thread::spawn(move || {
-            while let Ok(mut req) = rx.recv() {
-                while let Ok(newer) = rx.try_recv() {
-                    req = newer;
-                }
-                let (layout, variant) = req;
-                if let Err(e) = crate::RT.block_on(libtaidan::i18n::set_keymap(
-                    None,
-                    &layout,
-                    variant.as_deref(),
-                )) {
-                    tracing::error!(?e, layout, ?variant, "cannot set keymap");
-                }
+/// a keymap for the worker below, and whether it goes to the system too, not only the session
+type KeymapReq = (String, Option<String>, bool);
+
+static KEYMAP_TX: LazyLock<std::sync::mpsc::Sender<KeymapReq>> = LazyLock::new(|| {
+    let (tx, rx) = std::sync::mpsc::channel::<KeymapReq>();
+    std::thread::spawn(move || {
+        while let Ok(mut req) = rx.recv() {
+            while let Ok(newer) = rx.try_recv() {
+                // a picked one stays picked for the system, even if the newest is only the session
+                let system = req.2 || newer.2;
+                req = newer;
+                req.2 = system;
             }
-        });
-        tx
+            let (layout, variant, system) = req;
+            if let Err(e) = crate::RT.block_on(libtaidan::i18n::set_keymap(
+                None,
+                &layout,
+                variant.as_deref(),
+                system,
+            )) {
+                tracing::error!(?e, layout, ?variant, "cannot set keymap");
+            }
+        }
     });
+    tx
+});
 
 /// keeps the keymap for the installed system, without applying it
 fn save_keymap(layout: &str, variant: Option<&str>) {
@@ -192,9 +212,15 @@ fn save_keymap(layout: &str, variant: Option<&str>) {
     settings.kb_variant = variant.map(ToOwned::to_owned);
 }
 
-fn set_keymap(layout: &str, variant: Option<&str>) {
+/// whether US English goes along with `layout`, see [`libtaidan::i18n::XkbKeymap::new`]
+fn has_latin_fallback(layout: &str, variant: Option<&str>) -> bool {
+    libtaidan::i18n::XkbKeymap::new(layout, variant).has_latin_fallback()
+}
+
+/// keeps the keymap and applies it, to the system too if `system`, else only to the session
+fn set_keymap(layout: &str, variant: Option<&str>, system: bool) {
     save_keymap(layout, variant);
-    if let Err(e) = KEYMAP_TX.send((layout.to_owned(), variant.map(ToOwned::to_owned))) {
+    if let Err(e) = KEYMAP_TX.send((layout.to_owned(), variant.map(ToOwned::to_owned), system)) {
         tracing::error!(?e, "keymap worker is gone");
     }
 }
@@ -265,8 +291,8 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
         })
         .or_else(|| LANGS.iter().find(|lang| lang.locale == "en-US"))
         .expect("no english");
-    set_lang(&initial.bcp47());
-    lang.set_rtl(is_rtl(&initial.bcp47()));
+    // by the translation shown, a language without one would be English laid out right to left
+    lang.set_rtl(is_rtl(&set_lang(&initial.bcp47())));
     lang.set_current_language(Language {
         locale: initial.bcp47(),
         native_name: initial.native_name.to_shared_string(),
@@ -275,14 +301,11 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
     lang.on_set_lang({
         let ui = ui.clone();
         move |lang| {
-            if lang.locale == "en-owo" {
-                set_lang("en-Xowo");
-            } else {
-                set_lang(&lang.locale);
-            }
+            let loaded =
+                if lang.locale == "en-owo" { set_lang("en-Xowo") } else { set_lang(&lang.locale) };
             // before `current_language` changes, like the translations, see `Lang.select`
             if let Some(ui) = ui.upgrade() {
-                ui.global::<crate::ui::Lang<'_>>().set_rtl(is_rtl(&lang.locale));
+                ui.global::<crate::ui::Lang<'_>>().set_rtl(is_rtl(&loaded));
                 crate::ims::follow_locale(&ui);
             }
             ui.upgrade_in_event_loop(|ui| {
@@ -404,11 +427,18 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
         }
     });
 
-    // nothing is applied until a layout is picked, the system already has this one
-    save_keymap(
-        &initial.id,
-        (!initial_variant.id.is_empty()).then_some(initial_variant.id.as_str()),
-    );
+    // applied to the session, KWin doesn't follow the system's layout and would type as US
+    // English, e.g. a password typed here wouldn't work at the login screen. Not to the system,
+    // which has it already, and more completely than what's parsed here (all its layouts, its
+    // options). Not in a dev session, where it would change the developer's keyboard
+    let initial_variant_id =
+        (!initial_variant.id.is_empty()).then_some(initial_variant.id.as_str());
+    if crate::install::is_dev_session() {
+        save_keymap(&initial.id, initial_variant_id);
+    } else {
+        set_keymap(&initial.id, initial_variant_id, false);
+    }
+    lang.set_latin_fallback(has_latin_fallback(&initial.id, initial_variant_id));
     lang.set_current_keymap(initial);
     lang.set_current_variant(initial_variant);
     lang.on_select_keymap({
@@ -423,7 +453,8 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
             variant_query.borrow_mut().clear();
             lang.set_variants(km.variants.clone());
             lang.set_current_variant(KeymapVariant::default());
-            set_keymap(&km.id, None);
+            set_keymap(&km.id, None, true);
+            lang.set_latin_fallback(has_latin_fallback(&km.id, None));
             lang.set_current_keymap(km);
         }
     });
@@ -433,7 +464,9 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
             let Some(ui) = ui.upgrade() else { return };
             let lang = ui.global::<crate::ui::Lang<'_>>();
             let layout = lang.get_current_keymap().id;
-            set_keymap(&layout, (!variant.id.is_empty()).then_some(variant.id.as_str()));
+            let id = (!variant.id.is_empty()).then_some(variant.id.as_str());
+            set_keymap(&layout, id, true);
+            lang.set_latin_fallback(has_latin_fallback(&layout, id));
             lang.set_current_variant(variant);
         }
     });
@@ -458,6 +491,20 @@ fn display_name(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn languages_without_icu_names_are_listed() {
+        // only where the build machine has the locales, `localedef --list-archive` is the source
+        let has = |tag: &str| LANGS.iter().any(|row| row.bcp47() == tag);
+        if std::process::Command::new("localedef")
+            .arg("--list-archive")
+            .output()
+            .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).lines().any(|l| l == "ka_GE.utf8"))
+        {
+            assert!(has("ka-GE"));
+        }
+        assert!(LANGS.len() > 200, "{}", LANGS.len());
+    }
 
     #[test]
     fn localectl_keymap() {

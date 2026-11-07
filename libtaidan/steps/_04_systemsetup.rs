@@ -11,7 +11,7 @@ impl super::Step for SystemSetup {
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        if settings.nointernet || cfg.taidan0.skip_dnf || settings.locale.is_empty() {
+        if settings.nointernet || settings.locale.is_empty() || !super::can_use_dnf(cfg).await {
             return Ok(());
         }
         let candidates = langpack_candidates(&settings.locale);
@@ -39,30 +39,49 @@ impl super::Step for SystemSetup {
     ) -> Res<()> {
         if let Some(ids) = settings.tweaks.ids() {
             let sett = serde_json::to_vec(settings)?;
-            // the ones an earlier attempt turned on, to turn off again if they aren't anymore
-            let was_on = crate::tweaks::recorded_on();
-            let mut now_on = vec![];
+            // the ones an earlier attempt turned on, to turn off again if they aren't anymore.
+            // Recorded as it goes, so an attempt cut short still says what it turned on
+            let mut recorded = crate::tweaks::recorded_on();
+            let record = |ids: &[String]| {
+                let ids = ids.to_vec();
+                async move {
+                    if let Err(e) = crate::tweaks::record_on(&ids).await {
+                        tracing::warn!(?e, "cannot record the tweaks turned on");
+                    }
+                }
+            };
             for tweak in &*crate::tweaks::TWEAKS {
                 let id = tweak.id().to_string_lossy().into_owned();
+                let started = format!("{}{id}", crate::tweaks::STARTED);
                 let on = ids.contains(&id);
-                let earlier = was_on.contains(&id);
-                if on == earlier {
-                    if on {
-                        now_on.push(id);
-                    }
+                // one that may be only partly applied runs again whichever way it's wanted
+                if !recorded.contains(&started) && on == recorded.contains(&id) {
                     continue;
                 }
                 if on && settings.nointernet && tweak.needs_internet {
                     tracing::info!(id, "skipping tweak that needs the internet");
+                    // one an earlier attempt only got partway through turning on is turned off
+                    // again instead, nothing would after this install
+                    if recorded.contains(&started) && tweak.run(&sett, false).await {
+                        recorded.retain(|r| *r != started);
+                        record(&recorded).await;
+                    }
                     continue;
                 }
-                // one that fails to turn off stays recorded, for the next attempt to try again
-                if tweak.run(&sett, on).await == on {
-                    now_on.push(id);
+                recorded.retain(|r| *r != id && *r != started);
+                // before turning it on, so a retry still knows to turn it off
+                if on {
+                    recorded.push(started.clone());
+                    record(&recorded).await;
+                    recorded.pop();
                 }
-            }
-            if let Err(e) = crate::tweaks::record_on(&now_on).await {
-                tracing::warn!(?e, "cannot record the tweaks turned on");
+                let ok = tweak.run(&sett, on).await;
+                if !ok {
+                    recorded.push(started);
+                } else if on {
+                    recorded.push(id);
+                }
+                record(&recorded).await;
             }
         } else {
             tracing::warn!(

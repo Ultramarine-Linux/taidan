@@ -86,7 +86,7 @@ export component AppWindow inherits Window {
     }
     changed pagenum => {
         Modal.page = pagenum;
-        Network.page-changed();
+        Network.page-changed(pagenum);
         focus-page();
         if pagenum == 7 { Tz.refresh(); }
         // with the time zone page skipped, the summary still shows the system's

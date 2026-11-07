@@ -9,6 +9,10 @@ static NVIDIA_PREFIXES: std::sync::LazyLock<std::collections::HashMap<&str, &str
             // We're gonna be supporting GPUs from the 8000 series and up
             ("NV", "unsupported"),
             ("MCP", "unsupported"),
+            // nForce chipset graphics, e.g. `C51 [GeForce 6150 LE]`
+            ("C5", "unsupported"),
+            ("C6", "unsupported"),
+            ("C7", "unsupported"),
             ("G7", "unsupported"),
             // 340xx isn't packaged by RPM Fusion anymore
             ("G8", "unsupported"),
@@ -388,12 +392,39 @@ impl Drivers {
             .is_ok_and(|s| s.success()))
     }
 
+    /// whether a module akmods builds would load: Secure Boot is off, or the key akmods signs with
+    /// is enrolled. Otherwise the kernel refuses it, and as the driver packages turn off nouveau
+    /// (and simpledrm on rpm-ostree), the next boot would have no display at all
+    async fn kmods_would_load() -> bool {
+        const AKMODS_KEY: &str = "/etc/pki/akmods/certs/public_key.der";
+        match secure_boot_enforced().await {
+            Some(false) => return true,
+            Some(true) => {}
+            None => {
+                tracing::warn!("cannot tell whether Secure Boot is on, taking it to be");
+                return false;
+            }
+        }
+        if !tokio::fs::try_exists(AKMODS_KEY).await.unwrap_or_default() {
+            return false;
+        }
+        let out = Command::new("mokutil").args(["--test-key", AKMODS_KEY]).output().await;
+        out.is_ok_and(|out| String::from_utf8_lossy(&out.stdout).contains("already enrolled"))
+    }
+
     /// Returns whether the kernel module is ready, so a reboot would load it.
     async fn setup_nvidia(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<bool> {
         tracing::info!("Setting up Nvidia drivers");
         let primary_gpu = std::env::var("STELLAR_OPTION").is_ok_and(|x| x == "1");
         if !has_nvidia_gpu(pci) {
             tracing::info!("No Nvidia GPU detected");
+            return Ok(false);
+        }
+        if !Self::kmods_would_load().await {
+            tracing::warn!(
+                "Secure Boot is on and the akmods signing key isn't enrolled, so the NVIDIA \
+                 module wouldn't load. Not installing it, the open driver keeps working"
+            );
             return Ok(false);
         }
         let Some(pkgs) = Self::list_nvidia_packages().await? else {
@@ -436,7 +467,12 @@ impl Drivers {
     /// rpm-ostree layered the packages.
     async fn setup_broadcom(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<bool> {
         let mut built = false;
-        if has_wl_only_wifi(pci) {
+        if has_wl_only_wifi(pci) && !Self::kmods_would_load().await {
+            tracing::warn!(
+                "Secure Boot is on and the akmods signing key isn't enrolled, so wl wouldn't load. \
+                 Not installing it"
+            );
+        } else if has_wl_only_wifi(pci) {
             tracing::info!("Setting up broadcom wifi drivers");
             // broadcom-wl blacklists the in-kernel drivers, so wl only takes over after a reboot
             built = match install_pkgs(cfg, &["broadcom-wl", "akmod-wl"])
@@ -454,13 +490,48 @@ impl Drivers {
         }
         if has_broadcom_bluetooth(pci, &usb_interfaces().await) {
             tracing::info!("Setting up broadcom bluetooth drivers");
-            let installed = install_pkgs(cfg, &["broadcom-bt-firmware"])
-                .await
-                .wrap_msg("fail to install broadcom bluetooth drivers")?;
-            // layered packages only show up after a reboot
-            built |= installed == Installed::Ostree;
+            // not worth losing the wifi driver's reboot over
+            match install_pkgs(cfg, &["broadcom-bt-firmware"]).await {
+                // layered packages only show up after a reboot
+                Ok(installed) => built |= installed == Installed::Ostree,
+                Err(e) => tracing::warn!(?e, "cannot install broadcom bluetooth firmware"),
+            }
         }
         Ok(built)
+    }
+}
+
+/// whether the kernel only loads signed modules: Secure Boot is on in the firmware and shim
+/// hasn't had validation turned off in MokManager, as the kernel decides it. [`None`] if it can't
+/// be told
+async fn secure_boot_enforced() -> Option<bool> {
+    const EFIVARS: &str = "/sys/firmware/efi/efivars";
+    // the last byte of an EFI variable, after 4 bytes of attributes
+    let var = |name: &'static str| async move {
+        match tokio::fs::read(format!("{EFIVARS}/{name}")).await {
+            Ok(bytes) => Ok(bytes.get(4).copied()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e),
+        }
+    };
+    if !tokio::fs::try_exists("/sys/firmware/efi").await.unwrap_or_default() {
+        // BIOS, no Secure Boot
+        return Some(false);
+    }
+    if !tokio::fs::try_exists(EFIVARS).await.unwrap_or_default() {
+        return None;
+    }
+    match var("SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c").await {
+        Ok(Some(1)) => {}
+        // not there means firmware without Secure Boot
+        Ok(Some(0) | None) => return Some(false),
+        Ok(Some(_)) | Err(_) => return None,
+    }
+    // 1 when validation was turned off in MokManager
+    match var("MokSBStateRT-605dab50-e046-4300-abb6-3dd810dd8b23").await {
+        Ok(Some(1)) => Some(false),
+        Ok(_) => Some(true),
+        Err(_) => None,
     }
 }
 
@@ -489,6 +560,7 @@ mod tests {
         let lspci = "01:00.0 VGA compatible controller: NVIDIA Corporation GK208B [GeForce GT 710] (rev a1)";
         assert_eq!(nvidia_chipset(lspci), Some("GK208B"));
         assert_eq!(Drivers::get_nvidia_driver(nvidia_chipset(lspci).unwrap()), "470xx");
+        assert_eq!(Drivers::get_nvidia_driver("C51"), "unsupported");
         assert_eq!(
             nvidia_chipset("00:02.0 VGA compatible controller: Intel Corporation UHD"),
             None

@@ -39,7 +39,7 @@ component A11yTile inherits Rectangle {
     accessible-label: root.text;
     accessible-checkable: true;
     accessible-checked: root.checked;
-    accessible-action-default => { root.toggle(); }
+    accessible-action-default => { if Modal.open == root.in-dialog { root.toggle(); } }
 
     border-radius: Tokens.radius-lg;
     border-width: root.checked ? 2px : 1px;
@@ -297,6 +297,8 @@ export component AccessibilityPage inherits TdnBasePg {
     // Enter goes on, unless a tile or button has focus and takes it first
     focus := FocusScope {
         enabled: !Modal.open;
+        // not a Tab stop of its own, it has nothing to show focus on
+        focus-on-tab-navigation: false;
         // focused when the page is shown, and when the window refocuses the page after a dialog
         // closes, the content takes it from here
         focus-gained(reason) => {
@@ -329,6 +331,8 @@ export component AccessibilityDialog inherits Rectangle {
     TouchArea { }
 
     FocusScope {
+        // keys bubble up to it, it needn't be a Tab stop
+        focus-on-tab-navigation: false;
         key-pressed(event) => {
             if event.text == Key.Escape && !A11y.more-open {
                 A11y.open = false;
@@ -360,6 +364,7 @@ component OptionRow inherits VerticalLayout {
     callback toggled(bool);
     // Enter, which closes the dialog like Done
     callback accepted();
+    callback focus-in(length, length);
 
     spacing: 0.4rem;
 
@@ -369,6 +374,7 @@ component OptionRow inherits VerticalLayout {
         checked: root.checked;
         toggled(on) => { root.toggled(on); }
         accepted => { root.accepted(); }
+        focus-in(y, height) => { root.focus-in(y, height); }
     }
 
     TdnText {
@@ -385,6 +391,21 @@ export component A11yMoreDialog inherits TdnDialog {
     title: Lang.t("page-accessibility-more", []);
     dialog-width: 26rem;
     dismissed => { A11y.more-open = false; }
+
+    // keeps what has keyboard focus in view, Tab doesn't scroll on its own
+    function reveal(y: length, item-height: length) {
+        // with room for the focus ring around it
+        let ring = Tokens.focus-ring-offset + Tokens.focus-ring-width;
+        let height = item-height + 2 * ring;
+        let top = y - ring - scroll.absolute-position.y;
+        if top < 0 {
+            scroll.content-y = min(0, scroll.content-y - top);
+        } else if top + height > scroll.visible-height {
+            scroll.content-y = max(
+                scroll.visible-height - scroll.content-height,
+                scroll.content-y - (top + height - scroll.visible-height));
+        }
+    }
 
     scroll := ScrollView {
         // as tall as the list, the dialog shrinks it to fit the window and it scrolls
@@ -408,6 +429,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 desc: Lang.t("page-accessibility-larger-text-desc", []);
                 checked: A11y.larger-text;
                 accepted => { root.dismissed(); }
+                focus-in(y, height) => { root.reveal(y, height); }
                 toggled(on) => {
                     A11y.larger-text = on;
                     A11y.changed();
@@ -419,6 +441,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 desc: Lang.t("page-accessibility-legible-font-desc", []);
                 checked: A11y.legible-font;
                 accepted => { root.dismissed(); }
+                focus-in(y, height) => { root.reveal(y, height); }
                 toggled(on) => {
                     A11y.legible-font = on;
                     A11y.changed();
@@ -430,6 +453,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 desc: Lang.t("page-accessibility-reduce-motion-desc", []);
                 checked: A11y.reduce-motion;
                 accepted => { root.dismissed(); }
+                focus-in(y, height) => { root.reveal(y, height); }
                 toggled(on) => {
                     A11y.reduce-motion = on;
                     A11y.changed();
@@ -441,6 +465,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 desc: Lang.t("page-accessibility-slow-keys-desc", []);
                 checked: A11y.slow-keys;
                 accepted => { root.dismissed(); }
+                focus-in(y, height) => { root.reveal(y, height); }
                 toggled(on) => {
                     A11y.slow-keys = on;
                     A11y.changed();
@@ -452,6 +477,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 desc: Lang.t("page-accessibility-bounce-keys-desc", []);
                 checked: A11y.bounce-keys;
                 accepted => { root.dismissed(); }
+                focus-in(y, height) => { root.reveal(y, height); }
                 toggled(on) => {
                     A11y.bounce-keys = on;
                     A11y.changed();
@@ -463,6 +489,7 @@ export component A11yMoreDialog inherits TdnDialog {
                 desc: Lang.t("page-accessibility-dwell-click-desc", []);
                 checked: A11y.dwell-click;
                 accepted => { root.dismissed(); }
+                focus-in(y, height) => { root.reveal(y, height); }
                 toggled(on) => {
                     A11y.dwell-click = on;
                     A11y.changed();
@@ -475,6 +502,7 @@ export component A11yMoreDialog inherits TdnDialog {
 
                 filter := TdnSelect {
                     in-dialog: true;
+                    focus-in(y, height) => { root.reveal(y, height); }
                     label: Lang.t("page-accessibility-color-filter", []);
                     options: [
                         Lang.t("page-accessibility-color-filter-none", []),
@@ -483,7 +511,7 @@ export component A11yMoreDialog inherits TdnDialog {
                         Lang.t("page-accessibility-color-filter-tritanopia", []),
                         Lang.t("page-accessibility-color-filter-monochrome", []),
                     ];
-                    index: A11y.color-filter;
+                    index <=> A11y.color-filter;
                     changed(i) => {
                         A11y.color-filter = i;
                         A11y.changed();

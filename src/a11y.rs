@@ -14,8 +14,12 @@ const ZOOM_STEPS: usize = 4;
 /// the screen reader, here rather than in the worker so [`shutdown`] can stop it
 static ORCA: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
 
+/// set by [`shutdown`], so a change still queued doesn't start Orca again as taidan exits
+static SHUT_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// stops Orca, which would outlive taidan otherwise
 pub fn shutdown() {
+    SHUT_DOWN.store(true, std::sync::atomic::Ordering::SeqCst);
     set_orca(false);
 }
 
@@ -156,7 +160,7 @@ fn set_orca(on: bool) {
             tracing::warn!(?e, "cannot wait for Orca");
         }
     }
-    if on {
+    if on && !SHUT_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
         // Orca turns on AT-SPI's screen reader flag, which makes Slint expose the UI to it
         match std::process::Command::new("orca").arg("--replace").spawn() {
             Ok(child) => *orca = Some(child),

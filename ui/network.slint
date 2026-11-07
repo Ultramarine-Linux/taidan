@@ -176,5 +176,6 @@ export global Network {
     // writes the device name and whether setup should go without internet to the settings
     callback save(offline: bool);
     // any page change, so a connection that fails later doesn't pop a dialog over another page
-    callback page-changed();
+    // the page shown now, `pagenum`
+    callback page-changed(int);
 }

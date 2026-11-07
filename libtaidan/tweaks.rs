@@ -234,9 +234,13 @@ impl Tweak {
 }
 
 /// ids of the tweaks an unfinished install turned on, one per line, so a retry with one of them
-/// turned off can turn it off again. Removed once the install finishes, from then on they're the
-/// user's
+/// turned off can turn it off again. One that was started but may not have finished, turning on
+/// or off, has [`STARTED`] in front, a retry runs it again either way. Removed once the install
+/// finishes, from then on they're the user's
 pub const ON_RECORD: &str = "/var/lib/taidan/tweaks-on";
+
+/// in front of a tweak in [`ON_RECORD`] that may be only partly turned on or off
+pub const STARTED: char = '?';
 
 /// what [`ON_RECORD`] says, empty if there's none
 #[must_use]
@@ -257,12 +261,18 @@ pub async fn record_on(ids: &[String]) -> Res<()> {
     }
     let mut args = vec![
         "-c",
+        // replaced whole, and failing if any of it does, so a full disk can't leave it empty. On
+        // disk before what it records is done, a power cut mustn't lose it
         r#"
+            set -e
             f=$1
             shift
             mkdir -p "$(dirname "$f")"
-            printf '%s\n' "$@" > "$f"
-            chmod 644 "$f"
+            printf '%s\n' "$@" > "$f.tmp"
+            chmod 644 "$f.tmp"
+            sync "$f.tmp"
+            mv -f "$f.tmp" "$f"
+            sync "$(dirname "$f")"
         "#,
         "sh",
         ON_RECORD,

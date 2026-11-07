@@ -54,6 +54,8 @@ export global Lang {
     in property <Keymap> current_keymap;
     // `id` is empty for the layout's default variant
     in property <KeymapVariant> current_variant;
+    // the current layout can't type ASCII, so US English was added and Super+Space switches
+    in property <bool> latin-fallback;
     // selecting also applies the keymap to the system
     callback select_keymap(keymap: Keymap);
     callback select_variant(variant: KeymapVariant);

@@ -82,9 +82,15 @@ pub async fn start_install(
     // if the record stays, since a machine that leaves the OOBE with it could later have the
     // account and its home removed by a rerun
     clear_record_retrying().await?;
-    // the tweaks are the user's now too, a later rerun shouldn't undo them
-    if let Err(e) = tweaks::clear_on_record().await {
-        tracing::warn!(?e, "cannot remove the tweaks record");
+    // the tweaks are the user's now too, a later rerun shouldn't undo them. After the user record,
+    // which a retry needs, while this is only needed if the install doesn't finish. If it dies
+    // before this, the repair in Taidan's startup clears it
+    for attempt in 1..=3 {
+        match tweaks::clear_on_record().await {
+            Ok(()) => break,
+            Err(e) => tracing::warn!(?e, attempt, "cannot remove the tweaks record"),
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     }
     // right away rather than when the user leaves the last page, or a machine that dies on it
     // would boot into the OOBE again with the record gone and the user still there
@@ -163,10 +169,12 @@ async fn run_cmd(
     cmd.stdout(std::process::Stdio::piped());
     // for the error, which would say nothing about why otherwise
     cmd.stderr(std::process::Stdio::piped());
+    // not the OOBE's, a tty nobody types into, where a command asking something would wait
+    // forever. Without stdin, it fails
     cmd.stdin(if input.is_some() {
         std::process::Stdio::piped()
     } else {
-        std::process::Stdio::inherit()
+        std::process::Stdio::null()
     });
     let mut p = cmd.spawn().map_err(|e| Err::FailToRunProgram(name, e))?;
     if let Some(input) = input

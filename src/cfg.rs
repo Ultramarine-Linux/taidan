@@ -44,7 +44,7 @@ pub enum SkipPage {
     Timezone,
     Network,
     Location,
-    /// the drivers and codecs page, also turns installing them off by default
+    /// the drivers and codecs page, they're still installed without it
     Drivers,
     /// not a page anymore, but the tweaks button on the summary page
     Tweaks,
@@ -188,6 +188,12 @@ impl Taidan0Config {
                     std::thread::spawn(|| crate::RT.block_on(libtaidan::mark_configured()));
                 if marked.join().is_err() {
                     tracing::error!("marking the system configured panicked");
+                }
+                // nor should a later rerun undo the tweaks that install turned on
+                let cleared =
+                    std::thread::spawn(|| crate::RT.block_on(libtaidan::tweaks::clear_on_record()));
+                if !matches!(cleared.join(), Ok(Ok(()))) {
+                    tracing::error!("cannot remove the tweaks record");
                 }
             }
             tracing::warn!("taidan0.continue_if_user_exists is false, exiting");

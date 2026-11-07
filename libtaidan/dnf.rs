@@ -30,6 +30,8 @@ pub(super) async fn run_logged(
     let (writer, reader) = tokio::net::unix::pipe::pipe().map_err(Err::_fail_to_run(name))?;
     let writer = writer.into_blocking_fd().map_err(Err::_fail_to_run(name))?;
     let mut child = cmd
+        // nobody types into the OOBE's tty, a question would wait forever
+        .stdin(std::process::Stdio::null())
         .stdout(writer.try_clone().map_err(Err::_fail_to_run(name))?)
         .stderr(writer)
         .spawn()
@@ -138,7 +140,14 @@ pub(super) async fn handle_dnf(
 #[tracing::instrument]
 pub(super) async fn enable_repo(repo: &str) -> Res<()> {
     tracing::debug!("Enabling repo");
-    if repo.starts_with("https://") || repo.starts_with("http://") {
+    // a repo file over plain HTTP could be swapped for one without signature checks
+    if repo.starts_with("http://") {
+        return Err(Err::Message(format!("refusing to add repo `{repo}` over plain HTTP")));
+    }
+    if repo.starts_with('-') {
+        return Err(Err::Message(format!("invalid repo `{repo}`")));
+    }
+    if repo.starts_with("https://") {
         // overwritten, so a retried install doesn't fail on the file the first attempt added
         crate::root(
             "dnf5",

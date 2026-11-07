@@ -12,11 +12,8 @@
 // it draws an outline `offset` px outside that box, so override `radius` per call
 // site to match the host element's corner radius
 //
-// known limitation (Slint 1.16): there is no focus-lost / focus-changed event,
-// so the `pointer-focus` flag used by every consumer is not cleared on focus
-// loss, a narrow edge case: mouse-click a control, Tab away to another control,
-// then Tab back to the same control — the ring stays suppressed until the next
-// key press clears the flag, accepted given the current Slint 1.16 API surface
+// consumers hide it after a click with a `pointer-focus` flag, which the shared widgets in
+// `components.slint` clear in their FocusScope's `focus-gained` when Tab brings the focus back
 
 import { Tokens } from "../theme/tokens.slint";
 

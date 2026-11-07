@@ -57,6 +57,8 @@ export component SummaryPage inherits TdnPage {
     step_i: 3;
     name: Lang.t("page-summary", [{ key: "name", value: Account.first-name(Account.fullname, Account.username) }]);
     next-text: Lang.t("page-summary-confirm", []);
+    // Enter on the review doesn't start it, only on the button itself
+    next-enter-hint: false;
 
     // the wi-fi network in use, if any
     property <string> connected-ssid: Network.connected-ssid;

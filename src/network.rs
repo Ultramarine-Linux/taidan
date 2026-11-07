@@ -17,6 +17,13 @@ use crate::ui::{
 
 /// how often the state and network list are refreshed while nothing else happens
 const POLL: Duration = Duration::from_secs(3);
+/// how often it looks while the network page isn't shown, where little shows the state (the
+/// summary's updates switch), and the installation shouldn't compete with it
+const POLL_ELSEWHERE: Duration = Duration::from_secs(10);
+/// the network page's `pagenum`
+const NETWORK_PAGE: i32 = 8;
+/// whether the network page is shown, see [`POLL_ELSEWHERE`]
+static ON_PAGE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// how long a connection may take to come up
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(45);
 /// how long scan results take to come in after asking for them
@@ -86,6 +93,8 @@ mod nm {
         fn active_connection(&self) -> zbus::Result<OwnedObjectPath>;
         #[zbus(property)]
         fn available_connections(&self) -> zbus::Result<Vec<OwnedObjectPath>>;
+        #[zbus(property)]
+        fn interface(&self) -> zbus::Result<String>;
     }
 
     #[zbus::proxy(
@@ -99,6 +108,17 @@ mod nm {
         fn get_all_access_points(&self) -> zbus::Result<Vec<OwnedObjectPath>>;
         #[zbus(property)]
         fn active_access_point(&self) -> zbus::Result<OwnedObjectPath>;
+    }
+
+    #[zbus::proxy(
+        interface = "org.freedesktop.NetworkManager.Device.Wired",
+        default_service = "org.freedesktop.NetworkManager",
+        gen_async = false,
+        blocking_name = "Wired"
+    )]
+    pub trait Wired {
+        #[zbus(property)]
+        fn perm_hw_address(&self) -> zbus::Result<String>;
     }
 
     #[zbus::proxy(
@@ -329,8 +349,12 @@ fn portal() -> std::sync::MutexGuard<'static, Option<std::process::Child>> {
 
 /// closes the captive portal browser, which would outlive taidan otherwise
 pub fn shutdown() {
+    SHUT_DOWN.store(true, std::sync::atomic::Ordering::SeqCst);
     close_portal();
 }
+
+/// set by [`shutdown`], so a request still queued doesn't open the portal browser as taidan exits
+static SHUT_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 struct Nm {
     conn: Connection,
@@ -426,6 +450,11 @@ impl Nm {
     /// the wi-fi adapter to use, one that's connected or connecting, else one that can connect,
     /// so an unmanaged or blocked card doesn't hide a working one (e.g. a USB dongle)
     fn wifi_device(&self) -> Option<OwnedObjectPath> {
+        self.best_device(DEVICE_TYPE_WIFI)
+    }
+
+    /// the device of `kind` in use, else one that could be (for ethernet, has a cable plugged in)
+    fn best_device(&self, kind: u32) -> Option<OwnedObjectPath> {
         let rank = |path: &OwnedObjectPath| match self
             .at::<nm::Device<'_>>(path)
             .and_then(|d| d.state())
@@ -434,7 +463,7 @@ impl Nm {
             Ok(s) if s >= DEVICE_STATE_DISCONNECTED => 1,
             _ => 2,
         };
-        self.devices_of(DEVICE_TYPE_WIFI).into_iter().min_by_key(rank)
+        self.devices_of(kind).into_iter().min_by_key(rank)
     }
 
     fn scan(&self) {
@@ -1107,13 +1136,15 @@ fn set_proxy(nm: &Nm, ui: &slint::Weak<AppWindow>, url: &str, bypass: &str) {
     };
     push(ui, move |net| {
         net.set_proxy_busy(false);
+        // cancelled while it was checked, the user gave up on it
+        if !net.get_proxy_open() {
+            return;
+        }
         match res {
             Ok(proxy) => {
                 let (url, bypass) = proxy.map(|p| (p.url, p.no_proxy)).unwrap_or_default();
                 net.set_proxy_url(url.into());
-                if !bypass.is_empty() {
-                    net.set_proxy_bypass(bypass.replace(',', ", ").into());
-                }
+                net.set_proxy_bypass(bypass.replace(',', ", ").into());
                 net.set_proxy_open(false);
             }
             Err(failure) => net.set_proxy_error_id(failure.into()),
@@ -1267,6 +1298,9 @@ impl Nm {
     /// opens a browser at the connectivity check page, which a captive portal redirects to its
     /// login, returns whether it's open
     fn open_portal(&mut self, proxy: Option<(String, String)>) -> bool {
+        if SHUT_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
+            return false;
+        }
         if portal().is_some() {
             return true;
         }
@@ -1392,7 +1426,8 @@ impl Nm {
     }
 
     fn ethernet_device(&self) -> Option<OwnedObjectPath> {
-        self.devices_of(DEVICE_TYPE_ETHERNET).into_iter().next()
+        // e.g. a dock's rather than the laptop's own when the cable is in the dock
+        self.best_device(DEVICE_TYPE_ETHERNET)
     }
 
     /// the saved connection active on `dev`, if any
@@ -1406,10 +1441,50 @@ impl Nm {
 
     /// the saved connection for the wired adapter, the active one or else one it could use
     fn ethernet_connection(&self, dev: &ObjectPath<'_>) -> Option<OwnedObjectPath> {
-        self.active_on(dev).or_else(|| {
-            let available = self.at::<nm::Device<'_>>(dev).ok()?.available_connections().ok()?;
-            available.into_iter().next()
-        })
+        let device = self.at::<nm::Device<'_>>(dev).ok()?;
+        self.active_on(dev)
+            .or_else(|| device.available_connections().ok()?.into_iter().next())
+            .or_else(|| {
+                // without a cable none are available, so look through the saved ones, else
+                // saving here again would add another
+                let iface = device.interface().ok()?;
+                let mac = self
+                    .at::<nm::Wired<'_>>(dev)
+                    .and_then(|w| w.perm_hw_address())
+                    .ok()
+                    .and_then(|a| parse_mac(&a));
+                let settings: nm::Settings<'_> =
+                    zbus::blocking::proxy::Builder::new(&self.conn).build().ok()?;
+                settings.list_connections().ok()?.into_iter().find(|path| {
+                    let Some(settings) = self
+                        .at::<nm::SettingsConnection<'_>>(path)
+                        .ok()
+                        .and_then(|c| c.get_settings().ok())
+                    else {
+                        return false;
+                    };
+                    let Some(connection) = settings.get("connection") else { return false };
+                    let text = |key: &str| {
+                        connection.get(key).and_then(|v| String::try_from(v.clone()).ok())
+                    };
+                    // a port of a bond or bridge has its IP settings on the bond or bridge
+                    let port = ["controller", "master"]
+                        .iter()
+                        .any(|key| text(key).is_some_and(|c| !c.is_empty()));
+                    // one bound to another card by its address isn't this one's
+                    let other_card = (settings.get("802-3-ethernet"))
+                        .and_then(|e| e.get("mac-address"))
+                        .and_then(|v| Vec::<u8>::try_from(v.clone()).ok())
+                        .is_some_and(|m| {
+                            !m.is_empty() && mac.as_ref().is_some_and(|mac| *mac != m)
+                        });
+                    text("type").as_deref() == Some("802-3-ethernet")
+                        && text("interface-name")
+                            .is_none_or(|name| name.is_empty() || name == iface)
+                        && !port
+                        && !other_card
+                })
+            })
     }
 
     /// the saved connection the dialog is for, a wi-fi network if `ssid` isn't empty
@@ -1448,8 +1523,14 @@ impl Nm {
         }
         for (name, values) in ip.sections() {
             let section = settings.entry(name.to_owned()).or_default();
-            section.retain(|key, _| !IP_KEYS.contains(&key.as_str()));
-            for (key, value) in values {
+            // the dialog only sets IPv6 DNS, a manual or disabled IPv6 stays as it was
+            let v6 = name == "ipv6";
+            let replaced = |key: &str| {
+                IP_KEYS.contains(&key)
+                    && (!v6 || matches!(key, "dns" | "dns-data" | "ignore-auto-dns"))
+            };
+            section.retain(|key, _| !replaced(key));
+            for (key, value) in values.into_iter().filter(|(key, _)| replaced(key)) {
                 // only fails for file descriptors, which these never are
                 if let Ok(value) = OwnedValue::try_from(value) {
                     section.insert(key.to_owned(), value);
@@ -1517,6 +1598,14 @@ impl Nm {
             .is_ok_and(|s| s >= DEVICE_STATE_DISCONNECTED);
         if plugged { self.activate(&conn, &dev) } else { Ok(()) }
     }
+}
+
+/// the bytes of a MAC address written like `AA:BB:CC:DD:EE:FF`
+fn parse_mac(s: &str) -> Option<Vec<u8>> {
+    s.split(':')
+        .map(|b| u8::from_str_radix(b, 16).ok())
+        .collect::<Option<Vec<_>>>()
+        .filter(|b| b.len() == 6)
 }
 
 /// asks the portal browser to quit, so it can shut down its web process too, and kills it if it
@@ -1644,11 +1733,15 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
         Cmd::Connect { ssid, password, visit } => {
             start_connecting(ui, &ssid);
             let res = nm.connect(&ssid, &password);
-            let enterprise = nm
-                .aps
-                .iter()
-                .any(|ap| ap.name == ssid && ap.key_mgmt.security() == Security::Enterprise);
-            (ssid, res, enterprise, visit)
+            let security =
+                nm.aps.iter().find(|ap| ap.name == ssid).map(|ap| ap.key_mgmt.security());
+            // an open network has no password to get wrong, a supplicant disconnect there is
+            // something else, like a MAC filter or a full AP
+            let res = match res {
+                Err(FAILED_SECRETS) if security == Some(Security::Open) => Err(FAILED),
+                res => res,
+            };
+            (ssid, res, security == Some(Security::Enterprise), visit)
         }
         Cmd::ConnectHidden { ssid, key_mgmt, password } => {
             return connect_hidden(nm, ui, ssid, key_mgmt, &password);
@@ -1679,6 +1772,10 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
             let res = IpConfig::parse(&ip).and_then(|ip| nm.save_ip(&ssid, ip));
             push(ui, move |net| {
                 net.set_ip_busy(false);
+                // cancelled meanwhile, it mustn't close or show errors in another network's
+                if !net.get_ip_open() || net.get_ip_ssid().as_str() != ssid.as_str() {
+                    return;
+                }
                 match res {
                     Ok(()) => net.set_ip_open(false),
                     Err(failure) => net.set_ip_error_id(failure.into()),
@@ -1698,7 +1795,14 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
                 // ask for the password if a saved one didn't work, or one was given and was wrong,
                 // unless the page was left meanwhile, where a dialog would come out of nowhere
                 let left = PAGE_VISIT.load(std::sync::atomic::Ordering::SeqCst) != visit;
-                if failure == FAILED_SECRETS && !left {
+                // nor over another dialog, whose typing would go into this one
+                let other_dialog = net.get_proxy_open()
+                    || net.get_ip_open()
+                    || net.get_hidden_open()
+                    || net.get_enterprise_open()
+                    || net.get_offline_prompt()
+                    || !["", ssid.as_str()].contains(&net.get_password_ssid().as_str());
+                if failure == FAILED_SECRETS && !left && !other_dialog {
                     if enterprise {
                         net.set_enterprise_ssid(ssid.as_str().into());
                         net.set_enterprise_wired(false);
@@ -1798,10 +1902,18 @@ fn worker(ui: &slint::Weak<AppWindow>, rx: &mpsc::Receiver<Cmd>) {
         }
     };
     nm.scan();
+    // right away, whether it's online decides how the installation runs, even if the network
+    // page is skipped
+    nm.publish();
     loop {
+        if SHUT_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
+            return;
+        }
+        let poll =
+            if ON_PAGE.load(std::sync::atomic::Ordering::Relaxed) { POLL } else { POLL_ELSEWHERE };
         // sooner if a scan is due to end
         let timeout = (nm.scanning_until)
-            .map_or(POLL, |until| until.saturating_duration_since(Instant::now()).min(POLL));
+            .map_or(poll, |until| until.saturating_duration_since(Instant::now()).min(poll));
         match rx.recv_timeout(timeout) {
             Ok(cmd) => handle(&mut nm, ui, cmd),
             Err(mpsc::RecvTimeoutError::Timeout) => {}
@@ -2045,7 +2157,8 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
         }
     });
     init_portal(ui, net, send.clone());
-    net.on_page_changed(|| {
+    net.on_page_changed(|page| {
+        ON_PAGE.store(page == NETWORK_PAGE, std::sync::atomic::Ordering::Relaxed);
         PAGE_VISIT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     });
     net.on_save({
@@ -2054,18 +2167,26 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
             PAGE_VISIT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             // done with the network page, so done logging in to the portal too
             send(Cmd::ClosePortal);
-            let Some(ui) = ui.upgrade() else { return };
-            let net = ui.global::<Network<'_>>();
-            let mut settings = crate::SETTINGS.write();
-            settings.nointernet = offline;
-            let url = net.get_proxy_url();
-            settings.proxy = (!url.is_empty())
-                .then(|| libtaidan::proxy::Proxy::new(&url, &net.get_proxy_bypass()))
-                .flatten();
-            net.get_device_name().trim().clone_into(&mut settings.device_name);
-            settings.hostname = net.get_hostname().into();
+            if let Some(ui) = ui.upgrade() {
+                save(&ui.global::<Network<'_>>(), offline);
+            }
         }
     });
+}
+
+/// keeps what the network page set for the installation, when leaving it
+fn save(net: &Network<'_>, offline: bool) {
+    // a connection's dialog mustn't follow onto the next page
+    net.set_password_ssid("".into());
+    net.set_enterprise_open(false);
+    let mut settings = crate::SETTINGS.write();
+    settings.nointernet = offline;
+    let url = net.get_proxy_url();
+    settings.proxy = (!url.is_empty())
+        .then(|| libtaidan::proxy::Proxy::new(&url, &net.get_proxy_bypass()))
+        .flatten();
+    net.get_device_name().trim().clone_into(&mut settings.device_name);
+    settings.hostname = net.get_hostname().into();
 }
 
 #[cfg(test)]

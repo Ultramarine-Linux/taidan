@@ -33,7 +33,7 @@ pub fn user_already_exists() -> bool {
 }
 
 /// uids `useradd` gives regular users, `UID_MIN` to `UID_MAX` in Fedora's `/etc/login.defs`
-const REGULAR_UIDS: std::ops::RangeInclusive<u32> = 1000..=60000;
+pub const REGULAR_UIDS: std::ops::RangeInclusive<u32> = 1000..=60000;
 
 /// uids systemd-homed gives its users
 pub const HOMED_UIDS: std::ops::RangeInclusive<u32> = 60001..=60513;
@@ -50,7 +50,7 @@ fn regular_user_in(reader: impl BufRead, recorded: Option<&str>) -> bool {
     reader.lines().any(|l| {
         l.is_ok_and(|l| {
             let Some([user, _, uid, _]) = l.splitn(4, ':').collect_array() else {
-                tracing::error!(?l, "cannot parse line in /etc/passwd");
+                tracing::error!("cannot parse a line in the passwd database");
                 return false;
             };
             let Ok(uid) =
@@ -108,10 +108,18 @@ pub fn recorded_user() -> Option<String> {
 }
 
 /// the user named in [`CREATED_RECORD`], if there's one and nobody has logged in as it. One that
-/// has been is someone's account now, whatever the record says
+/// has been is someone's account now, whatever the record says. One whose logins can't be told
+/// about counts as unused, as the record says it's from an install that never finished. Taking it
+/// for a real user would mark the system configured with an account that was never set up, and
+/// [`login_state`] says to keep its home when it's removed
 #[must_use]
 pub fn unused_recorded_user() -> Option<String> {
-    recorded_user().filter(|u| !has_logged_in(u))
+    recorded_user().filter(|u| match login_state(u) {
+        Some(logged_in) => !logged_in,
+        // except a homed one, which can't be removed while keeping its home, so it stays put,
+        // see `remove_previous`
+        None => uzers::get_user_by_name(u).is_none_or(|user| !HOMED_UIDS.contains(&user.uid())),
+    })
 }
 
 /// whether an unfinished install created `username` and nobody has logged in as it since, see
@@ -122,21 +130,20 @@ pub fn created_by_us(username: &str) -> bool {
 }
 
 /// whether `username` has ever logged in, going by lastlog2, which PAM updates for display
-/// manager, console and ssh logins but not `runuser` or `pkexec`. If it can't be told, the user
-/// is taken to have logged in, since that only costs a retry while the opposite can cost their
-/// home
+/// manager, console and ssh logins but not `runuser` or `pkexec`, or [`None`] if it can't be
+/// told. Then removing the user mustn't take its home along, in case it was used after all
 #[must_use]
-pub fn has_logged_in(username: &str) -> bool {
+pub fn login_state(username: &str) -> Option<bool> {
     // `-a` leaves out users who never logged in. A missing database prints nothing
     match std::process::Command::new("lastlog2").args(["-a", "-u", username]).output() {
-        Ok(out) if out.status.success() => logged_in_from(&out.stdout, username),
+        Ok(out) if out.status.success() => Some(logged_in_from(&out.stdout, username)),
         Ok(out) => {
             tracing::error!(status = ?out.status, stderr = %String::from_utf8_lossy(&out.stderr), "lastlog2 failed");
-            true
+            None
         }
         Err(e) => {
             tracing::error!(?e, "cannot run lastlog2");
-            true
+            None
         }
     }
 }
@@ -154,12 +161,18 @@ fn logged_in_from(output: &[u8], username: &str) -> bool {
 pub async fn record_created(username: &str, keep_home: bool) -> Res<()> {
     let mut args = vec![
         "-c",
+        // replaced whole, and failing if any of it does, so a full disk can't leave it empty. On
+        // disk before what it records is done, a power cut mustn't lose it
         r#"
+            set -e
             f=$1
             shift
             mkdir -p "$(dirname "$f")"
-            printf '%s\n' "$@" > "$f"
-            chmod 644 "$f"
+            printf '%s\n' "$@" > "$f.tmp"
+            chmod 644 "$f.tmp"
+            sync "$f.tmp"
+            mv -f "$f.tmp" "$f"
+            sync "$(dirname "$f")"
         "#,
         "sh",
         CREATED_RECORD,

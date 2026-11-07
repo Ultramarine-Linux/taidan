@@ -40,9 +40,14 @@ fn redact(url: &str) -> String {
 static PROXY: std::sync::RwLock<Option<Proxy>> = std::sync::RwLock::new(None);
 
 pub fn set(proxy: Option<Proxy>) {
-    if let Err(e) = write_env_file(&env_file(), proxy.as_ref()) {
-        tracing::error!(?e, "cannot save the proxy for commands run as root");
-    }
+    // without the file, `wrapper` would make every command run as root fail
+    let proxy = match write_env_file(&env_file(), proxy.as_ref()) {
+        Ok(()) => proxy,
+        Err(e) => {
+            tracing::error!(?e, "cannot save the proxy for commands run as root, going without");
+            None
+        }
+    };
     *PROXY.write().unwrap_or_else(std::sync::PoisonError::into_inner) = proxy;
 }
 
@@ -62,6 +67,14 @@ impl Proxy {
             return None;
         }
         let url = if url.contains("://") { url.to_owned() } else { format!("http://{url}") };
+        // the parser takes `http:///host` and `http:\\host` too, but the host must come right
+        // after `://` where `without_credentials` looks for it
+        if url.split_once("://").is_some_and(|(_, rest)| {
+            rest.starts_with(['/', '\\'])
+                || rest.split(['/', '?', '#']).next().is_some_and(|a| a.contains('\\'))
+        }) {
+            return None;
+        }
         let parsed = reqwest::Url::parse(&url).ok()?;
         if parsed.host_str().is_none_or(str::is_empty)
             || !matches!(parsed.scheme(), "http" | "https" | "socks5" | "socks5h")
@@ -77,6 +90,13 @@ impl Proxy {
         if has_control(&no_proxy) {
             return None;
         }
+        // as typed, apart from the scheme's case, which some tools are picky about. Not as the
+        // parser writes it out, which drops a default port, and a proxy without one is on 1080
+        // for curl
+        let url = match url.split_once("://") {
+            Some((scheme, rest)) => format!("{}://{rest}", scheme.to_ascii_lowercase()),
+            None => url,
+        };
         Some(Self { url: url.trim_end_matches('/').to_owned(), no_proxy })
     }
 
@@ -111,16 +131,20 @@ impl Proxy {
     /// the proxy without the `user:password@` in its URL, for places other users can read.
     /// [`None`] if the URL can't be parsed
     fn without_credentials(&self) -> Option<Self> {
-        let mut url = reqwest::Url::parse(&self.url).ok()?;
+        let url = reqwest::Url::parse(&self.url).ok()?;
         if url.username().is_empty() && url.password().is_none() {
             return Some(self.clone());
         }
-        url.set_username("").ok()?;
-        url.set_password(None).ok()?;
-        Some(Self {
-            url: url.as_str().trim_end_matches('/').to_owned(),
-            no_proxy: self.no_proxy.clone(),
-        })
+        // cut out of the text rather than through the parser, which would drop a default port
+        let (scheme, rest) = self.url.split_once("://")?;
+        let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+        let (authority, path) = rest.split_at(end);
+        let host = authority.rsplit_once('@').map_or(authority, |(_, host)| host);
+        let public = format!("{scheme}://{host}{path}");
+        // whatever the parser sees in it, it mustn't see credentials anymore
+        let check = reqwest::Url::parse(&public).ok()?;
+        (check.username().is_empty() && check.password().is_none())
+            .then(|| Self { url: public, no_proxy: self.no_proxy.clone() })
     }
 
     /// # Errors
@@ -143,24 +167,9 @@ impl Proxy {
         // every user can read `/etc/environment` and gets it in their session, so the password
         // only goes into the dnf config. Apps ask for it themselves when the proxy wants one
         let public = self.without_credentials().ok_or(Err::Msg("the proxy URL is invalid"))?;
-        // through stdin, since the arguments of commands run as root are logged
-        let mut lines = public.env().join("\n");
-        lines.push('\n');
-        crate::root_with_stdin(
-            "sh",
-            [
-                "-c",
-                r#"
-                    sed -i '/^\(https\?\|no\)_proxy=/Id' /etc/environment
-                    cat >> /etc/environment
-                "#,
-            ],
-            lines.as_bytes(),
-        )
-        .await
-        .wrap_msg("cannot write the proxy to /etc/environment")?;
-        // only root may read it. `/etc/environment` has to stay readable for login sessions to
-        // pick the proxy up
+        // the dnf config first, `clear` goes by it, so it must be there if anything is. Only root
+        // may read it. `/etc/environment` has to stay readable for login sessions to pick the
+        // proxy up
         crate::root_with_stdin(
             "sh",
             [
@@ -177,7 +186,23 @@ impl Proxy {
             format!("{}\n", self.url).as_bytes(),
         )
         .await
-        .wrap_msg("cannot write the proxy to the dnf config")
+        .wrap_msg("cannot write the proxy to the dnf config")?;
+        // through stdin, since the arguments of commands run as root are logged
+        let mut lines = public.env().join("\n");
+        lines.push('\n');
+        crate::root_with_stdin(
+            "sh",
+            [
+                "-c",
+                r#"
+                    sed -i '/^\(https\?\|no\)_proxy=/Id' /etc/environment
+                    cat >> /etc/environment
+                "#,
+            ],
+            lines.as_bytes(),
+        )
+        .await
+        .wrap_msg("cannot write the proxy to /etc/environment")
     }
 }
 
@@ -329,6 +354,14 @@ mod tests {
         assert_eq!(p.without_credentials().unwrap().url, "http://proxy.example.com:3128");
         let p = Proxy::new("proxy.example.com:3128", "").unwrap();
         assert_eq!(p.without_credentials().unwrap(), p);
+        // the parser would drop it, curl would then go to 1080
+        let p = Proxy::new("HTTP://bob:pw@proxy.example.com:80", "").unwrap();
+        assert_eq!(p.url, "http://bob:pw@proxy.example.com:80");
+        assert_eq!(p.without_credentials().unwrap().url, "http://proxy.example.com:80");
+        // the parser reads these as credentials too, which mustn't end up in /etc/environment
+        assert!(Proxy::new("http:///bob:hunter2@proxy.example:3128", "").is_none());
+        assert!(Proxy::new("http:\\\\bob:hunter2@proxy.example:3128", "").is_none());
+        assert!(Proxy::new("http://bob:hunter2\\@proxy.example:3128", "").is_none());
     }
 
     #[test]

@@ -250,10 +250,29 @@ fn suggest(zones: &[Zone], system: Option<&str>, locale: &str) -> Option<String>
         .map(|z| z.id.clone())
 }
 
-/// what a zone is found by: its city, every country it's for, its name and offset
+/// whether `query` is `offset` (`UTC+5:30`), with or without the `UTC`, or it without the
+/// minutes, so `utc+1` finds `UTC+1:30` but not `UTC+10`. Not any part of it, every offset has
+/// `utc` in it
+fn offset_matches(offset: &str, query: &str) -> bool {
+    let offset = offset.to_lowercase().replace('−', "-");
+    let query = query.replace('−', "-");
+    // the whole offset, or its hours when the minutes are left out
+    let ends_in_digit = query.ends_with(|c: char| c.is_ascii_digit());
+    let rest = |offset: &str| {
+        offset
+            .strip_prefix(query.as_str())
+            .is_some_and(|rest| rest.is_empty() || (ends_in_digit && rest.starts_with(':')))
+    };
+    if query.starts_with(['+', '-']) {
+        return offset.strip_prefix("utc").is_some_and(rest);
+    }
+    query.starts_with("utc") && rest(&offset)
+}
+
+/// what a zone is found by: its city, every country it's for, and its name
 fn search_text(tz: &TimeZone, zone: Option<&Zone>, regions: &Regions) -> String {
     let countries = zone.into_iter().flat_map(|z| &z.countries).map(|c| regions.name(c));
-    [tz.city.to_string(), tz.id.to_string(), tz.offset.to_string()]
+    [tz.city.to_string(), tz.id.to_string()]
         .into_iter()
         .chain(countries)
         .collect::<Vec<_>>()
@@ -274,11 +293,30 @@ struct State {
     /// timezone page is skipped, since nothing saves the guess and the system keeps its zone
     guess: bool,
     query: String,
+    /// every zone and UTC as shown, with what it's searched by (see [`search_text`]), for the
+    /// language in `cached_for`, so typing a search doesn't redo them all
+    cache: Vec<(TimeZone, String)>,
+    cached_for: String,
 }
 
 fn locale(ui: &AppWindow) -> String {
     let locale = ui.global::<Lang<'_>>().get_current_language().locale;
     if locale == "en-owo" { "en-US".to_owned() } else { locale.into() }
+}
+
+/// the zones [`State::query`] finds, from [`State::cache`]
+fn show_results(ui: &AppWindow, state: &State) {
+    let query = &state.query;
+    let mut results = (state.cache.iter())
+        .filter(|(e, text)| text.contains(query.as_str()) || offset_matches(&e.offset, query))
+        .map(|(e, _)| e.clone())
+        .collect::<Vec<_>>();
+    // one that's exactly what was typed first, e.g. UTC for `utc`, which Enter then picks
+    let exact = |e: &TimeZone| {
+        !query.is_empty() && (e.city.to_lowercase() == *query || e.id.to_lowercase() == *query)
+    };
+    results.sort_by(|a, b| exact(b).cmp(&exact(a)).then_with(|| a.city.cmp(&b.city)));
+    ui.global::<Tz<'_>>().set_results(slint::ModelRc::new(slint::VecModel::from(results)));
 }
 
 fn select(ui: &AppWindow, id: &str) {
@@ -288,20 +326,23 @@ fn select(ui: &AppWindow, id: &str) {
     tz.set_current(current);
 }
 
-fn refresh(ui: &AppWindow, state: &State) {
-    let regions = Regions::new(&locale(ui));
+fn refresh(ui: &AppWindow, state: &mut State) {
+    let lang = locale(ui);
+    let regions = Regions::new(&lang);
     let entries = state.zones.iter().map(|z| entry(z, &regions)).collect::<Vec<_>>();
     let tz = ui.global::<Tz<'_>>();
     let dots = state.on_map.iter().map(|z| entry(z, &regions)).collect::<Vec<_>>();
     tz.set_zones(slint::ModelRc::new(slint::VecModel::from(dots)));
     tz.set_all_zones(slint::ModelRc::new(slint::VecModel::from(entries.clone())));
-    let mut results = (entries.into_iter().zip(state.zones.iter().map(Some)))
+    state.cache = (entries.into_iter().zip(state.zones.iter().map(Some)))
         .chain([(utc_entry(), None)])
-        .filter(|(e, z)| search_text(e, *z, &regions).contains(&state.query))
-        .map(|(e, _)| e)
-        .collect::<Vec<_>>();
-    results.sort_by(|a, b| a.city.cmp(&b.city));
-    tz.set_results(slint::ModelRc::new(slint::VecModel::from(results)));
+        .map(|(e, z)| {
+            let text = search_text(&e, z, &regions);
+            (e, text)
+        })
+        .collect();
+    state.cached_for = lang;
+    show_results(ui, state);
     let id = if state.touched {
         tz.get_current().id.to_string()
     } else {
@@ -323,9 +364,10 @@ fn read(path: &str) -> String {
 }
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tz: &Tz<'_>) {
-    let main = parse_tab(&read(ZONE_TAB));
-    let on_map = map_zones(&main);
-    let mut zones = merge_tabs(main, parse_tab(&read(COUNTRY_TAB)));
+    let mut zones = merge_tabs(parse_tab(&read(ZONE_TAB)), parse_tab(&read(COUNTRY_TAB)));
+    // from all of them, `zone1970.tab` leaves out countries whose clocks have matched another's
+    // since 1970 (e.g. Sweden's are Germany's), whose nearest dot could then be in another zone
+    let on_map = map_zones(&zones);
     let links = parse_links(&read(TZDATA_ZI));
     let system_tz = jiff::tz::TimeZone::system();
     let system = system_tz.iana_name().and_then(|name| system_zone(&mut zones, &links, name));
@@ -337,12 +379,14 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tz: &Tz<'_>) {
         touched: false,
         guess: !crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Timezone),
         query: String::new(),
+        cache: vec![],
+        cached_for: String::new(),
     }));
     tz.on_refresh({
         let (ui, state) = (ui.clone(), Rc::clone(&state));
         move || {
             if let Some(ui) = ui.upgrade() {
-                refresh(&ui, &state.borrow());
+                refresh(&ui, &mut state.borrow_mut());
             }
         }
     });
@@ -352,7 +396,11 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tz: &Tz<'_>) {
             let Some(ui) = ui.upgrade() else { return };
             let mut state = state.borrow_mut();
             state.query = query.trim().to_lowercase();
-            refresh(&ui, &state);
+            if state.cached_for == locale(&ui) {
+                show_results(&ui, &state);
+            } else {
+                refresh(&ui, &mut state);
+            }
         }
     });
     tz.on_pick({
@@ -514,6 +562,18 @@ mod tests {
         let brussels = entry(&zones[0], &regions);
         let text = search_text(&brussels, Some(&zones[0]), &regions);
         assert!(text.contains("luxembourg") && text.contains("netherlands"), "{text}");
+    }
+
+    #[test]
+    fn offsets_found_whole() {
+        assert!(offset_matches("UTC", "utc"));
+        assert!(!offset_matches("UTC+5:30", "utc"));
+        assert!(!offset_matches("UTC+5:30", "u"));
+        assert!(offset_matches("UTC+5:30", "utc+5"));
+        assert!(offset_matches("UTC+5:30", "+5:30"));
+        assert!(offset_matches("UTC+1", "utc+1"));
+        assert!(!offset_matches("UTC+10", "utc+1"));
+        assert!(offset_matches("UTC−3", "utc-3"));
     }
 
     #[test]

@@ -31,7 +31,7 @@ component ThemeTile inherits Rectangle {
     accessible-label: root.text;
     accessible-checkable: true;
     accessible-checked: root.checked;
-    accessible-action-default => { root.picked(); }
+    accessible-action-default => { if Modal.open == root.in-dialog { root.picked(); } }
 
     border-radius: Tokens.radius-lg;
     border-width: root.checked ? 2px : 1px;
@@ -207,7 +207,7 @@ component AccentRow inherits Rectangle {
             accessible-label: Lang.t("page-theme-accent-" + accent.id, []);
             accessible-checkable: true;
             accessible-checked: self.checked;
-            accessible-action-default => { Appearance.accent = i; }
+            accessible-action-default => { if !Modal.open { Appearance.accent = i; } }
 
             changed checked => {
                 if self.checked && root.moving {

@@ -17,7 +17,7 @@ impl super::Step for SetupImf {
         if settings.ims.is_empty() || cfg.taidan0.systemd_homed {
             return Ok(());
         }
-        let Some(settings) = &with_installed_ims(settings, cfg).await else { return Ok(()) };
+        let Some(settings) = &with_installed_ims(settings, cfg, true).await else { return Ok(()) };
         if let Err(e) = match settings.imf {
             i18n::I18nImf::IBus => write_ibus_profile(settings).await,
             i18n::I18nImf::Fcitx5 => write_fcitx5_profile(settings).await,
@@ -28,13 +28,16 @@ impl super::Step for SetupImf {
     }
 }
 
-/// `settings` with only the input methods that are installed, when they couldn't be installed
-/// here (offline or without dnf) but the image may have them, [`None`] if that leaves none
+/// `settings` with only the input methods that are installed, [`None`] if that leaves none. Ones
+/// installed here may still be missing, as dnf skips broken packages, and offline or without dnf
+/// only the image's are there. Before the installation (`installed` false, e.g. for homed's
+/// skeleton), the ones dnf is about to install count too
 async fn with_installed_ims(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
+    installed: bool,
 ) -> Option<crate::settings::Settings> {
-    if !settings.nointernet && !cfg.taidan0.skip_dnf {
+    if !installed && !settings.nointernet && super::can_use_dnf(cfg).await {
         return (!settings.ims.is_empty()).then(|| settings.clone());
     }
     let mut ims = vec![];
@@ -91,7 +94,13 @@ fn fcitx5_profile(
         ",
     );
 
-    let refs = ims.iter().filter_map(|im| i18n::find_im(im)?.fcitx5_ref);
+    // a layout that can't type ASCII gets US English next to it, see `XkbKeymap::new`
+    let latin = i18n::XkbKeymap::new(kb_layout, kb_variant.as_deref())
+        .has_latin_fallback()
+        .then_some("keyboard-us");
+    // after the input methods, fcitx5's Ctrl+Space toggles between the layout and the first of
+    // them
+    let refs = ims.iter().filter_map(|im| i18n::find_im(im)?.fcitx5_ref).chain(latin);
     for (i, im) in refs.enumerate() {
         buf.push_str(&format!(
             "\
@@ -178,7 +187,7 @@ pub async fn write_to_skel(
     if settings.ims.is_empty() {
         return Ok(false);
     }
-    let Some(settings) = &with_installed_ims(settings, cfg).await else { return Ok(false) };
+    let Some(settings) = &with_installed_ims(settings, cfg, false).await else { return Ok(false) };
     if settings.imf.is_ibus() {
         return write_ibus_to_skel(settings, skel).await;
     }
@@ -199,12 +208,14 @@ pub async fn write_to_skel(
     Ok(true)
 }
 
-/// the `dconf write`s, joined for `bash -c`, that hand IBus the chosen engines, [`None`] if none of
-/// them have an IBus engine. IBus reads `preload-engines`, but GNOME (and Budgie) drive IBus from
-/// their own `input-sources`, ignoring it, so the engines go in there too after the layout
-fn ibus_dconf_script(
+/// the `dconf write`s that hand IBus the chosen engines, for [`crate::a11y::one_session`] to run
+/// through one D-Bus,
+/// [`None`] if none of them have an IBus engine. IBus reads `preload-engines`, but GNOME (and
+/// Budgie) drive IBus from their own `input-sources`, ignoring it, so the engines go in there too
+/// after the layout. Arguments rather than a shell script, the layout comes from the settings
+fn ibus_dconf_writes(
     crate::settings::Settings { ims, kb_layout, kb_variant, .. }: &crate::settings::Settings,
-) -> Option<String> {
+) -> Option<Vec<Vec<String>>> {
     let engines: Vec<_> = ims.iter().filter_map(|s| i18n::find_im(s)?.ibus_ref).collect();
     if engines.is_empty() {
         return None;
@@ -213,32 +224,36 @@ fn ibus_dconf_script(
 
     // without an xkb source first GNOME would type through an IBus engine all the time
     let layout = if kb_layout.is_empty() { "us" } else { kb_layout };
-    let xkb = match kb_variant.as_deref().filter(|v| !v.is_empty()) {
-        Some(variant) => format!("{layout}+{variant}"),
-        None => layout.to_owned(),
-    };
-    let sources = std::iter::once(format!("('xkb', '{xkb}')"))
+    let sources = (i18n::XkbKeymap::new(layout, kb_variant.as_deref()).gnome_sources().into_iter())
         .chain(engines.iter().map(|r| format!("('ibus', '{r}')")))
         .collect::<Vec<_>>()
         .join(", ");
 
-    Some(format!(
-        "dconf write /desktop/ibus/general/use-system-keyboard-layout true && \
-        dconf write /desktop/ibus/general/engines-order \"[{order}]\" && \
-        dconf write /desktop/ibus/general/preload-engines \"[{order}]\" && \
-        dconf write /org/gnome/desktop/input-sources/sources \"[{sources}]\""
-    ))
+    let write = |key: &str, value: String| {
+        ["dbus-run-session", "--", "dconf", "write", key]
+            .iter()
+            .map(|&s| s.to_owned())
+            .chain([value])
+            .collect()
+    };
+    Some(vec![
+        write("/desktop/ibus/general/use-system-keyboard-layout", "true".to_owned()),
+        write("/desktop/ibus/general/engines-order", format!("[{order}]")),
+        write("/desktop/ibus/general/preload-engines", format!("[{order}]")),
+        write("/org/gnome/desktop/input-sources/sources", format!("[{sources}]")),
+    ])
 }
 
-/// [`ibus_dconf_script`] into the dconf database in `skel`, through a D-Bus of its own like the
+/// [`ibus_dconf_writes`] into the dconf database in `skel`, through a D-Bus of its own like the
 /// theme's `gsettings`
 async fn write_ibus_to_skel(
     settings: &crate::settings::Settings,
     skel: &std::path::Path,
 ) -> Res<bool> {
-    let Some(script) = ibus_dconf_script(settings) else { return Ok(false) };
+    let Some(cmd) = ibus_dconf_writes(settings).and_then(crate::a11y::one_session) else {
+        return Ok(false);
+    };
     tokio::fs::create_dir_all(skel.join(".config")).await.map_err(Err::Io)?;
-    let cmd = ["dbus-run-session", "--", "bash", "-c", &script].map(str::to_owned).to_vec();
     let env = crate::a11y::in_home(skel, cmd);
     let env = env.iter().map(String::as_str).collect::<Vec<_>>();
     // not worth losing the rest of the skeleton over
@@ -252,10 +267,13 @@ async fn write_ibus_to_skel(
 async fn write_ibus_profile(settings: &crate::settings::Settings) -> Res<()> {
     let username = &settings.username;
     // dconf writes through its D-Bus service, which a bus of its own starts
-    let Some(dbus_args) = ibus_dconf_script(settings) else { return Ok(()) };
+    let Some(cmd) = ibus_dconf_writes(settings).and_then(crate::a11y::one_session) else {
+        return Ok(());
+    };
 
     let p = tokio::process::Command::new("pkexec")
-        .args(["--user", username, "dbus-run-session", "--", "bash", "-c", &dbus_args])
+        .args(["--user", username])
+        .args(&cmd)
         .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| Err::FailToRunProgram("pkexec", e))
@@ -303,24 +321,38 @@ mod tests {
             ims: vec!["Pinyin".into(), "bogus".into(), "Mozc".into()],
             ..Default::default()
         };
-        let script = ibus_dconf_script(&settings).unwrap();
+        let script = ibus_dconf_writes(&settings).unwrap().concat().join(" ");
         let refs: Vec<_> = ["Pinyin", "Mozc"]
             .iter()
             .map(|im| i18n::find_im(im).unwrap().ibus_ref.unwrap())
             .collect();
         let sources = format!(
-            "/org/gnome/desktop/input-sources/sources \"[('xkb', 'de+nodeadkeys'), ('ibus', '{}'), ('ibus', '{}')]\"",
+            "/org/gnome/desktop/input-sources/sources [('xkb', 'de+nodeadkeys'), ('ibus', '{}'), ('ibus', '{}')]",
             refs[0], refs[1],
         );
         assert!(script.contains(&sources), "{script}");
-        let preload = format!("preload-engines \"['{}', '{}']\"", refs[0], refs[1]);
+        let preload = format!("preload-engines ['{}', '{}']", refs[0], refs[1]);
         assert!(script.contains(&preload), "{script}");
+    }
+
+    #[test]
+    fn non_latin_layouts_get_us_too() {
+        let settings = crate::settings::Settings {
+            kb_layout: "ru".into(),
+            ims: vec!["Mozc".into()],
+            ..Default::default()
+        };
+        let profile = fcitx5_profile(&settings);
+        assert!(profile.contains("[Groups/0/Items/1]\n# Name\nName=mozc\n"));
+        assert!(profile.contains("[Groups/0/Items/2]\n# Name\nName=keyboard-us\n"));
+        let script = ibus_dconf_writes(&settings).unwrap().concat().join(" ");
+        assert!(script.contains("[('xkb', 'ru'), ('xkb', 'us'), ('ibus', "), "{script}");
     }
 
     #[test]
     fn no_ibus_engines_writes_nothing() {
         let settings =
             crate::settings::Settings { ims: vec!["bogus".into()], ..Default::default() };
-        assert!(ibus_dconf_script(&settings).is_none());
+        assert!(ibus_dconf_writes(&settings).is_none());
     }
 }

@@ -12,12 +12,14 @@ impl super::Step for UserAdd {
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        // it goes into commands run as root, so make sure the UI's check held
-        if matches!(
-            crate::passwd::username_problem(&settings.username),
-            Some(crate::passwd::UsernameProblem::Invalid | crate::passwd::UsernameProblem::TooLong)
-        ) {
-            return Err(Err::Message(format!("invalid username `{}`", settings.username)));
+        // it goes into commands run as root, so make sure the UI's check held. Reserved names too,
+        // `remove_previous` couldn't remove one on a retry. One an earlier attempt made counts as
+        // free, see `username_problem`
+        if let Some(problem) = crate::passwd::username_problem(&settings.username) {
+            return Err(Err::Message(format!(
+                "username `{}` can't be used: {problem:?}",
+                settings.username
+            )));
         }
         // a passwordless wheel user would be root for anyone at the keyboard. The UI never sends
         // one, but settings from elsewhere (tdnx) can leave it out
@@ -40,6 +42,15 @@ impl super::Step for UserAdd {
         let keep_home = !cfg.taidan0.systemd_homed && home_exists(&settings.username);
         if keep_home {
             tracing::info!(user = settings.username, "home is already there, keeping it");
+            // another user's, or a symlink to anywhere, would hand whoever controls it the new
+            // admin's session
+            if previous_uid(&settings.username).is_none() {
+                return Err(Err::Message(format!(
+                    "{} is already there and belongs to another user, or isn't a directory. \
+                     Move it away or pick another username",
+                    home_path(&settings.username).display()
+                )));
+            }
         }
         // before the user is made, so it's never there without the record, which would keep the
         // next attempt from removing it. A record of a user that never got made is cleared then
@@ -82,9 +93,16 @@ async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
     let pass = hash_password(settings)?;
     let fullname = crate::passwd::sanitize_fullname(&settings.fullname);
     let user = settings.username.as_str();
-    super::super::root("useradd", ["-c", &fullname, "-m", "-G", "wheel", "--", user])
-        .await
-        .wrap_msg("cannot create the user")?;
+    let mut args =
+        vec!["-c".to_owned(), fullname, "-m".to_owned(), "-G".to_owned(), "wheel".into()];
+    // a home kept from a reinstall stays its old owner's, `useradd` doesn't change that, so the
+    // user gets that uid back, or they couldn't get into it
+    if let Some(uid) = previous_uid(user) {
+        tracing::info!(uid, "giving the user the uid that owns its home");
+        args.extend(["-u".to_owned(), uid.to_string()]);
+    }
+    args.extend(["--".to_owned(), user.to_owned()]);
+    super::super::root("useradd", &args).await.wrap_msg("cannot create the user")?;
     // through stdin, since anyone can read a command's arguments
     super::super::root_with_stdin("chpasswd", ["-e"], format!("{user}:{pass}\n").as_bytes())
         .await
@@ -125,7 +143,8 @@ async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -
 /// whether the home `useradd -m` would give `user` is already there: under the `HOME=` from
 /// `/etc/default/useradd`, or `/home`. If it can't be told, it's taken to be, since that only
 /// leaves a home behind while the opposite can remove someone's files
-fn home_exists(user: &str) -> bool {
+/// where `useradd` puts `user`'s home
+fn home_path(user: &str) -> std::path::PathBuf {
     let base = std::fs::read_to_string("/etc/default/useradd")
         .ok()
         .and_then(|s| {
@@ -133,8 +152,25 @@ fn home_exists(user: &str) -> bool {
         })
         .filter(|h| h.starts_with('/'))
         .unwrap_or_else(|| "/home".to_owned());
+    std::path::Path::new(&base).join(user)
+}
+
+/// the uid that owns `user`'s home if it's already there, so the user can get it back and keep
+/// access to their files, [`None`] if it isn't a regular uid or another user has it now
+fn previous_uid(user: &str) -> Option<u32> {
+    use std::os::unix::fs::MetadataExt;
+    let meta = home_path(user).symlink_metadata().ok().filter(std::fs::Metadata::is_dir)?;
+    let uid = meta.uid();
+    // not one of homed's, a retry would take the user for a homed one and fail to remove it
+    (crate::passwd::REGULAR_UIDS.contains(&uid)
+        && crate::passwd::removable(user, uid)
+        && uzers::get_user_by_uid(uid).is_none())
+    .then_some(uid)
+}
+
+fn home_exists(user: &str) -> bool {
     // a dangling symlink counts too, userdel -r would remove what it points to
-    match std::path::Path::new(&base).join(user).symlink_metadata() {
+    match home_path(user).symlink_metadata() {
         Ok(_) => true,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
         Err(e) => {
@@ -152,12 +188,22 @@ async fn remove_previous() -> Res<()> {
     let Some(crate::passwd::Record { user: prev, keep_home }) = crate::passwd::record() else {
         return Ok(());
     };
+    let logins = crate::passwd::login_state(&prev);
+    // if it can't be told whether it was used, it's removed but its home stays
+    let keep_home = keep_home || logins.is_none();
     match uzers::get_user_by_name(&prev) {
         None => tracing::info!(prev, "user from an earlier attempt is already gone"),
         // the record outlived the install that made it (it couldn't be cleared, or Taidan died
         // after making the user) and the account is in use, so it's theirs to keep
-        Some(_) if crate::passwd::has_logged_in(&prev) => {
+        Some(_) if logins == Some(true) => {
             tracing::warn!(prev, "user from an earlier attempt has logged in, keeping it");
+        }
+        // homed can't remove a user and keep its home, so one that may be in use stays put
+        Some(u) if logins.is_none() && crate::passwd::HOMED_UIDS.contains(&u.uid()) => {
+            return Err(Err::Message(format!(
+                "cannot tell whether `{prev}` from an earlier attempt has been used, so it can't \
+                 be removed safely. lastlog2 failed, see the log"
+            )));
         }
         Some(u) if !crate::passwd::removable(&prev, u.uid()) => {
             return Err(Err::Message(format!(
@@ -171,7 +217,7 @@ async fn remove_previous() -> Res<()> {
             if crate::passwd::HOMED_UIDS.contains(&u.uid()) {
                 super::super::root("homectl", ["remove", prev.as_str()]).await
             } else if keep_home {
-                tracing::info!(prev, "its home was there before it, keeping it");
+                tracing::info!(prev, "its home may be in use, keeping it");
                 super::super::root("userdel", ["--", prev.as_str()]).await
             } else {
                 super::super::root("userdel", ["-r", "--", prev.as_str()]).await

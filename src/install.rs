@@ -54,21 +54,40 @@ fn run_install(
     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         if is_dev_session() {
             tracing::warn!("Dev session: simulating the installation instead");
-            return crate::RT.block_on(simulate_install(callback)).map_err(|e| format!("{e:?}"));
+            return crate::RT.block_on(simulate_install(callback)).map_err(|e| e.to_string());
         }
-        let cfg = backend_cfg().map_err(|e| format!("cannot convert the config: {e:?}"))?;
-        crate::RT
-            .block_on(libtaidan::start_install(settings, &cfg, callback))
-            .map_err(|e| format!("{e:?}"))
+        let cfg = backend_cfg().map_err(|e| format!("cannot convert the config: {e}"))?;
+        crate::RT.block_on(libtaidan::start_install(settings, &cfg, callback)).map_err(|e| {
+            // not an error, those go to Sentry, and this may name the user
+            tracing::debug!(?e, "installation error");
+            e.to_string()
+        })
     }));
     let msg = match res {
         Ok(Ok(())) => return None,
         Ok(Err(msg)) => msg,
         Err(payload) => format!("the installation crashed: {}", panic_msg(&*payload)),
     };
-    tracing::error!(msg, "installation failed");
-    sentry::capture_message(&msg, sentry::Level::Error);
+    // errors can name the user, e.g. ``user `alice` already exists``, which mustn't reach Sentry
+    let report = without_user(&msg, &settings.username);
+    // not info, which goes along with Sentry events as a breadcrumb
+    tracing::debug!(msg, "installation failed");
+    tracing::error!(msg = report, "installation failed");
     Some(strip_ansi_escapes::strip_str(msg))
+}
+
+/// `msg` with `user` replaced wherever it's a word of its own, so a one-letter name doesn't take
+/// every such letter with it
+fn without_user(msg: &str, user: &str) -> String {
+    if user.is_empty() {
+        return msg.to_owned();
+    }
+    // usernames are letters, digits, `_` and `-`, so not part of a longer one
+    let word = format!("(^|[^A-Za-z0-9_-]){}($|[^A-Za-z0-9_-])", regex::escape(user));
+    let Ok(re) = regex::Regex::new(&word) else { return msg.to_owned() };
+    // twice, a match takes the character after it, which may be where the next one starts
+    let once = re.replace_all(msg, "${1}<user>${2}");
+    re.replace_all(&once, "${1}<user>${2}").into_owned()
 }
 
 /// whether `TAIDAN_SIMULATE_HW` pretends `name` is present, a comma-separated list of `nvidia`,
@@ -129,8 +148,12 @@ fn start(ui: &slint::Weak<AppWindow>) {
     }
     install.set_state(InstallState::Running);
     install.set_error("".into());
-    install.set_needs_reboot(false);
+    // not `needs_reboot`, drivers an earlier attempt installed still need it
     install.set_updates_ready(false);
+    // not where a failed attempt stopped, until the first stage starts
+    install.set_stage_id("".into());
+    install.set_stage_num(0);
+    install.set_stage_progress(-1.0);
     install.set_stage_count(i32::try_from(Stage::all().len()).expect("too many stages"));
     crate::SETTINGS.write().install_codecs_drivers = app.global::<Drivers<'_>>().get_install();
     // a skipped location page leaves GeoClue as the distro has it
@@ -240,7 +263,7 @@ async fn reapply_a11y() {
 static FINISHING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// marks the system as configured so the OOBE doesn't run again, then reboots or exits
-async fn finish(reboot: bool) {
+async fn finish(ui: &slint::Weak<AppWindow>, reboot: bool) {
     if is_dev_session() {
         tracing::warn!(reboot, "Dev session: not marking the system configured, nor rebooting");
     } else {
@@ -256,8 +279,11 @@ async fn finish(reboot: bool) {
         {
             tracing::warn!(?e, "cannot disable taidan-initial-setup-reconfiguration.service");
         }
-        if reboot && let Err(e) = libtaidan::root("systemctl", ["reboot"]).await {
-            tracing::error!(?e, "cannot reboot");
+        if reboot && !reboot_now().await {
+            // the drivers may need it, so rather than quitting, the button can be pressed again
+            FINISHING.store(false, std::sync::atomic::Ordering::SeqCst);
+            _ = ui.upgrade_in_event_loop(|app| app.global::<Install<'_>>().set_reboot_failed(true));
+            return;
         }
     }
     // the process ends with the event loop, and these would outlive it
@@ -266,6 +292,19 @@ async fn finish(reboot: bool) {
     if let Err(e) = slint::invoke_from_event_loop(|| _ = slint::quit_event_loop()) {
         tracing::error!(?e, "cannot quit");
     }
+}
+
+/// asks systemd to reboot, a few times since `pkexec` can fail for a moment after a VT switch,
+/// whether it did
+async fn reboot_now() -> bool {
+    for attempt in 1..=3 {
+        match libtaidan::root("systemctl", ["reboot"]).await {
+            Ok(()) => return true,
+            Err(e) => tracing::error!(?e, attempt, "cannot reboot"),
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+    false
 }
 
 /// back to [`InstallState::Idle`] after a failure, so the summary page can start it again
@@ -279,18 +318,20 @@ fn reset(ui: &slint::Weak<AppWindow>) {
     install.set_error("".into());
     install.set_used_internet(false);
     install.set_force_offline(false);
-    install.set_needs_reboot(false);
     install.set_updates_ready(false);
+    install.set_reboot_failed(false);
     install.set_stage_id("".into());
     install.set_stage_num(0);
     install.set_stage_progress(-1.0);
 }
 
+/// whether dnf can install packages here, see `libtaidan::steps::can_use_dnf`
+fn can_use_dnf() -> bool {
+    !crate::CFG.taidan0.skip_dnf && !std::path::Path::new("/ostree").exists()
+}
+
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
-    // dnf can't install to rpm-ostree systems, and distros that skip dnf don't want it run
-    install.set_can_download_updates(
-        !crate::CFG.taidan0.skip_dnf && !std::path::Path::new("/ostree").exists(),
-    );
+    install.set_can_download_updates(can_use_dnf());
     install.on_start({
         let ui = ui.clone();
         move || start(&ui)
@@ -312,17 +353,16 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
             if FINISHING.swap(true, std::sync::atomic::Ordering::SeqCst) {
                 return;
             }
-            std::thread::spawn(move || crate::RT.block_on(finish(reboot)));
+            let ui = ui.clone();
+            std::thread::spawn(move || crate::RT.block_on(finish(&ui, reboot)));
         }
     });
     if let Some(app) = ui.upgrade() {
         let drivers = app.global::<Drivers<'_>>();
-        // as on the GTK version, skipping the drivers (`codecs`) page means not installing them
-        if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Drivers) {
-            drivers.set_install(false);
-        }
+        // a skipped drivers (`codecs`) page still installs them, as on the GTK version, hiding
+        // it is how a distro installs them without asking
         // codecs come from dnf, see `DnfDownloadApps`
-        drivers.set_codecs(!crate::CFG.taidan0.skip_dnf);
+        drivers.set_codecs(can_use_dnf());
     }
 
     // detect hardware for the drivers page in the background, as `lspci` can take a moment
@@ -331,7 +371,8 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
         let mut hw = crate::RT.block_on(libtaidan::steps::detect_hardware());
         tracing::debug!(?hw, "Detected hardware");
         // pretend to have hardware, to see the drivers list
-        if std::env::var_os("TAIDAN_SIMULATE_HW").is_some() {
+        // debug builds only, a stray variable mustn't list hardware that isn't there
+        if cfg!(debug_assertions) && std::env::var_os("TAIDAN_SIMULATE_HW").is_some() {
             hw.nvidia |= simulated_hw("nvidia");
             hw.broadcom_wifi |= simulated_hw("broadcom-wifi");
             hw.broadcom_bluetooth |= simulated_hw("broadcom-bluetooth");
@@ -352,6 +393,15 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn user_left_out_of_reports() {
+        assert_eq!(
+            without_user("user `al` already exists: al al, /home/al", "al"),
+            "user `<user>` already exists: <user> <user>, /home/<user>"
+        );
+        assert_eq!(without_user("cannot install alsa-lib", "al"), "cannot install alsa-lib");
+    }
 
     #[test]
     fn cfg_converts_to_backend_cfg() {

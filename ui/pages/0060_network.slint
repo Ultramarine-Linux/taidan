@@ -494,8 +494,9 @@ export component HiddenDialog inherits TdnDialog {
     property <string> password;
     // nothing else can connect while the dialog is open
     property <bool> busy: Network.connecting-ssid != "";
-    // NetworkManager wants 8 to 63 characters for WPA, or 64 hex digits
-    property <bool> complete: root.ssid != "" && (!root.needs-password || root.password.character-count >= 8);
+    // NetworkManager wants 8 to 63 characters for WPA, or 64 hex digits, WPA3 has no minimum
+    property <bool> complete: root.ssid != "" && (!root.needs-password
+        || (root.security == HiddenSecurity.wpa3 ? root.password != "" : root.password.character-count >= 8));
 
     title: Lang.t("page-internet-hidden-title", []);
     dismissed => {
@@ -543,7 +544,7 @@ export component HiddenDialog inherits TdnDialog {
             Lang.t("page-internet-hidden-open", []),
             Lang.t("page-internet-hidden-enterprise", []),
         ];
-        index: root.security-index;
+        index <=> root.security-index;
         enabled: !root.busy;
         changed(i) => { root.security-index = i; }
     }
@@ -876,7 +877,7 @@ export component EnterpriseDialog inherits TdnDialog {
             domain: root.uses-ca ? root.domain : "",
             peap-version: root.method == EapMethod.peap ? root.peap-version : 0,
             client-cert: root.method == EapMethod.tls ? root.client-cert : "",
-            private-key: root.method == EapMethod.tls ? root.private-key : "",
+            private-key: root.method == EapMethod.tls && !Network.is-pkcs12(root.client-cert) ? root.private-key : "",
             private-key-password: root.method == EapMethod.tls ? root.private-key-password : "",
             fast-provisioning: root.method == EapMethod.fast && root.fast-provisioning ? root.fast-mode + 1 : 0,
             pac-file: root.method == EapMethod.fast ? root.pac-file : "",

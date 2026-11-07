@@ -178,6 +178,8 @@ export component TdnPage inherits TdnBasePg {
     // false for pages before the welcome screen, which aren't part of any step
     in property <bool> show-steps: true;
     in property <string> next-text: Lang.t("next", []);
+    // whether Next shows the Enter keycap, off where Enter elsewhere on the page doesn't press it
+    in property <bool> next-enter-hint: true;
 
     // when set, Next and Enter call `next-intercepted` instead, e.g. to confirm first
     in property <bool> intercept-next;
@@ -242,7 +244,7 @@ export component TdnPage inherits TdnBasePg {
                 layout-order: Dir.order(1);
                 text: root.next-text;
                 enabled: root.can-next;
-                enter-hint: true;
+                enter-hint: root.next-enter-hint || self.has-focus;
                 background-color: TdnStyle.accent;
                 foreground-color: TdnStyle.accent-foreground;
                 clicked => { root.try-next(); }
