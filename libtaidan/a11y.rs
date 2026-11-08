@@ -567,14 +567,9 @@ pub(crate) async fn run_in_home(
     let user = settings.username.as_str();
     if !cfg.taidan0.systemd_homed {
         for (cmd, input) in cmds {
-            let mut args = vec!["-u".to_owned(), user.to_owned(), "--".to_owned()];
-            args.extend(cmd);
-            let res = match input {
-                Some(input) => crate::root_with_stdin("runuser", &args, input.as_bytes()).await,
-                None => crate::root("runuser", &args).await,
-            };
+            let res = crate::as_user(user, cmd.clone(), input.as_deref().map(str::as_bytes)).await;
             if let Err(e) = res {
-                tracing::warn!(?e, ?args, "cannot write into the user's home");
+                tracing::warn!(?e, ?cmd, "cannot write into the user's home");
             }
         }
         return;
@@ -583,18 +578,11 @@ pub(crate) async fn run_in_home(
         return;
     }
     let script = homed_script(&cmds);
-    // homectl takes the password from `$PASSWORD`, read from stdin into it since anyone can read
-    // a command's arguments, and kept from what runs in the home
+    // homectl takes the password from `$PASSWORD`, which the helper sets from stdin since anyone
+    // can read a command's arguments, and keeps from what runs in the home
+    let argv = ["sh", "-c", &script].map(str::to_owned).to_vec();
     let res = crate::root_with_stdin(
-        "sh",
-        [
-            "-c",
-            r#"IFS= read -r PASSWORD; export PASSWORD
-            exec homectl with -- "$1" env -u PASSWORD runuser -u "$1" -- sh -c "$2""#,
-            "sh",
-            user,
-            &script,
-        ],
+        crate::Verb::AsUserHomed { user: user.to_owned(), argv },
         format!("{}\n", settings.passwd.expose_secret()).as_bytes(),
     )
     .await;

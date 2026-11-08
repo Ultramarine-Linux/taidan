@@ -270,17 +270,9 @@ async fn finish(ui: &slint::Weak<AppWindow>, reboot: bool) {
         tracing::warn!(reboot, "Dev session: not marking the system configured, nor rebooting");
     } else {
         reapply_a11y().await;
-        // libtaidan did these at the end of the installation already, this only makes sure. Both
-        // succeed when there's nothing left to do
-        if let Err(e) = libtaidan::root("rm", ["-rf", "/var/.unconfigured", "/.unconfigured"]).await
-        {
-            tracing::warn!(?e, "cannot remove /var/.unconfigured and/or /.unconfigured");
-        }
-        if let Err(e) =
-            libtaidan::root("systemctl", ["disable", "taidan-initial-setup-reconfiguration"]).await
-        {
-            tracing::warn!(?e, "cannot disable taidan-initial-setup-reconfiguration.service");
-        }
+        // libtaidan did this at the end of the installation already, this only makes sure. It
+        // succeeds when there's nothing left to do
+        libtaidan::mark_configured().await;
         if reboot && !reboot_now().await {
             // the drivers may need it, so rather than quitting, the button can be pressed again
             FINISHING.store(false, std::sync::atomic::Ordering::SeqCst);
@@ -304,7 +296,7 @@ async fn finish(ui: &slint::Weak<AppWindow>, reboot: bool) {
 /// whether it did
 async fn reboot_now() -> bool {
     for attempt in 1..=3 {
-        match libtaidan::root("systemctl", ["reboot"]).await {
+        match libtaidan::root(libtaidan::Verb::Reboot).await {
             Ok(()) => return true,
             Err(e) => tracing::error!(?e, attempt, "cannot reboot"),
         }

@@ -1,6 +1,6 @@
 # seeded into the OOBE session's own config by taidan-initial-setup.service, so nothing can close
 # Taidan (start-taidan then stops the session and boots to the login screen with no user), or open
-# something running as the taidan user, which can pkexec anything
+# something running as the taidan user, which can run the root helper (taidan-helper)
 #
 # KWin's own are `action=current,default,name`, see initShortcut() in KWin's src/useractions.cpp.
 # Alt+Tab stays, to get back from the captive portal browser.

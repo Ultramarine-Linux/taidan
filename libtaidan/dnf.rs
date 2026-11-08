@@ -17,32 +17,36 @@ const DRAIN_LINE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1
 /// that keeps printing can't hold it up forever
 const DRAIN_TOTAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// runs `name` as root, with what `f` adds to it as arguments, and passes each line it prints to
-/// `on_line`. The output also goes to stdout and is appended to `<name>.stdout.log` in
-/// [`crate::TEMP_DIR`]
+/// runs `verb` through the helper, and passes each line what it runs prints to `on_line`. The
+/// output also goes to stdout and is appended to `<name>.stdout.log` in [`crate::TEMP_DIR`]
 ///
 /// # Errors
 /// - the program cannot be run
 /// - it exits with a non-zero status, the error has the last lines it printed
 pub(super) async fn run_logged(
     name: &'static str,
-    f: impl FnOnce(&mut tokio::process::Command) -> &mut tokio::process::Command,
+    verb: &crate::Verb,
     mut on_line: impl FnMut(&str),
 ) -> Res<()> {
-    let mut cmd = tokio::process::Command::new("pkexec");
-    cmd.args(["--user", "root", "env"]).args(crate::proxy::wrapper()).arg(name);
-    f(&mut cmd);
+    let mut cmd = crate::helper::command(verb);
     let (writer, reader) = tokio::net::unix::pipe::pipe().map_err(Err::_fail_to_run(name))?;
     let writer = writer.into_blocking_fd().map_err(Err::_fail_to_run(name))?;
     let mut child = cmd
-        // nobody types into the OOBE's tty, a question would wait forever
-        .stdin(std::process::Stdio::null())
+        // only the request, the helper doesn't pass stdin on to what it runs, and nobody types
+        // into the OOBE's tty, a question would wait forever
+        .stdin(std::process::Stdio::piped())
         .stdout(writer.try_clone().map_err(Err::_fail_to_run(name))?)
         .stderr(writer)
         .spawn()
         .map_err(Err::_fail_to_run(name))?;
     // it holds the write end too, the pipe would never reach EOF otherwise
     drop(cmd);
+    if let Some(mut stdin) = child.stdin.take() {
+        // a failed write shows up as the helper refusing, so wait for it anyway
+        if let Err(e) = stdin.write_all(&crate::helper::stdin(verb, &[])).await {
+            tracing::error!(?e, name, "cannot pass the request to the helper");
+        }
+    }
 
     let log_path = crate::TEMP_DIR.join(format!("{name}.stdout.log"));
     // appended, so a later run doesn't wipe the log of an earlier step
@@ -121,11 +125,8 @@ pub(super) async fn run_logged(
 
 /// # Errors
 /// - if `dnf5` doesn't work correctly then maybe
-pub(super) async fn handle_dnf(
-    callback: &impl crate::Callback,
-    f: impl FnOnce(&mut tokio::process::Command) -> &mut tokio::process::Command,
-) -> Res<()> {
-    run_logged("dnf5", f, |line| {
+pub(super) async fn handle_dnf(callback: &impl crate::Callback, verb: crate::Verb) -> Res<()> {
+    run_logged("dnf5", &verb, |line| {
         let Some(matches) = PROGRESS_REGEX.captures(line) else {
             return;
         };
@@ -140,31 +141,17 @@ pub(super) async fn handle_dnf(
 }
 
 /// enables `repo`, either the URL of a `.repo` file or the id of a repo that's already defined
-/// but disabled
+/// but disabled. The helper only takes this from a caller that's root already, see
+/// [`crate::helper::Verb::EnableRepo`]
 ///
 /// # Errors
 /// - `dnf5 config-manager` fails, e.g. the repo doesn't exist or the file can't be downloaded
 #[tracing::instrument]
 pub(super) async fn enable_repo(repo: &str) -> Res<()> {
     tracing::debug!("Enabling repo");
-    // a repo file over plain HTTP could be swapped for one without signature checks
-    if repo.starts_with("http://") {
-        return Err(Err::Message(format!("refusing to add repo `{repo}` over plain HTTP")));
-    }
-    if repo.starts_with('-') {
-        return Err(Err::Message(format!("invalid repo `{repo}`")));
-    }
-    if repo.starts_with("https://") {
-        // overwritten, so a retried install doesn't fail on the file the first attempt added
-        crate::root(
-            "dnf5",
-            ["config-manager", "addrepo", "--overwrite", &format!("--from-repofile={repo}")],
-        )
+    crate::root(crate::Verb::EnableRepo { repo: repo.to_owned() })
         .await
-    } else {
-        crate::root("dnf5", ["config-manager", "setopt", &format!("{repo}.enabled=1")]).await
-    }
-    .wrap_message(|_| format!("cannot enable repo `{repo}`"))
+        .wrap_message(|_| format!("cannot enable repo `{repo}`"))
 }
 
 #[cfg(test)]

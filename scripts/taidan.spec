@@ -94,9 +94,14 @@ This package contains the default configuration files for Taidan.
 %build
 %{cargo_license_online} > LICENSE.dependencies
 %cargo_license_summary_online
+# the root helper is a binary of libtaidan, which %%cargo_install (the taidan package only) leaves
+# out. Its dependencies are a subset of taidan's, so the licenses above cover it
+%{__cargo} build %{__cargo_common_opts} --profile rpm -p libtaidan --bin taidan-helper
 
 %install
 %cargo_install
+# the only program the OOBE's polkit rule lets the taidan user run as root, by this exact path
+install -Dpm755 target/rpm/taidan-helper %{buildroot}%{_libexecdir}/taidan-helper
 DESTDIR=%buildroot ./scripts/install.sh
 install -d %buildroot%{_sharedstatedir}/taidan
 
@@ -115,6 +120,7 @@ install -d %buildroot%{_sharedstatedir}/taidan
 %license LICENSE.md LICENSE.dependencies
 %{_bindir}/taidan
 %{_libexecdir}/start-taidan
+%{_libexecdir}/taidan-helper
 %{_datadir}/taidan/polkit/
 %{_presetdir}/95-taidan.preset
 %config(noreplace) %{_sysconfdir}/pam.d/taidan

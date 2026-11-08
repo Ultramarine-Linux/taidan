@@ -229,20 +229,14 @@ impl Tweak {
         self.path.file_name().unwrap()
     }
 
-    /// Run `up` with the serialized `settings`, whether it succeeded. Failures are logged
-    ///
-    /// Expects `pkexec` to be available.
+    /// Run `up` with the serialized `settings`, as root through the helper, which finds it in
+    /// `/usr/share/taidan/tweaks` by the id. Whether it succeeded, failures are logged
     // not the settings, which have the user's name and the proxy in them
     #[tracing::instrument(skip(settings))]
     pub async fn run(&self, settings: &[u8], on: bool) -> bool {
-        // `pkexec` clears the environment, and tweaks may download things too
-        let cmd = tokio::process::Command::new("pkexec")
-            .args(["--user", "root", "env"])
-            .args(crate::proxy::wrapper())
-            .arg(self.path.join("up"))
-            .arg(if on { "1" } else { "0" })
-            .stdin(std::process::Stdio::piped())
-            .spawn();
+        let verb = crate::Verb::RunTweak { id: self.id().to_string_lossy().into_owned(), on };
+        // `up`'s output goes to the log as it is, rather than into an error
+        let cmd = crate::helper::command(&verb).stdin(std::process::Stdio::piped()).spawn();
         let mut cmd = match cmd {
             Ok(cmd) => cmd,
             Err(err) => {
@@ -251,7 +245,7 @@ impl Tweak {
             }
         };
         if let Some(mut stdin) = cmd.stdin.take()
-            && let Err(err) = stdin.write_all(settings).await
+            && let Err(err) = stdin.write_all(&crate::helper::stdin(&verb, settings)).await
         {
             // `up` may not read the settings at all, and exit before they're written
             tracing::debug!(?err, "cannot pass the settings to `up`");
@@ -309,26 +303,16 @@ pub async fn record_on(ids: &[String]) -> Res<()> {
     if ids.is_empty() {
         return clear_on_record().await;
     }
-    let mut args = vec![
-        "-c",
-        // replaced whole, and failing if any of it does, so a full disk can't leave it empty. On
-        // disk before what it records is done, a power cut mustn't lose it
-        r#"
-            set -e
-            f=$1
-            shift
-            mkdir -p "$(dirname "$f")"
-            printf '%s\n' "$@" > "$f.tmp"
-            chmod 644 "$f.tmp"
-            sync "$f.tmp"
-            mv -f "$f.tmp" "$f"
-            sync "$(dirname "$f")"
-        "#,
-        "sh",
-        ON_RECORD,
-    ];
-    args.extend(ids.iter().map(String::as_str));
-    crate::root("sh", args).await.wrap_msg("cannot record the tweaks turned on")
+    crate::root(crate::Verb::RecordTweaks { ids: ids.to_vec() })
+        .await
+        .wrap_msg("cannot record the tweaks turned on")
+}
+
+/// what [`record_on`] does, run by the helper as root. Replaced whole, so a full disk can't
+/// leave it empty, and on disk before what it records is done, a power cut mustn't lose it
+pub(crate) fn write_on_record(ids: &[String]) -> std::io::Result<()> {
+    let content: String = ids.iter().map(|id| format!("{id}\n")).collect();
+    crate::helper::write_atomic(Path::new(ON_RECORD), content.as_bytes(), 0o644)
 }
 
 /// removes [`ON_RECORD`], if it's there
@@ -339,7 +323,7 @@ pub async fn clear_on_record() -> Res<()> {
     if !tokio::fs::try_exists(ON_RECORD).await.unwrap_or(true) {
         return Ok(());
     }
-    crate::root("rm", ["-f", ON_RECORD]).await.wrap_msg("cannot remove the tweaks record")
+    crate::root(crate::Verb::ClearTweakRecord).await.wrap_msg("cannot remove the tweaks record")
 }
 
 /// The x86-64 microarchitecture level of the running CPU, or 0 on other architectures.

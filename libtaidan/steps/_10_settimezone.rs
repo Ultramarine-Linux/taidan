@@ -14,7 +14,7 @@ impl super::Step for SetTimezone {
         // which isn't worth failing setup over
         if !settings.timezone.is_empty()
             && let Err(e) =
-                crate::root("timedatectl", ["set-timezone", "--", &settings.timezone]).await
+                crate::root(crate::Verb::SetTimezone { timezone: settings.timezone.clone() }).await
         {
             tracing::warn!(?e, timezone = settings.timezone, "cannot set the time zone");
         }

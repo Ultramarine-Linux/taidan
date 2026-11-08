@@ -21,25 +21,20 @@ impl super::Step for DownloadUpdates {
         }
         if settings.nointernet || !settings.download_updates {
             // one an earlier attempt staged would otherwise still install on the next restart
-            if let Err(e) = crate::root("dnf5", ["offline", "clean", "-y"]).await {
+            if let Err(e) = crate::root(crate::Verb::DnfOfflineClean).await {
                 tracing::debug!(?e, "cannot clean up offline updates, there were probably none");
             }
             return Ok(());
         }
         let downloaded =
-            super::super::dnf::handle_dnf(callback, |dnf| dnf.args(["upgrade", "--offline", "-y"]))
-                .await;
+            super::super::dnf::handle_dnf(callback, crate::Verb::DnfUpgradeOffline).await;
         if let Err(e) = downloaded {
             tracing::warn!(?e, "cannot download updates, leaving them for later");
             return Ok(());
         }
         // what `dnf5 offline reboot` does but the reboot, which is up to the user. It fails when
         // nothing was staged because the system is up to date already
-        let armed = crate::root(
-            "env",
-            ["DNF_SYSTEM_UPGRADE_NO_REBOOT=1", "dnf5", "offline", "reboot", "-y"],
-        )
-        .await;
+        let armed = crate::root(crate::Verb::DnfOfflineArm).await;
         match armed {
             Ok(()) => callback.send(crate::InstallMsg::UpdatesReady),
             Err(e) => tracing::info!(?e, "no updates to install on restart"),

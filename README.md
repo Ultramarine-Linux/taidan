@@ -43,6 +43,19 @@ glibc-all-langpacks [for `localedef --list-archive`]
 xkeyboard-config [for /usr/share/X11/xkb/rules/evdev.lst]
 ```
 
+### Root helper
+
+Taidan runs as the unprivileged `taidan` user. Everything it does as root goes through
+`/usr/libexec/taidan-helper` (a binary in the `libtaidan` crate, `libtaidan/helper.rs`), and while
+the OOBE runs, the polkit rule only lets the `taidan` user `pkexec` that exact path. The helper
+takes a fixed set of requests with checked arguments, and refuses everything but a few cleanup ones
+once the system is marked configured. Packaging has to install it there:
+
+```sh
+cargo build --release -p libtaidan --bin taidan-helper
+install -Dpm755 target/release/taidan-helper /usr/libexec/taidan-helper
+```
+
 ## tdnx
 
 `tdnx` is a small libtaidan bridge used by
@@ -53,6 +66,10 @@ package. `server-oobe` builds it from this repo:
 ```sh
 cargo build --release -p tdnx --no-default-features --features server-oobe
 ```
+
+The `desktop-install` backend runs the installation through `taidan-helper` like Taidan does, so the
+helper has to be installed. Custom repos, coprs and scripts in `actions`, and packages other than the
+ones Taidan installs itself, are only taken when `tdnx` runs as root.
 
 ## Testing
 
@@ -69,6 +86,9 @@ TAIDAN_LOG=trace cargo r
 
 To debug the OOBE on a real machine, boot with `taidan.debug_shell` on the kernel command line,
 then press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> to open a root terminal.
+
+Debug builds run the root helper from `TAIDAN_HELPER` if it's set, instead of
+`/usr/libexec/taidan-helper`.
 
 ## 📃 License
 

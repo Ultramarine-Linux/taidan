@@ -131,10 +131,9 @@ async fn apply_to_user(settings: &crate::settings::Settings, cfg: &crate::cfg::C
     }
     for env in cmds {
         // as the user, so the files they get are theirs
-        let mut args = vec!["-u".to_owned(), settings.username.clone(), "--".to_owned()];
-        args.push("env".to_owned());
-        args.extend(env);
-        if let Err(e) = crate::root("runuser", &args).await {
+        let mut argv = vec!["env".to_owned()];
+        argv.extend(env);
+        if let Err(e) = crate::as_user(&settings.username, argv, None).await {
             tracing::warn!(?e, "cannot set the theme");
         }
     }

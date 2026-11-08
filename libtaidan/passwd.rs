@@ -159,29 +159,20 @@ fn logged_in_from(output: &[u8], username: &str) -> bool {
 /// # Errors
 /// Cannot write the file.
 pub async fn record_created(username: &str, keep_home: bool) -> Res<()> {
-    let mut args = vec![
-        "-c",
-        // replaced whole, and failing if any of it does, so a full disk can't leave it empty. On
-        // disk before what it records is done, a power cut mustn't lose it
-        r#"
-            set -e
-            f=$1
-            shift
-            mkdir -p "$(dirname "$f")"
-            printf '%s\n' "$@" > "$f.tmp"
-            chmod 644 "$f.tmp"
-            sync "$f.tmp"
-            mv -f "$f.tmp" "$f"
-            sync "$(dirname "$f")"
-        "#,
-        "sh",
-        CREATED_RECORD,
-        username,
-    ];
+    crate::root(crate::Verb::RecordCreated { user: username.to_owned(), keep_home })
+        .await
+        .wrap_msg("cannot record the created user")
+}
+
+/// what [`record_created`] does, run by the helper as root. Replaced whole, so a full disk can't
+/// leave it empty, and on disk before what it records is done, a power cut mustn't lose it
+pub(crate) fn write_record(username: &str, keep_home: bool) -> std::io::Result<()> {
+    let mut content = format!("{username}\n");
     if keep_home {
-        args.push(KEEP_HOME);
+        content.push_str(KEEP_HOME);
+        content.push('\n');
     }
-    crate::root("sh", args).await.wrap_msg("cannot record the created user")
+    crate::helper::write_atomic(std::path::Path::new(CREATED_RECORD), content.as_bytes(), 0o644)
 }
 
 /// removes [`CREATED_RECORD`], if it's there
@@ -192,9 +183,7 @@ pub async fn clear_record() -> Res<()> {
     if !tokio::fs::try_exists(CREATED_RECORD).await.unwrap_or(true) {
         return Ok(());
     }
-    crate::root("rm", ["-f", CREATED_RECORD])
-        .await
-        .wrap_msg("cannot remove the created user record")
+    crate::root(crate::Verb::ClearRecord).await.wrap_msg("cannot remove the created user record")
 }
 
 /// whether `username` with `uid` is safe for Taidan to remove: a regular user with a name the OOBE

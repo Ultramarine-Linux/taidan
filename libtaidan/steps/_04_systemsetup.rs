@@ -94,8 +94,8 @@ impl super::Step for SystemSetup {
         // it's on, for a retry after an attempt with it off. Left alone when the page was skipped,
         // the distro may have masked it on purpose
         if let Some(on) = settings.location {
-            let (verb, what) = if on { ("unmask", "on") } else { ("mask", "off") };
-            if let Err(e) = crate::root("systemctl", [verb, "geoclue.service"]).await {
+            let what = if on { "on" } else { "off" };
+            if let Err(e) = crate::root(crate::Verb::Geoclue { on }).await {
                 tracing::warn!(?e, "cannot turn {what} location services");
             }
         }
@@ -112,7 +112,8 @@ impl super::Step for SystemSetup {
         // homed users get it when they're created
         if has_video
             && !cfg.taidan0.systemd_homed
-            && let Err(e) = crate::root("usermod", ["-aG", "video", &settings.username]).await
+            && let Err(e) =
+                crate::root(crate::Verb::AddToVideo { user: settings.username.clone() }).await
         {
             tracing::warn!(?e, "cannot add the user to the video group");
         }
@@ -141,22 +142,8 @@ fn langpack_candidates(locale: &str) -> Vec<String> {
 /// which of `pkgs` the repositories have
 async fn available(pkgs: &[String]) -> Res<Vec<String>> {
     // as root, to use the system's metadata cache rather than downloading one for this user
-    let out = tokio::process::Command::new("pkexec")
-        .args(["--user", "root", "env"])
-        .args(crate::proxy::wrapper())
-        .args(["dnf5", "-q", "repoquery", "--latest-limit", "1", "--qf", "%{name}\\n"])
-        .args(pkgs)
-        .output()
-        .await
-        .map_err(|e| Err::FailToRunProgram("dnf5", e))?;
-    if !out.status.success() {
-        return Err(Err::ProgramFail {
-            name: "dnf5",
-            output: String::from_utf8_lossy(&out.stderr).into_owned(),
-            rc: out.status.code(),
-        });
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).lines().map(str::to_owned).collect())
+    let out = crate::root_output(crate::Verb::RepoQuery { pkgs: pkgs.to_vec() }).await?;
+    Ok(out.lines().map(str::to_owned).collect())
 }
 
 #[cfg(test)]

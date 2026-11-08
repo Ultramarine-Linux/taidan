@@ -24,9 +24,9 @@ unconfigured() {
 	[ -e /.unconfigured ] || [ -e /var/.unconfigured ]
 }
 
-# root processes in this session, which taidan started through pkexec (dnf, flatpak, tweaks…).
-# Its children don't go down with it, and would race the next attempt. pkexec keeps the cgroup,
-# and nothing else here runs as root
+# root processes in this session, which taidan started through pkexec and taidan-helper (dnf,
+# flatpak, tweaks…). Its children don't go down with it, and would race the next attempt. pkexec
+# keeps the cgroup, and nothing else here runs as root
 leftovers() {
 	cgroup=$(sed -n 's/^0:://p' /proc/self/cgroup)
 	while read -r pid; do
@@ -35,16 +35,21 @@ leftovers() {
 	return 0
 }
 
+# runs taidan-helper's verb $1, which polkit lets through while the OOBE runs. Verbs without
+# arguments need nothing on stdin
+helper() {
+	pkexec /usr/libexec/taidan-helper "$1" </dev/null
+}
+
 # asks them to stop, rpm finishes the transaction it's in first, and kills what's left after a
-# few minutes
+# few minutes. The helper finds them itself, the same way
 stop_leftovers() {
 	# the captive portal browser runs in a unit of its own
-	pkexec systemctl stop taidan-portal.service 2>/dev/null
+	helper stop-portal 2>/dev/null
 	pids=$(leftovers)
 	[ -n "$pids" ] || return 0
 	echo "stopping what the last taidan left running: $(echo $pids)" >&2
-	# shellcheck disable=SC2086
-	pkexec kill -TERM $pids
+	helper kill-leftovers
 	waited=0
 	while [ -n "$(leftovers)" ] && [ "$waited" -lt 300 ]; do
 		sleep 1
@@ -53,8 +58,7 @@ stop_leftovers() {
 	pids=$(leftovers)
 	if [ -n "$pids" ]; then
 		echo "killing what didn't stop: $(echo $pids)" >&2
-		# shellcheck disable=SC2086
-		pkexec kill -KILL $pids
+		helper kill-leftovers-now
 	fi
 }
 
@@ -68,7 +72,7 @@ give_up() {
 	chvt 7 2>/dev/null
 	# so whatever is still running as taidan can't use the polkit rules anymore. ExecStopPost
 	# removes them too, but this never stops on its own. polkitd picks the removal up by itself
-	pkexec rm -f /run/polkit-1/rules.d/100-taidan.rules
+	helper drop-polkit-rule
 	# Ctrl+C/Ctrl+\ would kill this and its parent (systemd-inhibit), which ends the unit and lets
 	# the display manager start after all. Also don't echo what's typed over the message
 	stty -isig -echo -icanon </dev/tty 2>/dev/null

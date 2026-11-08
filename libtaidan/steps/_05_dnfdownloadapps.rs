@@ -5,7 +5,22 @@ use crate::{i18n::I18nImf, prelude::*};
 /// skips packages that aren't in the repos, e.g. an input method the distro doesn't package, and
 /// `--skip-broken` the ones whose dependencies don't resolve. dnf5 split the two, so neither
 /// implies the other, see <https://dnf5.readthedocs.io/en/latest/changes_from_dnf4.7.html>
-pub(super) const DNF_EXTRAS_ARGS: &[&str] = &["in", "-y", "--skip-broken", "--skip-unavailable"];
+pub(crate) const DNF_EXTRAS_ARGS: &[&str] = &["in", "-y", "--skip-broken", "--skip-unavailable"];
+
+/// the input method framework's own packages, installed along with any input method
+pub(crate) const fn imf_packages(imf: I18nImf) -> &'static [&'static str] {
+    match imf {
+        I18nImf::Fcitx5 => &[
+            "fcitx5-autostart",
+            "fcitx5-qt5",
+            "fcitx5-qt6",
+            "fcitx5-gtk",
+            "kcm-fcitx5",
+            "fcitx5-configtool",
+        ],
+        I18nImf::IBus => &["ibus-wayland", "ibus-qt", "ibus-gtk3", "ibus-gtk4"],
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DnfDownloadApps;
@@ -28,15 +43,7 @@ impl super::Step for DnfDownloadApps {
         }
 
         if !settings.ims.is_empty() {
-            let pkgs: &[&str] = match settings.imf {
-                I18nImf::Fcitx5 => &[
-                    ["fcitx5-autostart", "fcitx5-qt5", "fcitx5-qt6"],
-                    ["fcitx5-gtk", "kcm-fcitx5", "fcitx5-configtool"],
-                ]
-                .concat(),
-                I18nImf::IBus => &["ibus-wayland", "ibus-qt", "ibus-gtk3", "ibus-gtk4"],
-            };
-            settings.actions[1].extend(pkgs.iter().map(|&s| s.to_owned()));
+            settings.actions[1].extend(imf_packages(settings.imf).iter().map(|&s| s.to_owned()));
         }
         settings.actions[1].extend(
             (settings.ims.iter())
@@ -73,12 +80,11 @@ impl super::Step for DnfDownloadApps {
             for repo in &settings.actions[0] {
                 super::super::dnf::enable_repo(repo).await?;
             }
+            // the helper only takes these from a caller that's root already, see `helper::Verb`
             for copr in &settings.actions[4] {
-                // it'd be an option
-                if copr.starts_with('-') {
-                    return Err(Err::Message(format!("invalid copr `{copr}`")));
-                }
-                crate::pkexec("root", "dnf5", &["copr", "enable", "-y", copr]).await?;
+                crate::root(crate::Verb::CoprEnable { copr: copr.clone() })
+                    .await
+                    .wrap_message(|_| format!("cannot enable copr `{copr}`"))?;
             }
         }
         // RPM Fusion's `@multimedia` breaks for a while whenever it lags behind a Fedora update,
@@ -88,35 +94,31 @@ impl super::Step for DnfDownloadApps {
         match (pkgs.is_empty(), settings.actions[2].is_empty()) {
             (true, true) => {}
             (true, false) => {
-                super::super::flatpak::handle_flatpak(callback, |flatpak| {
-                    flatpak
-                        .args(["install", "-y", "--noninteractive", "--no-deploy"])
-                        .args(&settings.actions[2])
-                })
-                .await?;
+                super::super::flatpak::handle_flatpak(callback, flatpaks(settings)).await?;
             }
             (false, true) => {
-                super::super::dnf::handle_dnf(callback, |dnf| {
-                    dnf.args(DNF_EXTRAS_ARGS).arg("--downloadonly").args(pkgs)
-                })
-                .await?;
+                super::super::dnf::handle_dnf(callback, extras(pkgs)).await?;
             }
             (false, false) => {
                 // run flatpak and dnf in parallel
                 // this should be safe, supposedly they don't affect each other
                 super::join_both(
-                    super::super::flatpak::handle_flatpak(callback, |flatpak| {
-                        flatpak
-                            .args(["install", "-y", "--noninteractive", "--no-deploy"])
-                            .args(&settings.actions[2])
-                    }),
-                    super::super::dnf::handle_dnf(callback, |dnf| {
-                        dnf.args(DNF_EXTRAS_ARGS).arg("--downloadonly").args(pkgs)
-                    }),
+                    super::super::flatpak::handle_flatpak(callback, flatpaks(settings)),
+                    super::super::dnf::handle_dnf(callback, extras(pkgs)),
                 )
                 .await?;
             }
         }
         Ok(())
     }
+}
+
+/// downloads the flatpaks in the settings
+fn flatpaks(settings: &crate::settings::Settings) -> crate::Verb {
+    crate::Verb::FlatpakInstall { refs: settings.actions[2].clone(), download_only: true }
+}
+
+/// downloads the extras
+fn extras(pkgs: &[String]) -> crate::Verb {
+    crate::Verb::DnfExtras { pkgs: pkgs.to_vec(), download_only: true }
 }

@@ -13,15 +13,20 @@ impl super::Step for SetHostname {
         // an empty name keeps whatever the system already has. A name that didn't take isn't
         // worth failing setup over, the system's is a fine place to end up
         if !settings.device_name.is_empty()
-            && let Err(e) =
-                crate::root("hostnamectl", ["hostname", "--pretty", "--", &settings.device_name])
-                    .await
+            && let Err(e) = crate::root(crate::Verb::SetHostname {
+                hostname: settings.device_name.clone(),
+                pretty: true,
+            })
+            .await
         {
             tracing::warn!(?e, name = settings.device_name, "cannot set the device name");
         }
         if !settings.hostname.is_empty()
-            && let Err(e) =
-                crate::root("hostnamectl", ["hostname", "--static", "--", &settings.hostname]).await
+            && let Err(e) = crate::root(crate::Verb::SetHostname {
+                hostname: settings.hostname.clone(),
+                pretty: false,
+            })
+            .await
         {
             tracing::warn!(?e, hostname = settings.hostname, "cannot set the hostname");
         }

@@ -5,5 +5,5 @@
 /// # Errors
 /// `timedatectl` failed, e.g. no NTP service is installed.
 pub async fn enable_ntp() -> crate::Res<()> {
-    crate::root("timedatectl", ["set-ntp", "true"]).await
+    crate::root(crate::Verb::EnableNtp).await
 }

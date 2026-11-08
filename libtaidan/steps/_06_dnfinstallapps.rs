@@ -1,4 +1,3 @@
-use super::_05_dnfdownloadapps::DNF_EXTRAS_ARGS;
 use crate::prelude::*;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -18,9 +17,7 @@ async fn swap_ffmpeg(callback: &impl crate::Callback) {
     if !installed {
         return;
     }
-    let swap = super::super::dnf::handle_dnf(callback, |dnf| {
-        dnf.args(["swap", "-y", "--allowerasing", "ffmpeg-free", "ffmpeg"])
-    });
+    let swap = super::super::dnf::handle_dnf(callback, crate::Verb::DnfSwapFfmpeg);
     if let Err(e) = swap.await {
         tracing::warn!(?e, "cannot swap ffmpeg-free for ffmpeg, codecs may be left out");
     }
@@ -47,40 +44,39 @@ impl super::Step for DnfInstallApps {
         match (pkgs.is_empty(), settings.actions[2].is_empty()) {
             (true, true) => {}
             (true, false) => {
-                super::super::flatpak::handle_flatpak(sender, |flatpak| {
-                    flatpak
-                        .args(["install", "-y", "--noninteractive", "--no-pull"])
-                        .args(&settings.actions[2])
-                })
-                .await?;
+                super::super::flatpak::handle_flatpak(sender, flatpaks(settings)).await?;
             }
             (false, true) => {
-                super::super::dnf::handle_dnf(sender, |dnf| dnf.args(DNF_EXTRAS_ARGS).args(pkgs))
-                    .await?;
+                super::super::dnf::handle_dnf(sender, extras(pkgs)).await?;
             }
             (false, false) => {
                 // run flatpak and dnf in parallel
                 // this should be safe, supposedly they don't affect each other
                 super::join_both(
-                    super::super::flatpak::handle_flatpak(sender, |flatpak| {
-                        flatpak
-                            .args(["install", "-y", "--noninteractive", "--no-pull"])
-                            .args(&settings.actions[2])
-                    }),
-                    super::super::dnf::handle_dnf(sender, |dnf| {
-                        dnf.args(DNF_EXTRAS_ARGS).args(pkgs)
-                    }),
+                    super::super::flatpak::handle_flatpak(sender, flatpaks(settings)),
+                    super::super::dnf::handle_dnf(sender, extras(pkgs)),
                 )
                 .await?;
             }
         }
 
+        // the helper only takes these from a caller that's root already, see `helper::Verb`
         for script in settings.actions[3].iter().filter(|_| dnf) {
-            super::root("sh", &["-c", script])
+            super::root(crate::Verb::RunScript { script: script.clone() })
                 .await
                 .wrap_message(|_| format!("script failed: {script}"))?;
         }
 
         Ok(())
     }
+}
+
+/// installs the flatpaks in the settings, downloaded by `DnfDownloadApps`
+fn flatpaks(settings: &crate::settings::Settings) -> crate::Verb {
+    crate::Verb::FlatpakInstall { refs: settings.actions[2].clone(), download_only: false }
+}
+
+/// installs the extras, downloaded by `DnfDownloadApps`
+fn extras(pkgs: &[String]) -> crate::Verb {
+    crate::Verb::DnfExtras { pkgs: pkgs.to_vec(), download_only: false }
 }

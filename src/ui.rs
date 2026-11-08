@@ -47,25 +47,16 @@ pub fn run() {
 }
 
 /// whether `taidan.debug_shell` is on the kernel command line, either bare or set to a true value
-/// like systemd's `systemd.debug_shell`. The taidan user can pkexec anything, so the root terminal
-/// has to be opt-in.
+/// like systemd's `systemd.debug_shell`. A root terminal has to be opt-in. The helper checks it
+/// too, this only saves asking it
 fn debug_shell_enabled() -> bool {
     match std::fs::read_to_string("/proc/cmdline") {
-        Ok(cmdline) => cmdline_has_debug_shell(&cmdline),
+        Ok(cmdline) => libtaidan::helper::cmdline_has_debug_shell(&cmdline),
         Err(e) => {
             tracing::error!(?e, "cannot read /proc/cmdline");
             false
         }
     }
-}
-
-fn cmdline_has_debug_shell(cmdline: &str) -> bool {
-    cmdline.split_ascii_whitespace().any(|arg| match arg.split_once('=') {
-        None => arg == "taidan.debug_shell",
-        Some((key, value)) => {
-            key == "taidan.debug_shell" && matches!(value, "1" | "yes" | "y" | "true" | "on")
-        }
-    })
 }
 
 fn init_actions(_ui: slint::Weak<impl slint::ComponentHandle + 'static>, actions: &Actions<'_>) {
@@ -76,7 +67,7 @@ fn init_actions(_ui: slint::Weak<impl slint::ComponentHandle + 'static>, actions
         }
         // as root, which logind lets through the unit's inhibitor
         std::thread::spawn(|| {
-            if let Err(e) = crate::RT.block_on(libtaidan::root("systemctl", ["poweroff"])) {
+            if let Err(e) = crate::RT.block_on(libtaidan::root(libtaidan::Verb::PowerOff)) {
                 tracing::error!(?e, "cannot power off");
             }
         });
@@ -88,38 +79,15 @@ fn init_actions(_ui: slint::Weak<impl slint::ComponentHandle + 'static>, actions
                 tracing::info!("Ignoring Alt+Shift+T, boot with taidan.debug_shell to enable it");
                 return;
             }
-            let status = std::process::Command::new("pkexec")
-                .args(["--user", "root", "env"])
-                .args(std::env::vars_os().map(|(mut k, v)| {
-                    k.push("=");
-                    k.push(v);
-                    k
-                }))
-                .args(["xdg-terminal-exec", "--", "sh", "-c"])
-                .arg("echo 'Taidan has detected Alt+Shift+T. A terminal with superuser privilege is opened for debugging purposes. Only proceed if you know what you are doing, OTHERWISE YOU MAY RISK DATA LOSS OR CAUSE DAMAGES TO YOUR DEVICE. To exit the terminal, press Ctrl+D.' && sh")
-                .status();
-            match status {
-                Ok(status) if !status.success() => tracing::warn!(?status, "debug terminal exited"),
-                Ok(_) => {}
-                Err(e) => tracing::error!(?e, "cannot spawn pkexec for debug terminal"),
+            let Some(wayland_display) = std::env::var("WAYLAND_DISPLAY").ok() else {
+                tracing::error!("no WAYLAND_DISPLAY for the debug terminal");
+                return;
+            };
+            let verb = libtaidan::Verb::DebugShell { wayland_display };
+            match crate::RT.block_on(libtaidan::root(verb)) {
+                Ok(()) => {}
+                Err(e) => tracing::warn!(?e, "debug terminal failed or exited"),
             }
         });
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn debug_shell_needs_the_flag() {
-        assert!(cmdline_has_debug_shell("BOOT_IMAGE=/vmlinuz ro taidan.debug_shell quiet\n"));
-        assert!(cmdline_has_debug_shell("ro taidan.debug_shell=1"));
-        assert!(cmdline_has_debug_shell("ro taidan.debug_shell=yes"));
-        assert!(!cmdline_has_debug_shell("BOOT_IMAGE=/vmlinuz ro rhgb quiet\n"));
-        assert!(!cmdline_has_debug_shell("ro taidan.debug_shell=0"));
-        assert!(!cmdline_has_debug_shell("ro taidan.debug_shell=no"));
-        assert!(!cmdline_has_debug_shell("ro systemd.debug_shell"));
-        assert!(!cmdline_has_debug_shell("ro taidan.debug_shellx"));
-    }
 }

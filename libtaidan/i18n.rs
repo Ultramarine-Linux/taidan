@@ -1,4 +1,4 @@
-use super::{pkexec, root};
+use super::root;
 use crate::prelude::*;
 
 taidan_proc_macros::keymap!(LAYOUTS);
@@ -356,9 +356,9 @@ impl XkbKeymap {
 
 async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<()> {
     for entry in XkbKeymap::new(layout, variant).kxkbrc_entries() {
-        let mut args = vec!["--file", "kxkbrc"];
-        args.extend(entry.iter().map(String::as_str));
-        pkexec(user, "kwriteconfig6", &args).await?;
+        let mut argv = ["kwriteconfig6", "--file", "kxkbrc"].map(str::to_owned).to_vec();
+        argv.extend(entry);
+        crate::as_user(user, argv, None).await?;
     }
     let args = [
         ["--session", "--type=signal"],
@@ -367,7 +367,9 @@ async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<
     ];
     // the layout is written already, a session without the tool or a KWin to hear it just picks
     // it up on its next login
-    if let Err(e) = pkexec(user, "dbus-send", &args.concat()).await {
+    let mut argv = vec!["dbus-send".to_owned()];
+    argv.extend(args.concat().into_iter().map(str::to_owned));
+    if let Err(e) = crate::as_user(user, argv, None).await {
         tracing::warn!(?e, "cannot tell KWin to reload the keyboard layout");
     }
     Ok(())
@@ -381,7 +383,9 @@ async fn set_gsettings_keymap(user: &str, layout: &str, variant: Option<&str>) -
         ["set", "org.gnome.desktop.input-sources"],
         ["sources", &format!("[{sources}]")],
     ];
-    pkexec(user, "env", &args.concat()).await?;
+    let mut argv = vec!["env".to_owned()];
+    argv.extend(args.concat().into_iter().map(str::to_owned));
+    crate::as_user(user, argv, None).await?;
     Ok(())
 }
 
@@ -391,8 +395,12 @@ async fn set_gsettings_keymap(user: &str, layout: &str, variant: Option<&str>) -
 /// - `localectl` fails
 pub async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> Res<()> {
     let xkb = XkbKeymap::new(layout, variant);
-    let args = ["set-x11-keymap", &xkb.layouts, "", &xkb.variants, &xkb.options];
-    root("localectl", &args).await?;
+    root(crate::Verb::SetX11Keymap {
+        layouts: xkb.layouts,
+        variants: xkb.variants,
+        options: xkb.options,
+    })
+    .await?;
     Ok(())
 }
 
@@ -424,9 +432,11 @@ pub async fn apply_keymap_to_user(
     let file = file.to_string_lossy();
     for entry in entries {
         // as the user, so the file they get is theirs
-        let mut args = vec!["-u", &settings.username, "--", "kwriteconfig6", "--file", &file];
-        args.extend(entry.iter().map(String::as_str));
-        root("runuser", &args).await.wrap_msg("cannot write the keyboard layout")?;
+        let mut argv = ["kwriteconfig6", "--file", &file].map(str::to_owned).to_vec();
+        argv.extend(entry);
+        crate::as_user(&settings.username, argv, None)
+            .await
+            .wrap_msg("cannot write the keyboard layout")?;
     }
     Ok(())
 }

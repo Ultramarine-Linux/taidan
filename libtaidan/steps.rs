@@ -12,8 +12,11 @@ mod _12_downloadupdates;
 
 use crate::prelude::*;
 
+pub(crate) use _00_useradd::previous_uid;
 pub use _00_useradd::unlock as unlock_user;
+pub(crate) use _05_dnfdownloadapps::{DNF_EXTRAS_ARGS, imf_packages};
 pub(crate) use _07_drivers_codecs::secure_boot_enforced;
+pub(crate) use _07_drivers_codecs::{Codecs, NVIDIA_PRIMARY_GPU_CONF, driver_packages};
 pub use _07_drivers_codecs::{Hardware, detect_hardware};
 pub use _08_setup_imf::fix_homed as fix_homed_ims;
 
@@ -153,4 +156,4 @@ pub async fn acmd(name: &'static str, args: &[&str]) -> Res<()> {
     Ok(())
 }
 
-pub(crate) use super::root;
+pub(crate) use super::{root, root_with_stdin};

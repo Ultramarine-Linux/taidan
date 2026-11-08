@@ -72,16 +72,9 @@ impl super::Step for UserAdd {
 /// desktops look for it
 async fn set_avatar(settings: &crate::settings::Settings) -> Res<()> {
     let Some(avatar) = &settings.avatar else { return Ok(()) };
-    let icon = format!("/var/lib/AccountsService/icons/{}", settings.username);
-    super::root("install", [std::ffi::OsStr::new("-Dm644"), avatar.as_os_str(), icon.as_ref()])
-        .await?;
-    // a new user has no settings there yet, so this doesn't overwrite anything of theirs
-    let user = crate::TEMP_DIR.join("accountsservice-user");
-    tokio::fs::write(&user, format!("[User]\nIcon={icon}\nSystemAccount=false\n"))
-        .await
-        .map_err(Err::Io)?;
-    let dest = format!("/var/lib/AccountsService/users/{}", settings.username);
-    super::root("install", [std::ffi::OsStr::new("-Dm600"), user.as_os_str(), dest.as_ref()]).await
+    // read here, as taidan, so it can only be a file taidan may read anyway
+    let image = tokio::fs::read(avatar).await.map_err(Err::Io)?;
+    super::root_with_stdin(crate::Verb::SetAvatar { user: settings.username.clone() }, &image).await
 }
 
 fn hash_password(settings: &crate::settings::Settings) -> Res<String> {
@@ -93,22 +86,18 @@ async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
     let pass = hash_password(settings)?;
     let fullname = crate::passwd::sanitize_fullname(&settings.fullname);
     let user = settings.username.as_str();
-    let mut args =
-        vec!["-c".to_owned(), fullname, "-m".to_owned(), "-G".to_owned(), "wheel".into()];
     // a home kept from a reinstall stays its old owner's, `useradd` doesn't change that, so the
     // user gets that uid back, or they couldn't get into it
-    if let Some(uid) = previous_uid(user) {
+    let uid = previous_uid(user);
+    if let Some(uid) = uid {
         tracing::info!(uid, "giving the user the uid that owns its home");
-        args.extend(["-u".to_owned(), uid.to_string()]);
     }
-    args.extend(["--".to_owned(), user.to_owned()]);
-    super::super::root("useradd", &args).await.wrap_msg("cannot create the user")?;
-    // through stdin, since anyone can read a command's arguments
-    super::super::root_with_stdin("chpasswd", ["-e"], format!("{user}:{pass}\n").as_bytes())
+    // the hash through stdin, since anyone can read a command's arguments. The helper sets the
+    // password and locks the user until the installation finishes, see `unlock`
+    let verb = crate::Verb::UserAdd { user: user.to_owned(), fullname, uid };
+    super::super::root_with_stdin(verb, format!("{pass}\n").as_bytes())
         .await
-        .wrap_msg("cannot set the password")?;
-    // until the installation finishes, see `unlock`
-    super::root("usermod", ["-L", "--", user]).await.wrap_msg("cannot lock the user")
+        .wrap_msg("cannot create the user")
 }
 
 /// lets the user log in once the installation is done. until then, it's locked, so if the OOBE
@@ -121,20 +110,14 @@ async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
 pub async fn unlock(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
     let user = settings.username.as_str();
     if !cfg.taidan0.systemd_homed {
-        return super::super::root("usermod", ["-U", "--", user])
+        return super::super::root(crate::Verb::UnlockUser { user: user.to_owned() })
             .await
             .wrap_msg("cannot unlock the user");
     }
-    // updating an inactive home needs its password, which homectl takes from `$PASSWORD`. read
-    // from stdin into it, since anyone can read a command's arguments
+    // updating an inactive home needs its password, through stdin, since anyone can read a
+    // command's arguments
     super::super::root_with_stdin(
-        "sh",
-        [
-            "-c",
-            r#"IFS= read -r PASSWORD; export PASSWORD; exec homectl update --locked=no -- "$1""#,
-            "sh",
-            user,
-        ],
+        crate::Verb::HomedUnlock { user: user.to_owned() },
         format!("{}\n", settings.passwd.expose_secret()).as_bytes(),
     )
     .await
@@ -153,23 +136,9 @@ async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -
         "locked": true,
     });
     let skel = stage_skel(settings, cfg).await;
-    let mut args: Vec<std::ffi::OsString> = vec![
-        "create".into(),
-        "--identity=-".into(),
-        "--real-name".into(),
-        fullname.into(),
-        // groups that don't exist are left out
-        "--member-of=wheel,video".into(),
-        "--enforce-password-policy=no".into(),
-    ];
-    if let Some(skel) = skel {
-        let mut arg = std::ffi::OsString::from("--skel=");
-        arg.push(skel);
-        args.push(arg);
-    }
-    // validated to start with a letter, so it can't be taken for an option
-    args.push(user.into());
-    super::super::root_with_stdin("homectl", args, identity.to_string().as_bytes())
+    // in `wheel` and `video`, groups that don't exist are left out
+    let verb = crate::Verb::HomedCreate { user: user.to_owned(), fullname, skel };
+    super::super::root_with_stdin(verb, identity.to_string().as_bytes())
         .await
         .wrap_msg("cannot create the user with homectl")
 }
@@ -188,7 +157,7 @@ fn home_path(user: &str) -> std::path::PathBuf {
 
 /// the uid that owns `user`'s home if it's already there, so the user can get it back and keep
 /// access to their files, [`None`] if it isn't a regular uid or another user has it now
-fn previous_uid(user: &str) -> Option<u32> {
+pub(crate) fn previous_uid(user: &str) -> Option<u32> {
     use std::os::unix::fs::MetadataExt;
     let meta = home_path(user).symlink_metadata().ok().filter(std::fs::Metadata::is_dir)?;
     let uid = meta.uid();
@@ -246,21 +215,15 @@ async fn remove_previous() -> Res<()> {
         }
         Some(u) => {
             tracing::info!(prev, "removing the user from an earlier attempt");
-            // by uid rather than the config, in case it changed since the user was made
-            if crate::passwd::HOMED_UIDS.contains(&u.uid()) {
-                super::super::root("homectl", ["remove", prev.as_str()]).await
-            } else if keep_home {
+            // by uid rather than the config, in case it changed since the user was made. The
+            // helper checks again that it's the recorded user and removable, and takes its icon
+            // along
+            if keep_home && !crate::passwd::HOMED_UIDS.contains(&u.uid()) {
                 tracing::info!(prev, "its home may be in use, keeping it");
-                super::super::root("userdel", ["--", prev.as_str()]).await
-            } else {
-                super::super::root("userdel", ["-r", "--", prev.as_str()]).await
             }
-            .wrap_msg("cannot remove the user from an earlier attempt")?;
-            let icon = format!("/var/lib/AccountsService/icons/{prev}");
-            let user = format!("/var/lib/AccountsService/users/{prev}");
-            if let Err(e) = super::super::root("rm", ["-f", &icon, &user]).await {
-                tracing::warn!(?e, "cannot remove the old user icon");
-            }
+            super::super::root(crate::Verb::RemoveUser { user: prev.clone(), keep_home })
+                .await
+                .wrap_msg("cannot remove the user from an earlier attempt")?;
         }
     }
     crate::passwd::clear_record().await

@@ -339,14 +339,10 @@ const PROXY_INVALID: Failure = "page-internet-proxy-invalid";
 const PROXY_FAILED: Failure = "page-internet-proxy-error";
 /// the browser for logging in to captive portals, a `WPE WebKit` shell
 const PORTAL_BROWSER: &str = "/usr/bin/cog";
-/// the user it runs as. Not taidan, which may run anything as root while the OOBE runs, so a page
+/// the user it runs as. Not taidan, which has the root helper while the OOBE runs, so a page
 /// the network serves that gets past `WebKit` can't. `taidan-initial-setup.service` makes the user
 /// and removes it once the OOBE is done
 const PORTAL_USER: &str = "taidan-portal";
-/// the name of the display socket in its runtime dir
-const PORTAL_DISPLAY: &str = "wayland-0";
-/// the systemd unit it runs in, so taidan can stop it although it's another user's
-const PORTAL_UNIT: &str = "taidan-portal.service";
 /// checked through the proxy if `NetworkManager` has no connectivity check URI of its own
 const CHECK_URI: &str = "http://fedoraproject.org/static/hotspot.txt";
 
@@ -1030,7 +1026,7 @@ fn eap_settings(login: &EnterpriseLogin) -> HashMap<&'static str, Value<'_>> {
 }
 
 /// where certificates for 802.1X are kept, so they still work once the USB stick is gone
-const CERT_DIR: &str = "/etc/pki/taidan/8021x";
+use libtaidan::helper::CERT_DIR;
 
 fn is_pkcs12(path: &str) -> bool {
     let ext = std::path::Path::new(path).extension().and_then(|e| e.to_str()).unwrap_or_default();
@@ -1058,9 +1054,9 @@ fn cert_name(wired: bool, ssid: &str) -> String {
 
 /// certificate files copied for one login attempt, see [`install_certs`]
 struct Certs {
-    /// the folder for the network's certificates, with one folder per attempt inside
-    dir: String,
-    /// the folder of this attempt, if it copied anything
+    /// the network's folder in [`CERT_DIR`], with one folder per attempt inside
+    network: String,
+    /// the folder of this attempt in it, if it copied anything
     attempt: Option<String>,
 }
 
@@ -1068,24 +1064,19 @@ impl Certs {
     /// keeps this attempt's files and removes those of earlier ones once it `worked`, or else
     /// removes this attempt's, leaving the ones the network's saved connection still uses
     fn finish(&self, worked: bool) {
-        let res = if worked {
-            if !std::path::Path::new(&self.dir).is_dir() {
+        let network = self.network.clone();
+        let verb = if worked {
+            if !std::path::Path::new(CERT_DIR).join(&self.network).is_dir() {
                 return;
             }
-            let mut args = vec![self.dir.as_str(), "-mindepth", "1", "-maxdepth", "1"];
-            if let Some(attempt) = &self.attempt {
-                let name = attempt.rsplit('/').next().unwrap_or_default();
-                args.extend(["!", "-name", name]);
-            }
-            args.extend(["-exec", "rm", "-rf", "--", "{}", "+"]);
-            crate::RT.block_on(libtaidan::root("find", args))
+            libtaidan::Verb::PruneCerts { network, keep: self.attempt.clone() }
         } else if let Some(attempt) = &self.attempt {
-            crate::RT.block_on(libtaidan::root("rm", ["-rf", "--", attempt.as_str()]))
+            libtaidan::Verb::RemoveCertAttempt { network, attempt: attempt.clone() }
         } else {
             return;
         };
-        if let Err(e) = res {
-            tracing::warn!(?e, dir = self.dir, "cannot remove old certificates");
+        if let Err(e) = crate::RT.block_on(libtaidan::root(verb)) {
+            tracing::warn!(?e, network = self.network, "cannot remove old certificates");
         }
     }
 }
@@ -1094,13 +1085,13 @@ impl Certs {
 /// by root, and points it at them. A new folder each time, so a failed attempt can't overwrite the
 /// files the network's working connection uses
 fn install_certs(login: &mut EnterpriseLogin) -> Result<Certs, Failure> {
-    let dir = format!("{CERT_DIR}/{}", cert_name(login.wired, &login.ssid));
+    let network = cert_name(login.wired, &login.ssid);
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_nanos();
-    let attempt = format!("{dir}/{stamp}");
-    let mut certs = Certs { dir, attempt: None };
+        .as_nanos()
+        .to_string();
+    let mut certs = Certs { network: network.clone(), attempt: None };
     let files = [
         ("ca", &mut login.ca_cert),
         ("client", &mut login.client_cert),
@@ -1115,14 +1106,23 @@ fn install_certs(login: &mut EnterpriseLogin) -> Result<Certs, Failure> {
         let ext = std::path::Path::new(path.as_str())
             .extension()
             .and_then(|e| e.to_str())
+            // the helper only takes a short ASCII one, the rest is what the file's in it anyway
+            .filter(|e| !e.is_empty() && e.len() <= 8 && e.chars().all(|c| c.is_ascii_alphanumeric()))
             .map(|e| format!(".{}", e.to_ascii_lowercase()))
             .unwrap_or_default();
-        let dest = format!("{attempt}/{kind}{ext}");
-        certs.attempt = Some(attempt.clone());
-        let res = crate::RT.block_on(libtaidan::root(
-            "install",
-            ["-D", "-m", "0600", path.as_str(), dest.as_str()],
-        ));
+        let file = format!("{kind}{ext}");
+        let dest = format!("{CERT_DIR}/{network}/{stamp}/{file}");
+        certs.attempt = Some(stamp.clone());
+        // read here, as taidan, so it can only be a file taidan may read anyway
+        let res =
+            std::fs::read(path.as_str()).map_err(libtaidan::prelude::Err::Io).and_then(|content| {
+                let verb = libtaidan::Verb::InstallCert {
+                    network: network.clone(),
+                    attempt: stamp.clone(),
+                    file: file.clone(),
+                };
+                crate::RT.block_on(libtaidan::root_with_stdin(verb, &content))
+            });
         if let Err(e) = res {
             tracing::error!(?e, %path, dest, "cannot copy certificate");
             certs.finish(false);
@@ -1388,9 +1388,16 @@ impl Nm {
         let uri = (self.manager.connectivity_check_uri().ok())
             .filter(|uri| !uri.is_empty())
             .unwrap_or_else(|| CHECK_URI.to_owned());
-        let Some(mut cmd) = portal_command(proxy) else { return false };
-        match cmd.args(["--", PORTAL_BROWSER, "--platform", "gtk4", &uri]).spawn() {
-            Ok(child) => {
+        let Some((mut cmd, request)) = portal_command(proxy, &uri) else { return false };
+        match cmd.spawn() {
+            Ok(mut child) => {
+                if let Some(mut stdin) = child.stdin.take() {
+                    use std::io::Write as _;
+                    // a failed write shows up as the helper refusing, and the browser not opening
+                    if let Err(e) = stdin.write_all(&request) {
+                        tracing::error!(?e, "cannot pass the request to the helper");
+                    }
+                }
                 tracing::info!(uri, "Opened the captive portal browser");
                 {
                     let mut slot = portal();
@@ -1693,10 +1700,13 @@ fn parse_mac(s: &str) -> Option<Vec<u8>> {
         .filter(|b| b.len() == 6)
 }
 
-/// `systemd-run`, run as root, starting the portal browser as [`PORTAL_USER`] in [`PORTAL_UNIT`],
-/// what's left is `--` and the browser's command. It waits for the browser to quit, so
-/// [`Nm::check_portal`] can tell. [`None`] if the browser can't be given the session's display
-fn portal_command(proxy: Option<(String, String)>) -> Option<std::process::Command> {
+/// the helper starting the portal browser at `uri` as [`PORTAL_USER`] in `taidan-portal.service`, with
+/// what to write to its stdin. It waits for the browser to quit, so [`Nm::check_portal`] can tell.
+/// [`None`] if the browser can't be given the session's display
+fn portal_command(
+    proxy: Option<(String, String)>,
+    uri: &str,
+) -> Option<(std::process::Command, Vec<u8>)> {
     let runtime = std::env::var("XDG_RUNTIME_DIR").ok().filter(|d| d.starts_with('/'))?;
     let display = std::env::var("WAYLAND_DISPLAY").ok().filter(|d| !d.is_empty())?;
     let socket = if display.starts_with('/') { display } else { format!("{runtime}/{display}") };
@@ -1719,62 +1729,23 @@ fn portal_command(proxy: Option<(String, String)>) -> Option<std::process::Comma
     if let Err(e) = stop_portal_unit() {
         tracing::debug!(?e, "no earlier portal browser to stop");
     }
-    let home = format!("/run/{PORTAL_USER}");
-    let mut cmd = std::process::Command::new("pkexec");
-    cmd.args(["--user", "root", "systemd-run", "--quiet", "--wait", "--collect"])
-        .arg(format!("--unit={PORTAL_UNIT}"))
-        .arg(format!("--uid={PORTAL_USER}"))
-        .arg(format!("--property=RuntimeDirectory={PORTAL_USER}"))
-        .args([
-            "--property=NoNewPrivileges=yes",
-            "--property=PrivateTmp=yes",
-            "--property=ProtectHome=yes",
-            "--property=ProtectSystem=full",
-        ])
-        .arg(format!("--property=BindReadOnlyPaths={socket}:{home}/{PORTAL_DISPLAY}"))
-        .arg(format!("--setenv=WAYLAND_DISPLAY={PORTAL_DISPLAY}"))
-        .arg(format!("--setenv=XDG_RUNTIME_DIR={home}"))
-        .arg(format!("--setenv=HOME={home}"));
-    if let Ok(lang) = std::env::var("LANG") {
-        cmd.arg(format!("--setenv=LANG={lang}"));
-    }
-    // through a file rather than `--setenv`, since anyone can read a command's arguments and the
-    // URL may carry a password. WebKit then uses GLib's default proxy resolver, and the libproxy
-    // one reads `http_proxy` and friends. GNOME's would go by its own settings instead, so it's
-    // picked explicitly
-    if let Some(proxy) = proxy.and_then(|(url, bypass)| libtaidan::proxy::Proxy::new(&url, &bypass))
-    {
-        let file = crate::TEMP_DIR.join("portal-proxy.env");
-        let mut vars = String::new();
-        for (key, value) in proxy.vars().into_iter().chain([("GIO_USE_PROXY_RESOLVER", "libproxy")])
-        {
-            // quoted for systemd, the URL has no control characters
-            let value = value.replace('\\', "\\\\").replace('"', "\\\"");
-            vars.extend([key, "=\"", &value, "\"\n"]);
-        }
-        let written = {
-            use std::{io::Write, os::unix::fs::OpenOptionsExt};
-            std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .open(&file)
-                .and_then(|mut f| f.write_all(vars.as_bytes()))
-        };
-        match written {
-            // read by systemd, as root
-            Ok(()) => _ = cmd.arg(format!("--property=EnvironmentFile={}", file.display())),
-            Err(e) => tracing::error!(?e, "cannot pass the proxy to the portal browser"),
-        }
-    }
-    Some(cmd)
+    let lang = std::env::var("LANG").ok();
+    // the helper gets the proxy in the request, and passes it to the browser through a file rather
+    // than an argument, since anyone can read a command's arguments and the URL may carry a
+    // password
+    let proxy = proxy.and_then(|(url, bypass)| libtaidan::proxy::Proxy::new(&url, &bypass));
+    let verb = libtaidan::Verb::StartPortal { socket, lang, uri: uri.to_owned() };
+    let mut cmd = libtaidan::helper::std_command(&verb);
+    // the installation's proxy isn't set yet, so the request gets the page's
+    let stdin = libtaidan::helper::stdin_with_proxy(&verb, &[], proxy.as_ref());
+    cmd.stdin(std::process::Stdio::piped());
+    Some((cmd, stdin))
 }
 
-/// `systemctl stop` for [`PORTAL_UNIT`], on a thread of its own, as this may run inside
+/// `systemctl stop` for `taidan-portal.service`, on a thread of its own, as this may run inside
 /// [`crate::RT`] already, e.g. from `install::finish`
 fn stop_portal_unit() -> libtaidan::prelude::Res<()> {
-    std::thread::spawn(|| crate::RT.block_on(libtaidan::root("systemctl", ["stop", PORTAL_UNIT])))
+    std::thread::spawn(|| crate::RT.block_on(libtaidan::root(libtaidan::Verb::StopPortal)))
         .join()
         .unwrap_or_else(|_| Err(libtaidan::prelude::Err::Msg("stopping the portal panicked")))
 }

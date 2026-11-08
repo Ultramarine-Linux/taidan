@@ -2,14 +2,23 @@
 // and removed again when it stops, so none of this outlives the setup.
 //
 // the OOBE runs as the taidan user before any admin account exists to authenticate as. It runs
-// the installation steps as root with pkexec, and adds system-wide network connections (so the
-// new user stays online).
+// the installation steps as root through pkexec and taidan-helper, which only takes a fixed set
+// of requests, and adds system-wide network connections (so the new user stays online).
+//
+// pkexec puts the canonical path (realpath) of what it runs in `program`, so a symlink to the
+// helper still matches and nothing else does
 polkit.addRule(function(action, subject) {
     if (!subject.isInGroup("taidan") || !subject.local || !subject.active) {
         return;
     }
-    if (action.id == "org.freedesktop.policykit.exec" ||
-        action.id == "org.freedesktop.NetworkManager.settings.modify.system" ||
+    if (action.id == "org.freedesktop.policykit.exec") {
+        if (action.lookup("program") == "/usr/libexec/taidan-helper") {
+            return polkit.Result.YES;
+        }
+        // nothing else, not even with an admin's password, the taidan user has no business there
+        return polkit.Result.NO;
+    }
+    if (action.id == "org.freedesktop.NetworkManager.settings.modify.system" ||
         action.id == "org.freedesktop.NetworkManager.network-control" ||
         action.id == "org.freedesktop.NetworkManager.wifi.scan" ||
         action.id == "org.freedesktop.NetworkManager.enable-disable-wifi") {

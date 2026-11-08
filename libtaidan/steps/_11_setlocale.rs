@@ -19,8 +19,9 @@ impl super::Step for SetLocale {
         // systemd refuses locales that aren't installed, which can happen offline or on atomic
         // editions, the system's language is a better place to end up than a failed setup. The
         // done page says so
-        let lang = format!("LANG={}", settings.locale);
-        if let Err(e) = crate::root("localectl", ["set-locale", &lang]).await {
+        if let Err(e) =
+            crate::root(crate::Verb::SetLocale { locale: settings.locale.clone() }).await
+        {
             tracing::warn!(?e, locale = settings.locale, "cannot set the system language");
             sender.send(crate::InstallMsg::LocaleFailed);
         }

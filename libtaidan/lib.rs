@@ -4,6 +4,7 @@ pub mod cfg;
 pub mod dnf;
 pub mod err;
 pub mod flatpak;
+pub mod helper;
 pub mod i18n;
 pub mod passwd;
 pub mod prelude;
@@ -151,37 +152,6 @@ mod parseutil {
     }
 }
 
-/// `name` with `args` as `user` through `pkexec`, with the environment passed on since `pkexec`
-/// clears it. Root only gets the locale and the proxy, the rest (`HOME`, `XDG_*`, the session bus)
-/// is the OOBE session's and would have root write into it
-fn pkexec_cmd<I>(user: &str, name: &'static str, args: I) -> tokio::process::Command
-where
-    I: IntoIterator,
-    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
-{
-    let as_root = user == "root";
-    let mut cmd = tokio::process::Command::new("pkexec");
-    cmd.args(["--user", user, "env"])
-        // `vars_os`, as `vars` panics on a variable that isn't UTF-8
-        .args(std::env::vars_os().filter(|(k, _)| !as_root || is_locale_var(k)).map(|(k, v)| {
-            let mut kv = k;
-            kv.push("=");
-            kv.push(v);
-            kv
-        }))
-        // other users can't read the file the proxy is passed in, and nothing run as them
-        // downloads anything
-        .args(if as_root { proxy::wrapper() } else { vec![] })
-        .arg(name)
-        .args(args);
-    cmd
-}
-
-fn is_locale_var(key: &std::ffi::OsStr) -> bool {
-    let key = key.as_encoded_bytes();
-    key == b"LANG" || key == b"LANGUAGE" || key.starts_with(b"LC_")
-}
-
 /// runs `cmd`, with `input` on its stdin if there's any, and returns its stdout
 async fn run_cmd(
     mut cmd: tokio::process::Command,
@@ -223,74 +193,62 @@ async fn run_cmd(
     Ok(p.stdout)
 }
 
-/// # Errors
-/// - command failed to run
-/// - command exited with non-zero status code
-pub async fn pkexec<I: IntoIterator + std::fmt::Debug>(
-    user: &str,
-    name: &'static str,
-    args: I,
-) -> Res<()>
-where
-    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
-{
-    tracing::debug!(?name, ?args, "running pkexec");
-    run_cmd(pkexec_cmd(user, name, args), name, None).await.map(drop)
-}
+pub use helper::Verb;
 
-/// # Errors
-/// - command failed to run
-/// - command exited with non-zero status code
-pub async fn root<I: IntoIterator + std::fmt::Debug>(name: &'static str, args: I) -> Res<()>
-where
-    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
-{
-    pkexec("root", name, args).await
-}
-
-/// like [`root`], but returns what the command printed
+/// runs `verb` as root through `pkexec` and [`helper`]
 ///
 /// # Errors
-/// - command failed to run
-/// - command exited with non-zero status code
-pub async fn root_output<I: IntoIterator + std::fmt::Debug>(
-    name: &'static str,
-    args: I,
-) -> Res<String>
-where
-    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
-{
-    tracing::debug!(?name, ?args, "running pkexec");
-    let out = run_cmd(pkexec_cmd("root", name, args), name, None).await?;
+/// - the helper failed to run
+/// - it refused the request, or what it ran exited with a non-zero status code
+pub async fn root(verb: Verb) -> Res<()> {
+    root_with_stdin(verb, &[]).await
+}
+
+/// like [`root`], but returns what the helper printed
+///
+/// # Errors
+/// - the helper failed to run
+/// - it refused the request, or what it ran exited with a non-zero status code
+pub async fn root_output(verb: Verb) -> Res<String> {
+    tracing::debug!(?verb, "running taidan-helper");
+    let out =
+        run_cmd(helper::command(&verb), verb.name(), Some(&helper::stdin(&verb, &[]))).await?;
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
-/// like [`root`], but feeds `input` to the command's stdin, for secrets that shouldn't be in its
-/// arguments, which anyone can read
+/// like [`root`], but passes `input` on to the verb, for secrets that shouldn't be in arguments,
+/// which anyone can read, and files
 ///
 /// # Errors
-/// - command failed to run
-/// - command exited with non-zero status code
-pub async fn root_with_stdin<I: IntoIterator + std::fmt::Debug>(
-    name: &'static str,
-    args: I,
-    input: &[u8],
-) -> Res<()>
-where
-    <I as IntoIterator>::Item: AsRef<std::ffi::OsStr>,
-{
-    tracing::debug!(?name, ?args, "running pkexec");
-    run_cmd(pkexec_cmd("root", name, args), name, Some(input)).await.map(drop)
+/// - the helper failed to run
+/// - it refused the request, or what it ran exited with a non-zero status code
+pub async fn root_with_stdin(verb: Verb, input: &[u8]) -> Res<()> {
+    tracing::debug!(?verb, "running taidan-helper");
+    run_cmd(helper::command(&verb), verb.name(), Some(&helper::stdin(&verb, input))).await.map(drop)
+}
+
+/// runs `argv` as `user`, with `input` on its stdin, directly if that's who this runs as already,
+/// otherwise through the helper, which only runs things as the user the installation made
+///
+/// # Errors
+/// - the command failed to run
+/// - it exited with a non-zero status code
+pub async fn as_user(user: &str, argv: Vec<String>, input: Option<&[u8]>) -> Res<()> {
+    let current = uzers::get_current_username();
+    if current.as_ref().is_some_and(|c| c.as_encoded_bytes() == user.as_bytes()) {
+        let Some((name, args)) = argv.split_first() else { return Ok(()) };
+        let mut cmd = tokio::process::Command::new(name);
+        cmd.args(args);
+        return run_cmd(cmd, "as-user", input).await.map(drop);
+    }
+    root_with_stdin(Verb::AsUser { user: user.to_owned(), argv }, input.unwrap_or_default()).await
 }
 
 /// marks the system as configured so the OOBE doesn't run on the next boot, failures are logged.
 /// Safe to run more than once
 pub async fn mark_configured() {
-    if let Err(e) = root("rm", ["-rf", "/var/.unconfigured", "/.unconfigured"]).await {
-        tracing::error!(?e, "cannot remove /var/.unconfigured and/or /.unconfigured");
-    }
-    if let Err(e) = root("systemctl", ["disable", "taidan-initial-setup-reconfiguration"]).await {
-        tracing::error!(?e, "cannot disable taidan-initial-setup-reconfiguration.service");
+    if let Err(e) = root(Verb::MarkConfigured).await {
+        tracing::error!(?e, "cannot mark the system configured");
     }
 }
 

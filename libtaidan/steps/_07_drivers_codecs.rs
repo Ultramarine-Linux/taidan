@@ -1,4 +1,4 @@
-use crate::{prelude::*, root, root_with_stdin};
+use crate::{Verb, prelude::*, root};
 use tokio::process::Command;
 /// an NVIDIA driver branch RPM Fusion packages, oldest first, so the oldest of several sorts
 /// lowest
@@ -8,6 +8,20 @@ enum NvidiaBranch {
     R580,
     /// `akmod-nvidia`, Turing and newer
     Latest,
+}
+
+/// every driver package Taidan may install, which are all the helper takes for drivers
+pub(crate) fn driver_packages() -> Vec<&'static str> {
+    let mut pkgs = vec![
+        "nvidia-gpu-firmware",
+        "libva-nvidia-driver",
+        "broadcom-wl",
+        "akmod-wl",
+        "broadcom-bt-firmware",
+    ];
+    pkgs.extend(NvidiaBranch::R580.packages());
+    pkgs.extend(NvidiaBranch::Latest.packages());
+    pkgs
 }
 
 impl NvidiaBranch {
@@ -99,7 +113,7 @@ impl NvidiaDriver {
 }
 
 /// makes the NVIDIA GPU drive the displays instead of the integrated one, for `STELLAR_OPTION`
-const NVIDIA_PRIMARY_GPU_CONF: &str = r#"Section "OutputClass"
+pub(crate) const NVIDIA_PRIMARY_GPU_CONF: &str = r#"Section "OutputClass"
 	Identifier "nvidia-primary"
 	MatchDriver "nvidia-drm"
 	Driver "nvidia"
@@ -382,19 +396,18 @@ enum Installed {
 /// install packages with rpm-ostree on atomic systems, or dnf unless the config skips it
 async fn install_pkgs(cfg: &crate::cfg::Config, pkgs: &[&str]) -> Res<Installed> {
     if super::is_ostree().await {
-        // idempotent, so a retried install doesn't fail on packages it already layered
-        let mut args = vec!["install", "-y", "--idempotent"];
-        args.extend_from_slice(pkgs);
-        root("rpm-ostree", &args).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
+        let owned = pkgs.iter().map(|&p| p.to_owned()).collect();
+        root(Verb::RpmOstreeInstall { pkgs: owned })
+            .await
+            .wrap_message(|_| format!("pkgs={pkgs:?}"))?;
         return Ok(Installed::Ostree);
     }
     if cfg.taidan0.skip_dnf {
         tracing::info!(?pkgs, "skip_dnf is set, not installing driver packages");
         return Ok(Installed::Skipped);
     }
-    let mut args = vec!["in", "-y", "--allowerasing", "--best"];
-    args.extend_from_slice(pkgs);
-    root("dnf", &args).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
+    let owned = pkgs.iter().map(|&p| p.to_owned()).collect();
+    root(Verb::DnfDrivers { pkgs: owned }).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
     Ok(Installed::Dnf)
 }
 
@@ -417,18 +430,7 @@ impl Drivers {
     }
 
     async fn setup_nvidia_kargs() -> Res<()> {
-        // append-if-missing so a retry doesn't duplicate kargs. rpm-ostree exits 0 on no changes
-        root(
-            "rpm-ostree",
-            &[
-                "kargs",
-                "--append-if-missing=rd.driver.blacklist=nouveau",
-                "--append-if-missing=modprobe.blacklist=nouveau",
-                "--append-if-missing=nvidia-drm.modeset=1",
-                "--append-if-missing=initcall_blacklist=simpledrm_platform_driver_init",
-            ],
-        )
-        .await?;
+        root(Verb::NvidiaKargs).await?;
         Ok(())
     }
 
@@ -437,7 +439,7 @@ impl Drivers {
     /// restart, then akmods builds the module for their kernel while booting
     async fn next_kernel() -> Res<String> {
         // grubby reads the boot loader entries, which only root may
-        let out = crate::root_output("grubby", ["--default-kernel"]).await;
+        let out = crate::root_output(Verb::DefaultKernel).await;
         if let Ok(out) = &out
             && let Some(kver) = out.trim().strip_prefix("/boot/vmlinuz-")
         {
@@ -457,7 +459,7 @@ impl Drivers {
     async fn kmod_built(module: &str) -> Res<bool> {
         let kver = Self::next_kernel().await?;
         tracing::info!(kver, module, "Waiting for akmods to build the kernel module");
-        if let Err(e) = root("akmods", ["--kernels", &kver]).await {
+        if let Err(e) = root(Verb::Akmods { kernel: kver.clone() }).await {
             tracing::warn!(?e, "akmods failed");
         }
         Ok(Command::new("modinfo")
@@ -531,13 +533,7 @@ impl Drivers {
         if primary_gpu {
             // a snippet of its own, the packaged `nvidia.conf` stays as it is. Xorg applies every
             // `OutputClass` that matches, so this only adds the option
-            if let Err(e) = root_with_stdin(
-                "install",
-                ["-Dm644", "/dev/stdin", "/etc/X11/xorg.conf.d/10-nvidia-primary.conf"],
-                NVIDIA_PRIMARY_GPU_CONF.as_bytes(),
-            )
-            .await
-            {
+            if let Err(e) = root(Verb::NvidiaPrimaryGpu).await {
                 tracing::warn!(?e, "cannot set nvidia as primary gpu");
                 primary_failed = true;
             }
@@ -712,6 +708,19 @@ mod tests {
         // the oldest branch that drives both
         assert_eq!(driver(&["GP108", "TU116"]), NvidiaDriver::Branch(R580));
         assert_eq!(driver(&["AD104", "GP108"]), NvidiaDriver::Branch(R580));
+    }
+
+    #[test]
+    fn helper_takes_every_driver_package() {
+        let all = driver_packages();
+        let used = [
+            &["nvidia-gpu-firmware", "libva-nvidia-driver"][..],
+            &NvidiaBranch::R580.packages(),
+            &NvidiaBranch::Latest.packages(),
+            &["broadcom-wl", "akmod-wl"],
+            &["broadcom-bt-firmware"],
+        ];
+        assert!(used.concat().iter().all(|p| all.contains(p)));
     }
 
     #[test]

@@ -2,7 +2,7 @@
 #
 # turns off KWin's window menu (right-clicking a title bar, Alt+F3 is already unbound in
 # kglobalshortcutsrc). Its "Configure Special Window Settings" opens the window rules KCM, and from
-# there apps running as the taidan user, which can pkexec anything. KWin checks this with
+# there apps running as the taidan user, which can run the root helper. KWin checks this with
 # KAuthorized::authorizeAction("kwin_rmb") in src/useractions.cpp.
 [KDE Action Restrictions][$i]
 action/kwin_rmb=false

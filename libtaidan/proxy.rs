@@ -1,7 +1,7 @@
 //! a manual HTTP proxy, for networks that only reach the internet through one
 //!
-//! `pkexec` clears the environment, so anything run through it as root gets the proxy through
-//! [`wrapper`] instead of inheriting `http_proxy` and friends.
+//! `pkexec` clears the environment, so what runs as root gets the proxy from the request the
+//! helper reads on stdin (see [`crate::helper`]) instead of inheriting `http_proxy` and friends.
 use crate::prelude::*;
 
 #[derive(Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -40,14 +40,6 @@ fn redact(url: &str) -> String {
 static PROXY: std::sync::RwLock<Option<Proxy>> = std::sync::RwLock::new(None);
 
 pub fn set(proxy: Option<Proxy>) {
-    // without the file, `wrapper` would make every command run as root fail
-    let proxy = match write_env_file(&env_file(), proxy.as_ref()) {
-        Ok(()) => proxy,
-        Err(e) => {
-            tracing::error!(?e, "cannot save the proxy for commands run as root, going without");
-            None
-        }
-    };
     *PROXY.write().unwrap_or_else(std::sync::PoisonError::into_inner) = proxy;
 }
 
@@ -173,51 +165,59 @@ impl Proxy {
         if !self.is_safe() {
             return Err(Err::Msg("the proxy has control characters in it"));
         }
+        // the helper saves the proxy the request has, which is the installation's
+        if get().as_ref() != Some(self) {
+            return Err(Err::Msg("only the installation's proxy can be saved"));
+        }
+        crate::root(crate::Verb::ProxyPersist).await.wrap_msg("cannot save the proxy")
+    }
+
+    /// what [`Self::persist`] does, run by the helper as root
+    ///
+    /// # Errors
+    /// Cannot write the files.
+    pub(crate) fn persist_as_root(&self) -> Result<(), String> {
+        if !self.is_safe() {
+            return Err("the proxy has control characters in it".to_owned());
+        }
         // every user can read `/etc/environment` and gets it in their session, so the password
         // only goes into the dnf config. Apps ask for it themselves when the proxy wants one
-        let public = self.without_credentials().ok_or(Err::Msg("the proxy URL is invalid"))?;
+        let public = self.without_credentials().ok_or("the proxy URL is invalid")?;
         // the dnf config first, `clear` goes by it, so it must be there if anything is. Only root
         // may read it. `/etc/environment` has to stay readable for login sessions to pick the
         // proxy up
-        crate::root_with_stdin(
-            "sh",
-            [
-                "-c",
-                r#"
-                    mkdir -p /etc/dnf/libdnf5.conf.d
-                    umask 077
-                    { printf '[main]\nproxy='; cat; } > "$1"
-                    chmod 600 "$1"
-                "#,
-                "sh",
-                DNF_DROPIN,
-            ],
-            format!("{}\n", self.url).as_bytes(),
-        )
-        .await
-        .wrap_msg("cannot write the proxy to the dnf config")?;
+        let dropin = format!("[main]\nproxy={}\n", self.url);
+        crate::helper::write_atomic(std::path::Path::new(DNF_DROPIN), dropin.as_bytes(), 0o600)
+            .map_err(|e| format!("cannot write the proxy to the dnf config: {e}"))?;
         // dnf going through the proxy for a mirror it shouldn't is only slower, so this isn't
         // worth failing over
-        if let Err(e) = self.write_repo_overrides().await {
-            tracing::warn!(?e, "cannot keep dnf from using the proxy for the bypassed hosts");
+        if let Err(e) = self.write_repo_overrides_as_root() {
+            eprintln!("cannot keep dnf from using the proxy for the bypassed hosts: {e}");
         }
-        // through stdin, since the arguments of commands run as root are logged
-        let mut lines = public.env().join("\n");
-        lines.push('\n');
-        crate::root_with_stdin(
-            "sh",
-            [
-                "-c",
-                r#"
-                    sed -i '/^\(https\?\|no\)_proxy=/Id' /etc/environment
-                    cat >> /etc/environment
-                "#,
-            ],
-            lines.as_bytes(),
-        )
-        .await
-        .wrap_msg("cannot write the proxy to /etc/environment")
+        let mut env =
+            without_proxy_vars(&std::fs::read_to_string(ETC_ENVIRONMENT).unwrap_or_default());
+        for line in public.env() {
+            env.push_str(&line);
+            env.push('\n');
+        }
+        crate::helper::write_atomic(std::path::Path::new(ETC_ENVIRONMENT), env.as_bytes(), 0o644)
+            .map_err(|e| format!("cannot write the proxy to {ETC_ENVIRONMENT}: {e}"))
     }
+}
+
+/// login sessions' environment, see pam_env(8)
+const ETC_ENVIRONMENT: &str = "/etc/environment";
+
+/// `/etc/environment` without its `http_proxy`, `https_proxy` and `no_proxy` lines, in any case,
+/// each line ending in a newline
+fn without_proxy_vars(env: &str) -> String {
+    env.lines()
+        .filter(|line| {
+            let key = line.split_once('=').map_or("", |(k, _)| k).to_ascii_lowercase();
+            !matches!(key.as_str(), "http_proxy" | "https_proxy" | "no_proxy")
+        })
+        .map(|line| format!("{line}\n"))
+        .collect()
 }
 
 impl Proxy {
@@ -232,6 +232,16 @@ impl Proxy {
     /// # Errors
     /// Cannot write or remove the file.
     pub async fn write_repo_overrides(&self) -> Res<()> {
+        if get().as_ref() != Some(self) {
+            return Err(Err::Msg("only the installation's proxy has overrides written"));
+        }
+        crate::root(crate::Verb::ProxyRepoOverrides)
+            .await
+            .wrap_msg("cannot write the dnf proxy overrides")
+    }
+
+    /// what [`Self::write_repo_overrides`] does, run by the helper as root
+    pub(crate) fn write_repo_overrides_as_root(&self) -> std::io::Result<()> {
         let repos = REPO_DIRS
             .iter()
             .filter_map(|dir| std::fs::read_dir(dir).ok())
@@ -243,31 +253,15 @@ impl Proxy {
             .flat_map(|text| repo_hosts(&text))
             .collect::<Vec<_>>();
         let overrides = repo_overrides(&repos, &self.no_proxy);
+        let path = std::path::Path::new(REPO_OVERRIDE);
         if overrides.is_empty() {
-            if !tokio::fs::try_exists(REPO_OVERRIDE).await.unwrap_or(true) {
-                return Ok(());
-            }
-            return crate::root("rm", ["-f", REPO_OVERRIDE])
-                .await
-                .wrap_msg("cannot remove the dnf proxy overrides");
+            return match std::fs::remove_file(path) {
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                res => res,
+            };
         }
         // nothing secret in it, readable like the repo files themselves
-        crate::root_with_stdin(
-            "sh",
-            [
-                "-c",
-                r#"
-                    mkdir -p /etc/dnf/repos.override.d
-                    umask 022
-                    cat > "$1"
-                "#,
-                "sh",
-                REPO_OVERRIDE,
-            ],
-            overrides.as_bytes(),
-        )
-        .await
-        .wrap_msg("cannot write the dnf proxy overrides")
+        crate::helper::write_atomic(path, overrides.as_bytes(), 0o644)
     }
 }
 
@@ -401,73 +395,34 @@ pub async fn clear() -> Res<()> {
     if !exists(DNF_DROPIN).await && !exists(REPO_OVERRIDE).await {
         return Ok(());
     }
-    crate::root(
-        "sh",
-        [
-            "-c",
-            r#"
-                rm -f "$2"
-                if [ -e "$1" ]; then
-                    sed -i '/^\(https\?\|no\)_proxy=/Id' /etc/environment
-                    rm -f "$1"
-                fi
-            "#,
-            "sh",
-            DNF_DROPIN,
-            REPO_OVERRIDE,
-        ],
-    )
-    .await
-    .wrap_msg("cannot remove the saved proxy")
+    crate::root(crate::Verb::ProxyClear).await.wrap_msg("cannot remove the saved proxy")
 }
 
-/// where [`set`] saves the current proxy for [`wrapper`], in Taidan's own temporary directory,
-/// which only its user (and root) can read
-fn env_file() -> std::path::PathBuf {
-    crate::TEMP_DIR.join("proxy.env")
-}
-
-/// writes `proxy` to `path` as `export` lines for `sh`, only readable by its owner, or removes
-/// the file if there's no proxy
-fn write_env_file(path: &std::path::Path, proxy: Option<&Proxy>) -> std::io::Result<()> {
-    use std::io::Write as _;
-    use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
-    let Some(proxy) = proxy else {
-        return match std::fs::remove_file(path) {
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            res => res,
-        };
+/// what [`clear`] does, run by the helper as root
+pub(crate) fn clear_as_root() -> std::io::Result<()> {
+    let remove = |path| match std::fs::remove_file(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        res => res,
     };
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path)?;
-    // the mode only applies to a new file
-    file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
-    let mut lines = String::new();
-    for (key, value) in proxy.vars() {
-        lines.push_str(&format!("export {key}={}\n", sh_quote(value)));
+    remove(REPO_OVERRIDE)?;
+    if std::path::Path::new(DNF_DROPIN).exists() {
+        let env = std::fs::read_to_string(ETC_ENVIRONMENT).unwrap_or_default();
+        let cleaned = without_proxy_vars(&env);
+        if cleaned != env {
+            crate::helper::write_atomic(
+                std::path::Path::new(ETC_ENVIRONMENT),
+                cleaned.as_bytes(),
+                0o644,
+            )?;
+        }
+        remove(DNF_DROPIN)?;
     }
-    file.write_all(lines.as_bytes())
+    Ok(())
 }
 
 /// `s` in single quotes for `sh`, where nothing in it is special
 pub(crate) fn sh_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
-}
-
-/// what to put between `pkexec --user root env` and the command so it runs with the current
-/// proxy, empty if there's none. The proxy is read from [`env_file`] instead of being passed as
-/// arguments, since the URL may carry a password, and `pkexec` logs the arguments of what it runs
-/// and anyone can read them in `/proc`
-#[must_use]
-pub fn wrapper() -> Vec<std::ffi::OsString> {
-    if get().is_none() {
-        return vec![];
-    }
-    vec!["/bin/sh".into(), "-c".into(), r#". "$0" && exec "$@""#.into(), env_file().into()]
 }
 
 #[cfg(test)]
@@ -547,28 +502,11 @@ mod tests {
     }
 
     #[test]
-    fn env_file_round_trips_through_sh() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("proxy.env");
-        let p = Proxy {
-            url: "http://bob:it's $HOME `x`@proxy.example.com:3128".into(),
-            no_proxy: "localhost".into(),
-        };
-        write_env_file(&path, Some(&p)).unwrap();
-        let mode = std::os::unix::fs::PermissionsExt::mode(&path.metadata().unwrap().permissions());
-        assert_eq!(mode & 0o777, 0o600);
-        let out = std::process::Command::new("/bin/sh")
-            .args(["-c", r#". "$0" && exec "$@""#])
-            .arg(&path)
-            .args(["/usr/bin/printenv", "HTTPS_PROXY", "no_proxy"])
-            .env_clear()
-            .output()
-            .unwrap();
-        assert!(out.status.success());
-        assert_eq!(String::from_utf8(out.stdout).unwrap(), format!("{}\nlocalhost\n", p.url));
-        write_env_file(&path, None).unwrap();
-        assert!(!path.exists());
-        write_env_file(&path, None).unwrap();
+    fn drops_proxy_vars_from_etc_environment() {
+        let env = "LANG=C\nhttp_proxy=x\nHTTPS_PROXY=y\nNo_Proxy=z\nhttp_proxy_user=keep\n# c\n";
+        assert_eq!(without_proxy_vars(env), "LANG=C\nhttp_proxy_user=keep\n# c\n");
+        assert_eq!(without_proxy_vars("A=1"), "A=1\n");
+        assert_eq!(without_proxy_vars(""), "");
     }
 
     #[test]

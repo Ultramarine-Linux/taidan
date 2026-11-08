@@ -1,5 +1,3 @@
-use tokio::io::AsyncWriteExt;
-
 use super::super::i18n;
 use crate::prelude::*;
 
@@ -106,15 +104,18 @@ async fn remove_fcitx5_config(settings: &crate::settings::Settings) -> Res<()> {
     let config = crate::a11y::home_of(username).await?.join(".config");
     let plasma = if crate::a11y::is_plasma() { "plasma" } else { "" };
     let [_, _, _, _, _, launcher] = KWINRC_FCITX5[0];
-    let args = [std::ffi::OsStr::new("-c"), SCRIPT.as_ref(), "sh".as_ref()];
-    let args = args.into_iter().chain([
-        config.as_os_str(),
-        FCITX5_PROFILE_MARKER.as_ref(),
-        plasma.as_ref(),
-        launcher.as_ref(),
-    ]);
+    let argv = [
+        "sh",
+        "-c",
+        SCRIPT,
+        "sh",
+        &config.to_string_lossy(),
+        FCITX5_PROFILE_MARKER,
+        plasma,
+        launcher,
+    ];
     // as the user, whose home it is
-    crate::pkexec(username, "sh", args.collect::<Vec<_>>()).await
+    crate::as_user(username, argv.map(str::to_owned).to_vec(), None).await
 }
 
 /// `~/.config/fcitx5/profile` with the keyboard layout and the chosen input methods
@@ -167,40 +168,18 @@ fn fcitx5_profile(
 
 /// writes `content` to `path` as `user`, replacing what was there, so the file is theirs
 async fn write_as(user: &str, path: &str, content: &[u8]) -> Res<()> {
-    let mut p = tokio::process::Command::new("pkexec")
-        .args(["--user", user, "tee", "--", path])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| Err::FailToRunProgram("pkexec", e))?;
-    if let Some(mut stdin) = p.stdin.take() {
-        (stdin.write_all(content).await.map_err(Err::Io))
-            .wrap_msg("cannot write to pkexec tee stdin")?;
-    }
-
-    let p = (p.wait_with_output().await)
-        .map_err(|e| Err::FailToRunProgram("pkexec", e))
-        .wrap_msg("cannot tee")?;
-
-    if !p.status.success() {
-        return Err(Err::ProgramFail {
-            name: "pkexec (tee)",
-            output: String::from_utf8_lossy(&p.stderr).to_string(),
-            rc: p.status.code(),
-        })
-        .wrap_message(|_| format!("failed to write to {path}"));
-    }
-    Ok(())
+    let argv = ["sh", "-c", r#"exec cat > "$1""#, "sh", path].map(str::to_owned).to_vec();
+    crate::as_user(user, argv, Some(content))
+        .await
+        .wrap_message(|_| format!("failed to write to {path}"))
 }
 
 async fn write_fcitx5_profile(settings: &crate::settings::Settings) -> Res<()> {
     let username = &settings.username;
     let config = crate::a11y::home_of(username).await?.join(".config");
     let fcitx5 = config.join("fcitx5");
-    crate::pkexec(username, "mkdir", [std::ffi::OsStr::new("-p"), fcitx5.as_os_str()])
-        .await
-        .wrap_msg("cannot create ~/.config/fcitx5/")?;
+    let argv = vec!["mkdir".to_owned(), "-p".to_owned(), fcitx5.to_string_lossy().into_owned()];
+    crate::as_user(username, argv, None).await.wrap_msg("cannot create ~/.config/fcitx5/")?;
 
     let profile_path = fcitx5.join("profile");
     write_as(username, &profile_path.to_string_lossy(), fcitx5_profile(settings).as_bytes())
@@ -214,9 +193,10 @@ async fn write_fcitx5_profile(settings: &crate::settings::Settings) -> Res<()> {
     let kwinrc = kwinrc.to_string_lossy();
     for entry in KWINRC_FCITX5 {
         // as the user, so the file they get is theirs
-        let mut args = vec!["-u", username, "--", "kwriteconfig6", "--file", &kwinrc];
-        args.extend(entry);
-        crate::root("runuser", &args).await.wrap_msg("cannot select Fcitx5 in kwinrc")?;
+        let mut argv = vec!["kwriteconfig6", "--file", &kwinrc];
+        argv.extend(entry);
+        let argv = argv.into_iter().map(str::to_owned).collect();
+        crate::as_user(username, argv, None).await.wrap_msg("cannot select Fcitx5 in kwinrc")?;
     }
     Ok(())
 }
@@ -364,28 +344,7 @@ async fn write_ibus_profile(settings: &crate::settings::Settings) -> Res<()> {
         return Ok(());
     };
 
-    let p = tokio::process::Command::new("pkexec")
-        .args(["--user", username])
-        .args(&cmd)
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| Err::FailToRunProgram("pkexec", e))
-        .wrap_msg("fail to spawn pkexec for dbus command")?;
-
-    let p = (p.wait_with_output().await)
-        .map_err(|e| Err::FailToRunProgram("pkexec", e))
-        .wrap_msg("cannot run dbus-run-session with pkexec")?;
-
-    if !p.status.success() {
-        return Err(Err::ProgramFail {
-            name: "pkexec (dbus-run-session)",
-            output: String::from_utf8_lossy(&p.stderr).to_string(),
-            rc: p.status.code(),
-        })
-        .wrap_msg("failed to set the IBus engines");
-    }
-
-    Ok(())
+    crate::as_user(username, cmd, None).await.wrap_msg("failed to set the IBus engines")
 }
 
 #[cfg(test)]
