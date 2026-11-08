@@ -29,14 +29,6 @@ const fn stage_l10n_id(stage: Stage) -> &'static str {
     }
 }
 
-/// libtaidan's view of [`crate::CFG`]
-fn backend_cfg() -> serde_json::Result<libtaidan::cfg::Config> {
-    let json = serde_json::to_value(&*crate::CFG)?;
-    let mut cfg: libtaidan::cfg::Config = serde_json::from_value(json)?;
-    cfg.distro.clone_from(&crate::CFG.distro);
-    Ok(cfg)
-}
-
 /// the text of a panic's payload
 fn panic_msg(payload: &(dyn std::any::Any + Send)) -> String {
     payload
@@ -56,8 +48,7 @@ fn run_install(
             tracing::warn!("Dev session: simulating the installation instead");
             return crate::RT.block_on(simulate_install(callback)).map_err(|e| e.to_string());
         }
-        let cfg = backend_cfg().map_err(|e| format!("cannot convert the config: {e}"))?;
-        crate::RT.block_on(libtaidan::start_install(settings, &cfg, callback)).map_err(|e| {
+        crate::RT.block_on(libtaidan::start_install(settings, &crate::CFG, callback)).map_err(|e| {
             // not an error, those go to Sentry, and this may name the user
             tracing::debug!(?e, "installation error");
             e.to_string()
@@ -276,14 +267,10 @@ async fn reapply_a11y() {
     if a11y == applied {
         return;
     }
-    let cfg = match backend_cfg() {
-        Ok(cfg) => cfg,
-        Err(e) => return tracing::warn!(?e, "cannot convert the config"),
-    };
     // the password opens a systemd-homed home, which isn't mounted anymore
     let passwd = crate::SETTINGS.read().passwd.clone();
     let settings = libtaidan::settings::Settings { username, a11y, passwd, ..Default::default() };
-    if let Err(e) = libtaidan::a11y::reapply_to_user(&settings, &cfg, applied).await {
+    if let Err(e) = libtaidan::a11y::reapply_to_user(&settings, &crate::CFG, applied).await {
         tracing::warn!(?e, "cannot carry over the accessibility settings");
     }
 }
@@ -452,12 +439,6 @@ mod tests {
             "user `<user>` already exists: <user> <user>, /home/<user>"
         );
         assert_eq!(without_user("cannot install alsa-lib", "al"), "cannot install alsa-lib");
-    }
-
-    #[test]
-    fn cfg_converts_to_backend_cfg() {
-        let json = serde_json::to_value(crate::cfg::Config::default()).unwrap();
-        serde_json::from_value::<libtaidan::cfg::Config>(json).unwrap();
     }
 
     #[test]

@@ -47,7 +47,7 @@ pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
         );
         cfg::Config::default()
     });
-    cfg.populate();
+    cfg::populate(&mut cfg);
     tracing::debug!("Populated cfg::Config (turn on `trace` to see body)");
     cfg
 });

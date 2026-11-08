@@ -1,15 +1,21 @@
-use crate::passwd::user_already_exists;
-
 pub const ACTION_TYPES: usize = 5;
 
+/// `/etc/taidan.toml`, what both the backend and the UI read from it
 #[allow(clippy::unsafe_derive_deserialize)]
-#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct Config {
     #[serde(skip)]
     pub distro: String,
+    /// set when the OOBE shouldn't run, taidan's `main` exits on it so the log and Sentry guards
+    /// still flush
+    #[serde(skip)]
+    pub should_exit: bool,
     #[serde(default)]
     pub edition: String,
 
+    /// pages the distro doesn't want shown, see [`SkipPage`]
+    #[serde(default, deserialize_with = "de_skip_pages")]
+    pub skip_pages: Vec<SkipPage>,
     #[serde(default = "_default_org")]
     pub org: String,
 
@@ -18,7 +24,22 @@ pub struct Config {
 
     #[serde(default)]
     pub taidan0: Taidan0Config,
+
+    /// keys only the UI reads (e.g. `accent_color`, `welcome.*`), looked up through `Cfg` in Slint,
+    /// this also takes keys older versions had (`internet_timeout`, …) so those configs still parse
+    #[serde(flatten)]
+    pub ui: serde_json::Map<String, serde_json::Value>,
 }
+
+/// the same defaults as an empty `/etc/taidan.toml`
+impl Default for Config {
+    fn default() -> Self {
+        basic_toml::from_str("").expect("an empty config parses")
+    }
+}
+
+/// keys from before the Slint rewrite that are ignored, they set how the internet page pinged
+pub const IGNORED_KEYS: [&str; 2] = ["internet_timeout", "internet_retry_interval"];
 
 fn _default_org() -> String {
     "Fyra Labs".into()
@@ -32,10 +53,71 @@ const fn _default_internet_timeout() -> u64 {
     20
 }
 
+/// a page that `skip_pages` in `/etc/taidan.toml` can hide
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SkipPage {
+    Accessibility,
+    Language,
+    Keyboard,
+    Welcome,
+    Theme,
+    Timezone,
+    Network,
+    Location,
+    /// the drivers and codecs page, they're still installed without it
+    Drivers,
+    /// not a page anymore, but the tweaks button on the summary page
+    Tweaks,
+    /// not a page anymore either, but the keyboard page's input methods, so none are set up
+    InputMethod,
+}
+
+impl SkipPage {
+    /// parses a page name, including the ones from before the Slint rewrite (`internet`, `codecs`)
+    fn parse(name: &str) -> Result<Self, &'static str> {
+        Ok(match name {
+            "accessibility" => Self::Accessibility,
+            "language" => Self::Language,
+            "keyboard" => Self::Keyboard,
+            "welcome" => Self::Welcome,
+            "theme" => Self::Theme,
+            "timezone" => Self::Timezone,
+            "network" | "internet" => Self::Network,
+            "location" => Self::Location,
+            "drivers" | "codecs" => Self::Drivers,
+            "tweaks" => Self::Tweaks,
+            "inputmethod" | "ims" => Self::InputMethod,
+            "devicename" | "analytics" | "crashreport" => {
+                return Err("this page no longer exists");
+            }
+            // the install can't create the account without these
+            "whoareyou" | "password" | "summary" | "installing" | "finish" | "done" | "error" => {
+                return Err("this page can't be skipped");
+            }
+            _ => return Err("unknown page"),
+        })
+    }
+}
+
+/// reads `skip_pages`, ignoring (with a warning) names it doesn't know instead of refusing the
+/// whole config
+fn de_skip_pages<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Vec<SkipPage>, D::Error> {
+    let names = <Vec<String> as serde::Deserialize>::deserialize(de)?;
+    Ok(names
+        .iter()
+        .filter_map(|name| {
+            SkipPage::parse(&name.to_lowercase())
+                .inspect_err(|reason| tracing::warn!(name, reason, "ignoring skip_pages entry"))
+                .ok()
+        })
+        .collect())
+}
+
 impl Config {
     /// Create a new [`Config`] by reading from `/etc/taidan.toml`, else [`Self::default()`].
     ///
-    /// Remember to [`Self::populate`] afterwards.
+    /// Remember to fill in [`Self::read_os_release`] afterwards.
     ///
     /// # Errors
     /// Failure to parse `/etc/taidan.toml`.
@@ -45,15 +127,18 @@ impl Config {
         else {
             return Ok(Self::default());
         };
-        basic_toml::from_str(&s)
+        basic_toml::from_str(&s).inspect(Self::warn_ignored_keys)
     }
 
-    /// Populate the [`Config`] struct.
-    #[tracing::instrument]
-    pub fn populate(&mut self) {
-        self.taidan0.check();
-        self.read_os_release();
-        tracing::trace!("Populated config: {self:#?}");
+    /// warns about keys older versions read that do nothing now. They still parse, see [`Self::ui`]
+    fn warn_ignored_keys(&self) {
+        for key in IGNORED_KEYS.into_iter().filter(|key| self.ui.contains_key(*key)) {
+            tracing::warn!(
+                key,
+                "ignoring /etc/taidan.toml key, online detection uses NetworkManager's connectivity \
+                 check now"
+            );
+        }
     }
 
     /// the distro name, and the edition unless the config sets it, from os-release
@@ -113,7 +198,35 @@ pub fn desktop(edition: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{desktop, parse_os_release};
+    use super::{Config, IGNORED_KEYS, SkipPage, desktop, parse_os_release};
+
+    #[test]
+    fn defaults_are_the_serde_ones() {
+        assert_eq!(Config::default().org, "Fyra Labs");
+    }
+
+    #[test]
+    fn skip_pages_accepts_old_names() {
+        let cfg: Config = basic_toml::from_str(
+            r#"skip_pages = ["codecs", "internet", "Theme", "inputmethod", "nope"]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            cfg.skip_pages,
+            [SkipPage::Drivers, SkipPage::Network, SkipPage::Theme, SkipPage::InputMethod]
+        );
+        // not swallowed by the flattened `ui` map
+        assert!(!cfg.ui.contains_key("skip_pages"));
+        assert!(!cfg.ui.contains_key("org"));
+    }
+
+    #[test]
+    fn old_internet_keys_still_parse() {
+        let cfg: Config =
+            basic_toml::from_str("internet_timeout = 20\ninternet_retry_interval = 5").unwrap();
+        assert_eq!(cfg.skip_pages, []);
+        assert!(IGNORED_KEYS.iter().all(|key| cfg.ui.contains_key(*key)));
+    }
 
     #[test]
     fn desktops() {
@@ -137,7 +250,7 @@ mod tests {
     }
 }
 
-#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
 pub struct Taidan0Config {
     #[serde(default)]
     pub continue_if_user_exists: bool,
@@ -147,15 +260,4 @@ pub struct Taidan0Config {
     pub persist_no_internet_btn: bool,
     #[serde(default)]
     pub systemd_homed: bool,
-}
-
-impl Taidan0Config {
-    pub fn check(&self) {
-        if self.continue_if_user_exists {
-            tracing::info!("taidan0.continue_if_user_exists detected");
-        } else if user_already_exists() {
-            tracing::warn!("taidan0.continue_if_user_exists is false, exiting");
-            std::process::exit(0);
-        }
-    }
 }

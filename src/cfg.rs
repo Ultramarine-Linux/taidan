@@ -1,126 +1,27 @@
+pub use libtaidan::cfg::{Config, SkipPage};
 use libtaidan::passwd::user_already_exists;
-
-pub const ACTION_TYPES: usize = 5;
-
-#[allow(clippy::unsafe_derive_deserialize)]
-#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
-pub struct Config {
-    #[serde(skip)]
-    pub distro: String,
-    /// set by [`Self::populate`] when the OOBE shouldn't run, `main` exits on it so the log and
-    /// Sentry guards still flush
-    #[serde(skip)]
-    pub should_exit: bool,
-    #[serde(default)]
-    pub edition: String,
-
-    /// pages the distro doesn't want shown, see [`SkipPage`]
-    #[serde(default, deserialize_with = "de_skip_pages")]
-    pub skip_pages: Vec<SkipPage>,
-    #[serde(default = "_default_org")]
-    pub org: String,
-
-    #[serde(default)]
-    pub i18n: libtaidan::i18n::I18nCfg,
-
-    #[serde(default)]
-    pub taidan0: Taidan0Config,
-
-    /// keys only the UI reads (e.g. `accent_color`, `welcome.*`), looked up through `Cfg` in Slint,
-    /// this also takes keys older versions had (`internet_timeout`, …) so those configs still parse
-    #[serde(flatten)]
-    pub ui: serde_json::Map<String, serde_json::Value>,
-}
-
-/// keys from before the Slint rewrite that are ignored, they set how the internet page pinged
-const IGNORED_KEYS: [&str; 2] = ["internet_timeout", "internet_retry_interval"];
-
-fn _default_org() -> String {
-    "Fyra Labs".into()
-}
-
-/// a page that `skip_pages` in `/etc/taidan.toml` can hide
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SkipPage {
-    Accessibility,
-    Language,
-    Keyboard,
-    Welcome,
-    Theme,
-    Timezone,
-    Network,
-    Location,
-    /// the drivers and codecs page, they're still installed without it
-    Drivers,
-    /// not a page anymore, but the tweaks button on the summary page
-    Tweaks,
-    /// not a page anymore either, but the keyboard page's input methods, so none are set up
-    InputMethod,
-}
 
 /// index of the last page that Next and Back go through (the summary), as in `ui/app.slint`
 const LAST_PAGE: i32 = 11;
 
-impl SkipPage {
-    /// parses a page name, including the ones from before the Slint rewrite (`internet`, `codecs`)
-    fn parse(name: &str) -> Result<Self, &'static str> {
-        Ok(match name {
-            "accessibility" => Self::Accessibility,
-            "language" => Self::Language,
-            "keyboard" => Self::Keyboard,
-            "welcome" => Self::Welcome,
-            "theme" => Self::Theme,
-            "timezone" => Self::Timezone,
-            "network" | "internet" => Self::Network,
-            "location" => Self::Location,
-            "drivers" | "codecs" => Self::Drivers,
-            "tweaks" => Self::Tweaks,
-            "inputmethod" | "ims" => Self::InputMethod,
-            "devicename" | "analytics" | "crashreport" => {
-                return Err("this page no longer exists");
-            }
-            // the install can't create the account without these
-            "whoareyou" | "password" | "summary" | "installing" | "finish" | "done" | "error" => {
-                return Err("this page can't be skipped");
-            }
-            _ => return Err("unknown page"),
-        })
-    }
-
-    /// position in `ui/app.slint`, `None` if it's not a page
-    const fn index(self) -> Option<i32> {
-        Some(match self {
-            Self::Accessibility => 0,
-            Self::Language => 1,
-            Self::Keyboard => 2,
-            Self::Welcome => 3,
-            Self::Theme => 4,
-            Self::Timezone => 7,
-            Self::Network => 8,
-            Self::Location => 9,
-            Self::Drivers => 10,
-            Self::Tweaks | Self::InputMethod => return None,
-        })
-    }
-}
-
-/// reads `skip_pages`, ignoring (with a warning) names it doesn't know instead of refusing the
-/// whole config
-fn de_skip_pages<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Vec<SkipPage>, D::Error> {
-    let names = <Vec<String> as serde::Deserialize>::deserialize(de)?;
-    Ok(names
-        .iter()
-        .filter_map(|name| {
-            SkipPage::parse(&name.to_lowercase())
-                .inspect_err(|reason| tracing::warn!(name, reason, "ignoring skip_pages entry"))
-                .ok()
-        })
-        .collect())
+/// position of `page` in `ui/app.slint`, `None` if it's not a page
+const fn page_index(page: SkipPage) -> Option<i32> {
+    Some(match page {
+        SkipPage::Accessibility => 0,
+        SkipPage::Language => 1,
+        SkipPage::Keyboard => 2,
+        SkipPage::Welcome => 3,
+        SkipPage::Theme => 4,
+        SkipPage::Timezone => 7,
+        SkipPage::Network => 8,
+        SkipPage::Location => 9,
+        SkipPage::Drivers => 10,
+        SkipPage::Tweaks | SkipPage::InputMethod => return None,
+    })
 }
 
 fn is_skipped(cfg: &Config, page: i32) -> bool {
-    cfg.skip_pages.iter().any(|p| p.index() == Some(page))
+    cfg.skip_pages.iter().any(|p| page_index(*p) == Some(page))
 }
 
 /// the page Next goes to from `page`, past the skipped ones, `page` itself if there is none
@@ -139,88 +40,38 @@ pub fn first_page() -> i32 {
     next_page(&crate::CFG, -1)
 }
 
-impl Config {
-    /// Create a new [`Config`] by reading from `/etc/taidan.toml`, else [`Self::default()`].
-    ///
-    /// Remember to [`Self::populate`] afterwards.
-    ///
-    /// # Errors
-    /// Failure to parse `/etc/taidan.toml`.
-    pub fn new() -> Result<Self, basic_toml::Error> {
-        let Ok(s) = std::fs::read_to_string("/etc/taidan.toml")
-            .inspect_err(|err| tracing::warn!(?err, "cannot read /etc/taidan.toml"))
-        else {
-            return Ok(Self::default());
-        };
-        basic_toml::from_str(&s).inspect(Self::warn_ignored_keys)
-    }
-
-    /// warns about keys older versions read that do nothing now. They still parse, see [`Self::ui`]
-    fn warn_ignored_keys(&self) {
-        for key in IGNORED_KEYS.into_iter().filter(|key| self.ui.contains_key(*key)) {
-            tracing::warn!(
-                key,
-                "ignoring /etc/taidan.toml key, online detection uses NetworkManager's connectivity \
-                 check now"
-            );
-        }
-    }
-
-    /// Populate the [`Config`] struct.
-    #[tracing::instrument]
-    pub fn populate(&mut self) {
-        self.should_exit = !self.taidan0.check();
-        let (name, variant_id) = libtaidan::cfg::os_release();
-        self.distro = name;
-        if self.edition.is_empty() {
-            self.edition = variant_id;
-        }
-
-        tracing::trace!("Populated config: {self:#?}");
-    }
+/// fills in what `/etc/taidan.toml` doesn't say, and whether the OOBE should run at all
+#[tracing::instrument(skip_all)]
+pub fn populate(cfg: &mut Config) {
+    cfg.should_exit = !should_run(&cfg.taidan0);
+    cfg.read_os_release();
+    tracing::trace!("Populated config: {cfg:#?}");
 }
 
-#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
-#[expect(clippy::struct_excessive_bools, reason = "independent config flags")]
-pub struct Taidan0Config {
-    #[serde(default)]
-    pub continue_if_user_exists: bool,
-    #[serde(default)]
-    pub skip_dnf: bool,
-    #[serde(default)]
-    pub persist_no_internet_btn: bool,
-    #[serde(default)]
-    pub systemd_homed: bool,
-}
-
-impl Taidan0Config {
-    /// whether the OOBE should run, false once the system already has a user
-    #[must_use]
-    pub fn check(&self) -> bool {
-        if self.continue_if_user_exists {
-            tracing::info!("taidan0.continue_if_user_exists detected");
-        } else if user_already_exists() {
-            // an install that died between removing its user record and the markers would
-            // otherwise start the OOBE on every boot. On a thread, since this may run on `RT`
-            if libtaidan::marked_unconfigured() {
-                tracing::warn!("the system has a user but is still marked unconfigured, fixing");
-                let marked =
-                    std::thread::spawn(|| crate::RT.block_on(libtaidan::mark_configured()));
-                if marked.join().is_err() {
-                    tracing::error!("marking the system configured panicked");
-                }
-                // nor should a later rerun undo the tweaks that install turned on
-                let cleared =
-                    std::thread::spawn(|| crate::RT.block_on(libtaidan::tweaks::clear_on_record()));
-                if !matches!(cleared.join(), Ok(Ok(()))) {
-                    tracing::error!("cannot remove the tweaks record");
-                }
+/// whether the OOBE should run, false once the system already has a user
+fn should_run(taidan0: &libtaidan::cfg::Taidan0Config) -> bool {
+    if taidan0.continue_if_user_exists {
+        tracing::info!("taidan0.continue_if_user_exists detected");
+    } else if user_already_exists() {
+        // an install that died between removing its user record and the markers would
+        // otherwise start the OOBE on every boot. On a thread, since this may run on `RT`
+        if libtaidan::marked_unconfigured() {
+            tracing::warn!("the system has a user but is still marked unconfigured, fixing");
+            let marked = std::thread::spawn(|| crate::RT.block_on(libtaidan::mark_configured()));
+            if marked.join().is_err() {
+                tracing::error!("marking the system configured panicked");
             }
-            tracing::warn!("taidan0.continue_if_user_exists is false, exiting");
-            return false;
+            // nor should a later rerun undo the tweaks that install turned on
+            let cleared =
+                std::thread::spawn(|| crate::RT.block_on(libtaidan::tweaks::clear_on_record()));
+            if !matches!(cleared.join(), Ok(Ok(()))) {
+                tracing::error!("cannot remove the tweaks record");
+            }
         }
-        true
+        tracing::warn!("taidan0.continue_if_user_exists is false, exiting");
+        return false;
     }
+    true
 }
 
 static CFG_JSON: std::sync::LazyLock<serde_json::Value> =
@@ -402,28 +253,6 @@ mod tests {
         for bad in ["00078f", "#00078", "#zz078f", "#", "blue"] {
             assert_eq!(parse_color(bad), None, "{bad}");
         }
-    }
-
-    #[test]
-    fn skip_pages_accepts_old_names() {
-        let cfg: Config = basic_toml::from_str(
-            r#"skip_pages = ["codecs", "internet", "Theme", "inputmethod", "nope"]"#,
-        )
-        .unwrap();
-        assert_eq!(
-            cfg.skip_pages,
-            [SkipPage::Drivers, SkipPage::Network, SkipPage::Theme, SkipPage::InputMethod]
-        );
-        // not swallowed by the flattened `ui` map
-        assert!(!cfg.ui.contains_key("skip_pages"));
-    }
-
-    #[test]
-    fn old_internet_keys_still_parse() {
-        let cfg: Config =
-            basic_toml::from_str("internet_timeout = 20\ninternet_retry_interval = 5").unwrap();
-        assert_eq!(cfg.skip_pages, []);
-        assert!(IGNORED_KEYS.iter().all(|key| cfg.ui.contains_key(*key)));
     }
 
     #[test]

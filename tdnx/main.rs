@@ -28,8 +28,7 @@ async fn main() {
         eprintln!("cannot parse /etc/taidan.toml, using the defaults: {e}");
         libtaidan::cfg::Config::default()
     });
-    // the edition picks the input method framework, among others. Not `populate`, which exits
-    // when a user exists already
+    // the edition picks the input method framework, among others
     cfg.read_os_release();
     libtaidan::start_install(&mut settings, &cfg, &|_| {}).await.expect("taidan install failed");
 }
