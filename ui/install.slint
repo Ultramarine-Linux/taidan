@@ -8,7 +8,7 @@ export global Install {
     // 1-based
     in property <int> stage-num;
     in property <int> stage-count: 11;
-    // progress within the stage, 0–1, or negative when unknown
+    // progress within the stage, 0–1, or negative when unknown. A bar on the installing page
     in property <float> stage-progress: -1;
     // details of why the installation failed
     in property <string> error;

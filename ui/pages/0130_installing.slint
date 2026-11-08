@@ -3,7 +3,7 @@ import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
 import { Install } from "../install.slint";
 import { Modal } from "../modal.slint";
-import { TdnText, TdnSpinner } from "../components.slint";
+import { TdnText, TdnSpinner, TdnStyle } from "../components.slint";
 import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
 
 export component InstallingPage inherits TdnBasePg {
@@ -85,6 +85,24 @@ export component InstallingPage inherits TdnBasePg {
                         font-size: Tokens.typography-body-sm-size;
                         horizontal-alignment: Dir.text-start;
                         overflow: elide;
+                    }
+
+                    // how far the stage is, when it says (dnf's `[n/m]` lines). Hidden rather
+                    // than left out, so the text doesn't move when it shows
+                    Rectangle {
+                        visible: Install.stage-progress >= 0;
+                        height: 0.25rem;
+                        border-radius: self.height / 2;
+                        background: Tokens.color-muted;
+                        accessible-role: none;
+
+                        Rectangle {
+                            property <length> filled: parent.width * clamp(Install.stage-progress, 0, 1);
+                            x: Dir.x(0, self.width, parent.width);
+                            width: self.filled;
+                            border-radius: parent.border-radius;
+                            background: TdnStyle.accent;
+                        }
                     }
                 }
             }
