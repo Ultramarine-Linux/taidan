@@ -1,6 +1,7 @@
 import { Account } from "account.slint";
 
-export enum Security { open, password, enterprise, unsupported }
+// `enterprise-tls` is WPA3-Enterprise 192-bit (Suite B), which only works with EAP-TLS
+export enum Security { open, password, enterprise, enterprise-tls, unsupported }
 
 // what a hidden network is secured with, as picked in its dialog
 export enum HiddenSecurity { open, wpa, wpa3, enterprise }
@@ -101,6 +102,8 @@ export global Network {
     in-out property <bool> enterprise-open;
     in-out property <string> enterprise-ssid;
     in-out property <bool> enterprise-wired;
+    // the network only takes EAP-TLS, so that's the only method the dialog offers
+    in-out property <bool> enterprise-tls-only;
     in property <bool> enterprise-busy;
     // translation id of why the login failed
     in-out property <string> enterprise-error-id;
@@ -162,6 +165,9 @@ export global Network {
     callback connect-enterprise(login: EnterpriseLogin);
     // the dialog for a network that doesn't announce its name, which closes once it's connected
     in-out property <bool> hidden-open;
+    // the network the hidden dialog last tried, trimmed as it's connected to, so the dialog only
+    // shows its own errors and not those of a connect from the list still running when it opened
+    in-out property <string> hidden-ssid;
     // `password` is empty for open networks, enterprise ones go through `connect-enterprise`
     callback connect-hidden(ssid: string, security: HiddenSecurity, password: string);
     // whether the captive portal browser is open, opening it again closes it

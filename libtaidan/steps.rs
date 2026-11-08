@@ -14,6 +14,7 @@ use crate::prelude::*;
 
 pub use _00_useradd::unlock as unlock_user;
 pub use _07_drivers_codecs::{Hardware, detect_hardware};
+pub use _08_setup_imf::fix_homed as fix_homed_ims;
 
 use crate::steps::{
     _00_useradd::UserAdd, _01_settheme::SetTheme, _04_systemsetup::SystemSetup,

@@ -127,6 +127,10 @@ async fn simulate_install(
     if simulated_hw("nvidia") {
         callback.send(InstallMsg::NeedsReboot);
     }
+    // to see the done page with a driver that didn't install
+    if std::env::var_os("TAIDAN_SIMULATE_DRIVER_ERROR").is_some() {
+        callback.send(InstallMsg::DriversFailed);
+    }
     // to see the done page with updates waiting
     if std::env::var_os("TAIDAN_SIMULATE_UPDATES").is_some() {
         callback.send(InstallMsg::UpdatesReady);
@@ -147,6 +151,7 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
             #[expect(clippy::cast_possible_truncation, reason = "a fraction, for display")]
             InstallMsg::StageProgress(frac) => install.set_stage_progress(frac as f32),
             InstallMsg::NeedsReboot => install.set_needs_reboot(true),
+            InstallMsg::DriversFailed => install.set_drivers_failed(true),
             InstallMsg::UpdatesReady => install.set_updates_ready(true),
             InstallMsg::Finish => {}
         }
@@ -166,6 +171,7 @@ fn start(ui: &slint::Weak<AppWindow>) {
     install.set_error("".into());
     // not `needs_reboot`, drivers an earlier attempt installed still need it
     install.set_updates_ready(false);
+    install.set_drivers_failed(false);
     // not where a failed attempt stopped, until the first stage starts
     install.set_stage_id("".into());
     install.set_stage_num(0);
@@ -269,7 +275,9 @@ async fn reapply_a11y() {
         Ok(cfg) => cfg,
         Err(e) => return tracing::warn!(?e, "cannot convert the config"),
     };
-    let settings = libtaidan::settings::Settings { username, a11y, ..Default::default() };
+    // the password opens a systemd-homed home, which isn't mounted anymore
+    let passwd = crate::SETTINGS.read().passwd.clone();
+    let settings = libtaidan::settings::Settings { username, a11y, passwd, ..Default::default() };
     if let Err(e) = libtaidan::a11y::reapply_to_user(&settings, &cfg, applied).await {
         tracing::warn!(?e, "cannot carry over the accessibility settings");
     }
@@ -393,8 +401,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
             hw.broadcom_wifi |= simulated_hw("broadcom-wifi");
             hw.broadcom_bluetooth |= simulated_hw("broadcom-bluetooth");
             // only matters with drivers it blocks, as on real hardware
-            hw.secure_boot_blocks |=
-                simulated_hw("secure-boot") && (hw.nvidia || hw.broadcom_wifi);
+            hw.secure_boot_blocks |= simulated_hw("secure-boot") && (hw.nvidia || hw.broadcom_wifi);
             tracing::debug!(?hw, "Simulated hardware (TAIDAN_SIMULATE_HW)");
         }
         let set = ui.upgrade_in_event_loop(move |ui| {

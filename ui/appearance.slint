@@ -5,6 +5,8 @@ export struct AccentItem {
     color: color,
     // darkened just enough that white text on it passes WCAG AA, for buttons and other fills
     fill: color,
+    // the swatch's check mark on `color`, white unless that's too faint to see
+    check: color,
 }
 
 // the accent color for the new user, driven from Rust (`src/theme.rs`)

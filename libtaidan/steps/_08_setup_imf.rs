@@ -213,14 +213,22 @@ pub async fn write_to_skel(
 /// [`None`] if none of them have an IBus engine. IBus reads `preload-engines`, but GNOME (and
 /// Budgie) drive IBus from their own `input-sources`, ignoring it, so the engines go in there too
 /// after the layout. Arguments rather than a shell script, the layout comes from the settings
-fn ibus_dconf_writes(
+fn ibus_dconf_writes(settings: &crate::settings::Settings) -> Option<Vec<Vec<String>>> {
+    let any = settings.ims.iter().any(|s| i18n::find_im(s).is_some_and(|im| im.ibus_ref.is_some()));
+    any.then(|| ibus_dconf_writes_all(settings))
+}
+
+/// [`ibus_dconf_writes`] even without engines, which sets IBus and GNOME back to the layout alone
+fn ibus_dconf_writes_all(
     crate::settings::Settings { ims, kb_layout, kb_variant, .. }: &crate::settings::Settings,
-) -> Option<Vec<Vec<String>>> {
+) -> Vec<Vec<String>> {
     let engines: Vec<_> = ims.iter().filter_map(|s| i18n::find_im(s)?.ibus_ref).collect();
-    if engines.is_empty() {
-        return None;
-    }
-    let order = engines.iter().map(|r| format!("'{r}'")).collect::<Vec<_>>().join(", ");
+    // an empty array has no type dconf can tell otherwise
+    let order = if engines.is_empty() {
+        "@as []".to_owned()
+    } else {
+        format!("[{}]", engines.iter().map(|r| format!("'{r}'")).collect::<Vec<_>>().join(", "))
+    };
 
     // without an xkb source first GNOME would type through an IBus engine all the time
     let layout = if kb_layout.is_empty() { "us" } else { kb_layout };
@@ -236,12 +244,50 @@ fn ibus_dconf_writes(
             .chain([value])
             .collect()
     };
-    Some(vec![
+    vec![
         write("/desktop/ibus/general/use-system-keyboard-layout", "true".to_owned()),
-        write("/desktop/ibus/general/engines-order", format!("[{order}]")),
-        write("/desktop/ibus/general/preload-engines", format!("[{order}]")),
+        write("/desktop/ibus/general/engines-order", order.clone()),
+        write("/desktop/ibus/general/preload-engines", order),
         write("/org/gnome/desktop/input-sources/sources", format!("[{sources}]")),
-    ])
+    ]
+}
+
+/// on systemd-homed, the skeleton the home was made from counted the input methods dnf was about
+/// to install, see [`write_to_skel`]. Once the installation is over and the user is unlocked, this
+/// drops the ones that didn't install from the home, failures are logged
+pub async fn fix_homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) {
+    if !cfg.taidan0.systemd_homed || settings.ims.is_empty() {
+        return;
+    }
+    let in_skel = with_installed_ims(settings, cfg, false).await;
+    let installed = with_installed_ims(settings, cfg, true).await;
+    let ims = |s: &Option<crate::settings::Settings>| s.as_ref().map(|s| s.ims.clone());
+    if ims(&in_skel) == ims(&installed) {
+        return;
+    }
+    tracing::info!(?installed, "some input methods didn't install, fixing the home");
+    let settings =
+        &crate::settings::Settings { ims: ims(&installed).unwrap_or_default(), ..settings.clone() };
+    let home = match crate::a11y::home_of(&settings.username).await {
+        Ok(home) => home,
+        Err(e) => return tracing::warn!(?e, "cannot find the user's home"),
+    };
+    let cmds = if settings.imf.is_ibus() {
+        let Some(cmd) = crate::a11y::one_session(ibus_dconf_writes_all(settings)) else { return };
+        let mut env = vec!["env".to_owned()];
+        env.extend(crate::a11y::in_home(&home, cmd));
+        vec![(env, None)]
+    } else {
+        let profile = home.join(".config/fcitx5/profile").to_string_lossy().into_owned();
+        if settings.ims.is_empty() {
+            vec![(vec!["rm".to_owned(), "-f".to_owned(), profile], None)]
+        } else {
+            let write = r#"mkdir -p "${1%/*}" && exec cat > "$1""#;
+            let cmd = ["sh", "-c", write, "sh"].map(str::to_owned).into_iter().chain([profile]);
+            vec![(cmd.collect(), Some(fcitx5_profile(settings)))]
+        }
+    };
+    crate::a11y::run_in_home(settings, cfg, cmds).await;
 }
 
 /// [`ibus_dconf_writes`] into the dconf database in `skel`, through a D-Bus of its own like the

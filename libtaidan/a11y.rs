@@ -454,12 +454,72 @@ pub async fn reapply_to_user(
     if settings.a11y == applied {
         return Ok(());
     }
-    if cfg.taidan0.systemd_homed {
-        // its home is locked once it's created, and needs the user's password to open
-        tracing::warn!("cannot change a systemd-homed user's accessibility settings, skipping");
-        return Ok(());
-    }
     write_to_home(settings, cfg, Some(applied)).await
+}
+
+/// a command to run as the user in their home, with what to feed its stdin
+pub(crate) type HomeCmd = (Vec<String>, Option<String>);
+
+/// runs `cmds` as the user, each failure logged. On systemd-homed, the home isn't mounted once
+/// it's created, so they all run in one `homectl with`, which opens it with the user's password.
+/// That only works once the user is unlocked, see `steps::unlock_user`
+pub(crate) async fn run_in_home(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    cmds: Vec<HomeCmd>,
+) {
+    use secrecy::ExposeSecret as _;
+    let user = settings.username.as_str();
+    if !cfg.taidan0.systemd_homed {
+        for (cmd, input) in cmds {
+            let mut args = vec!["-u".to_owned(), user.to_owned(), "--".to_owned()];
+            args.extend(cmd);
+            let res = match input {
+                Some(input) => crate::root_with_stdin("runuser", &args, input.as_bytes()).await,
+                None => crate::root("runuser", &args).await,
+            };
+            if let Err(e) = res {
+                tracing::warn!(?e, ?args, "cannot write into the user's home");
+            }
+        }
+        return;
+    }
+    if cmds.is_empty() {
+        return;
+    }
+    let script = homed_script(&cmds);
+    // homectl takes the password from `$PASSWORD`, read from stdin into it since anyone can read
+    // a command's arguments, and kept from what runs in the home
+    let res = crate::root_with_stdin(
+        "sh",
+        [
+            "-c",
+            r#"IFS= read -r PASSWORD; export PASSWORD
+            exec homectl with -- "$1" env -u PASSWORD runuser -u "$1" -- sh -c "$2""#,
+            "sh",
+            user,
+            &script,
+        ],
+        format!("{}\n", settings.passwd.expose_secret()).as_bytes(),
+    )
+    .await;
+    if let Err(e) = res {
+        tracing::warn!(?e, "cannot write into the systemd-homed home");
+    }
+}
+
+/// `cmds` as one `sh` script that runs them all and fails if any did
+fn homed_script(cmds: &[HomeCmd]) -> String {
+    use crate::proxy::sh_quote;
+    let mut script = "rc=0\n".to_owned();
+    for (cmd, input) in cmds {
+        let cmd = cmd.iter().map(|a| sh_quote(a)).join(" ");
+        match input {
+            Some(input) => script += &format!("printf %s {} | {cmd} || rc=1\n", sh_quote(input)),
+            None => script += &format!("{cmd} || rc=1\n"),
+        }
+    }
+    script + "exit $rc\n"
 }
 
 /// writes the options into the user's home, undoing the ones in `applied` that are off now
@@ -469,12 +529,7 @@ async fn write_to_home(
     applied: Option<A11y>,
 ) -> Res<()> {
     let home = home_of(&settings.username).await?;
-    // as the user, so the files they get are theirs
-    let as_user = |cmd: &[String]| {
-        let mut args = vec!["-u".to_owned(), settings.username.clone(), "--".to_owned()];
-        args.extend_from_slice(cmd);
-        args
-    };
+    let mut cmds: Vec<HomeCmd> = vec![];
     if is_plasma() {
         let config = home.join(".config");
         let mut entries = if applied.is_some() { A11y::reset_entries() } else { vec![] };
@@ -482,41 +537,37 @@ async fn write_to_home(
         for entry in entries {
             let mut cmd = vec!["kwriteconfig6".to_owned()];
             cmd.extend(entry.kwriteconfig_args(&config.join(entry.file).to_string_lossy()));
-            if let Err(e) = crate::root("runuser", as_user(&cmd)).await {
-                tracing::warn!(?e, ?entry, "cannot write accessibility setting");
-            }
+            cmds.push((cmd, None));
         }
+        run_in_home(settings, cfg, cmds).await;
         return Ok(());
     }
     if let Some(cmd) = one_session(desktop_commands(settings, &cfg.edition, applied.is_some())) {
         let mut env = vec!["env".to_owned()];
         env.extend(in_home(&home, cmd));
-        if let Err(e) = crate::root("runuser", as_user(&env)).await {
-            tracing::warn!(?e, "cannot write accessibility setting");
-        }
+        cmds.push((env, None));
     }
     if settings.a11y.needs_orca_autostart(&cfg.edition) {
         let path = home.join(ORCA_AUTOSTART_PATH);
         let dir = path.parent().unwrap_or(&home).to_string_lossy().into_owned();
         let path = path.to_string_lossy().into_owned();
-        let mkdir = as_user(&["mkdir".to_owned(), "-p".to_owned(), dir]);
-        let res = match crate::root("runuser", mkdir).await {
-            Ok(()) => {
-                let tee = as_user(&["tee".to_owned(), path]);
-                crate::root_with_stdin("runuser", tee, ORCA_AUTOSTART.as_bytes()).await
-            }
-            Err(e) => Err(e),
-        };
-        if let Err(e) = res {
-            tracing::warn!(?e, "cannot make Orca start at login");
-        }
+        cmds.push((vec!["mkdir".to_owned(), "-p".to_owned(), dir], None));
+        // quiet, it would only echo the file into the log
+        cmds.push((
+            vec![
+                "sh".to_owned(),
+                "-c".to_owned(),
+                r#"exec cat > "$1""#.to_owned(),
+                "sh".to_owned(),
+                path,
+            ],
+            Some(ORCA_AUTOSTART.to_owned()),
+        ));
     } else if applied.is_some_and(|a| a.needs_orca_autostart(&cfg.edition)) {
         let path = home.join(ORCA_AUTOSTART_PATH).to_string_lossy().into_owned();
-        let rm = as_user(&["rm".to_owned(), "-f".to_owned(), path]);
-        if let Err(e) = crate::root("runuser", rm).await {
-            tracing::warn!(?e, "cannot stop Orca starting at login");
-        }
+        cmds.push((vec!["rm".to_owned(), "-f".to_owned(), path], None));
     }
+    run_in_home(settings, cfg, cmds).await;
     Ok(())
 }
 
@@ -586,6 +637,19 @@ pub(crate) async fn home_of(user: &str) -> Res<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn homed_script_quotes_and_feeds_stdin() {
+        let cmds: Vec<HomeCmd> = vec![
+            (vec!["echo".to_owned(), "it's; rm -rf /".to_owned()], None),
+            (vec!["cat".to_owned()], Some("a'b\n".to_owned())),
+            (vec!["false".to_owned()], None),
+        ];
+        let out =
+            std::process::Command::new("sh").args(["-c", &homed_script(&cmds)]).output().unwrap();
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "it's; rm -rf /\na'b\n");
+        assert!(!out.status.success());
+    }
 
     #[test]
     fn nothing_on_writes_nothing() {

@@ -59,7 +59,8 @@ component NetworkRow inherits VerticalLayout {
         { key: "security", value: Lang.t(
             root.net.security == Security.open ? "page-internet-security-open"
             : root.net.security == Security.password ? "page-internet-security-password"
-            : root.net.security == Security.enterprise ? "page-internet-security-enterprise"
+            : root.net.security == Security.enterprise || root.net.security == Security.enterprise-tls
+                ? "page-internet-security-enterprise"
             : "page-internet-security-unsupported", []) },
         { key: "bars", value: root.net.strength },
     ]);
@@ -70,9 +71,10 @@ component NetworkRow inherits VerticalLayout {
     function connect() {
         if root.net.known || root.net.security == Security.open {
             Network.connect(root.net.ssid, "");
-        } else if root.net.security == Security.enterprise {
+        } else if root.net.security == Security.enterprise || root.net.security == Security.enterprise-tls {
             Network.enterprise-ssid = root.net.ssid;
             Network.enterprise-wired = false;
+            Network.enterprise-tls-only = root.net.security == Security.enterprise-tls;
             Network.enterprise-error-id = "";
             Network.enterprise-open = true;
         } else {
@@ -128,7 +130,7 @@ component NetworkRow inherits VerticalLayout {
                 width: parent.width;
                 height: self.width;
                 colorize: Tokens.color-muted-foreground;
-                // the connect button says it, see `info`
+                // the connect button or the connected status says it, see `info`
                 accessible-role: none;
             }
         }
@@ -140,6 +142,9 @@ component NetworkRow inherits VerticalLayout {
 
             ip-btn := IpSettingsButton {
                 name: root.net.ssid;
+                // where the focus goes on the connected row, which has no connect button to say it
+                accessible-description: root.net.connected
+                    ? Lang.t("page-internet-connected", []) + "\n" + root.info : "";
                 clicked => { Network.open-ip(root.net.ssid); }
             }
         }
@@ -151,8 +156,10 @@ component NetworkRow inherits VerticalLayout {
             Rectangle {
                 height: 1.6rem * Tokens.text-scale;
 
+                // the connected row has no connect button to say it, so this does
                 if root.net.connected: TdnStatusIcon {
                     label: Lang.t("page-internet-connected", []);
+                    description: root.info;
                 }
 
                 // one button through the whole attempt, which turns into a spinner, so keyboard and
@@ -392,6 +399,7 @@ export component NetworkPage inherits TdnPage {
                             clicked => {
                                 Network.error-id = "";
                                 Network.error-ssid = "";
+                                Network.hidden-ssid = "";
                                 Network.hidden-open = true;
                             }
                         }
@@ -503,6 +511,7 @@ export component HiddenDialog inherits TdnDialog {
         Network.hidden-open = false;
         Network.error-id = "";
         Network.error-ssid = "";
+        Network.hidden-ssid = "";
     }
 
     function submit() {
@@ -512,6 +521,7 @@ export component HiddenDialog inherits TdnDialog {
             Network.hidden-open = false;
             Network.enterprise-ssid = root.ssid;
             Network.enterprise-wired = false;
+            Network.enterprise-tls-only = false;
             Network.enterprise-error-id = "";
             Network.enterprise-open = true;
         } else {
@@ -521,8 +531,9 @@ export component HiddenDialog inherits TdnDialog {
 
     name-field := TdnField {
         label: Lang.t("page-internet-hidden-ssid", []);
-        // cleared when the dialog opens, so any error is this one's
-        error: Network.error-ssid != "" && Network.error-id != "" ? Lang.t(Network.error-id, []) : "";
+        // only for the network this dialog tried, see `Network.hidden-ssid`
+        error: Network.hidden-ssid != "" && Network.error-ssid == Network.hidden-ssid && Network.error-id != ""
+            ? Lang.t(Network.error-id, []) : "";
 
         TdnInput {
             in-dialog: true;
@@ -768,12 +779,15 @@ export component EnterpriseDialog inherits TdnDialog {
     property <bool> busy: Network.enterprise-busy;
     property <bool> wired: Network.enterprise-wired;
 
-    property <EapMethod> method: EapMethod.peap;
+    // WPA3-Enterprise 192-bit networks only take TLS, see `Network.enterprise-tls-only`
+    property <bool> tls-only: Network.enterprise-tls-only && !root.wired;
+    property <EapMethod> method: root.tls-only ? EapMethod.tls : EapMethod.peap;
     // MD5 is only offered for wired, LEAP only for wi-fi, the same as NetworkManager
-    property <[EapMethod]> methods: root.wired
+    property <[EapMethod]> methods: root.tls-only ? [EapMethod.tls]
+        : root.wired
         ? [EapMethod.peap, EapMethod.ttls, EapMethod.tls, EapMethod.fast, EapMethod.pwd, EapMethod.md5]
         : [EapMethod.peap, EapMethod.ttls, EapMethod.tls, EapMethod.fast, EapMethod.pwd, EapMethod.leap];
-    property <[string]> method-names: [
+    property <[string]> method-names: root.tls-only ? ["TLS"] : [
         Lang.t("page-internet-8021x-peap", []),
         Lang.t("page-internet-8021x-ttls", []),
         "TLS",
@@ -781,7 +795,8 @@ export component EnterpriseDialog inherits TdnDialog {
         "PWD",
         root.wired ? "MD5" : "LEAP",
     ];
-    property <int> method-index: root.method == EapMethod.peap ? 0
+    property <int> method-index: root.tls-only ? 0
+        : root.method == EapMethod.peap ? 0
         : root.method == EapMethod.ttls ? 1
         : root.method == EapMethod.tls ? 2
         : root.method == EapMethod.fast ? 3
@@ -1407,6 +1422,7 @@ export component IpDialog inherits TdnDialog {
                 Network.ip-open = false;
                 Network.enterprise-ssid = "";
                 Network.enterprise-wired = true;
+                Network.enterprise-tls-only = false;
                 Network.enterprise-error-id = "";
                 Network.enterprise-open = true;
             }

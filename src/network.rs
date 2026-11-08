@@ -247,7 +247,8 @@ impl KeyMgmt {
         match self {
             Self::Open | Self::Owe => Security::Open,
             Self::Psk | Self::Sae => Security::Password,
-            Self::Enterprise | Self::EnterpriseSuiteB => Security::Enterprise,
+            Self::Enterprise => Security::Enterprise,
+            Self::EnterpriseSuiteB => Security::EnterpriseTls,
             Self::Wep => Security::Unsupported,
         }
     }
@@ -261,6 +262,8 @@ struct Ap {
     name: String,
     strength: u8,
     key_mgmt: KeyMgmt,
+    /// the adapter that sees it best, or is connected to it, which connecting uses
+    device: OwnedObjectPath,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -461,6 +464,11 @@ impl Nm {
 
     /// the device of `kind` in use, else one that could be (for ethernet, has a cable plugged in)
     fn best_device(&self, kind: u32) -> Option<OwnedObjectPath> {
+        self.ranked_devices(kind).into_iter().next()
+    }
+
+    /// the devices of `kind`, the ones in use first, then the ones that could be
+    fn ranked_devices(&self, kind: u32) -> Vec<OwnedObjectPath> {
         let rank = |path: &OwnedObjectPath| match self
             .at::<nm::Device<'_>>(path)
             .and_then(|d| d.state())
@@ -469,16 +477,28 @@ impl Nm {
             Ok(s) if s >= DEVICE_STATE_DISCONNECTED => 1,
             _ => 2,
         };
-        self.devices_of(kind).into_iter().min_by_key(rank)
+        let mut devices = self.devices_of(kind);
+        devices.sort_by_cached_key(rank);
+        devices
+    }
+
+    /// the wi-fi adapter to connect to the network `ssid` with: the one the list got it from, else
+    /// [`Self::wifi_device`]
+    fn wifi_device_for(&self, ssid: &[u8]) -> Option<OwnedObjectPath> {
+        (self.aps.iter().find(|ap| ap.ssid == ssid))
+            .map(|ap| ap.device.clone())
+            .or_else(|| self.wifi_device())
     }
 
     fn scan(&self) {
-        let Some(dev) = self.wifi_device() else { return };
-        // scans that come too soon after another are refused, which is fine
-        if let Err(e) =
-            self.at::<nm::Wireless<'_>>(&dev).and_then(|w| w.request_scan(HashMap::new()))
-        {
-            tracing::debug!(?e, "cannot request wi-fi scan");
+        // every adapter, the list shows what any of them sees
+        for dev in self.devices_of(DEVICE_TYPE_WIFI) {
+            // scans that come too soon after another are refused, which is fine
+            if let Err(e) =
+                self.at::<nm::Wireless<'_>>(&dev).and_then(|w| w.request_scan(HashMap::new()))
+            {
+                tracing::debug!(?e, ?dev, "cannot request wi-fi scan");
+            }
         }
     }
 
@@ -498,36 +518,49 @@ impl Nm {
             .collect()
     }
 
-    fn access_points(&self, dev: &ObjectPath<'_>) -> (Vec<Ap>, Option<Vec<u8>>) {
-        let Ok(wireless) = self.at::<nm::Wireless<'_>>(dev) else { return (vec![], None) };
-        let read = |path: &ObjectPath<'_>| -> zbus::Result<Ap> {
-            let ap = self.at::<nm::AccessPoint<'_>>(path)?;
-            let ssid = ap.ssid()?;
-            Ok(Ap {
-                name: String::from_utf8_lossy(&ssid).into_owned(),
-                ssid,
-                strength: ap.strength()?,
-                key_mgmt: KeyMgmt::from_flags(ap.flags()?, ap.wpa_flags()?, ap.rsn_flags()?),
-            })
-        };
-        let active = wireless
-            .active_access_point()
-            .ok()
-            .filter(|path| path.as_str() != "/")
-            .and_then(|path| read(&path).ok())
-            .map(|ap| ap.ssid);
+    /// the networks `devs` see, each once, and the ones they're connected to
+    fn access_points(&self, devs: &[OwnedObjectPath]) -> (Vec<Ap>, Vec<Vec<u8>>) {
         let mut aps: Vec<Ap> = vec![];
-        for path in wireless.get_all_access_points().unwrap_or_default() {
-            // hidden networks have no name to show
-            let Ok(ap) = read(&path) else { continue };
-            if ap.ssid.is_empty() {
-                continue;
+        let mut active = vec![];
+        for dev in devs {
+            let Ok(wireless) = self.at::<nm::Wireless<'_>>(dev) else { continue };
+            let read = |path: &ObjectPath<'_>| -> zbus::Result<Ap> {
+                let ap = self.at::<nm::AccessPoint<'_>>(path)?;
+                let ssid = ap.ssid()?;
+                Ok(Ap {
+                    name: String::from_utf8_lossy(&ssid).into_owned(),
+                    ssid,
+                    strength: ap.strength()?,
+                    key_mgmt: KeyMgmt::from_flags(ap.flags()?, ap.wpa_flags()?, ap.rsn_flags()?),
+                    device: dev.clone(),
+                })
+            };
+            let on = wireless
+                .active_access_point()
+                .ok()
+                .filter(|path| path.as_str() != "/")
+                .and_then(|path| read(&path).ok())
+                .map(|ap| ap.ssid);
+            for path in wireless.get_all_access_points().unwrap_or_default() {
+                // hidden networks have no name to show
+                let Ok(ap) = read(&path) else { continue };
+                if ap.ssid.is_empty() {
+                    continue;
+                }
+                let connected = on.as_ref() == Some(&ap.ssid);
+                match aps.iter_mut().find(|a| a.ssid == ap.ssid) {
+                    // the adapter that's connected to it keeps it, so connecting again or
+                    // changing its IP settings goes through the same one
+                    Some(a)
+                        if connected || (a.strength < ap.strength && !active.contains(&a.ssid)) =>
+                    {
+                        *a = ap;
+                    }
+                    Some(_) => {}
+                    None => aps.push(ap),
+                }
             }
-            match aps.iter_mut().find(|a| a.ssid == ap.ssid) {
-                Some(a) if a.strength < ap.strength => *a = ap,
-                Some(_) => {}
-                None => aps.push(ap),
-            }
+            active.extend(on);
         }
         (aps, active)
     }
@@ -556,11 +589,12 @@ impl Nm {
         } else {
             Radio::On
         };
-        let Some(dev) = self.wifi_device() else {
+        let devs = self.ranked_devices(DEVICE_TYPE_WIFI);
+        if devs.is_empty() {
             self.aps.clear();
             return Snapshot { state, wifi: false, radio, ethernet, wired, networks: vec![] };
-        };
-        let (aps, active) = self.access_points(&dev);
+        }
+        let (aps, active) = self.access_points(&devs);
         let known = self.known();
         let mut networks = aps
             .iter()
@@ -569,7 +603,7 @@ impl Nm {
                 strength: bars(ap.strength),
                 security: ap.key_mgmt.security(),
                 known: known.contains_key(&ap.ssid),
-                connected: active.as_deref() == Some(ap.ssid.as_slice()),
+                connected: active.contains(&ap.ssid),
             })
             .collect::<Vec<_>>();
         // bucketed strength keeps the list from reshuffling on every small change
@@ -676,7 +710,7 @@ impl Nm {
         ssid: &[u8],
         mut settings: nm::ConnSettings<'_>,
     ) -> Result<(), Failure> {
-        let dev = self.wifi_device().ok_or(FAILED)?;
+        let dev = self.wifi_device_for(ssid).ok_or(FAILED)?;
         let old = self.known().remove(ssid);
         let ip = self.pending_ip.get(ssid).cloned().or_else(|| {
             let old = self.settings_of(old.as_ref()?)?;
@@ -718,8 +752,8 @@ impl Nm {
 
     /// connects to a network from the list, `name` as the UI shows it
     fn connect(&mut self, name: &str, password: &str) -> Result<(), Failure> {
-        let dev = self.wifi_device().ok_or(FAILED)?;
         let ssid = self.ssid_of(name);
+        let dev = self.wifi_device_for(&ssid).ok_or(FAILED)?;
         let saved = self.known().remove(&ssid);
         if password.is_empty()
             && let Some(saved) = &saved
@@ -1558,9 +1592,11 @@ impl Nm {
             };
             self.pending_ip.remove(&bytes);
             self.update_ip(&conn, &ip).map_err(failed)?;
-            let dev = self.wifi_device().ok_or(FAILED_IP)?;
-            if self.active_on(&dev).as_ref() == Some(&conn) {
-                return self.activate(&conn, &dev);
+            // on whichever adapter it's up on
+            for dev in self.devices_of(DEVICE_TYPE_WIFI) {
+                if self.active_on(&dev).as_ref() == Some(&conn) {
+                    return self.activate(&conn, &dev);
+                }
             }
             return Ok(());
         }
@@ -1789,7 +1825,7 @@ fn sync_model<T: Clone + PartialEq + 'static, K: PartialEq>(
 }
 
 fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
-    let (ssid, res, enterprise, visit) = match cmd {
+    let (ssid, res, security, visit) = match cmd {
         Cmd::Refresh => {
             push(ui, |net| net.set_scanning(true));
             nm.scan();
@@ -1808,7 +1844,7 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
                 Err(FAILED_SECRETS) if security == Some(Security::Open) => Err(FAILED),
                 res => res,
             };
-            (ssid, res, security == Some(Security::Enterprise), visit)
+            (ssid, res, security, visit)
         }
         Cmd::ConnectHidden { ssid, key_mgmt, password } => {
             return connect_hidden(nm, ui, ssid, key_mgmt, &password);
@@ -1870,9 +1906,10 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
                     || net.get_offline_prompt()
                     || !["", ssid.as_str()].contains(&net.get_password_ssid().as_str());
                 if failure == FAILED_SECRETS && !left && !other_dialog {
-                    if enterprise {
+                    if let Some(Security::Enterprise | Security::EnterpriseTls) = security {
                         net.set_enterprise_ssid(ssid.as_str().into());
                         net.set_enterprise_wired(false);
+                        net.set_enterprise_tls_only(security == Some(Security::EnterpriseTls));
                         net.set_enterprise_error_id(failure.into());
                         net.set_enterprise_open(true);
                     } else {
@@ -2052,6 +2089,9 @@ fn init_connect(
                 // the 802.1X dialog takes it from here
                 HiddenSecurity::Enterprise => return,
             };
+            if let Some(app) = ui.upgrade() {
+                app.global::<Network<'_>>().set_hidden_ssid(ssid.into());
+            }
             if start_busy(&ui, ssid) {
                 send(Cmd::ConnectHidden { ssid: ssid.into(), key_mgmt, password: password.into() });
             }

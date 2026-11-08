@@ -272,7 +272,7 @@ fn write_env_file(path: &std::path::Path, proxy: Option<&Proxy>) -> std::io::Res
 }
 
 /// `s` in single quotes for `sh`, where nothing in it is special
-fn sh_quote(s: &str) -> String {
+pub(crate) fn sh_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
 }
 

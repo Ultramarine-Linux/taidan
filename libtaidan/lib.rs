@@ -29,6 +29,8 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 pub enum InstallMsg {
     UpdStage(steps::Stage),
     NeedsReboot,
+    /// some drivers couldn't be installed, the installation still finishes without them
+    DriversFailed,
     /// updates were downloaded and install on the next restart
     UpdatesReady,
     Finish,
@@ -88,6 +90,7 @@ pub async fn start_install(
         unlocked = steps::unlock_user(settings, cfg).await;
     }
     unlocked?;
+    steps::fix_homed_ims(settings, cfg).await;
     // the user is theirs now, so no later run of Taidan should remove it. Not marked configured
     // if the record stays, since a machine that leaves the OOBE with it could later have the
     // account and its home removed by a rerun

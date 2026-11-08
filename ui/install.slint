@@ -18,6 +18,8 @@ export global Install {
     in-out property <bool> download-updates: true;
     // false when dnf can't install updates, i.e. `taidan0.skip_dnf` or rpm-ostree
     in property <bool> can-download-updates: true;
+    // some drivers couldn't be installed, the rest of the installation still worked
+    in property <bool> drivers-failed;
     // updates were downloaded and install on the next restart
     in property <bool> updates-ready;
     // the failed installation had online steps, so it can be retried without them

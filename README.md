@@ -66,6 +66,7 @@ TAIDAN_LOG=trace cargo r
   reboot)
 - `TAIDAN_SIMULATE_ERROR=1` makes the simulated install fail halfway
 - `TAIDAN_SIMULATE_UPDATES=1` pretends updates were downloaded, to see the done page's restart button
+- `TAIDAN_SIMULATE_DRIVER_ERROR=1` pretends a driver failed to install, to see the done page's note about it
 
 To debug the OOBE on a real machine, boot with `taidan.debug_shell` on the kernel command line,
 then press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> to open a root terminal.

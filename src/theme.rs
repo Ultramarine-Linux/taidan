@@ -39,6 +39,16 @@ fn readable_fill(c: Color) -> Color {
         .unwrap_or(Color::from_rgb_u8(0, 0, 0))
 }
 
+/// the swatch's check mark on `c`: white, as on the other swatches, unless it's under 3:1 there
+/// (non-text contrast, with some room), then near black
+fn check_color(c: Color) -> Color {
+    if white_contrast(c) >= 3.5 {
+        Color::from_rgb_u8(255, 255, 255)
+    } else {
+        Color::from_rgb_u8(0x1e, 0x1e, 0x1e)
+    }
+}
+
 /// offers the accents if the edition's desktop follows them, otherwise there's no picker
 pub fn initialize_ui(appearance: &Appearance<'_>) {
     if !libtaidan::theme::accent_supported(&crate::CFG.edition) {
@@ -47,7 +57,12 @@ pub fn initialize_ui(appearance: &Appearance<'_>) {
     let accents = (libtaidan::theme::Accent::ALL.iter())
         .map(|a| {
             let color = parse_hex(a.hex());
-            AccentItem { id: a.id().into(), color, fill: readable_fill(color) }
+            AccentItem {
+                id: a.id().into(),
+                color,
+                fill: readable_fill(color),
+                check: check_color(color),
+            }
         })
         .collect::<Vec<_>>();
     appearance.set_accents(ModelRc::new(VecModel::from(accents)));
@@ -85,5 +100,18 @@ mod tests {
             );
         }
         assert_eq!(readable_fill(parse_hex("#3584e4")), Color::from_rgb_u8(0x30, 0x77, 0xcd));
+    }
+
+    #[test]
+    fn checks_stand_out() {
+        let contrast = |a: Color, b: Color| {
+            let (a, b) = (luminance(a) + 0.05, luminance(b) + 0.05);
+            a.max(b) / a.min(b)
+        };
+        for accent in libtaidan::theme::Accent::ALL {
+            let color = parse_hex(accent.hex());
+            let c = contrast(check_color(color), color);
+            assert!(c >= 3.5, "{accent:?}'s check is {c}");
+        }
     }
 }

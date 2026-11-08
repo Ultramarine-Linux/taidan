@@ -937,11 +937,13 @@ export component TdnIconButton inherits Rectangle {
 // a small square status icon: a green check when `ok`, a grey cross when not
 export component TdnStatusIcon inherits Rectangle {
     in property <bool> ok: true;
-    // the status, for screen readers
+    // the status, for screen readers, and anything more about it
     in property <string> label;
+    in property <string> description;
 
     accessible-role: image;
     accessible-label: root.label;
+    accessible-description: root.description;
 
     width: self.height;
     height: 1.6rem * Tokens.text-scale;

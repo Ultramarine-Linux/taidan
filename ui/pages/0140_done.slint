@@ -45,6 +45,16 @@ export component DonePage inherits TdnBasePg {
                     wrap: word-wrap;
                 }
 
+                // not an error, the system works without them, but nobody should have to guess
+                // why their GPU or Wi-Fi isn't any better
+                if Install.drivers-failed: TdnText {
+                    text: Lang.t("page-done-drivers-failed", []);
+                    color: Tokens.color-muted-foreground;
+                    horizontal-alignment: Dir.text-start;
+                    wrap: word-wrap;
+                    accessible-role: text;
+                }
+
                 if Install.reboot-failed: TdnText {
                     text: Lang.t("page-done-reboot-failed", []);
                     color: Tokens.color-destructive;

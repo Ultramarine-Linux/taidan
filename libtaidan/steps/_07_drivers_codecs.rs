@@ -54,22 +54,49 @@ impl super::Step for DriversCodecs {
             return Ok(());
         }
         let pci = pci_devices().await;
-        let mut needs_reboot = false;
+        // a failed driver doesn't fail the installation, the system works without it, but the
+        // done page says so
+        let mut done = Setup::default();
         match Drivers::setup_nvidia(cfg, &pci).await {
-            Ok(built) => needs_reboot |= built,
-            Err(e) => tracing::warn!(?e, "cannot setup nvidia drivers"),
+            Ok(setup) => done |= setup,
+            Err(e) => {
+                tracing::warn!(?e, "cannot setup nvidia drivers");
+                done.failed = true;
+            }
         }
         match Drivers::setup_broadcom(cfg, &pci).await {
-            Ok(built) => needs_reboot |= built,
-            Err(e) => tracing::warn!(?e, "cannot setup broadcom drivers"),
+            Ok(setup) => done |= setup,
+            Err(e) => {
+                tracing::warn!(?e, "cannot setup broadcom drivers");
+                done.failed = true;
+            }
         }
-        if needs_reboot {
+        if done.reboot {
             sender.send(crate::InstallMsg::NeedsReboot);
+        }
+        if done.failed {
+            sender.send(crate::InstallMsg::DriversFailed);
         }
         // FIXME: refactor this to somewhere else not in this file
         // also this is done inside `_05_dnfdownloadapps.rs`
         // Codecs::install_codecs().await?;
         Ok(())
+    }
+}
+
+/// what setting up a driver did
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Setup {
+    /// a reboot would load the driver
+    reboot: bool,
+    /// some of it didn't work, e.g. the packages are in but the kernel module didn't build
+    failed: bool,
+}
+
+impl std::ops::BitOrAssign for Setup {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.reboot |= rhs.reboot;
+        self.failed |= rhs.failed;
     }
 }
 
@@ -422,31 +449,31 @@ impl Drivers {
     }
 
     /// Returns whether the kernel module is ready, so a reboot would load it.
-    async fn setup_nvidia(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<bool> {
+    async fn setup_nvidia(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<Setup> {
         tracing::info!("Setting up Nvidia drivers");
         let primary_gpu = std::env::var("STELLAR_OPTION").is_ok_and(|x| x == "1");
         if !has_nvidia_gpu(pci) {
             tracing::info!("No Nvidia GPU detected");
-            return Ok(false);
+            return Ok(Setup::default());
         }
         if !Self::kmods_would_load().await {
             tracing::warn!(
                 "Secure Boot is on and the akmods signing key isn't enrolled, so the NVIDIA \
                  module wouldn't load. Not installing it, the open driver keeps working"
             );
-            return Ok(false);
+            return Ok(Setup::default());
         }
         let Some(pkgs) = Self::list_nvidia_packages().await? else {
-            return Ok(false);
+            return Ok(Setup::default());
         };
         let pkgs: Vec<_> = pkgs.iter().map(String::as_str).collect();
         match install_pkgs(cfg, &pkgs).await? {
             Installed::Dnf => {}
-            Installed::Skipped => return Ok(false),
+            Installed::Skipped => return Ok(Setup::default()),
             Installed::Ostree => {
                 // the kmod is built inside the rpm-ostree transaction, which needs a reboot anyway
                 Self::setup_nvidia_kargs().await?;
-                return Ok(true);
+                return Ok(Setup { reboot: true, failed: false });
             }
         }
 
@@ -469,13 +496,13 @@ impl Drivers {
         if !built {
             tracing::warn!("Nvidia kernel module isn't built, not asking for a reboot");
         }
-        Ok(built)
+        Ok(Setup { reboot: built, failed: !built })
     }
 
     /// Returns whether a reboot would load the drivers, i.e. the `wl` kernel module is ready or
     /// rpm-ostree layered the packages.
-    async fn setup_broadcom(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<bool> {
-        let mut built = false;
+    async fn setup_broadcom(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<Setup> {
+        let mut done = Setup::default();
         if has_wl_only_wifi(pci) && !Self::kmods_would_load().await {
             tracing::warn!(
                 "Secure Boot is on and the akmods signing key isn't enrolled, so wl wouldn't load. \
@@ -484,17 +511,25 @@ impl Drivers {
         } else if has_wl_only_wifi(pci) {
             tracing::info!("Setting up broadcom wifi drivers");
             // broadcom-wl blacklists the in-kernel drivers, so wl only takes over after a reboot
-            built = match install_pkgs(cfg, &["broadcom-wl", "akmod-wl"])
-                .await
-                .wrap_msg("fail to install broadcom wifi drivers")?
-            {
-                Installed::Dnf => Self::kmod_built("wl").await?,
+            // the Bluetooth firmware below doesn't depend on wl, so a failure here doesn't stop it
+            match install_pkgs(cfg, &["broadcom-wl", "akmod-wl"]).await {
+                Ok(Installed::Dnf) => {
+                    let built = Self::kmod_built("wl").await.unwrap_or_else(|e| {
+                        tracing::warn!(?e, "cannot check the wl kernel module");
+                        false
+                    });
+                    if !built {
+                        tracing::warn!("wl kernel module isn't built, not asking for a reboot");
+                    }
+                    done |= Setup { reboot: built, failed: !built };
+                }
                 // built inside the rpm-ostree transaction
-                Installed::Ostree => true,
-                Installed::Skipped => false,
-            };
-            if !built {
-                tracing::warn!("wl kernel module isn't built, not asking for a reboot");
+                Ok(Installed::Ostree) => done.reboot = true,
+                Ok(Installed::Skipped) => {}
+                Err(e) => {
+                    tracing::warn!(?e, "fail to install broadcom wifi drivers");
+                    done.failed = true;
+                }
             }
         }
         if has_broadcom_bluetooth(pci, &usb_interfaces().await) {
@@ -502,11 +537,14 @@ impl Drivers {
             // not worth losing the wifi driver's reboot over
             match install_pkgs(cfg, &["broadcom-bt-firmware"]).await {
                 // layered packages only show up after a reboot
-                Ok(installed) => built |= installed == Installed::Ostree,
-                Err(e) => tracing::warn!(?e, "cannot install broadcom bluetooth firmware"),
+                Ok(installed) => done.reboot |= installed == Installed::Ostree,
+                Err(e) => {
+                    tracing::warn!(?e, "cannot install broadcom bluetooth firmware");
+                    done.failed = true;
+                }
             }
         }
-        Ok(built)
+        Ok(done)
     }
 }
 
