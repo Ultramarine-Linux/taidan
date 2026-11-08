@@ -136,7 +136,7 @@ page-whoareyou-camera-take = Take Photo
 # followed by the technical reason on the next line
 page-whoareyou-camera-error = Can't use the camera:
 # .error: multiline, explanation pops out if invalid username
-page-whoareyou-error = Username must start with lowercase letters and must only contain lowercase letters, numbers, underscores (<tt>_</tt>), or hyphens (<tt>-</tt>).
+page-whoareyou-error = Username must start with lowercase letters and must only contain lowercase letters, numbers, underscores (_), or hyphens (-).
 page-whoareyou-error-taken = That username is already used on this system. Pick another one.
 page-whoareyou-error-long = Usernames can be at most 31 characters long.
 # shown under the name field if it has a comma or colon, which would cut the name short on the login screen
@@ -452,8 +452,6 @@ page-error-poweroff = Power Off
 
 ## [Tweaks in Ultramarine]
 
-flatpakening-name = Use RPMs instead of Flatpaks
-flatpakening-desc = Flatpaks provide better security by default, RPMs will save some space.
 mtu-probing-name = MTU Probing
 mtu-probing-desc = Enable MTU probing (fixes some applications like Ubisoft Connect). This can be reverted later.
 cachyos-kernel-name = CachyOS Kernel

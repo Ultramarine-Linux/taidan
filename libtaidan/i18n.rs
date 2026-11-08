@@ -50,7 +50,7 @@ pub const IMS: phf::OrderedMap<&'static str, phf::OrderedMap<&'static str, Input
     },
     "Vietnamese" => phf::phf_ordered_map! {
         "Unikey"            => im!(Unikey       "Unikey"=>"unikey",                             "unikey"),
-        "ViQR"              => im!(ViQR         "table:viqr"=>"table-tv",                       "viqr"=>"m17n"),
+        "ViQR"              => im!(ViQR         "table:viqr"=>"table-tv",                       "m17n_vi_viqr"=>"m17n"),
     },
     "Bengali" => phf::phf_ordered_map! {
         "OpenBangla"        => im!(বাংলা           "openbangla",                                      "openbangla"),
@@ -134,7 +134,8 @@ pub fn default_ims(locale: &str, imf: I18nImf) -> Vec<String> {
     let ims: &[&str] = match (lang, country) {
         // Traditional Chinese: Zhuyin is what Taiwan types with, Cangjie what Hong Kong and Macau do
         ("zh", "TW") => &["Zhuyin"],
-        ("zh", "HK" | "MO") => &["Cangjie 5"],
+        // Cantonese is written in Traditional Chinese, and typed like in Hong Kong
+        ("zh", "HK" | "MO") | ("yue", _) => &["Cangjie 5"],
         ("zh", _) => &["Pinyin"],
         ("ja", _) => &["Mozc"],
         ("ko", _) => &["libhangul"],
@@ -668,6 +669,7 @@ mod tests {
         assert_eq!(default_ims("zh_SG.UTF-8", f), ["Pinyin"]);
         assert_eq!(default_ims("zh_TW.UTF-8", f), ["Zhuyin"]);
         assert_eq!(default_ims("zh_HK.UTF-8", f), ["Cangjie 5"]);
+        assert_eq!(default_ims("yue_HK.UTF-8", f), ["Cangjie 5"]);
         assert_eq!(default_ims("ja_JP.UTF-8", f), ["Mozc"]);
         assert_eq!(default_ims("ko_KR.UTF-8", I18nImf::IBus), ["libhangul"]);
         assert_eq!(default_ims("th_TH.UTF-8", I18nImf::IBus), ["Thai"]);
