@@ -38,7 +38,6 @@ chrony and grubby [recommended, the clock and NVIDIA drivers]
 pkgconfig(openssl)
 pkgconfig(fontconfig)
 pkgconfig(libxcrypt)
-pkgconfig(icu-i18n)
 clang
 glibc-all-langpacks [for `localedef --list-archive`]
 xkeyboard-config [for /usr/share/X11/xkb/rules/evdev.lst]

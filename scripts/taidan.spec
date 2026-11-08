@@ -67,7 +67,6 @@ BuildRequires:  pkgconfig(openssl)
 BuildRequires:  pkgconfig(fontconfig)
 BuildRequires:  pkgconfig(libxcrypt)
 # taidan_proc_macros: language names, locales and keyboard layouts are read at build time
-BuildRequires:  pkgconfig(icu-i18n)
 BuildRequires:  glibc-all-langpacks
 BuildRequires:  xkeyboard-config
 BuildRequires:  clang-libs

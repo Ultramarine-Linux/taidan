@@ -16,11 +16,11 @@ jobs:
     with:
       # the same build deps for both, clippy builds the crates too
       clippy-pre: |
-        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
+        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel glibc-all-langpacks xkeyboard-config clang-devel perl-FindBin gcc make clang
       clippy-cargo-flags: --workspace --exclude tdnx --all-targets
       clippy-cache: true
       test-pre: |
-        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
+        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel glibc-all-langpacks xkeyboard-config clang-devel perl-FindBin gcc make clang
       # every crate's tests, taidan's are in the binary
       test-cargo-flags: --workspace
       test-cache: true
@@ -40,7 +40,7 @@ jobs:
         feature: [server-oobe, desktop-install]
     steps:
       - name: Install build deps
-        run: dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libxcb-devel libicu-devel glibc-all-langpacks xkeyboard-config 'pkgconfig(libattr)' clang-devel perl-FindBin gcc make clang
+        run: dnf install -y openssl-devel fontconfig-devel libxcrypt-devel glibc-all-langpacks xkeyboard-config clang-devel perl-FindBin gcc make clang
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
