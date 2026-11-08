@@ -213,7 +213,10 @@ export component AppWindow inherits Window {
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
-            Network.save(!Network.online);
+            // online, or offline without choosing "Set Up Offline", so the install goes by the
+            // connection it has when it starts
+            Network.offline-chosen = false;
+            Network.save();
             pagenum = Cfg.next-page(pagenum);
         }
     }
@@ -310,9 +313,11 @@ export component AppWindow inherits Window {
     if Network.offline-prompt: OfflineDialog {
         width: 100%;
         height: 100%;
+        explicit: Network.offline-prompt-explicit;
         skipped => {
             Network.offline-prompt = false;
-            Network.save(true);
+            Network.offline-chosen = Network.offline-prompt-explicit;
+            Network.save();
             pagenum = Cfg.next-page(pagenum);
         }
     }

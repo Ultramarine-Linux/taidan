@@ -86,9 +86,8 @@ component NetworkRow inherits VerticalLayout {
     // rebuilt when the list reordered
     function refocus() {
         if !root.wants-focus { return; }
-        if root.net.connected {
-            // connected rows have no connect button to come back to
-            Network.focus-ssid = "";
+        // connected rows have no connect button to come back to
+        if Network.focus-ip || root.net.connected {
             ip-btn.focus();
         } else {
             connect-btn.focus();
@@ -146,6 +145,14 @@ component NetworkRow inherits VerticalLayout {
                 accessible-description: root.net.connected
                     ? Lang.t("page-internet-connected", []) + "\n" + root.info : "";
                 clicked => { Network.open-ip(root.net.ssid); }
+                changed has-focus => {
+                    if self.has-focus {
+                        Network.focus-ssid = root.net.ssid;
+                        Network.focus-ip = true;
+                    } else if Network.focus-ssid == root.net.ssid && Network.focus-ip {
+                        Network.focus-ssid = "";
+                    }
+                }
             }
         }
 
@@ -177,7 +184,8 @@ component NetworkRow inherits VerticalLayout {
                     changed has-focus => {
                         if self.has-focus {
                             Network.focus-ssid = root.net.ssid;
-                        } else if Network.focus-ssid == root.net.ssid && !root.net.connected {
+                            Network.focus-ip = false;
+                        } else if Network.focus-ssid == root.net.ssid && !Network.focus-ip && !root.net.connected {
                             Network.focus-ssid = "";
                         }
                     }
@@ -199,7 +207,10 @@ export component NetworkPage inherits TdnPage {
     pageid: "internet";
     step_i: 1;
     intercept-next: !Network.online;
-    next-intercepted => { Network.offline-prompt = true; }
+    next-intercepted => {
+        Network.offline-prompt-explicit = false;
+        Network.offline-prompt = true;
+    }
     forward-focus: device-name;
 
     // the wi-fi adapter is there, but its radio is off, so there's nothing to list
@@ -253,7 +264,11 @@ export component NetworkPage inherits TdnPage {
                         text: Network.proxy-url != "" ? Lang.t("page-internet-proxy-on", []) : Lang.t("page-internet-proxy", []);
                         outline: true;
                         foreground-color: Tokens.color-foreground;
-                        clicked => { Network.proxy-open = true; }
+                        clicked => {
+                            // a check that failed before the dialog was last closed isn't this one's
+                            Network.proxy-error-id = "";
+                            Network.proxy-open = true;
+                        }
                     }
                 }
 
@@ -261,10 +276,13 @@ export component NetworkPage inherits TdnPage {
                     alignment: Dir.start;
                     min-height: 2.25rem;
                     TdnBtn {
-                        text: Lang.t("page-internet-skip", []);
+                        text: Lang.t("page-internet-offline-choose", []);
                         background-color: Tokens.color-destructive-solid;
                         foreground-color: Tokens.color-destructive-foreground;
-                        clicked => { Network.offline-prompt = true; }
+                        clicked => {
+                            Network.offline-prompt-explicit = true;
+                            Network.offline-prompt = true;
+                        }
                     }
                 }
             }
@@ -433,6 +451,7 @@ export component PasswordDialog inherits TdnDialog {
     title: Lang.t("page-internet-connect-to", [{ key: "ssid", value: Network.password-ssid }]);
     // the error was this dialog's, so it shouldn't be left under the network's row
     dismissed => {
+        Network.dismissed-ssid = Network.password-ssid;
         Network.password-ssid = "";
         Network.error-id = "";
         Network.error-ssid = "";
@@ -503,8 +522,15 @@ export component HiddenDialog inherits TdnDialog {
     // nothing else can connect while the dialog is open
     property <bool> busy: Network.connecting-ssid != "";
     // NetworkManager wants 8 to 63 characters for WPA, or 64 hex digits, WPA3 has no minimum
-    property <bool> complete: root.ssid != "" && (!root.needs-password
+    property <bool> complete: Network.trim(root.ssid) != "" && (!root.needs-password
         || (root.security == HiddenSecurity.wpa3 ? root.password != "" : root.password.character-count >= 8));
+
+    // why the last connect failed, only for the network this dialog tried, see `Network.hidden-ssid`
+    property <string> error: Network.hidden-ssid != "" && Network.error-ssid == Network.hidden-ssid && Network.error-id != ""
+        ? Lang.t(Network.error-id, []) : "";
+    // a wrong or too short password goes under the password, the rest under the name
+    property <bool> error-on-password: root.needs-password
+        && (Network.error-id == "page-internet-error-password" || Network.error-id == "page-internet-error-password-length");
 
     title: Lang.t("page-internet-hidden-title", []);
     dismissed => {
@@ -531,9 +557,7 @@ export component HiddenDialog inherits TdnDialog {
 
     name-field := TdnField {
         label: Lang.t("page-internet-hidden-ssid", []);
-        // only for the network this dialog tried, see `Network.hidden-ssid`
-        error: Network.hidden-ssid != "" && Network.error-ssid == Network.hidden-ssid && Network.error-id != ""
-            ? Lang.t(Network.error-id, []) : "";
+        error: root.error-on-password ? "" : root.error;
 
         TdnInput {
             in-dialog: true;
@@ -562,10 +586,12 @@ export component HiddenDialog inherits TdnDialog {
 
     if root.needs-password: pw-field := TdnField {
         label: Lang.t("page-internet-password", []);
+        error: root.error-on-password ? root.error : "";
 
         TdnInput {
             in-dialog: true;
             label: pw-field.label;
+            description: pw-field.description;
             text <=> root.password;
             password: true;
             enabled: !root.busy;
@@ -854,10 +880,13 @@ export component EnterpriseDialog inherits TdnDialog {
         : root.wired ? Lang.t("page-internet-8021x-wired", [])
         : Lang.t("page-internet-connect-to", [{ key: "ssid", value: Network.enterprise-ssid }]);
     dialog-width: 26rem;
+    // made each time it opens, see `Network.enterprise-visit`
+    init => { Network.enterprise-visit += 1; }
     dismissed => {
         if root.picking != "" {
             root.stop-picking();
         } else {
+            if !root.wired { Network.dismissed-ssid = Network.enterprise-ssid; }
             Network.enterprise-open = false;
             Network.error-id = "";
             Network.error-ssid = "";
@@ -1188,17 +1217,19 @@ export component EnterpriseDialog inherits TdnDialog {
     }
 }
 
-// confirms going on without internet
+// confirms going on without internet, from Next while offline, or as the explicit choice from
+// "Set Up Offline", which skips the online steps even if the device gets online later
 export component OfflineDialog inherits TdnDialog {
+    in property <bool> explicit;
     callback skipped;
 
-    title: Lang.t("page-internet-offline", []);
+    title: Lang.t(root.explicit ? "page-internet-offline-choose-title" : "page-internet-offline", []);
     dialog-width: 24rem;
     dismissed => { Network.offline-prompt = false; }
     init => { back.focus(); }
 
     TdnText {
-        text: Lang.t("page-internet-offline-desc", []);
+        text: Lang.t(root.explicit ? "page-internet-offline-choose-desc" : "page-internet-offline-desc", []);
         color: Tokens.color-muted-foreground;
         horizontal-alignment: Dir.text-start;
         wrap: word-wrap;
@@ -1217,7 +1248,7 @@ export component OfflineDialog inherits TdnDialog {
         TdnBtn {
             layout-order: Dir.order(1);
             in-dialog: true;
-            text: Lang.t("skip", []);
+            text: Lang.t(root.explicit ? "page-internet-offline-choose" : "skip", []);
             background-color: Tokens.color-destructive-tint;
             foreground-color: Tokens.color-destructive;
             clicked => { root.skipped(); }
@@ -1345,6 +1376,7 @@ export component IpDialog inherits TdnDialog {
 
     if !Network.ip-loading: TdnToggleRow {
         in-dialog: true;
+        enabled: !root.busy;
         text: Lang.t("page-internet-ip-manual", []);
         checked: Network.ip.manual;
         toggled(on) => { Network.ip.manual = on; }
@@ -1361,10 +1393,12 @@ export component IpDialog inherits TdnDialog {
             min-width: 0;
             horizontal-stretch: 1;
             label: Lang.t("page-internet-ip-address", []);
+            error: Network.ip-error-id == "page-internet-ip-error-address" ? Lang.t(Network.ip-error-id, []) : "";
 
             TdnInput {
                 in-dialog: true;
                 label: address-field.label;
+                description: address-field.description;
                 text: Network.ip.address;
                 placeholder: "192.168.1.20/24";
                 enabled: !root.busy;
@@ -1378,10 +1412,12 @@ export component IpDialog inherits TdnDialog {
             min-width: 0;
             horizontal-stretch: 1;
             label: Lang.t("page-internet-ip-gateway", []);
+            error: Network.ip-error-id == "page-internet-ip-error-gateway" ? Lang.t(Network.ip-error-id, []) : "";
 
             TdnInput {
                 in-dialog: true;
                 label: gateway-field.label;
+                description: gateway-field.description;
                 text: Network.ip.gateway;
                 placeholder: "192.168.1.1";
                 enabled: !root.busy;
@@ -1394,7 +1430,9 @@ export component IpDialog inherits TdnDialog {
     if !Network.ip-loading: dns-field := TdnField {
         label: Lang.t("page-internet-ip-dns", []);
         help: Lang.t(Network.ip.manual ? "page-internet-ip-dns-desc-manual" : "page-internet-ip-dns-desc", []);
-        error: Network.ip-error-id != "" ? Lang.t(Network.ip-error-id, []) : "";
+        // the DNS errors, and those that aren't about one field
+        error: Network.ip-error-id != "" && Network.ip-error-id != "page-internet-ip-error-address"
+            && Network.ip-error-id != "page-internet-ip-error-gateway" ? Lang.t(Network.ip-error-id, []) : "";
 
         TdnInput {
             in-dialog: true;

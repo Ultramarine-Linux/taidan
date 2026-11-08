@@ -92,11 +92,16 @@ export global Network {
     // the network whose row button last had keyboard focus, so the row can take it back when it's
     // rebuilt, for example when it moves to the top after connecting
     in-out property <string> focus-ssid;
+    // whether that was the row's IP settings button rather than its connect button
+    in-out property <bool> focus-ip;
     // shows "I Don't Have Internet" even when online, from `taidan0.persist_no_internet_btn`
     in property <bool> persist-offline-btn;
 
     // network the password dialog is open for, empty if closed
     in-out property <string> password-ssid;
+    // the network whose password or 802.1X dialog was last closed without connecting, so a connect
+    // that fails afterwards doesn't open it again. Cleared when a new connect starts
+    in-out property <string> dismissed-ssid;
     // whether the 802.1X login dialog is open, for the WPA-Enterprise network `enterprise-ssid`,
     // or the wired connection when `enterprise-wired`
     in-out property <bool> enterprise-open;
@@ -105,10 +110,18 @@ export global Network {
     // the network only takes EAP-TLS, so that's the only method the dialog offers
     in-out property <bool> enterprise-tls-only;
     in property <bool> enterprise-busy;
+    // counts the times the 802.1X dialog was opened, so a login sent from one that has closed
+    // since, wired ones included, doesn't close or show errors in the one open now
+    in-out property <int> enterprise-visit;
     // translation id of why the login failed
     in-out property <string> enterprise-error-id;
-    // whether the "No Network Selected" dialog is open
+    // whether the "No Network Selected" dialog is open, and whether "Set Up Offline" opened it
+    // rather than Next, which makes it the explicit choice that `offline-chosen` keeps
     in-out property <bool> offline-prompt;
+    in-out property <bool> offline-prompt-explicit;
+    // "Set Up Offline" was chosen when leaving the network page. Only this skips the online steps,
+    // otherwise the install goes by the connection it has when it starts
+    in-out property <bool> offline-chosen;
 
     // whether the proxy dialog is open
     in-out property <bool> proxy-open;
@@ -118,7 +131,7 @@ export global Network {
     // checking the proxy reaches the internet
     in property <bool> proxy-busy;
     // translation id of why the proxy can't be used
-    in property <string> proxy-error-id;
+    in-out property <string> proxy-error-id;
 
     // whether the IP settings dialog is open, for `ip-ssid`, or the wired connection if empty
     in-out property <bool> ip-open;
@@ -132,6 +145,9 @@ export global Network {
 
     // reaching the internet, directly or through the proxy, which NetworkManager can't check
     out property <bool> online: state == NetState.online || (proxy-url != "" && state != NetState.offline && state != NetState.connecting);
+    // whether the install would use the internet if it started now, what the summary shows and
+    // `install::start` goes by
+    out property <bool> install-online: online && !offline-chosen;
 
     // pretty name for this device, and the hostname derived from it, or from the username if the
     // name has nothing a hostname can use (e.g. it's all Japanese)
@@ -147,6 +163,9 @@ export global Network {
     is-pkcs12(path) => false;
     pure callback file-name(path: string) -> string;
     file-name(path) => path;
+    // without the whitespace around it, which Slint has no function for
+    pure callback trim(text: string) -> string;
+    trim(text) => text;
 
     // the file browser for picking certificates: the folder shown, its parent, and what's in it
     in property <string> browse-dir;
@@ -179,8 +198,8 @@ export global Network {
     // opens the IP settings dialog for a wi-fi network, or the wired connection if `ssid` is empty
     callback open-ip(ssid: string);
     callback save-ip(ssid: string, ip: IpSettings);
-    // writes the device name and whether setup should go without internet to the settings
-    callback save(offline: bool);
+    // writes the device name and proxy to the settings, when leaving the page
+    callback save();
     // any page change, so a connection that fails later doesn't pop a dialog over another page
     // the page shown now, `pagenum`
     callback page-changed(int);

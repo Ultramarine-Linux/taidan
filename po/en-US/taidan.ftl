@@ -180,7 +180,6 @@ page-timezone-place = { $city }, { $region }
 # page title
 page-internet = Get Online
 page-internet-desc = Connect to the internet to install codecs, drivers, and apps.
-page-internet-skip = I Don't Have Internet
 # btn, opens a browser to log in to networks like hotel or airport wi-fi
 page-internet-portal = Captive Portal
 # btn, closes the browser opened by page-internet-portal
@@ -315,6 +314,11 @@ page-internet-files-empty-pac = No PAC files in this folder.
 # dialog when continuing without internet
 page-internet-offline = No Network Selected
 page-internet-offline-desc = If you don't connect to the internet, drivers and codecs won't be installed.
+# btn, skips everything that needs the internet, even if the device gets online later. Also confirms it in its dialog
+page-internet-offline-choose = Set Up Offline
+# dialog title, after page-internet-offline-choose
+page-internet-offline-choose-title = Set Up Without Internet?
+page-internet-offline-choose-desc = Drivers, codecs, and updates won't be installed, even if this device connects to the internet before setup finishes.
 
 ## [Analytics and Crash Reporting]
 ## this page is currently not in use, we recommend skipping
@@ -403,6 +407,8 @@ page-summary-account = Your Account
 page-summary-region = Region and Connectivity
 page-summary-network = Network
 page-summary-network-none = Not Connected
+# page-internet-offline-choose was picked, so setup won't use the internet
+page-summary-network-offline = Setting Up Offline
 # the time zone's place, e.g. "Toronto, Canada", and its UTC offset, e.g. "UTC−05:00"
 page-summary-timezone = { $place } ({ $offset })
 page-summary-software = Additional Software

@@ -666,6 +666,8 @@ export component TdnToggleRow inherits Rectangle {
     in property <string> text;
     // set it from what `toggled` changes, rather than `<=>`, so it keeps following the setting
     in property <bool> checked;
+    // dimmed and can't be toggled when off, but keeps the focus, so it isn't lost while busy
+    in property <bool> enabled: true;
     callback toggled(bool);
     // fired on Enter, while Space toggles
     callback accepted();
@@ -682,11 +684,16 @@ export component TdnToggleRow inherits Rectangle {
     }
 
     function toggle() {
-        root.toggled(!root.checked);
+        if root.enabled { root.toggled(!root.checked); }
     }
+
+    // faded when disabled. Not `opacity` on the root, which Slint inlines a copy of the whole
+    // row per use for
+    property <float> fade: root.enabled ? 0 : 0.5;
 
     forward-focus: focus;
     accessible-role: switch;
+    accessible-enabled: root.enabled;
     accessible-label: root.text;
     accessible-checkable: true;
     accessible-checked: root.checked;
@@ -729,6 +736,7 @@ export component TdnToggleRow inherits Rectangle {
 
         TdnText {
             text: root.text;
+            color: Tokens.color-foreground.transparentize(root.fade);
             horizontal-alignment: Dir.text-start;
             vertical-alignment: center;
             font-weight: Tokens.typography-weight-medium;
@@ -748,8 +756,8 @@ export component TdnToggleRow inherits Rectangle {
                 height: 1.3rem;
                 border-radius: self.height / 2;
                 border-width: 1px;
-                border-color: root.checked ? Tokens.color-primary : Tokens.color-muted-foreground;
-                background: root.checked ? Tokens.color-primary : transparent;
+                border-color: (root.checked ? Tokens.color-primary : Tokens.color-muted-foreground).transparentize(root.fade);
+                background: root.checked ? Tokens.color-primary.transparentize(root.fade) : transparent;
                 animate background, border-color { duration: Tokens.motion-fast; }
 
                 Rectangle {
@@ -759,7 +767,7 @@ export component TdnToggleRow inherits Rectangle {
                     // on is toward the end, the left for right-to-left languages
                     x: Dir.x(root.checked ? parent.width - self.width - 0.15rem : 0.15rem, self.width, parent.width);
                     border-radius: self.width / 2;
-                    background: root.checked ? Tokens.color-primary-foreground : Tokens.color-muted-foreground;
+                    background: root.checked ? Tokens.color-primary-foreground : Tokens.color-muted-foreground.transparentize(root.fade);
                     animate background { duration: Tokens.motion-fast; }
                     animate x {
                         duration: Tokens.motion-fast;
@@ -771,7 +779,7 @@ export component TdnToggleRow inherits Rectangle {
     }
 
     TouchArea {
-        mouse-cursor: pointer;
+        mouse-cursor: root.enabled ? pointer : default;
         pointer-event(ev) => {
             if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
         }

@@ -195,14 +195,11 @@ fn start(ui: &slint::Weak<AppWindow>) {
     if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Language) {
         crate::SETTINGS.write().locale.clear();
     }
-    // `Network.save` only runs from the network page. With it skipped the device name stays empty,
-    // so the system keeps its hostname as when the name is left blank. Nobody chose to go offline
-    // either, so go by the connection right now, as the summary does. Leaving `nointernet` off on
-    // an offline machine makes the dnf steps fail.
-    let online = app.global::<Network<'_>>().get_online();
-    if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Network) {
-        crate::SETTINGS.write().nointernet = !online;
-    }
+    // only "Set Up Offline" on the network page skips the online steps no matter what. Otherwise
+    // this goes by the connection right now, as the summary does, also when the network page is
+    // skipped. Leaving `nointernet` off on an offline machine makes the dnf steps fail.
+    let net = app.global::<Network<'_>>();
+    let online = net.get_install_online();
     let mut settings = crate::SETTINGS.read().clone();
     // before anything that names them can be logged
     crate::set_private_values(&settings);
@@ -211,13 +208,11 @@ fn start(ui: &slint::Weak<AppWindow>) {
     // attempt's copy, so they keep following the language if it changes before a retry
     settings.ims = crate::ims::enabled(&app.global());
     settings.ims_picked = true;
-    // the rest only goes on this attempt's copy. `SETTINGS.nointernet` stays what the network page
-    // chose, so a later retry gets the online steps back once the connection is back
-    if !online && !settings.nointernet {
-        // online when leaving the network page, but not anymore, e.g. on a retry after the
-        // connection dropped
-        tracing::warn!("The connection is gone since the network page, installing offline");
-        settings.nointernet = true;
+    // only on this attempt's copy, so a later retry gets the online steps back once the
+    // connection is back
+    settings.nointernet = !online;
+    if !online {
+        tracing::info!(chosen = net.get_offline_chosen(), "Installing without the online steps");
     }
     // the error page's way out when an online step keeps failing. Skipping them all still leaves
     // a working system, just without updates and the extra software

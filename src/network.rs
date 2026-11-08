@@ -298,6 +298,8 @@ enum Cmd {
         login: EnterpriseLogin,
         /// whether the dialog only offered TLS, as it does for WPA3-Enterprise 192-bit
         tls_only: bool,
+        /// `Network.enterprise-visit` of the dialog it was sent from
+        visit: i32,
     },
     /// a network that doesn't announce its name, so it isn't in the list
     ConnectHidden {
@@ -1905,8 +1907,8 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
         Cmd::ConnectHidden { ssid, key_mgmt, password } => {
             return connect_hidden(nm, ui, ssid, key_mgmt, &password);
         }
-        Cmd::ConnectEnterprise { login, tls_only } => {
-            return connect_enterprise(nm, ui, login, tls_only);
+        Cmd::ConnectEnterprise { login, tls_only, visit } => {
+            return connect_enterprise(nm, ui, login, tls_only, visit);
         }
         Cmd::SetProxy { url, bypass } => return set_proxy(nm, ui, &url, &bypass),
         Cmd::OpenPortal { proxy, visit } => {
@@ -1971,7 +1973,9 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
                     || net.get_enterprise_open()
                     || net.get_offline_prompt()
                     || !["", ssid.as_str()].contains(&net.get_password_ssid().as_str());
-                if failure == FAILED_SECRETS && !left && !other_dialog {
+                // nor again after its dialog was closed while this was still going
+                let dismissed = net.get_dismissed_ssid().as_str() == ssid.as_str();
+                if failure == FAILED_SECRETS && !left && !other_dialog && !dismissed {
                     if let Some(Security::Enterprise | Security::EnterpriseTls) = security {
                         net.set_enterprise_ssid(ssid.as_str().into());
                         net.set_enterprise_wired(false);
@@ -1993,6 +1997,7 @@ fn connect_enterprise(
     ui: &slint::Weak<AppWindow>,
     mut login: EnterpriseLogin,
     tls_only: bool,
+    visit: i32,
 ) {
     // spaces around a typed hidden network's name are a slip, but a network in the list
     // can really have them
@@ -2025,6 +2030,11 @@ fn connect_enterprise(
     push(ui, move |net| {
         net.set_connecting_ssid("".into());
         net.set_enterprise_busy(false);
+        // the dialog it came from was closed meanwhile, maybe opened again for another network or
+        // the wired connection, which mustn't close or show this login's error
+        if !net.get_enterprise_open() || net.get_enterprise_visit() != visit {
+            return;
+        }
         match res {
             Ok(()) => net.set_enterprise_open(false),
             Err(failure) => net.set_enterprise_error_id(failure.into()),
@@ -2252,6 +2262,7 @@ fn start_busy(ui: &slint::Weak<AppWindow>, ssid: &str) -> bool {
     }
     net.set_error_id("".into());
     net.set_error_ssid("".into());
+    net.set_dismissed_ssid("".into());
     net.set_connecting_ssid(ssid.into());
     true
 }
@@ -2289,17 +2300,23 @@ fn spawn_worker(ui: &slint::Weak<AppWindow>) -> mpsc::Sender<Cmd> {
     tx
 }
 
-pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
-    let tx = spawn_worker(ui);
-    net.set_persist_offline_btn(crate::CFG.taidan0.persist_no_internet_btn);
+/// the pure callbacks, which work on their arguments only
+fn init_helpers(net: &Network<'_>) {
     net.on_derive_hostname(|name, username| device_hostname(&name, &username).into());
     net.on_realm(|username| realm(&username).into());
     net.on_is_pkcs12(|path| is_pkcs12(&path));
+    net.on_trim(|text| text.trim().into());
     net.on_file_name(|path| {
         std::path::Path::new(path.as_str())
             .file_name()
             .map_or_else(|| path.clone(), |name| name.to_string_lossy().as_ref().into())
     });
+}
+
+pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
+    let tx = spawn_worker(ui);
+    net.set_persist_offline_btn(crate::CFG.taidan0.persist_no_internet_btn);
+    init_helpers(net);
     net.on_browse({
         let ui = ui.clone();
         move |dir, pac, all| browse(&ui, &dir, pac, all)
@@ -2323,18 +2340,18 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
         let (send, ui) = (send.clone(), ui.clone());
         move |login| {
             // right away, so a second click doesn't queue another login
-            let tls_only = if let Some(ui) = ui.upgrade() {
+            let (tls_only, visit) = if let Some(ui) = ui.upgrade() {
                 let net = ui.global::<Network<'_>>();
                 if net.get_enterprise_busy() {
                     return;
                 }
                 net.set_enterprise_busy(true);
                 net.set_enterprise_error_id("".into());
-                net.get_enterprise_tls_only()
+                (net.get_enterprise_tls_only(), net.get_enterprise_visit())
             } else {
-                false
+                (false, 0)
             };
-            send(Cmd::ConnectEnterprise { login, tls_only });
+            send(Cmd::ConnectEnterprise { login, tls_only, visit });
         }
     });
     net.on_set_proxy({
@@ -2381,7 +2398,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
     });
     net.on_save({
         let ui = ui.clone();
-        move |offline| {
+        move || {
             PAGE_VISIT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             // done with the network page, so done logging in to the portal too. Not through the
             // worker, which may be busy connecting for a while yet
@@ -2390,19 +2407,19 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
                 ui.global::<Network<'_>>().set_portal_open(false);
             }
             if let Some(ui) = ui.upgrade() {
-                save(&ui.global::<Network<'_>>(), offline);
+                save(&ui.global::<Network<'_>>());
             }
         }
     });
 }
 
-/// keeps what the network page set for the installation, when leaving it
-fn save(net: &Network<'_>, offline: bool) {
+/// keeps what the network page set for the installation, when leaving it. Whether it goes online
+/// is up to `install::start`, from `Network.install-online`
+fn save(net: &Network<'_>) {
     // a connection's dialog mustn't follow onto the next page
     net.set_password_ssid("".into());
     net.set_enterprise_open(false);
     let mut settings = crate::SETTINGS.write();
-    settings.nointernet = offline;
     let url = net.get_proxy_url();
     settings.proxy = (!url.is_empty())
         .then(|| libtaidan::proxy::Proxy::new(&url, &net.get_proxy_bypass()))

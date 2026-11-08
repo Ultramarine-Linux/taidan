@@ -150,7 +150,9 @@ export component SummaryPage inherits TdnPage {
                 InfoRow {
                     icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
                     label: Lang.t("page-summary-network", []);
-                    value: !Network.online ? Lang.t("page-summary-network-none", [])
+                    // what the install will go by, see `Network.install-online`
+                    value: Network.offline-chosen ? Lang.t("page-summary-network-offline", [])
+                        : !Network.online ? Lang.t("page-summary-network-none", [])
                         : root.connected-ssid != "" ? root.connected-ssid
                         : Lang.t("page-internet-wired", []);
                 }
@@ -178,7 +180,9 @@ export component SummaryPage inherits TdnPage {
 
                         spacing: 0.5rem;
 
-                        if Drivers.install: DriverList { }
+                        if Drivers.install: DriverList {
+                            offline: !Network.install-online;
+                        }
 
                         for name in Tweaks.enabled-names: DriverRow {
                             icon: @image-url("../../data/icons/systemsettings-symbolic.svg");
@@ -195,10 +199,11 @@ export component SummaryPage inherits TdnPage {
                 }
 
                 // installed on the next restart, so only when there's internet to download them with
-                if Install.can-download-updates && Network.online: TdnToggleRow {
+                if Install.can-download-updates: TdnToggleRow {
                     vertical-stretch: 0;
+                    enabled: Network.install-online;
                     text: Lang.t("page-summary-updates", []);
-                    checked: Install.download-updates;
+                    checked: Install.download-updates && Network.install-online;
                     toggled(on) => { Install.download-updates = on; }
                 }
 
