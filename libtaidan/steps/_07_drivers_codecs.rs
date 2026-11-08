@@ -607,7 +607,7 @@ impl Drivers {
 /// whether the kernel only loads signed modules: Secure Boot is on in the firmware and shim
 /// hasn't had validation turned off in MokManager, as the kernel decides it. [`None`] if it can't
 /// be told
-async fn secure_boot_enforced() -> Option<bool> {
+pub(crate) async fn secure_boot_enforced() -> Option<bool> {
     const EFIVARS: &str = "/sys/firmware/efi/efivars";
     // the last byte of an EFI variable, after 4 bytes of attributes
     let var = |name: &'static str| async move {

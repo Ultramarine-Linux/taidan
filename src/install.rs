@@ -360,7 +360,7 @@ fn reset(ui: &slint::Weak<AppWindow>) {
 }
 
 /// whether dnf can install packages here, see `libtaidan::steps::can_use_dnf`
-fn can_use_dnf() -> bool {
+pub(crate) fn can_use_dnf() -> bool {
     !crate::CFG.taidan0.skip_dnf && !std::path::Path::new("/ostree").exists()
 }
 

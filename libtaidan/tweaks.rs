@@ -8,6 +8,8 @@ use tokio::io::AsyncWriteExt;
 
 use crate::err::{Res, TaidanErrHelper};
 
+/// every valid tweak this CPU supports. What to offer or run is [`available()`], which also
+/// checks [`Tweak::needs_dnf`] and [`Tweak::secure_boot`]
 pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
     let tweaks = Tweak::list()
         .inspect_err(|err| tracing::error!(?err, "cannot list tweaks"))
@@ -25,6 +27,29 @@ pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
     tracing::info!("found {} tweaks", tweaks.len());
     tweaks
 });
+
+/// the [`TWEAKS`] this system can take, given whether dnf can install packages here (see
+/// `steps::can_use_dnf`) and whether Secure Boot is enforced
+pub async fn available(can_use_dnf: bool) -> Vec<&'static Tweak> {
+    let secure_boot = if TWEAKS.iter().any(|t| t.secure_boot.is_some()) {
+        crate::steps::secure_boot_enforced().await.unwrap_or_else(|| {
+            tracing::warn!("cannot tell whether Secure Boot is on, taking it to be");
+            true
+        })
+    } else {
+        false
+    };
+    TWEAKS
+        .iter()
+        .filter(|t| {
+            let allowed = t.is_allowed(can_use_dnf, secure_boot);
+            if !allowed {
+                tracing::info!(id=?t.id(), can_use_dnf, secure_boot, "hiding tweak this system can't take");
+            }
+            allowed
+        })
+        .collect()
+}
 
 /// A distro-specified setting read by Taidan during runtime.
 ///
@@ -52,6 +77,10 @@ pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
 ///   Tweaks that set it are hidden on CPUs below that level and on other architectures.
 /// - `needs_internet`: whether `up` downloads anything, e.g. packages. Such tweaks aren't run
 ///   when setting up without internet, off by default
+/// - `needs_dnf`: whether `up` installs packages with dnf. Such tweaks are hidden on atomic
+///   (rpm-ostree) systems and with `taidan0.skip_dnf`, off by default
+/// - `secure_boot`: if set, the tweak is only offered when whether Secure Boot is enforced matches
+///   it, e.g. `false` hides it while Secure Boot is on
 #[derive(Clone, Debug, Default, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Tweak {
@@ -63,6 +92,8 @@ pub struct Tweak {
     pub ftl_desc: String,
     pub x86_64_level: Option<u8>,
     pub needs_internet: bool,
+    pub needs_dnf: bool,
+    pub secure_boot: Option<bool>,
 }
 
 #[cfg(debug_assertions)]
@@ -124,6 +155,12 @@ impl Tweak {
     #[must_use]
     pub fn is_supported(&self) -> bool {
         self.x86_64_level.is_none_or(|level| x86_64_level() >= level)
+    }
+    /// Whether the tweak can be offered, given whether dnf can install packages and whether Secure
+    /// Boot is enforced, see [`Self::needs_dnf`] and [`Self::secure_boot`].
+    #[must_use]
+    pub fn is_allowed(&self, can_use_dnf: bool, secure_boot: bool) -> bool {
+        (can_use_dnf || !self.needs_dnf) && self.secure_boot.is_none_or(|sb| sb == secure_boot)
     }
     /// Obtain [`Tweak`] from the path to the tweak directory.
     /// This is the "safe" version of [`Self::from_cfg_path()`].
@@ -382,6 +419,52 @@ mod tests {
             let err = Tweak::from_dir(dir.path().to_path_buf()).unwrap_err();
             assert_eq!(err.kind(), std::io::ErrorKind::InvalidData, "{toml:?}");
         }
+    }
+
+    #[test]
+    fn constraints_parse() {
+        let dir = tweak_dir(Some("needs_dnf = true\nsecure_boot = false\n"));
+        let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
+        assert!(tweak.needs_dnf);
+        assert_eq!(tweak.secure_boot, Some(false));
+        let dir = tweak_dir(None);
+        let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
+        assert!(!tweak.needs_dnf);
+        assert_eq!(tweak.secure_boot, None);
+    }
+
+    // (atomic, Secure Boot) combinations, `can_use_dnf` is false on atomic
+    #[test]
+    fn constraints_filter() {
+        let constrained = Tweak { needs_dnf: true, secure_boot: Some(false), ..Tweak::default() };
+        let free = Tweak::default();
+        for (atomic, secure_boot, shown) in
+            [(false, false, true), (false, true, false), (true, false, false), (true, true, false)]
+        {
+            assert_eq!(
+                constrained.is_allowed(!atomic, secure_boot),
+                shown,
+                "atomic={atomic} secure_boot={secure_boot}"
+            );
+            assert!(
+                free.is_allowed(!atomic, secure_boot),
+                "atomic={atomic} secure_boot={secure_boot}"
+            );
+        }
+        let dnf_only = Tweak { needs_dnf: true, ..Tweak::default() };
+        assert!(dnf_only.is_allowed(true, true));
+        assert!(!dnf_only.is_allowed(false, false));
+        let sb_on_only = Tweak { secure_boot: Some(true), ..Tweak::default() };
+        assert!(sb_on_only.is_allowed(false, true));
+        assert!(!sb_on_only.is_allowed(true, false));
+    }
+
+    #[test]
+    fn shipped_cachyos_kernel_constraints() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../data/tweaks/cachyos-kernel");
+        let tweak = Tweak::from_dir(dir.into()).unwrap();
+        assert!(tweak.needs_dnf);
+        assert_eq!(tweak.secure_boot, Some(false));
     }
 
     #[test]

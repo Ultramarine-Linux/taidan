@@ -50,7 +50,9 @@ impl super::Step for SystemSetup {
                     }
                 }
             };
-            for tweak in &*crate::tweaks::TWEAKS {
+            // a hidden one isn't run even if the settings have it
+            let tweaks = crate::tweaks::available(super::can_use_dnf(cfg).await).await;
+            for tweak in tweaks {
                 let id = tweak.id().to_string_lossy().into_owned();
                 let started = format!("{}{id}", crate::tweaks::STARTED);
                 let on = ids.contains(&id);

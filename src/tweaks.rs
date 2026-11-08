@@ -6,8 +6,10 @@ use slint::{ComponentHandle, Model, VecModel};
 use crate::ui::{AppWindow, TweakItem, Tweaks};
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tweaks: &Tweaks<'_>) {
-    let items = libtaidan::tweaks::TWEAKS
-        .iter()
+    // only reads a few EFI variables, quick enough for startup
+    let available = crate::RT.block_on(libtaidan::tweaks::available(crate::install::can_use_dnf()));
+    let items = available
+        .into_iter()
         .map(|t| TweakItem {
             id: t.id().to_string_lossy().as_ref().into(),
             name: t.ftl_name.as_str().into(),
