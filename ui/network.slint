@@ -128,6 +128,10 @@ export global Network {
     // the proxy in use, empty if none
     in property <string> proxy-url;
     in property <string> proxy-bypass: "localhost, 127.0.0.1, ::1";
+    // `proxy-url` without the username and password, to show
+    in property <string> proxy-public;
+    // whether the installed system keeps using the proxy, else it's only for setup
+    in-out property <bool> proxy-persist: true;
     // checking the proxy reaches the internet
     in property <bool> proxy-busy;
     // translation id of why the proxy can't be used
@@ -193,8 +197,9 @@ export global Network {
     in property <bool> portal-open;
     callback open-portal();
     callback close-portal();
-    // checks the proxy works and uses it, an empty `url` stops using one
-    callback set-proxy(url: string, bypass: string);
+    // checks the proxy works and uses it, an empty `url` stops using one. `persist` becomes
+    // `proxy-persist` once it's used
+    callback set-proxy(url: string, bypass: string, persist: bool);
     // opens the IP settings dialog for a wi-fi network, or the wired connection if `ssid` is empty
     callback open-ip(ssid: string);
     callback save-ip(ssid: string, ip: IpSettings);

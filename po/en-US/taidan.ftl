@@ -221,6 +221,8 @@ page-internet-proxy-bypass = Don't Use the Proxy For
 page-internet-proxy-bypass-desc = Addresses and domains, separated by commas.
 page-internet-proxy-invalid = Enter the proxy server like proxy.example.com:3128.
 page-internet-proxy-error = Couldn't reach the internet through this proxy.
+# toggle, off means the proxy is only used while setting up
+page-internet-proxy-persist = Keep Using This Proxy After Setup
 # btn, stops using the proxy
 page-internet-proxy-remove = Remove
 # btn, in the proxy and IP settings dialogs
@@ -415,6 +417,8 @@ page-summary-software = Additional Software
 page-summary-software-none = No additional software will be installed.
 # toggle, downloads updates during setup to install on the next restart
 page-summary-updates = Download Updates
+# toggle, $proxy is the proxy server's address. Off means the proxy is only used while setting up
+page-summary-proxy = Keep Using the Proxy { $proxy }
 # btn, opens the distribution's optional tweaks
 page-summary-tweaks = Advanced Tweaks
 # btn (next page), starts setting up the system

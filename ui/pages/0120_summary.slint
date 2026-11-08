@@ -207,6 +207,14 @@ export component SummaryPage inherits TdnPage {
                     toggled(on) => { Install.download-updates = on; }
                 }
 
+                // the proxy without its credentials, and whether the installed system keeps it
+                if Network.proxy-url != "": TdnToggleRow {
+                    vertical-stretch: 0;
+                    text: Lang.t("page-summary-proxy", [{ key: "proxy", value: Network.proxy-public }]);
+                    checked: Network.proxy-persist;
+                    toggled(on) => { Network.proxy-persist = on; }
+                }
+
                 // only when the distro ships tweaks
                 if Tweaks.items.length > 0 && !Cfg.skip-tweaks: HorizontalLayout {
                     vertical-stretch: 0;

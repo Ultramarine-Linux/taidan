@@ -310,6 +310,8 @@ enum Cmd {
     SetProxy {
         url: String,
         bypass: String,
+        /// whether to keep it after setup, see `Network.proxy-persist`
+        persist: bool,
     },
     /// with the proxy and the hosts it's not used for, if one is set
     OpenPortal {
@@ -1191,7 +1193,7 @@ fn browse_places() -> Vec<crate::ui::FileEntry> {
 }
 
 /// checks the internet is reachable through the proxy, then uses it
-fn set_proxy(nm: &Nm, ui: &slint::Weak<AppWindow>, url: &str, bypass: &str) {
+fn set_proxy(nm: &Nm, ui: &slint::Weak<AppWindow>, url: &str, bypass: &str, persist: bool) {
     let res = if url.is_empty() {
         Ok(None)
     } else {
@@ -1220,8 +1222,11 @@ fn set_proxy(nm: &Nm, ui: &slint::Weak<AppWindow>, url: &str, bypass: &str) {
         }
         match res {
             Ok(proxy) => {
+                let public = proxy.as_ref().map(libtaidan::proxy::Proxy::public_url);
+                net.set_proxy_public(public.unwrap_or_default().into());
                 let (url, bypass) = proxy.map(|p| (p.url, p.no_proxy)).unwrap_or_default();
                 net.set_proxy_url(url.into());
+                net.set_proxy_persist(persist);
                 net.set_proxy_bypass(bypass.replace(',', ", ").into());
                 net.set_proxy_open(false);
             }
@@ -1910,7 +1915,9 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
         Cmd::ConnectEnterprise { login, tls_only, visit } => {
             return connect_enterprise(nm, ui, login, tls_only, visit);
         }
-        Cmd::SetProxy { url, bypass } => return set_proxy(nm, ui, &url, &bypass),
+        Cmd::SetProxy { url, bypass, persist } => {
+            return set_proxy(nm, ui, &url, &bypass, persist);
+        }
         Cmd::OpenPortal { proxy, visit } => {
             // the page was left meanwhile, which closed the browser without waiting for this
             if PAGE_VISIT.load(std::sync::atomic::Ordering::SeqCst) != visit {
@@ -2356,13 +2363,13 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
     });
     net.on_set_proxy({
         let (send, ui) = (send.clone(), ui.clone());
-        move |url, bypass| {
+        move |url, bypass, persist| {
             if let Some(ui) = ui.upgrade() {
                 let net = ui.global::<Network<'_>>();
                 net.set_proxy_busy(true);
                 net.set_proxy_error_id("".into());
             }
-            send(Cmd::SetProxy { url: url.trim().into(), bypass: bypass.into() });
+            send(Cmd::SetProxy { url: url.trim().into(), bypass: bypass.into(), persist });
         }
     });
     net.on_open_ip({

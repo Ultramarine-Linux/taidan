@@ -38,7 +38,7 @@ impl super::Step for SystemSetup {
         _: &C,
     ) -> Res<()> {
         if let Some(ids) = settings.tweaks.ids() {
-            let sett = serde_json::to_vec(settings)?;
+            let sett = crate::tweaks::settings_json(settings)?;
             // the ones an earlier attempt turned on, to turn off again if they aren't anymore.
             // Recorded as it goes, so an attempt cut short still says what it turned on
             let mut recorded = crate::tweaks::recorded_on();

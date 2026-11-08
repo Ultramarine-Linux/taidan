@@ -232,7 +232,7 @@ impl Tweak {
     /// Run `up` with the serialized `settings`, whether it succeeded. Failures are logged
     ///
     /// Expects `pkexec` to be available.
-    // not the settings, which have the proxy in them, and its password
+    // not the settings, which have the user's name and the proxy in them
     #[tracing::instrument(skip(settings))]
     pub async fn run(&self, settings: &[u8], on: bool) -> bool {
         // `pkexec` clears the environment, and tweaks may download things too
@@ -268,6 +268,19 @@ impl Tweak {
             }
         }
     }
+}
+
+/// the settings `up` gets on stdin, with the proxy's username and password cut out. `up` already
+/// has the whole proxy in `http_proxy` and friends for its own downloads, while what's on stdin is
+/// what a tweak would write into a config file or log. A proxy whose credentials can't be cut
+/// out is left out altogether
+///
+/// # Errors
+/// The settings can't be serialized.
+pub fn settings_json(settings: &crate::settings::Settings) -> serde_json::Result<Vec<u8>> {
+    let mut settings = settings.clone();
+    settings.proxy = settings.proxy.as_ref().and_then(crate::proxy::Proxy::without_credentials);
+    serde_json::to_vec(&settings)
 }
 
 /// ids of the tweaks an unfinished install turned on, one per line, so a retry with one of them
@@ -381,6 +394,20 @@ pub fn is_executable(f: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn settings_json_hides_proxy_credentials() {
+        let settings = crate::settings::Settings {
+            proxy: crate::proxy::Proxy::new("http://bob:hunter2@proxy.example.com:3128", "lan"),
+            proxy_persist: false,
+            ..Default::default()
+        };
+        let json: serde_json::Value =
+            serde_json::from_slice(&settings_json(&settings).unwrap()).unwrap();
+        assert_eq!(json["proxy"]["url"], "http://proxy.example.com:3128");
+        assert_eq!(json["proxy"]["no_proxy"], "lan");
+        assert_eq!(json["proxy_persist"], false);
+    }
 
     fn tweak_dir(toml: Option<&str>) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();

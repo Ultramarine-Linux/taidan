@@ -130,7 +130,8 @@ impl Proxy {
 
     /// the proxy without the `user:password@` in its URL, for places other users can read.
     /// [`None`] if the URL can't be parsed
-    fn without_credentials(&self) -> Option<Self> {
+    #[must_use]
+    pub fn without_credentials(&self) -> Option<Self> {
         let url = reqwest::Url::parse(&self.url).ok()?;
         if url.username().is_empty() && url.password().is_none() {
             return Some(self.clone());
@@ -147,6 +148,13 @@ impl Proxy {
             .then(|| Self { url: public, no_proxy: self.no_proxy.clone() })
     }
 
+    /// the URL to show, without credentials, or with the password redacted if they can't be cut
+    /// out
+    #[must_use]
+    pub fn public_url(&self) -> String {
+        self.without_credentials().map_or_else(|| redact(&self.url), |p| p.url)
+    }
+
     /// # Errors
     /// The URL isn't a valid proxy for reqwest.
     pub fn client(&self) -> reqwest::Result<reqwest::Client> {
@@ -155,7 +163,8 @@ impl Proxy {
         reqwest::Client::builder().proxy(proxy).build()
     }
 
-    /// saves the proxy on the system, for login sessions (`/etc/environment`) and dnf
+    /// saves the proxy on the system, for login sessions (`/etc/environment`) and dnf, with
+    /// [`Self::write_repo_overrides`] for the hosts it's not used for
     ///
     /// # Errors
     /// Cannot write the files.
@@ -187,6 +196,11 @@ impl Proxy {
         )
         .await
         .wrap_msg("cannot write the proxy to the dnf config")?;
+        // dnf going through the proxy for a mirror it shouldn't is only slower, so this isn't
+        // worth failing over
+        if let Err(e) = self.write_repo_overrides().await {
+            tracing::warn!(?e, "cannot keep dnf from using the proxy for the bypassed hosts");
+        }
         // through stdin, since the arguments of commands run as root are logged
         let mut lines = public.env().join("\n");
         lines.push('\n');
@@ -206,6 +220,169 @@ impl Proxy {
     }
 }
 
+impl Proxy {
+    /// turns the proxy off in dnf for the repos on hosts in [`Self::no_proxy`], since libdnf5 has
+    /// no `no_proxy` of its own. Removes the overrides if no repo needs one. Run again once the
+    /// install has added its repos
+    ///
+    /// A best effort: only the hosts in a repo's `baseurl`, `metalink` and `mirrorlist` are
+    /// known, not the mirrors a metalink or mirrorlist hands out at runtime, which keep going
+    /// through the proxy
+    ///
+    /// # Errors
+    /// Cannot write or remove the file.
+    pub async fn write_repo_overrides(&self) -> Res<()> {
+        let repos = REPO_DIRS
+            .iter()
+            .filter_map(|dir| std::fs::read_dir(dir).ok())
+            .flatten()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|ext| ext == "repo"))
+            .filter_map(|path| std::fs::read_to_string(path).ok())
+            .flat_map(|text| repo_hosts(&text))
+            .collect::<Vec<_>>();
+        let overrides = repo_overrides(&repos, &self.no_proxy);
+        if overrides.is_empty() {
+            if !tokio::fs::try_exists(REPO_OVERRIDE).await.unwrap_or(true) {
+                return Ok(());
+            }
+            return crate::root("rm", ["-f", REPO_OVERRIDE])
+                .await
+                .wrap_msg("cannot remove the dnf proxy overrides");
+        }
+        // nothing secret in it, readable like the repo files themselves
+        crate::root_with_stdin(
+            "sh",
+            [
+                "-c",
+                r#"
+                    mkdir -p /etc/dnf/repos.override.d
+                    umask 022
+                    cat > "$1"
+                "#,
+                "sh",
+                REPO_OVERRIDE,
+            ],
+            overrides.as_bytes(),
+        )
+        .await
+        .wrap_msg("cannot write the dnf proxy overrides")
+    }
+}
+
+/// where dnf reads repos from, its default `reposdir`, see dnf5.conf(5)
+const REPO_DIRS: [&str; 3] = ["/etc/yum.repos.d", "/etc/distro.repos.d", "/usr/share/dnf5/repos.d"];
+
+/// where [`Proxy::write_repo_overrides`] turns the proxy off for repos on bypassed hosts
+const REPO_OVERRIDE: &str = "/etc/dnf/repos.override.d/50-taidan-proxy-bypass.repo";
+
+/// the repos in a `.repo` file, each with the hosts in its `baseurl`, `metalink` and
+/// `mirrorlist`. One with `$` in a host is left out, which is a variable only dnf knows
+fn repo_hosts(text: &str) -> Vec<(String, Vec<String>)> {
+    let mut repos: Vec<(String, Vec<String>)> = vec![];
+    // whether the lines are for a URL key, which go on in indented lines
+    let mut in_urls = false;
+    for line in text.lines() {
+        let continued = line.starts_with([' ', '\t']);
+        let line = line.trim();
+        if line.is_empty() || line.starts_with(['#', ';']) {
+            continue;
+        }
+        let values = if continued {
+            if !in_urls {
+                continue;
+            }
+            line
+        } else if let Some(id) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
+            repos.push((id.trim().to_owned(), vec![]));
+            in_urls = false;
+            continue;
+        } else {
+            let Some((key, value)) = line.split_once('=') else { continue };
+            in_urls = matches!(key.trim(), "baseurl" | "metalink" | "mirrorlist");
+            if !in_urls {
+                continue;
+            }
+            value
+        };
+        let Some((_, hosts)) = repos.last_mut() else { continue };
+        for url in values.split([',', ' ', '\t']).filter(|u| !u.is_empty()) {
+            if let Ok(url) = reqwest::Url::parse(url)
+                && let Some(host) = url.host_str()
+                && !host.is_empty()
+                // the parser takes it as part of the name
+                && !host.contains('$')
+            {
+                hosts.push(host.trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase());
+            }
+        }
+    }
+    repos
+}
+
+/// a repos.override.d file that turns the proxy off for the `repos` on a host in `no_proxy`,
+/// empty if there are none
+///
+/// An empty `proxy=` in a repo section overrides the one in `[main]`, and libdnf5 then doesn't
+/// give librepo a proxy at all, see dnf5.conf(5). curl still goes by `http_proxy` and
+/// `no_proxy` from the environment then, which `/etc/environment` sets together
+fn repo_overrides(repos: &[(String, Vec<String>)], no_proxy: &str) -> String {
+    let mut out = String::new();
+    for (id, hosts) in repos {
+        // a glob or `]` would match other repos or break the section
+        let id_ok = !id.is_empty()
+            && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':'));
+        if id_ok && hosts.iter().any(|host| bypassed(host, no_proxy)) {
+            out.push_str(&format!("[{id}]\nproxy=\n\n"));
+        }
+    }
+    out
+}
+
+/// whether `no_proxy` (comma-separated, like `localhost,.example.com,10.0.0.0/8`) says to reach
+/// `host` directly, matching it like curl does: an entry matches itself and its subdomains, a
+/// leading `.` or `*.` doesn't matter, `*` matches everything, and IPs match by CIDR
+fn bypassed(host: &str, no_proxy: &str) -> bool {
+    let host = host.trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase();
+    let host_ip = host.parse::<std::net::IpAddr>().ok();
+    no_proxy.split(',').map(str::trim).filter(|e| !e.is_empty()).any(|entry| {
+        if entry == "*" {
+            return true;
+        }
+        let entry = entry.to_ascii_lowercase();
+        if let Some(host_ip) = host_ip {
+            let (net, bits) = entry.split_once('/').unwrap_or((&entry, ""));
+            let net = net.trim_start_matches('[').trim_end_matches(']');
+            let Ok(net) = net.parse::<std::net::IpAddr>() else { return false };
+            return in_cidr(host_ip, net, bits.parse().ok());
+        }
+        // a port doesn't narrow it down, `::1`-like entries never match a name anyway
+        let name = entry.split(':').next().unwrap_or_default();
+        let name = name.trim_start_matches('*').trim_start_matches('.');
+        !name.is_empty()
+            && (host == name || host.strip_suffix(name).is_some_and(|rest| rest.ends_with('.')))
+    })
+}
+
+/// whether `ip` is in `net`/`bits`, or is `net` without `bits`
+fn in_cidr(ip: std::net::IpAddr, net: std::net::IpAddr, bits: Option<u32>) -> bool {
+    use std::net::IpAddr;
+    let (ip, net, len) = match (ip, net) {
+        (IpAddr::V4(ip), IpAddr::V4(net)) => {
+            (u128::from(ip.to_bits()), u128::from(net.to_bits()), 32)
+        }
+        (IpAddr::V6(ip), IpAddr::V6(net)) => (ip.to_bits(), net.to_bits(), 128),
+        _ => return false,
+    };
+    let bits = bits.unwrap_or(len).min(len);
+    if bits == 0 {
+        return true;
+    }
+    let shift = len - bits;
+    ip >> shift == net >> shift
+}
+
 /// whether `s` has a control character, like a newline, in it
 fn has_control(s: &str) -> bool {
     s.chars().any(char::is_control)
@@ -220,7 +397,8 @@ const DNF_DROPIN: &str = "/etc/dnf/libdnf5.conf.d/50-taidan-proxy.conf";
 /// # Errors
 /// Cannot change the files.
 pub async fn clear() -> Res<()> {
-    if !tokio::fs::try_exists(DNF_DROPIN).await.unwrap_or(true) {
+    let exists = |path| async move { tokio::fs::try_exists(path).await.unwrap_or(true) };
+    if !exists(DNF_DROPIN).await && !exists(REPO_OVERRIDE).await {
         return Ok(());
     }
     crate::root(
@@ -228,11 +406,15 @@ pub async fn clear() -> Res<()> {
         [
             "-c",
             r#"
-                sed -i '/^\(https\?\|no\)_proxy=/Id' /etc/environment
-                rm -f "$1"
+                rm -f "$2"
+                if [ -e "$1" ]; then
+                    sed -i '/^\(https\?\|no\)_proxy=/Id' /etc/environment
+                    rm -f "$1"
+                fi
             "#,
             "sh",
             DNF_DROPIN,
+            REPO_OVERRIDE,
         ],
     )
     .await
@@ -387,6 +569,69 @@ mod tests {
         write_env_file(&path, None).unwrap();
         assert!(!path.exists());
         write_env_file(&path, None).unwrap();
+    }
+
+    #[test]
+    fn finds_repo_hosts() {
+        let text = "\
+[fedora]
+name=Fedora $releasever
+#baseurl=http://commented.example/
+metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever
+
+[corp]
+baseurl=https://Mirror.Corp/fedora/$releasever/
+  http://backup.corp/fedora/, file:///srv/repo
+gpgcheck=1
+  https://not-a-url-key.example/
+
+[vars]
+baseurl=https://$mirrorhost/fedora/
+";
+        let repos = repo_hosts(text);
+        assert_eq!(repos.len(), 3);
+        assert_eq!(repos[0], ("fedora".to_owned(), vec!["mirrors.fedoraproject.org".to_owned()]));
+        assert_eq!(repos[1].0, "corp");
+        assert_eq!(repos[1].1, ["mirror.corp", "backup.corp"]);
+        assert!(repos[2].1.is_empty());
+    }
+
+    #[test]
+    fn overrides_bypassed_repos() {
+        let repos = repo_hosts(
+            "[corp]\nbaseurl=https://mirror.corp/fedora/\n\
+             [fedora]\nmetalink=https://mirrors.fedoraproject.org/metalink\n\
+             [bad*id]\nbaseurl=https://mirror.corp/\n",
+        );
+        let overrides = repo_overrides(&repos, "localhost,mirror.corp");
+        assert_eq!(overrides, "[corp]\nproxy=\n\n");
+        assert_eq!(repo_overrides(&repos, "localhost,127.0.0.1"), "");
+        assert_eq!(repo_overrides(&repos, ""), "");
+    }
+
+    #[test]
+    fn matches_no_proxy_like_curl() {
+        assert!(bypassed("mirror.corp", "mirror.corp"));
+        assert!(bypassed("eu.mirror.corp", "mirror.corp"));
+        assert!(bypassed("eu.mirror.corp", ".mirror.corp"));
+        assert!(bypassed("mirror.corp", "*.mirror.corp"));
+        assert!(bypassed("MIRROR.corp", "localhost, Mirror.Corp:443"));
+        assert!(!bypassed("evilmirror.corp", "mirror.corp"));
+        assert!(!bypassed("mirror.corp.evil", "mirror.corp"));
+        assert!(bypassed("anything.example", "*"));
+        assert!(bypassed("10.1.2.3", "10.0.0.0/8"));
+        assert!(!bypassed("11.1.2.3", "10.0.0.0/8"));
+        assert!(bypassed("127.0.0.1", "127.0.0.1"));
+        assert!(bypassed("[::1]", "::1"));
+        assert!(bypassed("fd00::5", "fd00::/8"));
+        assert!(!bypassed("10.1.2.3", "fd00::/8"));
+        assert!(!bypassed("mirror.corp", "::1,10.0.0.0/8"));
+    }
+
+    #[test]
+    fn public_url_hides_credentials() {
+        let p = Proxy::new("http://bob:hunter2@proxy.example.com:3128", "").unwrap();
+        assert_eq!(p.public_url(), "http://proxy.example.com:3128");
     }
 
     #[test]

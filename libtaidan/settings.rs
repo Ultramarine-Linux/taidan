@@ -48,6 +48,10 @@ pub struct Settings {
 
     /// for networks that only reach the internet through a proxy
     pub proxy: Option<crate::proxy::Proxy>,
+    /// whether the installed system keeps using [`Self::proxy`], for dnf and login sessions,
+    /// else it's only used during setup. On unless turned off
+    #[serde(default = "yes")]
+    pub proxy_persist: bool,
 
     /// input methods to set up, filled from [`Self::locale`] when empty unless
     /// [`Self::ims_picked`]
@@ -171,6 +175,7 @@ mod tests {
         assert_eq!(restored.tweaks.ids(), None);
         assert!(restored.passwd.expose_secret().is_empty());
         assert!(!restored.kb_picked);
+        assert!(restored.proxy_persist);
     }
 
     #[test]

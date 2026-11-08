@@ -145,6 +145,7 @@ since turned off. Both run as root.
   "dark_mode": true,              // null to keep the distro's default
   "accent": "blue",               // or teal, green, yellow, orange, red, pink, purple, slate, or null
   "proxy": null,                  // or { "url": "http://proxy:3128", "no_proxy": "localhost" }
+  "proxy_persist": true,          // whether the installed system keeps using the proxy
   "ims": ["Pinyin"],
   "ims_picked": false,
   "imf": "fcitx5",                // or "ibus"
@@ -153,15 +154,26 @@ since turned off. Both run as root.
 }
 ```
 
-The proxy URL may carry a username and password. Compared to the GTK version:
+The proxy URL on stdin never has the username and password in it. `up` gets the whole proxy,
+credentials and all, in `http_proxy` and friends for its own downloads. A tweak that sets the proxy
+up anywhere that outlives the install should only do so when `proxy_persist` is `true`, Taidan
+removes its own proxy config otherwise.
+
+With `proxy_persist` on, Taidan writes the proxy to `/etc/environment` (without credentials) and
+`/etc/dnf/libdnf5.conf.d/50-taidan-proxy.conf` (root only). libdnf5 has no `no_proxy`, so repos
+whose `baseurl`, `metalink` or `mirrorlist` host is in the bypass list get `proxy=` in
+`/etc/dnf/repos.override.d/50-taidan-proxy-bypass.repo`. This is a best effort: the mirrors a
+metalink or mirrorlist hands out are only known at runtime and still go through the proxy.
+
+Compared to the GTK version:
 
 - `langlocale` is now `locale`
 - `theme_is_dark` is now `dark_mode`, which can be `null`
 - `accent` is lowercase (`"blue"` instead of `"Blue"`)
 - `tweaks` is a list of the ids to turn on instead of a `bool` per tweak
 - `passwd` is gone
-- `timezone`, `avatar`, `download_updates`, `location`, `a11y`, `proxy`, `ims_picked` and `imf` are
-  new
+- `timezone`, `avatar`, `download_updates`, `location`, `a11y`, `proxy`, `proxy_persist`,
+  `ims_picked` and `imf` are new
 
 ### Branding
 

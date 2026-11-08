@@ -1262,9 +1262,18 @@ export component ProxyDialog inherits TdnDialog {
     dialog-width: 24rem;
     dismissed => { Network.proxy-open = false; }
 
+    // whether to keep the proxy after setup, only saved along with the rest
+    property <bool> persist: Network.proxy-persist;
+
     function submit() {
-        if !Network.proxy-busy && server.text != "" {
-            Network.set-proxy(server.text, bypass.text);
+        if Network.proxy-busy || server.text == "" {
+            // nothing to save
+        } else if server.text == Network.proxy-url && bypass.text == Network.proxy-bypass {
+            // no need to check the same proxy again
+            Network.proxy-persist = root.persist;
+            root.dismissed();
+        } else {
+            Network.set-proxy(server.text, bypass.text, root.persist);
         }
     }
 
@@ -1307,6 +1316,15 @@ export component ProxyDialog inherits TdnDialog {
         }
     }
 
+    TdnToggleRow {
+        in-dialog: true;
+        enabled: !Network.proxy-busy;
+        text: Lang.t("page-internet-proxy-persist", []);
+        checked: root.persist;
+        toggled(on) => { root.persist = on; }
+        accepted => { root.submit(); }
+    }
+
     HorizontalLayout {
         alignment: space-between;
 
@@ -1326,7 +1344,7 @@ export component ProxyDialog inherits TdnDialog {
                 enabled: !Network.proxy-busy;
                 background-color: Tokens.color-destructive-tint;
                 foreground-color: Tokens.color-destructive;
-                clicked => { Network.set-proxy("", ""); }
+                clicked => { Network.set-proxy("", "", Network.proxy-persist); }
             }
         }
 

@@ -185,6 +185,8 @@ fn start(ui: &slint::Weak<AppWindow>) {
         (!crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Location))
             .then(|| app.global::<Location<'_>>().get_enabled());
     crate::SETTINGS.write().download_updates = install.get_download_updates();
+    // here rather than when leaving the network page, the summary can still change it
+    crate::SETTINGS.write().proxy_persist = app.global::<Network<'_>>().get_proxy_persist();
     // what the theme page shows, unless it's skipped, then the distro's default stays
     crate::SETTINGS.write().dark_mode =
         (!crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Theme))

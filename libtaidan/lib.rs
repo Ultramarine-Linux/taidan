@@ -68,9 +68,9 @@ pub async fn start_install(
     tracing::info!("Starting installation");
     proxy::set(settings.proxy.clone());
     let saved = match &settings.proxy {
-        Some(proxy) => proxy.persist().await,
+        Some(proxy) if settings.proxy_persist => proxy.persist().await,
         // one saved by an earlier attempt would otherwise stay
-        None => proxy::clear().await,
+        _ => proxy::clear().await,
     };
     if let Err(e) = saved {
         tracing::error!(?e, "cannot save the proxy");
@@ -82,6 +82,13 @@ pub async fn start_install(
         stage.pre(settings, cfg, callback).await?;
         tracing::info!(?stage, "Running stage");
         stage.run(settings, cfg, callback).await?;
+    }
+    // the repos the install added, like the drivers' or a tweak's, may need overrides too
+    if settings.proxy_persist
+        && let Some(proxy) = &settings.proxy
+        && let Err(e) = proxy.write_repo_overrides().await
+    {
+        tracing::warn!(?e, "cannot keep dnf from using the proxy for the bypassed hosts");
     }
     // the user may log in now, it was locked so a half-installed system couldn't be logged in to.
     // A few tries, `pkexec` can fail for a moment after a VT switch
