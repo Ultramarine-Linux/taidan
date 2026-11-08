@@ -205,7 +205,7 @@ export global Network {
     callback save-ip(ssid: string, ip: IpSettings);
     // writes the device name and proxy to the settings, when leaving the page
     callback save();
-    // any page change, so a connection that fails later doesn't pop a dialog over another page
-    // the page shown now, `pagenum`
-    callback page-changed(int);
+    // any page change, so a connection that fails later doesn't pop a dialog over another page,
+    // with whether the network page is the one shown now
+    callback page-changed(bool);
 }

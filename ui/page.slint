@@ -29,6 +29,28 @@ export global StepHdl {
     }
 }
 
+// position of each page in `AppWindow`, in the order Next goes through them. Rust reads these
+// too, for `skip_pages` and to move to the done and error pages
+export global Pages {
+    out property <int> accessibility: 0;
+    out property <int> language: 1;
+    out property <int> keyboard: 2;
+    out property <int> welcome: 3;
+    out property <int> theme: 4;
+    out property <int> whoareyou: 5;
+    out property <int> password: 6;
+    out property <int> timezone: 7;
+    out property <int> network: 8;
+    out property <int> location: 9;
+    out property <int> drivers: 10;
+    // the last page that Next and Back go through
+    out property <int> summary: 11;
+    // the rest are jumped to
+    out property <int> installing: 12;
+    out property <int> done: 13;
+    out property <int> error: 14;
+}
+
 export component TdnBasePg {
     in property <string> pageid;
     // position of this page, and of the page currently shown

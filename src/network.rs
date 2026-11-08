@@ -20,8 +20,6 @@ const POLL: Duration = Duration::from_secs(3);
 /// how often it looks while the network page isn't shown, where little shows the state (the
 /// summary's updates switch), and the installation shouldn't compete with it
 const POLL_ELSEWHERE: Duration = Duration::from_secs(10);
-/// the network page's `pagenum`
-const NETWORK_PAGE: i32 = 8;
 /// whether the network page is shown, see [`POLL_ELSEWHERE`]
 static ON_PAGE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// how long a connection may take to come up
@@ -2399,8 +2397,8 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
         }
     });
     init_portal(ui, net, send);
-    net.on_page_changed(|page| {
-        ON_PAGE.store(page == NETWORK_PAGE, std::sync::atomic::Ordering::Relaxed);
+    net.on_page_changed(|on_page| {
+        ON_PAGE.store(on_page, std::sync::atomic::Ordering::Relaxed);
         PAGE_VISIT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     });
     net.on_save({

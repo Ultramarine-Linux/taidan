@@ -1,43 +1,55 @@
 pub use libtaidan::cfg::{Config, SkipPage};
 use libtaidan::passwd::user_already_exists;
 
-/// index of the last page that Next and Back go through (the summary), as in `ui/app.slint`
-const LAST_PAGE: i32 = 11;
-
-/// position of `page` in `ui/app.slint`, `None` if it's not a page
-const fn page_index(page: SkipPage) -> Option<i32> {
-    Some(match page {
-        SkipPage::Accessibility => 0,
-        SkipPage::Language => 1,
-        SkipPage::Keyboard => 2,
-        SkipPage::Welcome => 3,
-        SkipPage::Theme => 4,
-        SkipPage::Timezone => 7,
-        SkipPage::Network => 8,
-        SkipPage::Location => 9,
-        SkipPage::Drivers => 10,
-        SkipPage::Tweaks | SkipPage::InputMethod => return None,
-    })
+/// where `skip_pages` and Next and Back go, from the `Pages` global in `ui/page.slint`
+#[derive(Clone, Debug)]
+pub struct PageNav {
+    /// indices of the pages `skip_pages` hides
+    skipped: Vec<i32>,
+    /// the last page Next and Back go through, the summary
+    last: i32,
 }
 
-fn is_skipped(cfg: &Config, page: i32) -> bool {
-    cfg.skip_pages.iter().any(|p| page_index(*p) == Some(page))
-}
+impl PageNav {
+    #[must_use]
+    pub fn new(cfg: &Config, pages: &crate::ui::Pages<'_>) -> Self {
+        let skipped = cfg
+            .skip_pages
+            .iter()
+            .filter_map(|page| {
+                Some(match page {
+                    SkipPage::Accessibility => pages.get_accessibility(),
+                    SkipPage::Language => pages.get_language(),
+                    SkipPage::Keyboard => pages.get_keyboard(),
+                    SkipPage::Welcome => pages.get_welcome(),
+                    SkipPage::Theme => pages.get_theme(),
+                    SkipPage::Timezone => pages.get_timezone(),
+                    SkipPage::Network => pages.get_network(),
+                    SkipPage::Location => pages.get_location(),
+                    SkipPage::Drivers => pages.get_drivers(),
+                    // not pages
+                    SkipPage::Tweaks | SkipPage::InputMethod => return None,
+                })
+            })
+            .collect();
+        Self { skipped, last: pages.get_summary() }
+    }
 
-/// the page Next goes to from `page`, past the skipped ones, `page` itself if there is none
-fn next_page(cfg: &Config, page: i32) -> i32 {
-    (page + 1..=LAST_PAGE).find(|&i| !is_skipped(cfg, i)).unwrap_or(page)
-}
+    /// the page Next goes to from `page`, past the skipped ones, `page` itself if there is none
+    fn next(&self, page: i32) -> i32 {
+        (page + 1..=self.last).find(|i| !self.skipped.contains(i)).unwrap_or(page)
+    }
 
-/// the page Back goes to from `page`, past the skipped ones, `page` itself if there is none
-fn prev_page(cfg: &Config, page: i32) -> i32 {
-    (0..page).rev().find(|&i| !is_skipped(cfg, i)).unwrap_or(page)
-}
+    /// the page Back goes to from `page`, past the skipped ones, `page` itself if there is none
+    fn prev(&self, page: i32) -> i32 {
+        (0..page).rev().find(|i| !self.skipped.contains(i)).unwrap_or(page)
+    }
 
-/// the page shown first
-#[must_use]
-pub fn first_page() -> i32 {
-    next_page(&crate::CFG, -1)
+    /// the page shown first
+    #[must_use]
+    pub fn first(&self) -> i32 {
+        self.next(-1)
+    }
 }
 
 /// fills in what `/etc/taidan.toml` doesn't say, and whether the OOBE should run at all
@@ -215,14 +227,21 @@ fn load_image(path: &str) -> Option<slint::Image> {
         .ok()
 }
 
-pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, cfg: &crate::ui::Cfg<'_>) {
+pub fn initialize_ui(
+    ui: slint::Weak<crate::ui::AppWindow>,
+    cfg: &crate::ui::Cfg<'_>,
+    nav: PageNav,
+) {
     use slint::ToSharedString;
     cfg.set_version(env!("CARGO_PKG_VERSION").into());
     cfg.set_distro(crate::CFG.distro.to_shared_string());
     cfg.set_dev_session(crate::install::is_dev_session());
     cfg.set_skip_tweaks(crate::CFG.skip_pages.contains(&SkipPage::Tweaks));
-    cfg.on_next_page(|page| next_page(&crate::CFG, page));
-    cfg.on_prev_page(|page| prev_page(&crate::CFG, page));
+    cfg.on_next_page({
+        let nav = nav.clone();
+        move |page| nav.next(page)
+    });
+    cfg.on_prev_page(move |page| nav.prev(page));
     load_hero_images(ui);
     cfg.on_get_string(|path, default| {
         if let Some(serde_json::Value::String(s)) = get_val(&path) {
@@ -266,14 +285,12 @@ mod tests {
 
     #[test]
     fn navigation_skips_pages() {
-        let cfg = Config {
-            skip_pages: vec![SkipPage::Accessibility, SkipPage::Network, SkipPage::Location],
-            ..Config::default()
-        };
-        assert_eq!(next_page(&cfg, -1), 1);
-        assert_eq!(next_page(&cfg, 7), 10);
-        assert_eq!(prev_page(&cfg, 10), 7);
-        assert_eq!(prev_page(&cfg, 1), 1);
-        assert_eq!(next_page(&cfg, LAST_PAGE), LAST_PAGE);
+        // the accessibility, network and location pages
+        let nav = PageNav { skipped: vec![0, 8, 9], last: 11 };
+        assert_eq!(nav.first(), 1);
+        assert_eq!(nav.next(7), 10);
+        assert_eq!(nav.prev(10), 7);
+        assert_eq!(nav.prev(1), 1);
+        assert_eq!(nav.next(11), 11);
     }
 }

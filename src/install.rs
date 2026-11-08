@@ -2,7 +2,9 @@
 use libtaidan::{InstallMsg, steps::Stage};
 use slint::ComponentHandle;
 
-use crate::ui::{AppWindow, Drivers, Install, InstallState, Location, Network, Theme, ThemeMode};
+use crate::ui::{
+    AppWindow, Drivers, Install, InstallState, Location, Network, Pages, Theme, ThemeMode,
+};
 
 /// whether this is a developer running Taidan on their own machine, where installing (creating a
 /// user, running dnf, …) or rebooting would be destructive, the same rule as libtaidan's `set_keymap`
@@ -225,10 +227,10 @@ fn start(ui: &slint::Weak<AppWindow>) {
                 install.set_used_internet(used_internet);
                 install.set_error(error.into());
                 install.set_state(InstallState::Failed);
-                ui.set_pagenum(ui.get_error_page());
+                ui.set_pagenum(ui.global::<Pages<'_>>().get_error());
             } else {
                 install.set_state(InstallState::Done);
-                ui.set_pagenum(ui.get_done_page());
+                ui.set_pagenum(ui.global::<Pages<'_>>().get_done());
             }
         });
         if let Err(e) = set {

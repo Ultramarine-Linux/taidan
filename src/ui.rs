@@ -15,7 +15,9 @@ pub fn run() {
     slint::set_xdg_app_id(crate::APPID).expect("cannot set xdg app id");
     crate::l10n::initialize_ui(&ui.as_weak(), &ui.global::<Lang<'_>>());
     let cfg: Cfg<'_> = ui.global();
-    crate::cfg::initialize_ui(ui.as_weak(), &cfg);
+    let nav = crate::cfg::PageNav::new(&crate::CFG, &ui.global());
+    let first_page = nav.first();
+    crate::cfg::initialize_ui(ui.as_weak(), &cfg, nav);
     crate::account::initialize_ui(ui.as_weak(), &ui.global());
     crate::install::initialize_ui(&ui.as_weak(), &ui.global());
     crate::avatar::initialize_ui(&ui.as_weak(), &ui.global());
@@ -26,7 +28,7 @@ pub fn run() {
     crate::ims::initialize_ui(&ui.as_weak(), &ui.global());
     crate::a11y::initialize_ui(&ui.as_weak(), &ui.global());
     init_actions(ui.as_weak(), &ui.global());
-    ui.set_pagenum(crate::cfg::first_page());
+    ui.set_pagenum(first_page);
     ui.set_framed(crate::install::is_dev_session());
     // the OOBE has to be completed, Alt+F4 shouldn't drop to an unconfigured system. Finishing
     // quits the event loop directly instead of closing the window.

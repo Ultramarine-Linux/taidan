@@ -5,7 +5,7 @@ import { ThemePage } from "pages/0035_theme.slint";
 import { Lang } from "lang.slint";
 import { Cfg } from "cfg.slint";
 import { Account } from "account.slint";
-import { Step, StepHdl } from "page.slint";
+import { Step, StepHdl, Pages } from "page.slint";
 import { LanguagePage } from "pages/0010_language.slint";
 import { Theme, Tokens } from "slintcn/theme/tokens.slint";
 import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
@@ -30,7 +30,7 @@ import { Actions } from "actions.slint";
 import { Appearance } from "appearance.slint";
 import { ImsDialog } from "pages/0025_ims.slint";
 import { Ims } from "ims.slint";
-export { Lang, Cfg, Account, Step, StepHdl, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y, Appearance, Ims }
+export { Lang, Cfg, Account, Step, StepHdl, Pages, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y, Appearance, Ims }
 
 export component AppWindow inherits Window {
     // set from Rust to the first page not in `skip_pages`, Next and Back skip those too
@@ -59,40 +59,33 @@ export component AppWindow inherits Window {
     // the designs use 14px and all `rem` sizes derive from this
     default-font-size: 14 * Tokens.unit;
 
-    property <int> summary-page: 11;
-    // pages that are jumped to, rather than reached with Next and Back
-    property <int> installing-page: 12;
-    // read from Rust, which moves to them when the installation ends (`src/install.rs`)
-    out property <int> done-page: 13;
-    out property <int> error-page: 14;
-
     // move keyboard focus to the page being shown, unless a dialog has it
     function focus-page() {
         if Modal.open { return; }
-        if pagenum == 0 { accessibility.focus(); }
-        else if pagenum == 1 { language.focus(); }
-        else if pagenum == 2 { keyboard.focus(); }
-        else if pagenum == 3 { welcome.focus(); }
-        else if pagenum == 4 { theme.focus-picked(); }
-        else if pagenum == 5 { whoareyou.focus(); }
-        else if pagenum == 6 { password.focus(); }
-        else if pagenum == 7 { timezone.focus(); }
-        else if pagenum == 8 { network.focus(); }
-        else if pagenum == 9 { location.focus(); }
-        else if pagenum == 10 { drivers.focus(); }
-        else if pagenum == summary-page { summary.focus(); }
-        else if pagenum == installing-page { installing.focus(); }
-        else if pagenum == done-page { done.focus(); }
-        else if pagenum == error-page { error.focus(); }
+        if pagenum == Pages.accessibility { accessibility.focus(); }
+        else if pagenum == Pages.language { language.focus(); }
+        else if pagenum == Pages.keyboard { keyboard.focus(); }
+        else if pagenum == Pages.welcome { welcome.focus(); }
+        else if pagenum == Pages.theme { theme.focus-picked(); }
+        else if pagenum == Pages.whoareyou { whoareyou.focus(); }
+        else if pagenum == Pages.password { password.focus(); }
+        else if pagenum == Pages.timezone { timezone.focus(); }
+        else if pagenum == Pages.network { network.focus(); }
+        else if pagenum == Pages.location { location.focus(); }
+        else if pagenum == Pages.drivers { drivers.focus(); }
+        else if pagenum == Pages.summary { summary.focus(); }
+        else if pagenum == Pages.installing { installing.focus(); }
+        else if pagenum == Pages.done { done.focus(); }
+        else if pagenum == Pages.error { error.focus(); }
     }
     changed pagenum => {
         Modal.page = pagenum;
-        Network.page-changed(pagenum);
+        Network.page-changed(pagenum == Pages.network);
         focus-page();
-        if pagenum == 7 { Tz.refresh(); }
+        if pagenum == Pages.timezone { Tz.refresh(); }
         // with the time zone page skipped, the summary still shows the system's
-        if pagenum == summary-page && Tz.current.id == "" { Tz.refresh(); }
-        if pagenum == 8 { Network.refresh(); }
+        if pagenum == Pages.summary && Tz.current.id == "" { Tz.refresh(); }
+        if pagenum == Pages.network { Network.refresh(); }
     }
     init => {
         Modal.page = pagenum;
@@ -146,40 +139,40 @@ export component AppWindow inherits Window {
     }
 
     accessibility := AccessibilityPage {
-        index: 0;
+        index: Pages.accessibility;
         current: pagenum;
         next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     language := LanguagePage {
-        index: 1;
+        index: Pages.language;
         current: pagenum;
         next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     keyboard := KeyboardPage {
-        index: 2;
+        index: Pages.keyboard;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     welcome := WelcomePage {
-        index: 3;
+        index: Pages.welcome;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     theme := ThemePage {
-        index: 4;
+        index: Pages.theme;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     whoareyou := WhoAreYouPage {
-        index: 5;
+        index: Pages.whoareyou;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
@@ -189,7 +182,7 @@ export component AppWindow inherits Window {
     }
 
     password := PasswordPage {
-        index: 6;
+        index: Pages.password;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
@@ -199,7 +192,7 @@ export component AppWindow inherits Window {
     }
 
     timezone := TimezonePage {
-        index: 7;
+        index: Pages.timezone;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
@@ -209,7 +202,7 @@ export component AppWindow inherits Window {
     }
 
     network := NetworkPage {
-        index: 8;
+        index: Pages.network;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
@@ -222,51 +215,51 @@ export component AppWindow inherits Window {
     }
 
     location := LocationPage {
-        index: 9;
+        index: Pages.location;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     drivers := DriversPage {
-        index: 10;
+        index: Pages.drivers;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => { pagenum = Cfg.next-page(pagenum); }
     }
 
     summary := SummaryPage {
-        index: summary-page;
+        index: Pages.summary;
         current: pagenum;
         prev_page => { pagenum = Cfg.prev-page(pagenum); }
         next_page => {
             Install.start();
-            pagenum = installing-page;
+            pagenum = Pages.installing;
         }
     }
 
     installing := InstallingPage {
-        index: installing-page;
+        index: Pages.installing;
         current: pagenum;
     }
 
     done := DonePage {
-        index: done-page;
+        index: Pages.done;
         current: pagenum;
     }
 
     error := ErrorPage {
-        index: error-page;
+        index: Pages.error;
         current: pagenum;
         // back to the summary, to change what made it fail before trying again
         prev_page => {
             Install.reset();
-            pagenum = summary-page;
+            pagenum = Pages.summary;
         }
         // the retry button
         next_page => {
             Install.start();
-            pagenum = installing-page;
+            pagenum = Pages.installing;
         }
     }
 
