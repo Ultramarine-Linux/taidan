@@ -202,7 +202,9 @@ async fn run_cmd(
     let p = p.wait_with_output().await.map_err(|e| Err::FailToRunProgram(name, e))?;
     if !p.status.success() {
         let e = Err::program_fail(name, &p);
-        tracing::error!(%e, "command failed");
+        // not an error, the output can name the user and the caller reports the failure itself.
+        // The message ends with the program's last output line
+        tracing::debug!(name, %e, "command failed");
         return Err(e);
     }
     if !p.stderr.is_empty() {

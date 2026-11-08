@@ -204,6 +204,8 @@ fn start(ui: &slint::Weak<AppWindow>) {
         crate::SETTINGS.write().nointernet = !online;
     }
     let mut settings = crate::SETTINGS.read().clone();
+    // before anything that names them can be logged
+    crate::set_private_values(&settings);
     // the input methods the keyboard page and summary show, even the ones that only followed the
     // UI language, since the locale they came from may have just been cleared. Only on this
     // attempt's copy, so they keep following the language if it changes before a retry
