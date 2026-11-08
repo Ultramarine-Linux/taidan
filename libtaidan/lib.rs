@@ -78,6 +78,16 @@ pub async fn start_install(
         tracing::info!(?stage, "Running stage");
         stage.run(settings, cfg, callback).await?;
     }
+    // the user may log in now, it was locked so a half-installed system couldn't be logged in to.
+    // A few tries, `pkexec` can fail for a moment after a VT switch
+    let mut unlocked = steps::unlock_user(settings, cfg).await;
+    for attempt in 1..3 {
+        let Err(e) = &unlocked else { break };
+        tracing::warn!(?e, attempt, "cannot unlock the user, retrying");
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        unlocked = steps::unlock_user(settings, cfg).await;
+    }
+    unlocked?;
     // the user is theirs now, so no later run of Taidan should remove it. Not marked configured
     // if the record stays, since a machine that leaves the OOBE with it could later have the
     // account and its home removed by a rerun

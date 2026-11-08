@@ -12,6 +12,7 @@ mod _12_downloadupdates;
 
 use crate::prelude::*;
 
+pub use _00_useradd::unlock as unlock_user;
 pub use _07_drivers_codecs::{Hardware, detect_hardware};
 
 use crate::steps::{

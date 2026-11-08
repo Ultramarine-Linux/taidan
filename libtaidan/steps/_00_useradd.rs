@@ -106,7 +106,39 @@ async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
     // through stdin, since anyone can read a command's arguments
     super::super::root_with_stdin("chpasswd", ["-e"], format!("{user}:{pass}\n").as_bytes())
         .await
-        .wrap_msg("cannot set the password")
+        .wrap_msg("cannot set the password")?;
+    // until the installation finishes, see `unlock`
+    super::root("usermod", ["-L", "--", user]).await.wrap_msg("cannot lock the user")
+}
+
+/// lets the user log in once the installation is done. until then, it's locked, so if the OOBE
+/// gives up partway (it keeps crashing, the power goes, etc.) the display manager can't log in
+/// to an account the installation never finished. logging in would make it look like someone's
+/// account, see `passwd::login_state`, and the next run of the OOBE would keep it as it is
+///
+/// # Errors
+/// The user can't be unlocked.
+pub async fn unlock(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
+    let user = settings.username.as_str();
+    if !cfg.taidan0.systemd_homed {
+        return super::super::root("usermod", ["-U", "--", user])
+            .await
+            .wrap_msg("cannot unlock the user");
+    }
+    // updating an inactive home needs its password, which homectl takes from `$PASSWORD`. read
+    // from stdin into it, since anyone can read a command's arguments
+    super::super::root_with_stdin(
+        "sh",
+        [
+            "-c",
+            r#"IFS= read -r PASSWORD; export PASSWORD; exec homectl update --locked=no -- "$1""#,
+            "sh",
+            user,
+        ],
+        format!("{}\n", settings.passwd.expose_secret()).as_bytes(),
+    )
+    .await
+    .wrap_msg("cannot unlock the user with homectl")
 }
 
 async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
@@ -114,9 +146,11 @@ async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -
     let fullname = crate::passwd::sanitize_fullname(&settings.fullname);
     // the password goes through stdin, as the plain text one homed encrypts the home with and the
     // hash it checks logins against, so homectl doesn't need a terminal to ask for it
+    // locked until the installation finishes, see `unlock`
     let identity = serde_json::json!({
         "secret": { "password": [settings.passwd.expose_secret()] },
         "privileged": { "hashedPassword": [hash_password(settings)?] },
+        "locked": true,
     });
     let skel = stage_skel(settings, cfg).await;
     let mut args: Vec<std::ffi::OsString> = vec![
@@ -140,10 +174,7 @@ async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -
         .wrap_msg("cannot create the user with homectl")
 }
 
-/// whether the home `useradd -m` would give `user` is already there: under the `HOME=` from
-/// `/etc/default/useradd`, or `/home`. If it can't be told, it's taken to be, since that only
-/// leaves a home behind while the opposite can remove someone's files
-/// where `useradd` puts `user`'s home
+/// where `useradd` puts `user`'s home: under the `HOME=` from `/etc/default/useradd`, or `/home`
 fn home_path(user: &str) -> std::path::PathBuf {
     let base = std::fs::read_to_string("/etc/default/useradd")
         .ok()
@@ -168,6 +199,8 @@ fn previous_uid(user: &str) -> Option<u32> {
     .then_some(uid)
 }
 
+/// whether the home `useradd -m` would give `user` is already there. If it can't be told, it's
+/// taken to be, since that only leaves a home behind while the opposite can remove someone's files
 fn home_exists(user: &str) -> bool {
     // a dangling symlink counts too, userdel -r would remove what it points to
     match home_path(user).symlink_metadata() {
