@@ -101,6 +101,68 @@ skip_pages = ["location", "drivers"] # hide pages you don't want, see `SkipPage`
 org = "Fyra Labs"
 ```
 
+A few things work differently from the GTK version of Taidan:
+
+- `skip_pages = ["devicename"]` is ignored with a warning, since the device name moved onto the
+  network page. Skipping `network` keeps the system's hostname.
+- `skip_pages = ["keyboard"]` also hides the input method picker, which is part of the keyboard
+  page now. Input methods are then picked from the locale. To set up none at all, skip
+  `inputmethod`.
+- Codecs follow the drivers toggle, there's no separate codecs page. `skip_pages = ["codecs"]` is
+  the same as `drivers`. Skipping it hides the page, but drivers and codecs are still installed.
+- `internet_timeout` and `internet_retry_interval` are ignored with a warning, and
+  `/etc/com.fyralabs.Taidan/detect-internet` isn't run anymore. Whether the machine is online comes
+  from NetworkManager's connectivity check.
+- `/usr/share/taidan/oobe.sh` isn't run anymore. Use a tweak instead (see below).
+
+### Tweaks
+
+Tweaks are optional settings the user can turn on from the summary page. Each one is a directory in
+`/usr/share/taidan/tweaks/`, whose name is the tweak's id, with an executable `up` script and an
+optional `tweak.toml` (see `Tweak` in `libtaidan/tweaks.rs` for its fields). `up 1` turns the tweak
+on. `up 0` only runs for a tweak that an earlier, unfinished install turned on and the user has
+since turned off. Both run as root.
+
+`up` gets the user's choices as JSON on stdin (`Settings` in `libtaidan/settings.rs`), roughly:
+
+```jsonc
+{
+  "skipconfig": false,
+  "nointernet": false,            // setting up offline
+  "kb_layout": "us",
+  "kb_variant": null,
+  "device_name": "Cypress's Laptop",
+  "hostname": "cypresss-laptop",
+  "timezone": "America/Denver",   // "" to keep the system's
+  "locale": "en_US.UTF-8",        // "" to keep the system's
+  "fullname": "Cypress",
+  "username": "cypress",
+  "avatar": null,                 // path to the user's icon
+  "install_codecs_drivers": true,
+  "download_updates": true,
+  "location": true,               // null when the location page was skipped
+  "a11y": { "screen_reader": false, "zoom": false, "larger_text": false, ... },
+  "dark_mode": true,              // null to keep the distro's default
+  "accent": "blue",               // or teal, green, yellow, orange, red, pink, purple, slate, or null
+  "proxy": null,                  // or { "url": "http://proxy:3128", "no_proxy": "localhost" }
+  "ims": ["Pinyin"],
+  "ims_picked": false,
+  "imf": "fcitx5",                // or "ibus"
+  "actions": [[], [], [], [], []],
+  "tweaks": ["my_tweak"]          // ids of the tweaks to turn on
+}
+```
+
+The proxy URL may carry a username and password. Compared to the GTK version:
+
+- `langlocale` is now `locale`
+- `theme_is_dark` is now `dark_mode`, which can be `null`
+- `accent` is lowercase (`"blue"` instead of `"Blue"`)
+- `tweaks` is a list of the ids to turn on instead of a `bool` per tweak
+- `passwd` is gone
+- `timezone`, `avatar`, `download_updates`, `location`, `a11y`, `proxy`, `ims_picked` and `imf` are
+  new
+
 ### Branding
 
 Other distros can swap Ultramarine's look out from the same file. Every key is optional.

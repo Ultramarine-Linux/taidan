@@ -28,6 +28,9 @@ pub struct Config {
     pub ui: serde_json::Map<String, serde_json::Value>,
 }
 
+/// keys from before the Slint rewrite that are ignored, they set how the internet page pinged
+const IGNORED_KEYS: [&str; 2] = ["internet_timeout", "internet_retry_interval"];
+
 fn _default_org() -> String {
     "Fyra Labs".into()
 }
@@ -145,7 +148,18 @@ impl Config {
         else {
             return Ok(Self::default());
         };
-        basic_toml::from_str(&s)
+        basic_toml::from_str(&s).inspect(Self::warn_ignored_keys)
+    }
+
+    /// warns about keys older versions read that do nothing now. They still parse, see [`Self::ui`]
+    fn warn_ignored_keys(&self) {
+        for key in IGNORED_KEYS.into_iter().filter(|key| self.ui.contains_key(*key)) {
+            tracing::warn!(
+                key,
+                "ignoring /etc/taidan.toml key, online detection uses NetworkManager's connectivity \
+                 check now"
+            );
+        }
     }
 
     /// Populate the [`Config`] struct.
@@ -375,6 +389,7 @@ mod tests {
         let cfg: Config =
             basic_toml::from_str("internet_timeout = 20\ninternet_retry_interval = 5").unwrap();
         assert_eq!(cfg.skip_pages, []);
+        assert!(IGNORED_KEYS.iter().all(|key| cfg.ui.contains_key(*key)));
     }
 
     #[test]
