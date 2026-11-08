@@ -59,26 +59,10 @@ fn run_install(
         Ok(Err(msg)) => msg,
         Err(payload) => format!("the installation crashed: {}", panic_msg(&*payload)),
     };
-    // errors can name the user, e.g. ``user `alice` already exists``, which mustn't reach Sentry
-    let report = without_user(&msg, &settings.username);
-    // not info, which goes along with Sentry events as a breadcrumb
-    tracing::debug!(msg, "installation failed");
-    tracing::error!(msg = report, "installation failed");
+    // errors can name the user, e.g. ``user `alice` already exists``. `set_private_values` keeps
+    // that out of Sentry
+    tracing::error!(msg, "installation failed");
     Some(strip_ansi_escapes::strip_str(msg))
-}
-
-/// `msg` with `user` replaced wherever it's a word of its own, so a one-letter name doesn't take
-/// every such letter with it
-fn without_user(msg: &str, user: &str) -> String {
-    if user.is_empty() {
-        return msg.to_owned();
-    }
-    // usernames are letters, digits, `_` and `-`, so not part of a longer one
-    let word = format!("(^|[^A-Za-z0-9_-]){}($|[^A-Za-z0-9_-])", regex::escape(user));
-    let Ok(re) = regex::Regex::new(&word) else { return msg.to_owned() };
-    // twice, a match takes the character after it, which may be where the next one starts
-    let once = re.replace_all(msg, "${1}<user>${2}");
-    re.replace_all(&once, "${1}<user>${2}").into_owned()
 }
 
 /// how to enroll a key for drivers under Secure Boot, see `Drivers.secure-boot`
@@ -430,15 +414,6 @@ mod tests {
     fn secure_boot_qr_code() {
         let qr = qr_code(SECURE_BOOT_URL).unwrap();
         assert!(qr.size().width > 0);
-    }
-
-    #[test]
-    fn user_left_out_of_reports() {
-        assert_eq!(
-            without_user("user `al` already exists: al al, /home/al", "al"),
-            "user `<user>` already exists: <user> <user>, /home/<user>"
-        );
-        assert_eq!(without_user("cannot install alsa-lib", "al"), "cannot install alsa-lib");
     }
 
     #[test]

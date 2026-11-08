@@ -126,8 +126,13 @@ fn value_regex(value: &str) -> Option<regex::Regex> {
 #[cfg_attr(debug_assertions, allow(dead_code))]
 /// `text` with the [`PRIVATE_VALUES`] replaced
 fn scrub_str(text: &mut String) {
-    let values = PRIVATE_VALUES.read();
-    for (re, placeholder) in &*values {
+    replace_values(text, &PRIVATE_VALUES.read());
+}
+
+#[cfg_attr(debug_assertions, allow(dead_code))]
+/// `text` with each of `values` replaced by its placeholder
+fn replace_values(text: &mut String, values: &[(regex::Regex, &str)]) {
+    for (re, placeholder) in values {
         // twice, a match takes the character after it, which may be where the next one starts
         for _ in 0..2 {
             if let std::borrow::Cow::Owned(new) =
@@ -331,5 +336,17 @@ mod tests {
         assert!(re.is_match("user al exists"));
         assert!(re.is_match("/home/al"));
         assert!(value_regex("").is_none());
+    }
+
+    #[test]
+    fn replace_values_takes_every_match() {
+        // not through `set_private_values`, the other test sets those at the same time
+        let values = [(value_regex("al").expect("regex"), "<user>")];
+        let mut msg = "user `al` already exists: al al, /home/al".to_owned();
+        replace_values(&mut msg, &values);
+        assert_eq!(msg, "user `<user>` already exists: <user> <user>, /home/<user>");
+        let mut msg = "cannot install alsa-lib".to_owned();
+        replace_values(&mut msg, &values);
+        assert_eq!(msg, "cannot install alsa-lib");
     }
 }
