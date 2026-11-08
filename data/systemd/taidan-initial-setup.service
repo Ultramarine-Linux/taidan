@@ -30,7 +30,13 @@ Environment=XDG_CONFIG_HOME=%t/taidan/config
 Environment=XDG_CACHE_HOME=%t/taidan/cache
 Environment=XDG_DATA_HOME=%t/taidan/data
 Environment=XDG_STATE_HOME=%t/taidan/state
-ExecStartPre=-/bin/plymouth quit
+# the logs have usernames, SSIDs and the like in them. systemd opens them (creating them 0644) for
+# every command, so this goes first, before anything is written to them. Not UMask=: pkexec keeps
+# the umask, and everything taidan creates as root (repo files, directories `install -D` makes…)
+# would end up unreadable to everyone else
+ExecStartPre=-+chmod 0600 /var/log/taidan.stdout.log /var/log/taidan.stderr.log
+# as root, plymouthd ignores anyone else
+ExecStartPre=-+/bin/plymouth quit
 ExecStartPre=+sh -c "exec chvt 7"
 ExecStartPre=cp -rT /usr/share/taidan/session-config %t/taidan/config
 # the polkit rules that let the OOBE run things as root only exist while this unit runs. /run is
@@ -43,7 +49,9 @@ ExecStartPre=-+systemctl try-reload-or-restart polkit.service
 ExecStartPre=+sh -c "id taidan-portal >/dev/null 2>&1 || exec useradd --system --user-group --no-create-home --home-dir /run/taidan-portal --shell /usr/sbin/nologin --comment 'Taidan captive portal browser' taidan-portal"
 # not `shutdown`: logind refuses the power key while that's blocked, and that left holding the
 # button down as the only way out. Shutting down stops this unit first, like any other.
-# start-taidan runs the KWin session and restarts it if taidan crashes.
+# start-taidan runs the KWin session and restarts it if taidan crashes. If that keeps failing it
+# shows a message on tty7 and never exits, so the display manager and the gettys, ordered after
+# this oneshot, don't start on a system that isn't set up.
 ExecStart=systemd-inhibit \
  --who="taidan" \
  --what=handle-lid-switch:sleep \

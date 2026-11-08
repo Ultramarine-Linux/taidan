@@ -1,8 +1,13 @@
 #!/usr/bin/sh
-# started by taidan-initial-setup.service. Runs the OOBE in its own KWin session, and starts that
-# again (a few times) if taidan or KWin crashes before the setup is done, instead of falling through
-# to the display manager with a half-set-up system. A clean exit, or one after the setup removed the
-# markers, ends it.
+# started by taidan-initial-setup.service, as the taidan user. Runs the OOBE in its own KWin
+# session, and starts that again (a few times, on Slint's software renderer in case the GPU is what
+# broke it) if taidan or KWin crashes before the setup is done. A clean exit, or one after the setup
+# removed the markers, ends it.
+#
+# if it still fails, it never returns. The unit is a oneshot ordered before display-manager.service
+# and getty-pre.target, so as long as this runs neither the greeter nor a getty starts on the
+# half-set-up system. It prints what happened on its own VT instead and waits there until the
+# machine is rebooted or powered off.
 
 status_file="${RUNTIME_DIRECTORY:-/run/taidan}/exit-status"
 
@@ -53,6 +58,43 @@ stop_leftovers() {
 	fi
 }
 
+# shows why the setup stopped and blocks forever. It writes to /dev/tty, tty7, which the unit gives
+# this script as stdin and controlling terminal, and which systemd hands to the taidan user, so
+# none of it needs root. $1 is how many times it tried
+give_up() {
+	# back to this VT if someone switched away. The controlling terminal is enough for
+	# VT_ACTIVATE, and logind only counts the session as active (which the polkit rules want)
+	# while its VT is in front
+	chvt 7 2>/dev/null
+	# so whatever is still running as taidan can't use the polkit rules anymore. ExecStopPost
+	# removes them too, but this never stops on its own. polkitd picks the removal up by itself
+	pkexec rm -f /run/polkit-1/rules.d/100-taidan.rules
+	# Ctrl+C/Ctrl+\ would kill this and its parent (systemd-inhibit), which ends the unit and lets
+	# the display manager start after all. Also don't echo what's typed over the message
+	stty -isig -echo -icanon </dev/tty 2>/dev/null
+	trap '' INT QUIT TSTP HUP
+	# logind put the VT back into text mode when KWin let go of the session
+	{
+		printf '\033[H\033[2J'
+		cat <<-EOM
+		Taidan Initial Setup failed to start ($1 attempts).
+
+		The system is not set up yet, so it will not continue to the login screen.
+
+		Logs:
+		  /var/log/taidan.stdout.log
+		  /var/log/taidan.stderr.log
+		  /tmp/taidan-logs*/taidan.log
+		  /tmp/libtaidan-*/
+
+		To try again, restart the computer (Ctrl+Alt+Delete).
+		For a root shell on tty9 (Ctrl+Alt+F9), boot with systemd.debug_shell on the
+		kernel command line.
+		EOM
+	} >/dev/tty 2>/dev/null
+	exec sleep infinity
+}
+
 restarts=0
 while :; do
 	rm -f "$status_file"
@@ -65,10 +107,13 @@ while :; do
 	if [ "$restarts" -ge 3 ]; then
 		echo "taidan keeps failing (exit status ${status:-none}), giving up" >&2
 		stop_leftovers
-		exit 1
+		give_up $((restarts + 1))
 	fi
 	restarts=$((restarts + 1))
-	echo "taidan exited before the setup was done (exit status ${status:-none}), restarting" >&2
+	echo "taidan exited before the setup was done (exit status ${status:-none}), restarting with the software renderer" >&2
 	stop_leftovers
+	# Slint only falls back on its own when it can't create the renderer at all. femtovg failing
+	# later, in resume(), comes out of ui.run() and ends taidan. KWin passes this on to the session
+	export SLINT_BACKEND=winit-software
 	sleep 1
 done
