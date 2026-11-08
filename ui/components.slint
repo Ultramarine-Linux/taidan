@@ -906,12 +906,17 @@ export component TdnIconButton inherits Rectangle {
     width: self.height;
     height: 1.6rem * Tokens.text-scale;
     border-radius: Tokens.radius-sm;
-    background: root.busy ? transparent
-        : !root.enabled ? TdnStyle.accent.transparentize(0.92)
-        : area.pressed ? TdnStyle.accent.transparentize(0.6)
-        : area.has-hover ? TdnStyle.accent.transparentize(0.75)
-        : TdnStyle.accent.transparentize(0.85);
-    animate background { duration: Tokens.motion-fast; }
+
+    // on an inner rectangle, not the root, see `TdnBtn`'s `frame`
+    Rectangle {
+        border-radius: root.border-radius;
+        background: root.busy ? transparent
+            : !root.enabled ? TdnStyle.accent.transparentize(0.92)
+            : area.pressed ? TdnStyle.accent.transparentize(0.6)
+            : area.has-hover ? TdnStyle.accent.transparentize(0.75)
+            : TdnStyle.accent.transparentize(0.85);
+        animate background { duration: Tokens.motion-fast; }
+    }
 
     // stays enabled while busy, since disabling the focused item drops focus
     focus := FocusScope {
