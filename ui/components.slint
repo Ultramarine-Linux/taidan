@@ -9,6 +9,7 @@ import { Modal, DialogOpener } from "modal.slint";
 import { Appearance } from "appearance.slint";
 export { Modal, DialogOpener, Dir }
 import { Card } from "slintcn/components/card.slint";
+import { ScrollView } from "std-widgets.slint";
 
 export global TdnStyle {
     // the accent picked on the theme page, so it shows right away like dark mode does, otherwise
@@ -1040,5 +1041,51 @@ export component TdnDialog inherits Rectangle {
                 @children
             }
         }
+    }
+}
+
+// a list in a dialog that scrolls once the dialog shrinks it to fit the window, otherwise as tall
+// as what's in it. Items call `reveal` from their `focus-in`, Tab doesn't scroll on its own
+export component TdnScrollList inherits ScrollView {
+    in property <length> spacing: 1rem;
+
+    // keeps what has keyboard focus in view
+    public function reveal(y: length, item-height: length) {
+        // with room for the focus ring around it
+        let ring = Tokens.focus-ring-offset + Tokens.focus-ring-width;
+        let height = item-height + 2 * ring;
+        let top = y - ring - root.absolute-position.y;
+        if top < 0 {
+            root.content-y = min(0, root.content-y - top);
+        } else if top + height > root.visible-height {
+            root.content-y = max(
+                root.visible-height - root.content-height,
+                root.content-y - (top + height - root.visible-height));
+        }
+    }
+
+    // `list.preferred-height` measures wrapped text as a single line, so it comes out too short
+    // and the end can't be scrolled to. Where the end marker lands is the real height
+    preferred-height: list-end.y;
+    content-width: self.visible-width;
+    content-height: list-end.y;
+    // it only scrolls up and down, a horizontal bar would sit on top of the last item
+    horizontal-scrollbar-policy: always-off;
+
+    list := VerticalLayout {
+        width: root.visible-width;
+        // laid out at its (too short) preferred height, the items past it still get placed
+        height: self.preferred-height;
+        alignment: start;
+        spacing: root.spacing;
+        // focus rings are drawn outside their item, keep them clear of the edges and the scrollbar
+        padding-left: Tokens.focus-ring-offset + Tokens.focus-ring-width;
+        padding-top: self.padding-left;
+        padding-right: 0.9rem;
+
+        @children
+
+        // after the spacing, which leaves a gap at the bottom
+        list-end := Rectangle { height: 0; }
     }
 }

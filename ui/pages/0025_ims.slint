@@ -1,29 +1,13 @@
 import { Lang, Dir } from "../lang.slint";
 import { Ims } from "../ims.slint";
-import { TdnText, TdnBtn, TdnToggleRow, TdnDialog, TdnStyle } from "../components.slint";
+import { TdnText, TdnBtn, TdnToggleRow, TdnDialog, TdnStyle, TdnScrollList } from "../components.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
-import { ScrollView } from "std-widgets.slint";
 
 // input methods to add, opened from the keyboard page
 export component ImsDialog inherits TdnDialog {
     title: Lang.t("page-keyboard-ims", []);
     dialog-width: 26rem;
     dismissed => { Ims.open = false; }
-
-    // keeps what has keyboard focus in view, Tab doesn't scroll on its own
-    function reveal(y: length, item-height: length) {
-        // with room for the focus ring around it
-        let ring = Tokens.focus-ring-offset + Tokens.focus-ring-width;
-        let height = item-height + 2 * ring;
-        let top = y - ring - scroll.absolute-position.y;
-        if top < 0 {
-            scroll.content-y = min(0, scroll.content-y - top);
-        } else if top + height > scroll.visible-height {
-            scroll.content-y = max(
-                scroll.visible-height - scroll.content-height,
-                scroll.content-y - (top + height - scroll.visible-height));
-        }
-    }
 
     TdnText {
         text: Lang.t("page-keyboard-ims-desc", []);
@@ -32,46 +16,29 @@ export component ImsDialog inherits TdnDialog {
         wrap: word-wrap;
     }
 
-    scroll := ScrollView {
-        // as tall as the list, the dialog shrinks it to fit the window and it scrolls
-        preferred-height: list-end.y;
-        content-width: self.visible-width;
-        content-height: list-end.y;
-        horizontal-scrollbar-policy: always-off;
+    scroll := TdnScrollList {
+        spacing: 0.5rem;
 
-        list := VerticalLayout {
-            width: scroll.visible-width;
-            height: self.preferred-height;
-            alignment: start;
+        for im[i] in Ims.items: VerticalLayout {
             spacing: 0.5rem;
-            // room for the focus rings and the scrollbar
-            padding-left: Tokens.focus-ring-offset + Tokens.focus-ring-width;
-            padding-top: self.padding-left;
-            padding-right: 0.9rem;
 
-            for im[i] in Ims.items: VerticalLayout {
-                spacing: 0.5rem;
-
-                // a heading where the language changes
-                if i == 0 || Ims.items[i - 1].lang != im.lang: TdnText {
-                    text: im.lang;
-                    font-weight: Tokens.typography-weight-medium;
-                    color: Tokens.color-muted-foreground;
-                    horizontal-alignment: Dir.text-start;
-                }
-
-                TdnToggleRow {
-                    in-dialog: true;
-                    text: im.native == im.name ? im.name : im.name + " (" + im.native + ")";
-                    checked: im.on;
-                    toggled(on) => { Ims.set(i, on); }
-                    focus-in(y, height) => { root.reveal(y, height); }
-                    // Enter closes it like Done, Space toggles
-                    accepted => { root.dismissed(); }
-                }
+            // a heading where the language changes
+            if i == 0 || Ims.items[i - 1].lang != im.lang: TdnText {
+                text: im.lang;
+                font-weight: Tokens.typography-weight-medium;
+                color: Tokens.color-muted-foreground;
+                horizontal-alignment: Dir.text-start;
             }
 
-            list-end := Rectangle { height: 0; }
+            TdnToggleRow {
+                in-dialog: true;
+                text: im.native == im.name ? im.name : im.name + " (" + im.native + ")";
+                checked: im.on;
+                toggled(on) => { Ims.set(i, on); }
+                focus-in(y, height) => { scroll.reveal(y, height); }
+                // Enter closes it like Done, Space toggles
+                accepted => { root.dismissed(); }
+            }
         }
     }
 
