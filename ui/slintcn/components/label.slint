@@ -18,8 +18,9 @@ export component Label inherits Rectangle {
     callback clicked();
 
     background: transparent;
-    width:  row.preferred-width;
-    height: row.preferred-height;
+    // its text's width when there's room, narrower and wrapped when a long translation needs it
+    preferred-width: row.preferred-width;
+    min-width: 0;
 
     row := HorizontalLayout {
         spacing: 2px;
@@ -30,6 +31,9 @@ export component Label inherits Rectangle {
                 : Tokens.color-foreground;
             font-size: Tokens.typography-body-size;   // shadcn Label text-sm (14)
             font-weight: Tokens.typography-weight-medium;
+            wrap: word-wrap;
+            // or the layout never lets it be narrower than its whole text on one line
+            min-width: 0;
         }
         if variant == LabelVariant.required: Text {
             text: "*";

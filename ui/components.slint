@@ -213,10 +213,6 @@ export component TdnInput inherits Rectangle {
     key-pressed(event) => { reject }
     public function select-all() { input.select-all(); }
 
-    // true while focus arrived from a pointer press — suppresses the ring so it
-    // is keyboard-only (focus-visible emulation), set on pointer down, cleared
-    // on any key interaction
-    property <bool> pointer-focus: false;
     property <bool> revealed: false;
     property <bool> reveal-pointer-focus: false;
     // the page it's on is shown, leaving it hides a revealed password again
@@ -258,13 +254,6 @@ export component TdnInput inherits Rectangle {
 
         focus-area := TouchArea {
             mouse-cursor: MouseCursor.text;
-            pointer-event(ev) => {
-                if (root.enabled
-                    && ev.button == PointerEventButton.left
-                    && ev.kind == PointerEventKind.down) {
-                    root.pointer-focus = true;
-                }
-            }
             clicked => { input.focus(); }
         }
 
@@ -301,7 +290,6 @@ export component TdnInput inherits Rectangle {
             edited => { root.edited(self.text); }
             accepted => { root.accepted(self.text); }
             key-pressed(event) => {
-                root.pointer-focus = false;
                 // Enter is `accepted`, which moves on, so a held one would go through the next pages too
                 if event.text == Key.Return && event.repeat { return accept; }
                 root.key-pressed(event)
@@ -384,8 +372,10 @@ export component TdnInput inherits Rectangle {
             }
         }
 
-        // outer focus ring — keyboard-only, drawn last so it's visually unclipped
-        if input.has-focus && !root.pointer-focus: FocusRing {
+        // outer focus ring, drawn last so it isn't clipped. Unlike the buttons' it shows after a
+        // click too, as browsers' `:focus-visible` does on text fields, which keep the focus
+        // to type into
+        if input.has-focus: FocusRing {
             host-width: parent.width;
             host-height: parent.height;
         }
@@ -519,6 +509,9 @@ export component TdnSelect inherits Rectangle {
     accessible-enabled: root.enabled;
     accessible-expandable: true;
     accessible-expanded: root.open;
+    accessible-action-default => {
+        if root.enabled && Modal.open == root.in-dialog { root.open = !root.open; }
+    }
     accessible-action-expand => {
         if root.enabled && Modal.open == root.in-dialog { root.open = !root.open; }
     }
@@ -556,10 +549,12 @@ export component TdnSelect inherits Rectangle {
                     }
                     reject
                 }
-                // tabbing away leaves the list open otherwise. Not on clicks, one on an option
-                // must still reach it
+                // tabbing or clicking away leaves the list open otherwise. A click on an option
+                // doesn't move the focus, as the rows aren't focusable here, so it still reaches it
                 focus-lost(reason) => {
-                    if reason == FocusReason.tab-navigation { root.open = false; }
+                    if reason == FocusReason.tab-navigation || reason == FocusReason.pointer-click {
+                        root.open = false;
+                    }
                 }
             }
 
@@ -746,12 +741,16 @@ export component TdnToggleRow inherits Rectangle {
             layout-order: Dir.order(1);
             alignment: center;
 
+            // off is an outlined track with a darker knob, both above the 3:1 WCAG asks of
+            // controls against the card in either mode
             Rectangle {
                 width: 2.4rem;
                 height: 1.3rem;
                 border-radius: self.height / 2;
-                background: root.checked ? Tokens.color-primary : Tokens.color-border-hairline-strong;
-                animate background { duration: Tokens.motion-fast; }
+                border-width: 1px;
+                border-color: root.checked ? Tokens.color-primary : Tokens.color-muted-foreground;
+                background: root.checked ? Tokens.color-primary : transparent;
+                animate background, border-color { duration: Tokens.motion-fast; }
 
                 Rectangle {
                     width: parent.height - 0.3rem;
@@ -760,7 +759,8 @@ export component TdnToggleRow inherits Rectangle {
                     // on is toward the end, the left for right-to-left languages
                     x: Dir.x(root.checked ? parent.width - self.width - 0.15rem : 0.15rem, self.width, parent.width);
                     border-radius: self.width / 2;
-                    background: root.checked ? Tokens.color-primary-foreground : Tokens.color-background;
+                    background: root.checked ? Tokens.color-primary-foreground : Tokens.color-muted-foreground;
+                    animate background { duration: Tokens.motion-fast; }
                     animate x {
                         duration: Tokens.motion-fast;
                         easing: Tokens.motion-easing-standard;
@@ -987,8 +987,10 @@ export component TdnDialog inherits Rectangle {
     TouchArea { }
 
     FocusScope {
-        // keys bubble up to it, it needn't be a Tab stop
+        // keys bubble up to it, it needn't be a Tab stop, and a click on the dialog's
+        // background mustn't take the focus from the field that has it
         focus-on-tab-navigation: false;
+        focus-on-click: false;
         key-pressed(event) => {
             if event.text == Key.Escape {
                 root.dismissed();
