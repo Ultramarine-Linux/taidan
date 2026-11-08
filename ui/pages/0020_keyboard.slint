@@ -328,6 +328,14 @@ export component KeyboardPage inherits TdnPage {
         vertical-stretch: 0;
     }
 
+    if Lang.keymap-not-saved: TdnText {
+        text: Lang.t("page-keyboard-not-saved", []);
+        color: Tokens.color-destructive;
+        horizontal-alignment: Dir.text-start;
+        wrap: word-wrap;
+        vertical-stretch: 0;
+    }
+
     // only where the distro's input method framework has any
     if Ims.items.length > 0: ImsRow { }
 }

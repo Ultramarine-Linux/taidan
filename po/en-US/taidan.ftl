@@ -103,6 +103,8 @@ page-keyboard-search-layout = Search keyboard layouts…
 page-keyboard-search-variant = Search keyboard variants…
 # shown under the layouts when one that can't type Latin letters is picked, e.g. Russian
 page-keyboard-latin-fallback = English (US) is added too, for typing names and passwords. Press Super+Space to switch between them.
+# shown under the layouts when the picked layout couldn't be saved for the login screen
+page-keyboard-not-saved = The layout couldn't be saved for the login screen yet. It will be tried again during setup.
 # input methods (IMEs), for languages typed with more than a keyboard layout, e.g. Chinese
 page-keyboard-ims = Input Methods
 # what page-keyboard-ims shows when none are turned on, as in "Input Methods: None"

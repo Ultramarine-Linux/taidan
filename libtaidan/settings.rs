@@ -10,6 +10,9 @@ pub struct Settings {
 
     pub kb_layout: String,
     pub kb_variant: Option<String>,
+    /// whether the user picked [`Self::kb_layout`] themselves, else it's the one the system has
+    /// already, which the system keeps rather than getting it back with only its first layout
+    pub kb_picked: bool,
 
     pub device_name: String,
     pub hostname: String,
@@ -167,6 +170,7 @@ mod tests {
         assert_eq!(restored.a11y, crate::a11y::A11y::default());
         assert_eq!(restored.tweaks.ids(), None);
         assert!(restored.passwd.expose_secret().is_empty());
+        assert!(!restored.kb_picked);
     }
 
     #[test]

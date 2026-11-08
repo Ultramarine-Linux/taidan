@@ -11,6 +11,7 @@ impl super::Step for SetLocale {
         _: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
+        set_keymap(settings).await;
         // an empty locale keeps whatever the system already has
         if settings.locale.is_empty() {
             return Ok(());
@@ -22,5 +23,18 @@ impl super::Step for SetLocale {
             tracing::warn!(?e, locale = settings.locale, "cannot set the system language");
         }
         Ok(())
+    }
+}
+
+/// the keyboard page already set the picked keymap for the system, but that's done in the
+/// background and only logged when it fails, so the login screen could be left on the old one.
+/// One that wasn't picked is the system's already
+async fn set_keymap(settings: &crate::settings::Settings) {
+    if !settings.kb_picked || settings.kb_layout.is_empty() {
+        return;
+    }
+    let (layout, variant) = (&settings.kb_layout, settings.kb_variant.as_deref());
+    if let Err(e) = crate::i18n::set_localectl_keymap(layout, variant).await {
+        tracing::warn!(?e, layout, ?variant, "cannot set the system keymap");
     }
 }

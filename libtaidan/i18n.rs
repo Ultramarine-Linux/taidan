@@ -216,9 +216,9 @@ impl InputMethod {
 /// layouts whose default variant can't type ASCII, which usernames, passwords that work
 /// everywhere, and commands need
 const NON_LATIN: &[&str] = &[
-    "af", "am", "ara", "bd", "bg", "bt", "by", "eg", "et", "ge", "gn", "gr", "il", "in", "iq",
-    "ir", "kg", "kh", "kz", "la", "lk", "ma", "mk", "mm", "mn", "mv", "my", "np", "pk", "rs", "ru",
-    "sy", "th", "tj", "ua", "uz",
+    "af", "am", "ara", "bd", "bg", "brai", "bt", "by", "eg", "et", "ge", "gn", "gr", "il", "in",
+    "iq", "ir", "kg", "kh", "kz", "la", "lk", "ma", "mk", "mm", "mn", "mv", "my", "np", "pk", "rs",
+    "ru", "sy", "th", "tj", "ua", "uz",
 ];
 
 /// variants of [`NON_LATIN`] layouts that type Latin letters but don't say `latin` in their name
@@ -242,9 +242,12 @@ const LATIN_VARIANTS: &[(&str, &str)] = &[
     ("ua", "crh_f"),
 ];
 
-/// variants of other layouts that can't type ASCII, a variant ending in `*` stands for all that
-/// start with the rest
+/// variants of other layouts that can't type ASCII, checked against xkeyboard-config's
+/// `evdev.lst`. A variant ending in `*` stands for all that start with the rest, one starting with
+/// `*` for all that end with it
 const NON_LATIN_VARIANTS: &[(&str, &str)] = &[
+    ("al", "veqilharxhi"),
+    ("az", "cyrillic"),
     ("br", "rus"),
     ("ca", "ike"),
     ("cn", "mon_*"),
@@ -255,23 +258,41 @@ const NON_LATIN_VARIANTS: &[(&str, &str)] = &[
     ("de", "ru"),
     ("de", "ru-recom"),
     ("de", "ru-translit"),
+    ("dz", "ar"),
+    ("dz", "ber"),
+    ("fr", "geo"),
+    ("id", "melayu-phonetic*"),
+    ("id", "pegon-phonetic"),
+    ("ie", "ogam*"),
+    ("it", "geo"),
     ("jp", "kana"),
     ("jp", "kana86"),
+    ("lv", "modern-cyr"),
+    ("me", "cyrillic*"),
+    ("ph", "*-bay"),
     ("pl", "ru_phonetic_dvorak"),
     ("se", "rus"),
     ("us", "chr"),
     ("us", "rus"),
 ];
 
+/// whether `variant` matches `pattern`, which may start or end with a `*` wildcard
+fn variant_matches(pattern: &str, variant: &str) -> bool {
+    if let Some(prefix) = pattern.strip_suffix('*') {
+        variant.starts_with(prefix)
+    } else if let Some(suffix) = pattern.strip_prefix('*') {
+        variant.ends_with(suffix)
+    } else {
+        pattern == variant
+    }
+}
+
 /// whether `layout` with `variant` (empty for the default one) can't type ASCII
 fn is_non_latin(layout: &str, variant: &str) -> bool {
     if NON_LATIN.contains(&layout) {
         return !variant.contains("latin") && !LATIN_VARIANTS.contains(&(layout, variant));
     }
-    NON_LATIN_VARIANTS.iter().any(|&(l, v)| {
-        l == layout
-            && v.strip_suffix('*').map_or(v == variant, |prefix| variant.starts_with(prefix))
-    })
+    NON_LATIN_VARIANTS.iter().any(|&(l, v)| l == layout && variant_matches(v, variant))
 }
 
 /// switches between the layouts of an [`XkbKeymap`] with a Latin one added, Super+Space as on
@@ -318,14 +339,16 @@ impl XkbKeymap {
         let entry = |key: &str, rest: &[&str]| {
             ["--group", "Layout", "--key", key].iter().chain(rest).map(|&s| s.to_owned()).collect()
         };
+        // `Options` even when empty, so a switch toggle left from an earlier pick goes away. KWin
+        // only uses it with `ResetOldOptions`, else it keeps `XKB_DEFAULT_OPTIONS`
         let mut entries = vec![
             entry("Use", &["--type=bool", "true"]),
             entry("LayoutList", &["--", &self.layouts]),
             entry("VariantList", &["--", &self.variants]),
+            entry("Options", &["--", &self.options]),
         ];
         if self.has_latin_fallback() {
             entries.push(entry("ResetOldOptions", &["--type=bool", "true"]));
-            entries.push(entry("Options", &["--", &self.options]));
         }
         entries
     }
@@ -381,7 +404,11 @@ async fn set_gsettings_keymap(user: &str, layout: &str, variant: Option<&str>) -
     Ok(())
 }
 
-async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> Res<()> {
+/// sets the system's keymap (locale1), which the login screen and console use
+///
+/// # Errors
+/// - `localectl` fails
+pub async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> Res<()> {
     let xkb = XkbKeymap::new(layout, variant);
     let args = ["set-x11-keymap", &xkb.layouts, "", &xkb.variants, &xkb.options];
     root("localectl", &args).await?;
@@ -448,24 +475,35 @@ pub async fn write_keymap_to_skel(
 }
 
 #[allow(clippy::equatable_if_let)]
-#[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+#[allow(clippy::missing_panics_doc)]
 /// applies the keymap to `user`'s session (the current user's for [`None`]), and to the system
-/// (locale1, which the login screen and console use) if `system`
+/// (locale1, which the login screen and console use) if `system`. Returns whether the system's
+/// was saved, `true` if it wasn't asked for. A failure there is logged and the session still gets
+/// the keymap, the installation's `SetLocale` step tries the system again
+///
+/// # Errors
+/// - cannot get the current username
+/// - cannot apply the keymap to the session
 pub async fn set_keymap(
     user: Option<&str>,
     layout: &str,
     variant: Option<&str>,
     system: bool,
-) -> Res<()> {
+) -> Res<bool> {
     let current_user =
         uzers::get_current_username().ok_or(Err::Msg("can't get current username"))?;
     if current_user.as_encoded_bytes() != b"taidan" && cfg!(debug_assertions) {
         // #74
         tracing::warn!("Skipping set_keymap in debug mode without being `taidan` user");
-        return Ok(());
+        return Ok(true);
     }
-    if system && let Ok(true) = tokio::fs::try_exists("/usr/bin/localectl").await {
-        set_localectl_keymap(layout, variant).await?;
+    let mut saved = true;
+    if system
+        && let Ok(true) = tokio::fs::try_exists("/usr/bin/localectl").await
+        && let Err(e) = set_localectl_keymap(layout, variant).await
+    {
+        tracing::error!(?e, layout, ?variant, "cannot set the system keymap");
+        saved = false;
     }
 
     let user = match user {
@@ -473,10 +511,11 @@ pub async fn set_keymap(
         None => current_user.to_str().ok_or(Err::Msg("current username is not valid UTF-8"))?,
     };
     if let Ok(true) = tokio::fs::try_exists("/usr/bin/kwriteconfig6").await {
-        set_kde_keymap(user, layout, variant).await
+        set_kde_keymap(user, layout, variant).await?;
     } else {
-        set_gsettings_keymap(user, layout, variant).await
+        set_gsettings_keymap(user, layout, variant).await?;
     }
+    Ok(saved)
 }
 
 #[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
@@ -547,6 +586,79 @@ mod tests {
         assert!(XkbKeymap::new("eg", None).has_latin_fallback());
         let gr = XkbKeymap::new("gr", Some("polytonic"));
         assert_eq!(gr.gnome_sources(), ["('xkb', 'gr+polytonic')", "('xkb', 'us')"]);
+    }
+
+    #[test]
+    fn non_latin_variants() {
+        for (layout, variant) in [
+            ("brai", None),
+            ("brai", Some("left_hand")),
+            ("dz", Some("ar")),
+            ("dz", Some("ber")),
+            ("ph", Some("qwerty-bay")),
+            ("ph", Some("capewell-qwerf2k6-bay")),
+            ("fr", Some("geo")),
+            ("it", Some("geo")),
+            ("id", Some("melayu-phonetic")),
+            ("id", Some("melayu-phoneticx")),
+            ("id", Some("pegon-phonetic")),
+            ("ie", Some("ogam")),
+            ("ie", Some("ogam_is434")),
+            ("lv", Some("modern-cyr")),
+            ("me", Some("cyrillic")),
+            ("me", Some("cyrillicalternatequotes")),
+            ("al", Some("veqilharxhi")),
+            ("az", Some("cyrillic")),
+        ] {
+            assert!(XkbKeymap::new(layout, variant).has_latin_fallback(), "{layout}({variant:?})");
+        }
+        for (layout, variant) in [
+            ("dz", None),
+            ("dz", Some("azerty-deadkeys")),
+            ("ph", None),
+            ("ph", Some("capewell-dvorak")),
+            ("id", Some("javanese")),
+            ("ie", None),
+            ("lv", Some("modern")),
+            ("me", Some("latinyz")),
+            ("al", Some("plisi")),
+        ] {
+            assert!(!XkbKeymap::new(layout, variant).has_latin_fallback(), "{layout}({variant:?})");
+        }
+    }
+
+    #[test]
+    fn every_non_latin_variant_exists() {
+        // the patterns follow xkeyboard-config, each should still match one of its variants. These
+        // aren't in `evdev.lst`, the `ru` ones are only in the extras and `kana86` in older ones
+        let extras = [("de", "ru-recom"), ("de", "ru-translit"), ("jp", "kana86")];
+        for &(layout, pattern) in NON_LATIN_VARIANTS {
+            if extras.contains(&(layout, pattern)) {
+                continue;
+            }
+            let variants = &LAYOUTS.get(layout).unwrap_or_else(|| panic!("no {layout}")).variants;
+            assert!(
+                variants.keys().any(|v| variant_matches(pattern, v)),
+                "{layout}({pattern}) matches no variant"
+            );
+        }
+        for layout in NON_LATIN {
+            assert!(LAYOUTS.contains_key(layout), "no {layout}");
+        }
+        assert!(!LAYOUTS.contains_key("custom"));
+    }
+
+    #[test]
+    fn kxkbrc_clears_options() {
+        let has = |km: &XkbKeymap, key: &str| {
+            km.kxkbrc_entries().iter().find(|e| e[3] == key).map(|e| e.last().cloned())
+        };
+        let de = XkbKeymap::new("de", None);
+        assert_eq!(has(&de, "Options"), Some(Some(String::new())));
+        assert_eq!(has(&de, "ResetOldOptions"), None);
+        let ru = XkbKeymap::new("ru", None);
+        assert_eq!(has(&ru, "Options"), Some(Some(LAYOUT_SWITCH.to_owned())));
+        assert_eq!(has(&ru, "ResetOldOptions"), Some(Some("true".to_owned())));
     }
 
     #[test]

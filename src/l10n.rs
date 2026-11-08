@@ -181,6 +181,10 @@ fn display_hdl<T>(
 /// a keymap for the worker below, and whether it goes to the system too, not only the session
 type KeymapReq = (String, Option<String>, bool);
 
+/// the window the keymap worker tells when the system keymap couldn't be saved
+static KEYMAP_UI: std::sync::OnceLock<slint::Weak<crate::ui::AppWindow>> =
+    std::sync::OnceLock::new();
+
 static KEYMAP_TX: LazyLock<std::sync::mpsc::Sender<KeymapReq>> = LazyLock::new(|| {
     let (tx, rx) = std::sync::mpsc::channel::<KeymapReq>();
     std::thread::spawn(move || {
@@ -192,13 +196,28 @@ static KEYMAP_TX: LazyLock<std::sync::mpsc::Sender<KeymapReq>> = LazyLock::new(|
                 req.2 = system;
             }
             let (layout, variant, system) = req;
-            if let Err(e) = crate::RT.block_on(libtaidan::i18n::set_keymap(
+            let saved = match crate::RT.block_on(libtaidan::i18n::set_keymap(
                 None,
                 &layout,
                 variant.as_deref(),
                 system,
             )) {
-                tracing::error!(?e, layout, ?variant, "cannot set keymap");
+                Ok(saved) => saved,
+                Err(e) => {
+                    tracing::error!(?e, layout, ?variant, "cannot set keymap");
+                    // the system's may have been saved, but there's no telling
+                    true
+                }
+            };
+            // only a request for the system says anything about it
+            if system && let Some(ui) = KEYMAP_UI.get() {
+                let res = ui.upgrade_in_event_loop(move |ui| {
+                    use slint::ComponentHandle as _;
+                    ui.global::<crate::ui::Lang<'_>>().set_keymap_not_saved(!saved);
+                });
+                if let Err(e) = res {
+                    tracing::error!(?e, "cannot tell the UI about the keymap");
+                }
             }
         }
     });
@@ -217,9 +236,13 @@ fn has_latin_fallback(layout: &str, variant: Option<&str>) -> bool {
     libtaidan::i18n::XkbKeymap::new(layout, variant).has_latin_fallback()
 }
 
-/// keeps the keymap and applies it, to the system too if `system`, else only to the session
+/// keeps the keymap and applies it, to the system too if `system`, which is what picking one on
+/// the page does, else only to the session
 fn set_keymap(layout: &str, variant: Option<&str>, system: bool) {
     save_keymap(layout, variant);
+    if system {
+        crate::SETTINGS.write().kb_picked = true;
+    }
     if let Err(e) = KEYMAP_TX.send((layout.to_owned(), variant.map(ToOwned::to_owned), system)) {
         tracing::error!(?e, "keymap worker is gone");
     }
@@ -322,6 +345,9 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
         }
     });
     init_language_list(ui, lang);
+    if KEYMAP_UI.set(ui.clone()).is_err() {
+        tracing::warn!("keymaps initialized twice");
+    }
     init_keymaps(ui, lang);
 }
 
