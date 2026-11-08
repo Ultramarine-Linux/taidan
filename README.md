@@ -75,7 +75,7 @@ then press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> to open a root terminal.
 
 `GPL-3.0-or-later`
 
-    Copyright © 2024~2025  Fyra Labs & Ultramarine Linux Contributors
+    Copyright © 2024~2026  Fyra Labs & Ultramarine Linux Contributors
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
