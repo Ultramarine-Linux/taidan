@@ -17,7 +17,6 @@ pub mod ui;
 
 use std::sync::LazyLock;
 
-use crate::prelude::*;
 use i18n_embed::LanguageLoader;
 use parking_lot::RwLock;
 use sentry::integrations::tracing::{BreadcrumbLayer, ErrorLayer, SpanLayer};
@@ -51,10 +50,6 @@ pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     tracing::debug!("Populated cfg::Config (turn on `trace` to see body)");
     cfg
 });
-/// Language Loader
-pub static LL: LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
-    LazyLock::new(|| RwLock::new(handle_l10n()));
-
 pub static SETTINGS: LazyLock<RwLock<libtaidan::settings::Settings>> =
     LazyLock::new(Default::default);
 
@@ -71,22 +66,6 @@ pub static RT: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
 #[exclude = "en-owo/*.ftl"]
 struct Localizations;
 
-fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
-    use i18n_embed::{LanguageLoader, fluent::fluent_language_loader};
-    let loader = fluent_language_loader!();
-    let locale_solver = poly_l10n::LocaleFallbackSolver::<poly_l10n::Rulebook>::default();
-    let available_langs = loader.available_languages(&Localizations).unwrap();
-    let mut langs = poly_l10n::system_want_langids()
-        .flat_map(|li| locale_solver.solve_locale(li))
-        .filter(|li| available_langs.contains(li))
-        .collect_vec();
-    if langs.is_empty() {
-        langs = vec![loader.fallback_language().clone()];
-    }
-    loader.load_languages(&Localizations, &langs).unwrap();
-    loader
-}
-
 #[allow(clippy::missing_errors_doc)]
 #[allow(clippy::missing_panics_doc)]
 fn main() {
@@ -95,7 +74,7 @@ fn main() {
     if CFG.should_exit {
         return;
     }
-    std::sync::LazyLock::force(&LL);
+    std::sync::LazyLock::force(&l10n::PO_LOADER);
 
     ui::run();
 }

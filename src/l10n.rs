@@ -1,6 +1,4 @@
 //! Runtime l10n module.
-//!
-//! The compile-time loader is available as [`crate::LL`].
 use i18n_embed::fluent::{FluentLanguageLoader, fluent_language_loader};
 use i18n_embed::{FileSystemAssets, LanguageLoader as _, unic_langid::LanguageIdentifier};
 use icu::experimental::displaynames as dn;
@@ -59,7 +57,6 @@ pub fn new_loader(langs: Vec<LanguageIdentifier>) -> FluentLanguageLoader {
         embedded = vec![fallback];
     }
     if let Err(e) = loader.load_languages(&crate::Localizations, &embedded) {
-        // `LL` still has the strings, see the `_t` callback
         tracing::error!(?e, ?embedded, "cannot load the embedded translations either");
     }
     loader
@@ -141,9 +138,6 @@ fn ui_langs(
 
 /// switches the UI to `lang`, a BCP 47 tag, and keeps it for the installed system. Returns the
 /// tag of the translation it got, which may be a fallback
-///
-/// # Panics
-/// If the bundled translations can't be loaded.
 pub fn set_lang(lang: &str) -> String {
     let mut shown = "en-US".to_owned();
     if let Ok(locale) = lang
@@ -155,12 +149,9 @@ pub fn set_lang(lang: &str) -> String {
     {
         tracing::info!(?locale, lang, "Using selected locale");
         let locales = ui_langs(locale, &crate::AVAILABLE_LANGS);
-        let loader = fluent_language_loader!();
-        loader.load_languages(&crate::Localizations, &locales).expect("fail to load languages");
         if let Some(first) = locales.first() {
             shown = first.to_string();
         }
-        *crate::LL.write() = loader;
         *PO_LOADER.write() = new_loader(locales);
     }
     // applied to the system by the installation's `SetLocale` step
@@ -380,11 +371,7 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
             // weird design of `Model::iter()`
             fargs.set(key.to_string(), value.to_string());
         });
-        let s = if PO_LOADER.read().has(&id) {
-            PO_LOADER.read().get_args_fluent(&id, Some(&fargs))
-        } else {
-            crate::LL.read().get_args_fluent(&id, Some(&fargs))
-        };
+        let s = PO_LOADER.read().get_args_fluent(&id, Some(&fargs));
         // the source string dropped the GTK-era `<tt>` tags, but translations keep them until
         // they're redone in Weblate, and Slint text has no markup
         s.replace("<tt>", "").replace("</tt>", "").into()
