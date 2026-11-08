@@ -45,14 +45,6 @@ fn _default_org() -> String {
     "Fyra Labs".into()
 }
 
-const fn _default_internet_retry_interval() -> u64 {
-    5
-}
-
-const fn _default_internet_timeout() -> u64 {
-    20
-}
-
 /// a page that `skip_pages` in `/etc/taidan.toml` can hide
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]

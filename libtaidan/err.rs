@@ -1,15 +1,9 @@
-use std::borrow::Cow;
-
 #[derive(Debug, thiserror::Error)]
 pub enum Err {
     #[error("fail to run program `{0}`: {1}")]
     FailToRunProgram(&'static str, std::io::Error),
     #[error("program `{name}` failed{}", fail_detail(*rc, output))]
     ProgramFail { name: &'static str, output: String, rc: Option<i32> },
-    #[error("fail to read dir `{0}`: {1}")]
-    ReadDir(&'static str, std::io::Error),
-    #[error("fail to read file `{0}`: {1}")]
-    ReadFile(Cow<'static, std::path::Path>, std::io::Error),
     #[error("request error: {0}")]
     Reqwest(#[from] reqwest::Error),
     #[error("{0}: {1}")]
@@ -48,12 +42,6 @@ impl Err {
         Self::ProgramFail { name, output, rc: out.status.code() }
     }
 
-    pub fn _read_dir(dir: &'static str) -> impl FnOnce(std::io::Error) -> Self {
-        move |e| Self::ReadDir(dir, e)
-    }
-    pub fn _read_file(file: Cow<'static, std::path::Path>) -> impl FnOnce(std::io::Error) -> Self {
-        |e| Self::ReadFile(file, e)
-    }
     pub fn _fail_to_run(program: &'static str) -> impl FnOnce(std::io::Error) -> Self {
         move |e| Self::FailToRunProgram(program, e)
     }

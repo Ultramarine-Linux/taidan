@@ -110,15 +110,6 @@ impl std::fmt::Display for IMELanguages {
     }
 }
 
-/// Turns the IM name written in [`IMS`] to the [`InputMethod`] object.
-///
-/// # Panics
-/// This panics if and only if the IM name is invalid.
-#[must_use]
-pub fn str_to_im(s: &str) -> InputMethod {
-    find_im(s).expect("invalid im")
-}
-
 /// the [`InputMethod`] called `s` in [`IMS`], if there's one
 #[must_use]
 pub fn find_im(s: &str) -> Option<InputMethod> {
@@ -199,17 +190,6 @@ impl InputMethod {
         match imf {
             I18nImf::Fcitx5 => self.fcitx5_pkg.unwrap(),
             I18nImf::IBus => self.ibus_pkg.unwrap(),
-        }
-    }
-    /// Gets the internal reference of the IM for the current input method framework
-    ///
-    /// # Panics
-    /// Panics if and only if this IM is not available for the current framework.
-    #[must_use]
-    pub fn get_ref(self, imf: I18nImf) -> &'static str {
-        match imf {
-            I18nImf::Fcitx5 => self.fcitx5_ref.unwrap(),
-            I18nImf::IBus => self.ibus_ref.unwrap(),
         }
     }
 }
@@ -548,14 +528,6 @@ pub enum I18nImf {
 }
 
 impl I18nImf {
-    /// Returns `true` if the i18n imf is [`Fcitx5`].
-    ///
-    /// [`Fcitx5`]: I18nImf::Fcitx5
-    #[must_use]
-    pub const fn is_fcitx5(&self) -> bool {
-        matches!(self, Self::Fcitx5)
-    }
-
     /// Returns `true` if the i18n imf is [`IBus`].
     ///
     /// [`IBus`]: I18nImf::IBus

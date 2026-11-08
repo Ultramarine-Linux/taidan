@@ -65,8 +65,6 @@ pub trait Step {
     }
 }
 
-pub const NUM_STAGES: usize = 11;
-
 #[enum_dispatch::enum_dispatch]
 #[derive(Clone, Copy, Debug)]
 pub enum Stage {
@@ -84,13 +82,6 @@ pub enum Stage {
 }
 
 impl Stage {
-    #[must_use]
-    pub const fn is_dnf(&self) -> bool {
-        matches!(
-            self,
-            Self::DnfDownloadApps(_) | Self::DnfInstallApps(_) | Self::DownloadUpdates(_)
-        )
-    }
     #[must_use]
     pub const fn all() -> &'static [Self] {
         &[
