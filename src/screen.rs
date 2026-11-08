@@ -38,7 +38,10 @@ fn scale_for(screen: (f64, f64)) -> f64 {
 fn screen_size(event_loop: &ActiveEventLoop) -> Option<(f64, f64)> {
     if let Some((w, h)) = std::env::var("TAIDAN_SCREEN").ok().and_then(|s| {
         let (w, h) = s.split_once('x')?;
-        Some((w.trim().parse().ok()?, h.trim().parse().ok()?))
+        let (w, h): (f64, f64) = (w.trim().parse().ok()?, h.trim().parse().ok()?);
+        // `parse` takes `0`, `-5`, `inf` and `NaN`, which would break the scale math
+        let valid = |v: f64| v.is_finite() && v > 0.;
+        (valid(w) && valid(h)).then_some((w, h))
     }) {
         return Some((w, h));
     }

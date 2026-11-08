@@ -62,6 +62,15 @@ export component DonePage inherits TdnBasePg {
                     accessible-role: text;
                 }
 
+                // the system stays in its old language, which would otherwise look like a bug
+                if Install.locale-failed: TdnText {
+                    text: Lang.t("page-done-locale-failed", []);
+                    color: Tokens.color-muted-foreground;
+                    horizontal-alignment: Dir.text-start;
+                    wrap: word-wrap;
+                    accessible-role: text;
+                }
+
                 if Install.reboot-failed: TdnText {
                     text: Lang.t("page-done-reboot-failed", []);
                     color: Tokens.color-destructive;

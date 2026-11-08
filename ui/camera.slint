@@ -13,4 +13,6 @@ export global Camera {
     callback stop();
     // takes the photo, uses it as `Account.avatar`, and closes the camera
     callback capture();
+    // checks for a camera again and updates `available`
+    callback refresh();
 }

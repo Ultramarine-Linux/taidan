@@ -55,48 +55,45 @@ impl std::fmt::Display for ValidationError {
 
 impl std::error::Error for ValidationError {}
 
+/// operations every step may run, they only touch the OOBE's own state
+const ANY_STEP: &[&str] = &["state.patch", "state.reset"];
+
+/// the operations `step` may run besides [`ANY_STEP`], as `server-oobe` calls them from each step,
+/// [`None`] if it isn't a step
+fn step_operations(step: &str) -> Option<&'static [&'static str]> {
+    Some(match step {
+        "welcome" => &[],
+        "devicename" => &["hostname.apply", "keyboard.apply"],
+        "whoareyou" => &["user.create"],
+        "password" => &["password.set"],
+        "ssh-key" => &["ssh-key.apply"],
+        "internet" => &[
+            "network.interfaces",
+            "network.scan_wifi",
+            "network.connect_wifi",
+            "network.configure",
+            "network.confirm",
+            "network.check",
+        ],
+        "updates" => &["updates.set_policy"],
+        "remote-access" => &[
+            "remote_access.status",
+            "remote_access.tailscale_up",
+            "remote_access.cloudflared_set_token",
+        ],
+        "dashboard" => &["access.set"],
+        "complete" => &["setup.complete", "system.reboot", "system.poweroff"],
+        _ => return None,
+    })
+}
+
 /// Validate the narrow operation vocabulary exposed by the local OOBE API.
-/// Arbitrary commands, executable paths, and argument vectors are rejected.
+/// Arbitrary commands, executable paths, and argument vectors are rejected, and so is an operation
+/// sent from a step other than its own, e.g. `user.create` from `internet`.
 pub fn validate_operation(operation: &SetupOperation) -> Result<(), ValidationError> {
-    const STEPS: &[&str] = &[
-        "welcome",
-        "devicename",
-        "whoareyou",
-        "password",
-        "ssh-key",
-        "internet",
-        "updates",
-        "remote-access",
-        "dashboard",
-        "complete",
-    ];
-    const OPERATIONS: &[&str] = &[
-        "state.patch",
-        "state.reset",
-        "hostname.apply",
-        "keyboard.apply",
-        "user.create",
-        "password.set",
-        "network.interfaces",
-        "network.scan_wifi",
-        "network.connect_wifi",
-        "network.configure",
-        "network.confirm",
-        "network.check",
-        "ssh-key.apply",
-        "updates.set_policy",
-        "remote_access.status",
-        "remote_access.tailscale_up",
-        "remote_access.cloudflared_set_token",
-        "access.set",
-        "system.reboot",
-        "system.poweroff",
-        "setup.complete",
-    ];
-    if !STEPS.contains(&operation.step.as_str()) {
-        return Err(ValidationError::InvalidStep);
-    }
-    if !OPERATIONS.contains(&operation.operation.as_str()) {
+    let allowed = step_operations(&operation.step).ok_or(ValidationError::InvalidStep)?;
+    let op = operation.operation.as_str();
+    if !ANY_STEP.contains(&op) && !allowed.contains(&op) {
         return Err(ValidationError::InvalidOperation);
     }
     Ok(())
@@ -181,6 +178,46 @@ mod tests {
             };
             assert_eq!(validate_operation(&operation), Ok(()));
         }
+    }
+
+    #[test]
+    fn rejects_operations_from_other_steps() {
+        for (step, operation) in [
+            ("internet", "user.create"),
+            ("welcome", "password.set"),
+            ("dashboard", "system.reboot"),
+            ("updates", "setup.complete"),
+            ("complete", "network.configure"),
+        ] {
+            let operation = SetupOperation {
+                step: step.into(),
+                operation: operation.into(),
+                payload: serde_json::Value::Null,
+            };
+            assert_eq!(
+                validate_operation(&operation),
+                Err(ValidationError::InvalidOperation),
+                "{operation:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn state_operations_work_from_any_step() {
+        for step in ["welcome", "internet", "complete"] {
+            let operation = SetupOperation {
+                step: step.into(),
+                operation: "state.patch".into(),
+                payload: serde_json::Value::Null,
+            };
+            assert_eq!(validate_operation(&operation), Ok(()), "{step}");
+        }
+        let operation = SetupOperation {
+            step: "nope".into(),
+            operation: "state.patch".into(),
+            payload: serde_json::Value::Null,
+        };
+        assert_eq!(validate_operation(&operation), Err(ValidationError::InvalidStep));
     }
 
     #[test]

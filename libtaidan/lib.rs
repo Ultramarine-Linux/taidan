@@ -31,6 +31,9 @@ pub enum InstallMsg {
     NeedsReboot,
     /// some drivers couldn't be installed, the installation still finishes without them
     DriversFailed,
+    /// the system language couldn't be set, usually since its language pack isn't installed
+    /// (offline, or on an atomic edition), the installation still finishes in the old one
+    LocaleFailed,
     /// updates were downloaded and install on the next restart
     UpdatesReady,
     Finish,

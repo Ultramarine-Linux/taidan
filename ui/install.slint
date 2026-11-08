@@ -20,6 +20,8 @@ export global Install {
     in property <bool> can-download-updates: true;
     // some drivers couldn't be installed, the rest of the installation still worked
     in property <bool> drivers-failed;
+    // the system language couldn't be set, usually since its language pack isn't installed
+    in property <bool> locale-failed;
     // updates were downloaded and install on the next restart
     in property <bool> updates-ready;
     // the failed installation had online steps, so it can be retried without them

@@ -25,7 +25,6 @@ impl super::Step for SetTheme {
     }
 }
 
-const PLASMA: &str = "/usr/bin/plasma-apply-colorscheme";
 const GSETTINGS: &str = "/usr/bin/gsettings";
 const XFCONF: &str = "/usr/bin/xfconf-query";
 
@@ -43,7 +42,8 @@ fn commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String
     let accent = accent.filter(|_| crate::theme::accent_supported(edition));
     let themes = crate::theme::themes(edition, dark);
     let mut cmds = vec![];
-    if std::path::Path::new(PLASMA).exists() {
+    // plasma-apply-colorscheme comes with plasmashell, in plasma-workspace
+    if crate::a11y::is_plasma() {
         // a `QGuiApplication`, so it needs a platform even though it shows nothing
         let scheme = if dark { "BreezeDark" } else { "BreezeLight" };
         let owned = |cmd: &[&str]| cmd.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();

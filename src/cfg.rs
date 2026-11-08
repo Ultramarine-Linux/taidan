@@ -7,6 +7,10 @@ pub const ACTION_TYPES: usize = 5;
 pub struct Config {
     #[serde(skip)]
     pub distro: String,
+    /// set by [`Self::populate`] when the OOBE shouldn't run, `main` exits on it so the log and
+    /// Sentry guards still flush
+    #[serde(skip)]
+    pub should_exit: bool,
     #[serde(default)]
     pub edition: String,
 
@@ -165,7 +169,7 @@ impl Config {
     /// Populate the [`Config`] struct.
     #[tracing::instrument]
     pub fn populate(&mut self) {
-        self.taidan0.check();
+        self.should_exit = !self.taidan0.check();
         let (name, variant_id) = libtaidan::cfg::os_release();
         self.distro = name;
         if self.edition.is_empty() {
@@ -190,7 +194,9 @@ pub struct Taidan0Config {
 }
 
 impl Taidan0Config {
-    pub fn check(&self) {
+    /// whether the OOBE should run, false once the system already has a user
+    #[must_use]
+    pub fn check(&self) -> bool {
         if self.continue_if_user_exists {
             tracing::info!("taidan0.continue_if_user_exists detected");
         } else if user_already_exists() {
@@ -211,8 +217,9 @@ impl Taidan0Config {
                 }
             }
             tracing::warn!("taidan0.continue_if_user_exists is false, exiting");
-            std::process::exit(0);
+            return false;
         }
+        true
     }
 }
 
@@ -231,17 +238,27 @@ pub fn get_val(id: &str) -> Option<&'static serde_json::Value> {
 
 type HeroBuffer = slint::SharedPixelBuffer<slint::Rgba8Pixel>;
 
-/// the theme page's preview cards are only ~12rem wide
-const HERO_THUMB_WIDTH: u32 = 480;
+/// width of the theme page's preview cards in `rem`, see `ui/pages/0035_theme.slint`
+const THEME_CARD_REM: f32 = 12.;
+/// design pixels in a `rem`, `default-font-size` in `ui/app.slint`
+const REM_UNITS: f32 = 14.;
 
-fn to_buffer(img: image::DynamicImage) -> HeroBuffer {
-    let rgba = img.into_rgba8();
+/// how wide the theme page's thumbnails have to be to fill their cards, in physical pixels, at
+/// the UI's `scale` (`Tokens.scale`) on a screen with `scale_factor`
+fn hero_thumb_width(scale: f32, scale_factor: f32) -> u32 {
+    let width = THEME_CARD_REM * REM_UNITS * scale * scale_factor;
+    // a broken scale mustn't ask for a 0 or a huge thumbnail
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "clamped")]
+    if width.is_finite() { width.ceil().clamp(64., 1920.) as u32 } else { 480 }
+}
+
+fn to_buffer(img: &image::DynamicImage) -> HeroBuffer {
+    let rgba = img.to_rgba8();
     HeroBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height())
 }
 
-/// welcome page image: `welcome.hero_image[_dark]`, else the system wallpaper, else the bundled one.
-/// Also returns a small copy for the theme page.
-fn decode_hero(dark: bool) -> (HeroBuffer, HeroBuffer) {
+/// welcome page image: `welcome.hero_image[_dark]`, else the system wallpaper, else the bundled one
+fn decode_hero(dark: bool) -> image::DynamicImage {
     let (key, wallpaper, bundled): (_, _, &[u8]) = if dark {
         (
             "welcome.hero_image_dark",
@@ -267,33 +284,50 @@ fn decode_hero(dark: bool) -> (HeroBuffer, HeroBuffer) {
         })
         .unwrap_or_else(|| image::load_from_memory(bundled).expect("invalid bundled hero image"));
     // wallpapers are often 4K but the hero never needs more than this
-    let img = if img.width() > 1920 || img.height() > 1920 {
+    if img.width() > 1920 || img.height() > 1920 {
         img.resize(1920, 1920, image::imageops::FilterType::Triangle)
     } else {
         img
-    };
-    // the renderers sample without mipmaps, so drawing the full image into a small card skips
-    // most of its pixels and aliases. Filter it down here instead.
-    let thumb = if img.width() > HERO_THUMB_WIDTH {
-        img.resize(HERO_THUMB_WIDTH, u32::MAX, image::imageops::FilterType::Lanczos3)
+    }
+}
+
+/// a copy of the hero `width` pixels wide for the theme page. The renderers sample without
+/// mipmaps, so drawing the full image into a small card skips most of its pixels and aliases.
+/// Filter it down here instead.
+fn hero_thumb(img: &image::DynamicImage, width: u32) -> HeroBuffer {
+    if img.width() > width {
+        to_buffer(&img.resize(width, u32::MAX, image::imageops::FilterType::Lanczos3))
     } else {
-        img.clone()
-    };
-    (to_buffer(img), to_buffer(thumb))
+        to_buffer(img)
+    }
 }
 
 /// decodes the welcome images on a separate thread, since decoding a 4K wallpaper on the UI thread
-/// when the page first shows would stall its slide-in animation
+/// when the page first shows would stall its slide-in animation. The theme page's thumbnails come
+/// after, once the event loop runs and the UI's scale is known
 fn load_hero_images(ui: slint::Weak<crate::ui::AppWindow>) {
     std::thread::spawn(move || {
         let (light, dark) = (decode_hero(false), decode_hero(true));
-        let set = ui.upgrade_in_event_loop(move |ui| {
+        let (light_buf, dark_buf) = (to_buffer(&light), to_buffer(&dark));
+        let set = ui.upgrade_in_event_loop(move |app| {
             use slint::ComponentHandle;
-            let cfg = ui.global::<crate::ui::Cfg<'_>>();
-            cfg.set_hero_light(slint::Image::from_rgba8(light.0));
-            cfg.set_hero_dark(slint::Image::from_rgba8(dark.0));
-            cfg.set_hero_light_thumb(slint::Image::from_rgba8(light.1));
-            cfg.set_hero_dark_thumb(slint::Image::from_rgba8(dark.1));
+            let cfg = app.global::<crate::ui::Cfg<'_>>();
+            cfg.set_hero_light(slint::Image::from_rgba8(light_buf));
+            cfg.set_hero_dark(slint::Image::from_rgba8(dark_buf));
+            let width = hero_thumb_width(app.get_ui_scale(), app.window().scale_factor());
+            tracing::debug!(width, "Making the theme thumbnails");
+            let ui = app.as_weak();
+            std::thread::spawn(move || {
+                let (light, dark) = (hero_thumb(&light, width), hero_thumb(&dark, width));
+                let set = ui.upgrade_in_event_loop(move |app| {
+                    let cfg = app.global::<crate::ui::Cfg<'_>>();
+                    cfg.set_hero_light_thumb(slint::Image::from_rgba8(light));
+                    cfg.set_hero_dark_thumb(slint::Image::from_rgba8(dark));
+                });
+                if let Err(e) = set {
+                    tracing::error!(?e, "cannot set the theme thumbnails");
+                }
+            });
         });
         if let Err(e) = set {
             tracing::error!(?e, "cannot set hero images");
@@ -390,6 +424,15 @@ mod tests {
             basic_toml::from_str("internet_timeout = 20\ninternet_retry_interval = 5").unwrap();
         assert_eq!(cfg.skip_pages, []);
         assert!(IGNORED_KEYS.iter().all(|key| cfg.ui.contains_key(*key)));
+    }
+
+    #[test]
+    fn thumbs_follow_the_scale() {
+        // 12rem of 14 design pixels each
+        assert_eq!(hero_thumb_width(1., 1.), 168);
+        assert_eq!(hero_thumb_width(1.36, 2.), 457);
+        assert_eq!(hero_thumb_width(f32::NAN, 1.), 480);
+        assert_eq!(hero_thumb_width(0., 1.), 64);
     }
 
     #[test]

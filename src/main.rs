@@ -91,6 +91,10 @@ fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
 #[allow(clippy::missing_panics_doc)]
 fn main() {
     let _guard = setup_logs_and_install_panic_hook();
+    // returning instead of exiting drops `_guard`, which flushes the log and Sentry
+    if CFG.should_exit {
+        return;
+    }
     std::sync::LazyLock::force(&LL);
 
     ui::run();

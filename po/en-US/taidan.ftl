@@ -430,6 +430,8 @@ page-done-restart-update = Restart and Update
 page-done-updates = Updates are ready and will install the next time you restart
 page-done-updates-drivers = Your drivers need a restart, which will install updates
 page-done-drivers-failed = Some drivers couldn't be installed. Everything else is set up, and you can install them later.
+# shown when the language pack for the chosen language isn't installed, e.g. when setting up offline
+page-done-locale-failed = The system language couldn't be changed, likely because its language pack isn't installed. Everything else is set up, and you can change it later in Settings.
 page-done-reboot-failed = Couldn't restart. Try again, or restart from the login screen.
 # btn, ends the setup and shows the login screen, when no reboot is needed
 page-done-login = Log In

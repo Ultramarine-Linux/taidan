@@ -14,10 +14,21 @@ impl super::Step for SetupImf {
         _: &C,
     ) -> Res<()> {
         // written into the skeleton the home was created from, see `write_to_skel`
-        if settings.ims.is_empty() || cfg.taidan0.systemd_homed {
+        if cfg.taidan0.systemd_homed {
             return Ok(());
         }
-        let Some(settings) = &with_installed_ims(settings, cfg, true).await else { return Ok(()) };
+        let installed = if settings.ims.is_empty() {
+            None
+        } else {
+            with_installed_ims(settings, cfg, true).await
+        };
+        let Some(settings) = &installed else {
+            // not worth failing the setup over
+            if let Err(e) = remove_fcitx5_config(settings).await {
+                tracing::warn!(?e, "cannot remove the Fcitx5 config of an earlier attempt");
+            }
+            return Ok(());
+        };
         if let Err(e) = match settings.imf {
             i18n::I18nImf::IBus => write_ibus_profile(settings).await,
             i18n::I18nImf::Fcitx5 => write_fcitx5_profile(settings).await,
@@ -71,6 +82,41 @@ const KWINRC_FCITX5: [[&str; 6]; 2] = [
     ["--group", "Wayland", "--key", "VirtualKeyboardEnabled", "--type=bool", "true"],
 ];
 
+/// first line of the Fcitx5 profiles written here, so a retry knows which one it may remove.
+/// Fcitx5 drops it once it saves the profile itself, and then it's the user's
+const FCITX5_PROFILE_MARKER: &str = "# written by Taidan";
+
+/// removes the Fcitx5 profile and the kwinrc keys an earlier attempt wrote (see
+/// [`write_fcitx5_profile`]), for a retry without input methods. A home kept from before the
+/// install would keep them otherwise, a new one never has them. Nothing goes unless the profile
+/// is still the one written here
+async fn remove_fcitx5_config(settings: &crate::settings::Settings) -> Res<()> {
+    const SCRIPT: &str = r#"
+        profile="$1/fcitx5/profile"
+        # without the marker nothing here is from an earlier attempt
+        [ "$(head -n 1 -- "$profile" 2>/dev/null)" = "$2" ] || exit 0
+        rm -f -- "$profile"
+        if [ "$3" = plasma ] && [ -e "$1/kwinrc" ] \
+            && [ "$(kreadconfig6 --file "$1/kwinrc" --group Wayland --key InputMethod)" = "$4" ]; then
+            kwriteconfig6 --file "$1/kwinrc" --group Wayland --key InputMethod --delete
+            kwriteconfig6 --file "$1/kwinrc" --group Wayland --key VirtualKeyboardEnabled --delete
+        fi
+    "#;
+    let username = &settings.username;
+    let config = crate::a11y::home_of(username).await?.join(".config");
+    let plasma = if crate::a11y::is_plasma() { "plasma" } else { "" };
+    let [_, _, _, _, _, launcher] = KWINRC_FCITX5[0];
+    let args = [std::ffi::OsStr::new("-c"), SCRIPT.as_ref(), "sh".as_ref()];
+    let args = args.into_iter().chain([
+        config.as_os_str(),
+        FCITX5_PROFILE_MARKER.as_ref(),
+        plasma.as_ref(),
+        launcher.as_ref(),
+    ]);
+    // as the user, whose home it is
+    crate::pkexec(username, "sh", args.collect::<Vec<_>>()).await
+}
+
 /// `~/.config/fcitx5/profile` with the keyboard layout and the chosen input methods
 fn fcitx5_profile(
     crate::settings::Settings { ims, kb_layout, kb_variant, .. }: &crate::settings::Settings,
@@ -79,6 +125,7 @@ fn fcitx5_profile(
     let var = kb_variant.as_ref().map(|variant| format!("-{variant}")).unwrap_or_default();
     let mut buf = format!(
         "\
+            {FCITX5_PROFILE_MARKER}\n\
             [Groups/0]\n\
             # Group Name\n\
             Name={default_group_name}\n\
@@ -353,6 +400,7 @@ mod tests {
             ..Default::default()
         };
         let profile = fcitx5_profile(&settings);
+        assert!(profile.starts_with(&format!("{FCITX5_PROFILE_MARKER}\n[Groups/0]\n")));
         assert!(profile.contains("Default Layout=us\n"));
         assert!(profile.contains("[Groups/0/Items/1]\n# Name\nName=pinyin\n"));
         assert!(profile.contains("[Groups/0/Items/2]\n# Name\nName=mozc\n"));

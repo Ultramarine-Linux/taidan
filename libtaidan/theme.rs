@@ -68,10 +68,16 @@ impl Accent {
 }
 
 /// whether the edition's desktop follows an accent color all the way through: GNOME 47+ (shell
-/// and libadwaita apps) and Plasma. Budgie and Xfce use GTK 3 themes that ignore `accent-color`
+/// and libadwaita apps) and Plasma. Budgie and Xfce use GTK 3 themes that ignore `accent-color`.
+/// Plasma is told by its binary, as the theme step and the rest of the setup tell it
 #[must_use]
 pub fn accent_supported(edition: &str) -> bool {
-    matches!(crate::cfg::desktop(edition).as_str(), "gnome" | "plasma" | "kde")
+    accent_supported_with(edition, crate::a11y::is_plasma())
+}
+
+/// [`accent_supported`], with whether the desktop is Plasma given
+fn accent_supported_with(edition: &str, plasma: bool) -> bool {
+    plasma || crate::cfg::desktop(edition) == "gnome"
 }
 
 /// the GTK and icon themes that go with light or dark mode, and Xfce's window manager theme
@@ -132,12 +138,15 @@ mod tests {
 
     #[test]
     fn accent_only_where_it_works() {
-        assert!(accent_supported("gnome"));
-        assert!(accent_supported("Plasma"));
-        assert!(!accent_supported("budgie"));
-        assert!(accent_supported("atomic-gnome"));
-        assert!(!accent_supported("xfce"));
-        assert!(!accent_supported(""));
+        assert!(accent_supported_with("gnome", false));
+        assert!(accent_supported_with("atomic-gnome", false));
+        // the binary decides, whatever the edition says
+        assert!(accent_supported_with("kde", true));
+        assert!(accent_supported_with("", true));
+        assert!(!accent_supported_with("kde", false));
+        assert!(!accent_supported_with("budgie", false));
+        assert!(!accent_supported_with("xfce", false));
+        assert!(!accent_supported_with("", false));
     }
 
     #[test]

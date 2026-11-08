@@ -4,23 +4,25 @@ use crate::prelude::*;
 pub struct SetLocale;
 impl super::Step for SetLocale {
     /// after the apps, so the language pack, and with it the locale, is installed
-    #[tracing::instrument(skip(settings))]
+    #[tracing::instrument(skip(settings, sender))]
     async fn run<C: crate::Callback>(
         &self,
         settings: &crate::settings::Settings,
         _: &crate::cfg::Config,
-        _: &C,
+        sender: &C,
     ) -> Res<()> {
         set_keymap(settings).await;
         // an empty locale keeps whatever the system already has
         if settings.locale.is_empty() {
             return Ok(());
         }
-        // systemd refuses locales that aren't installed, which can happen offline, the system's
-        // language is a better place to end up than a failed setup
+        // systemd refuses locales that aren't installed, which can happen offline or on atomic
+        // editions, the system's language is a better place to end up than a failed setup. The
+        // done page says so
         let lang = format!("LANG={}", settings.locale);
         if let Err(e) = crate::root("localectl", ["set-locale", &lang]).await {
             tracing::warn!(?e, locale = settings.locale, "cannot set the system language");
+            sender.send(crate::InstallMsg::LocaleFailed);
         }
         Ok(())
     }

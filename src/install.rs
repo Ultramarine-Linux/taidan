@@ -152,6 +152,7 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
             InstallMsg::StageProgress(frac) => install.set_stage_progress(frac as f32),
             InstallMsg::NeedsReboot => install.set_needs_reboot(true),
             InstallMsg::DriversFailed => install.set_drivers_failed(true),
+            InstallMsg::LocaleFailed => install.set_locale_failed(true),
             InstallMsg::UpdatesReady => install.set_updates_ready(true),
             InstallMsg::Finish => {}
         }
@@ -172,6 +173,7 @@ fn start(ui: &slint::Weak<AppWindow>) {
     // not `needs_reboot`, drivers an earlier attempt installed still need it
     install.set_updates_ready(false);
     install.set_drivers_failed(false);
+    install.set_locale_failed(false);
     // not where a failed attempt stopped, until the first stage starts
     install.set_stage_id("".into());
     install.set_stage_num(0);

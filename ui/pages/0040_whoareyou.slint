@@ -189,39 +189,21 @@ component IconPicker inherits VerticalLayout {
         }
     }
 
-    // two, three, then two buttons, with the camera in the middle
-    VerticalLayout {
-        spacing: 0.15rem;
+    // the camera, then however many presets there are, wrapping into rows
+    FlexboxLayout {
+        alignment: center;
+        spacing-horizontal: 0.4rem;
+        spacing-vertical: 0.15rem;
 
-        HorizontalLayout {
-            alignment: center;
-            spacing: 0.4rem;
-            if Account.avatars.length > 0: Preset { index: 0; }
-            if Account.avatars.length > 1: Preset { index: 1; }
+        IconButton {
+            symbolic: true;
+            image: @image-url("../../data/icons/camera-photo-symbolic.svg");
+            label: Lang.t("page-whoareyou-camera", []);
+            enabled: Camera.available;
+            clicked => { Camera.start(); }
         }
 
-        HorizontalLayout {
-            alignment: center;
-            spacing: 0.4rem;
-            if Account.avatars.length > 2: Preset { index: 2; }
-
-            IconButton {
-                symbolic: true;
-                image: @image-url("../../data/icons/camera-photo-symbolic.svg");
-                label: Lang.t("page-whoareyou-camera", []);
-                enabled: Camera.available;
-                clicked => { Camera.start(); }
-            }
-
-            if Account.avatars.length > 3: Preset { index: 3; }
-        }
-
-        HorizontalLayout {
-            alignment: center;
-            spacing: 0.4rem;
-            if Account.avatars.length > 4: Preset { index: 4; }
-            if Account.avatars.length > 5: Preset { index: 5; }
-        }
+        for _[i] in Account.avatars: Preset { index: i; }
     }
 }
 
@@ -301,11 +283,18 @@ export component WhoAreYouPage inherits TdnPage {
     changed checked-for => {
         if self.next-pending && self.active {
             self.next-pending = false;
-            // does nothing if it turned out to be taken
-            self.try-next();
+            // does nothing if it turned out to be taken, nor while a dialog is over the page
+            if !Modal.open { self.try-next(); }
         }
     }
-    changed active => { if !self.active { self.next-pending = false; } }
+    changed active => {
+        if self.active {
+            // it may have been plugged in since the OOBE started
+            Camera.refresh();
+        } else {
+            self.next-pending = false;
+        }
+    }
 
     HorizontalLayout {
         spacing: 1rem;

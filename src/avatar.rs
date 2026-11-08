@@ -42,15 +42,12 @@ fn to_round_buffer(img: &image::RgbImage) -> Buffer {
     buf
 }
 
-/// the largest centered square of `img`, scaled to `size` and mirrored, as people expect to
-/// see themselves
+/// the largest centered square of `img`, scaled to `size`
 fn square(img: &image::RgbImage, size: u32) -> image::RgbImage {
     let edge = img.width().min(img.height());
     let (x, y) = ((img.width() - edge) / 2, (img.height() - edge) / 2);
     let cropped = image::imageops::crop_imm(img, x, y, edge, edge).to_image();
-    let scaled =
-        image::imageops::resize(&cropped, size, size, image::imageops::FilterType::Triangle);
-    image::imageops::flip_horizontal(&scaled)
+    image::imageops::resize(&cropped, size, size, image::imageops::FilterType::Triangle)
 }
 
 /// preset icons: `avatars_dir` in `/etc/taidan.toml`, else [`AVATARS_DIR`]
@@ -81,32 +78,43 @@ fn load_presets() -> Vec<(PathBuf, Buffer)> {
 }
 
 /// decodes one frame from the camera
-fn decode(fourcc: v4l::FourCC, width: u32, height: u32, data: &[u8]) -> Option<image::RgbImage> {
-    match &fourcc.repr {
+fn decode(fmt: &v4l::Format, data: &[u8]) -> Option<image::RgbImage> {
+    match &fmt.fourcc.repr {
         b"MJPG" => image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)
             .inspect_err(|e| tracing::debug!(?e, "bad MJPEG frame"))
             .ok()
             .map(image::DynamicImage::into_rgb8),
-        b"YUYV" => yuyv_to_rgb(width, height, data),
+        b"YUYV" => yuyv_to_rgb(fmt.width, fmt.height, fmt.stride, data),
         _ => None,
     }
 }
 
-/// converts packed YUYV 4:2:2 (BT.601) to RGB
-fn yuyv_to_rgb(width: u32, height: u32, data: &[u8]) -> Option<image::RgbImage> {
-    let len = usize::try_from(width * height * 2).ok()?;
-    let data = data.get(..len)?;
-    let mut out = Vec::with_capacity(len / 2 * 3);
-    for &[y0, u, y1, v] in data.as_chunks::<4>().0 {
-        let (u, v) = (f32::from(u) - 128.0, f32::from(v) - 128.0);
-        for y in [f32::from(y0), f32::from(y1)] {
-            #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "clamped")]
-            let c = |x: f32| x.clamp(0.0, 255.0) as u8;
-            out.extend([
-                c(1.402f32.mul_add(v, y)),
-                c(0.714f32.mul_add(-v, 0.344f32.mul_add(-u, y))),
-                c(1.772f32.mul_add(u, y)),
-            ]);
+/// converts packed YUYV 4:2:2 (BT.601) to RGB. Each line starts `stride` bytes after the last,
+/// which drivers may pad past `width * 2`
+fn yuyv_to_rgb(width: u32, height: u32, stride: u32, data: &[u8]) -> Option<image::RgbImage> {
+    let row_len = usize::try_from(width).ok()? * 2;
+    // 0 means the driver didn't say, so the lines are packed
+    let stride = usize::try_from(stride).ok()?.max(row_len);
+    let rows = usize::try_from(height).ok()?;
+    let mut out = Vec::with_capacity(row_len / 2 * 3 * rows);
+    for row in 0..rows {
+        let start = row * stride;
+        let line = data.get(start..start + row_len)?;
+        for &[y0, u, y1, v] in line.as_chunks::<4>().0 {
+            let (u, v) = (f32::from(u) - 128.0, f32::from(v) - 128.0);
+            for y in [f32::from(y0), f32::from(y1)] {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    reason = "clamped"
+                )]
+                let c = |x: f32| x.clamp(0.0, 255.0) as u8;
+                out.extend([
+                    c(1.402f32.mul_add(v, y)),
+                    c(0.714f32.mul_add(-v, 0.344f32.mul_add(-u, y))),
+                    c(1.772f32.mul_add(u, y)),
+                ]);
+            }
         }
     }
     image::RgbImage::from_raw(width, height, out)
@@ -178,9 +186,11 @@ fn stream(
         let (buf, meta) = stream.next()?;
         started = true;
         let data = buf.get(..usize::try_from(meta.bytesused).unwrap_or(buf.len())).unwrap_or(buf);
-        let Some(frame) = decode(fmt.fourcc, fmt.width, fmt.height, data) else { continue };
+        let Some(frame) = decode(&fmt, data) else { continue };
         let preview = (!in_flight.load(Ordering::Acquire))
-            .then(|| to_round_buffer(&square(&frame, PREVIEW_SIZE)));
+            // mirrored, as people expect to see themselves. The saved photo isn't, so text in
+            // it reads the right way
+            .then(|| to_round_buffer(&image::imageops::flip_horizontal(&square(&frame, PREVIEW_SIZE))));
         if let Ok(mut last) = last.lock() {
             *last = Some(frame);
         }
@@ -237,6 +247,20 @@ fn start(ui: &slint::Weak<AppWindow>) {
     }
 }
 
+/// checks again whether there's a camera, it may have been plugged in after the OOBE started
+fn refresh(ui: &slint::Weak<AppWindow>) {
+    // a running stream holds the camera, and it's there anyway
+    if RUNNING.with_borrow(Option::is_some) {
+        return;
+    }
+    let ui = ui.clone();
+    std::thread::spawn(move || {
+        let available = find_camera().is_some();
+        tracing::debug!(available, "Checked for a camera");
+        _ = ui.upgrade_in_event_loop(move |ui| ui.global::<Camera<'_>>().set_available(available));
+    });
+}
+
 /// the thread of the last stream, see [`start`]
 static STREAM_THREAD: Mutex<Option<std::thread::JoinHandle<()>>> = Mutex::new(None);
 
@@ -260,26 +284,41 @@ fn save_photo(frame: &image::RgbImage) -> image::ImageResult<(PathBuf, Buffer)> 
     Ok((path, to_round_buffer(&photo)))
 }
 
+thread_local! {
+    /// whether a photo is being saved, so pressing Take again doesn't save another
+    static SAVING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// saves the latest frame on a thread, since encoding the PNG would stall the UI
 fn capture(ui: &slint::Weak<AppWindow>) {
-    let frame = RUNNING.with_borrow(|r| r.as_ref().and_then(|r| r.last.lock().ok()?.clone()));
-    let Some(frame) = frame else { return };
-    match save_photo(&frame) {
+    if SAVING.get() {
+        return;
+    }
+    let running = RUNNING.with_borrow(|r| {
+        r.as_ref().and_then(|r| Some((Arc::clone(&r.stop), r.last.lock().ok()?.clone()?)))
+    });
+    let Some((stopped, frame)) = running else { return };
+    SAVING.set(true);
+    let ui = ui.clone();
+    std::thread::spawn(move || match save_photo(&frame) {
         Ok((path, photo)) => {
-            if let Some(app) = ui.upgrade() {
+            _ = ui.upgrade_in_event_loop(move |app| {
+                SAVING.set(false);
+                // cancelled while it saved
+                if stopped.load(Ordering::Relaxed) {
+                    return;
+                }
                 let account = app.global::<Account<'_>>();
                 account.set_avatar_id(path.to_string_lossy().as_ref().into());
                 account.set_avatar(slint::Image::from_rgba8(photo));
-            }
-            stop(ui);
+                stop(&app.as_weak());
+            });
         }
         Err(e) => {
-            let error = format!("cannot save photo: {e}");
-            tracing::error!(error, "camera error");
-            if let Some(app) = ui.upgrade() {
-                app.global::<Camera<'_>>().set_error(error.into());
-            }
+            _ = ui.upgrade_in_event_loop(|_| SAVING.set(false));
+            set_error(&ui, stopped, format!("cannot save photo: {e}"));
         }
-    }
+    });
 }
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, camera: &Camera<'_>) {
@@ -294,6 +333,10 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, camera: &Camera<'_>) {
     camera.on_capture({
         let ui = ui.clone();
         move || capture(&ui)
+    });
+    camera.on_refresh({
+        let ui = ui.clone();
+        move || refresh(&ui)
     });
 
     let ui = ui.clone();
@@ -322,8 +365,18 @@ mod tests {
     #[test]
     fn yuyv_grey_stays_grey() {
         // mid grey is Y=128, U=V=128
-        let rgb = yuyv_to_rgb(2, 1, &[128, 128, 128, 128]).unwrap();
+        let rgb = yuyv_to_rgb(2, 1, 0, &[128, 128, 128, 128]).unwrap();
         assert_eq!(rgb.as_raw(), &[128, 128, 128, 128, 128, 128]);
+    }
+
+    #[test]
+    fn yuyv_skips_line_padding() {
+        // two lines of one pixel pair, each padded to 8 bytes with white that mustn't show up
+        let data = [16, 128, 16, 128, 255, 255, 255, 255, 235, 128, 235, 128, 255, 255, 255, 255];
+        let rgb = yuyv_to_rgb(2, 2, 8, &data).unwrap();
+        assert_eq!(rgb.as_raw(), &[16, 16, 16, 16, 16, 16, 235, 235, 235, 235, 235, 235]);
+        // cut off before the last line
+        assert!(yuyv_to_rgb(2, 2, 8, &data[..9]).is_none());
     }
 
     #[test]

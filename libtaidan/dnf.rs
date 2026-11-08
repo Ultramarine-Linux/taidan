@@ -11,6 +11,11 @@ static PROGRESS_REGEX: LazyLock<regex::Regex> =
 
 /// how many of the last lines a failed [`run_logged`] puts in its error
 const TAIL_LINES: usize = 10;
+/// how long [`run_logged`] waits for another line once the program exited
+const DRAIN_LINE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+/// how long [`run_logged`] reads output in all once the program exited, so something it started
+/// that keeps printing can't hold it up forever
+const DRAIN_TOTAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// runs `name` as root, with what `f` adds to it as arguments, and passes each line it prints to
 /// `on_line`. The output also goes to stdout and is appended to `<name>.stdout.log` in
@@ -52,12 +57,13 @@ pub(super) async fn run_logged(
     let mut lines = tokio::io::BufReader::new(reader).split(b'\n');
     let mut tail = std::collections::VecDeque::with_capacity(TAIL_LINES);
     let mut status = None;
+    // set once it exits
+    let mut drain_until: Option<tokio::time::Instant> = None;
     loop {
-        let line = if status.is_some() {
+        let line = if let Some(drain_until) = drain_until {
             // it exited, but something it started may still have the pipe open
-            match tokio::time::timeout(std::time::Duration::from_secs(1), lines.next_segment())
-                .await
-            {
+            let deadline = drain_until.min(tokio::time::Instant::now() + DRAIN_LINE_TIMEOUT);
+            match tokio::time::timeout_at(deadline, lines.next_segment()).await {
                 Ok(line) => line,
                 Err(_) => break,
             }
@@ -66,6 +72,7 @@ pub(super) async fn run_logged(
                 line = lines.next_segment().fuse() => line,
                 s = child.wait().fuse() => {
                     status = Some(s.map_err(Err::_fail_to_run(name))?);
+                    drain_until = Some(tokio::time::Instant::now() + DRAIN_TOTAL_TIMEOUT);
                     continue;
                 }
             }
