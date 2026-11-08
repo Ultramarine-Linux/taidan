@@ -17,6 +17,9 @@ export global Cfg {
     // welcome page image, decoded off the UI thread and set from Rust
     in property <image> hero-light: @image-url("../data/icons/background-light.webp");
     in property <image> hero-dark: @image-url("../data/icons/background-dark.webp");
+    // small copies for the theme page's cards, see `decode_hero` in src/cfg.rs
+    in property <image> hero-light-thumb: @image-url("../data/icons/background-light.webp");
+    in property <image> hero-dark-thumb: @image-url("../data/icons/background-dark.webp");
     // the page Next and Back go to from a page, past the ones in `skip_pages` of /etc/taidan.toml
     pure callback next-page(page: int) -> int;
     pure callback prev-page(page: int) -> int;

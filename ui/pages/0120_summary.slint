@@ -156,9 +156,10 @@ export component SummaryPage inherits TdnPage {
                 }
             }
 
-            // the card takes up the height the page has left, so what's under it stays at the bottom
+            // packed at the top like the account column, the card only as tall as what's in it
             VerticalLayout {
                 layout-order: Dir.order(1);
+                alignment: start;
                 horizontal-stretch: 1;
                 spacing: 0.75rem;
 
@@ -168,7 +169,7 @@ export component SummaryPage inherits TdnPage {
                 }
 
                 Card {
-                    vertical-stretch: 1;
+                    vertical-stretch: 0;
                     card-radius: md;
 
                     VerticalLayout {

@@ -217,8 +217,17 @@ pub fn get_val(id: &str) -> Option<&'static serde_json::Value> {
 
 type HeroBuffer = slint::SharedPixelBuffer<slint::Rgba8Pixel>;
 
-/// welcome page image: `welcome.hero_image[_dark]`, else the system wallpaper, else the bundled one
-fn decode_hero(dark: bool) -> HeroBuffer {
+/// the theme page's preview cards are only ~12rem wide
+const HERO_THUMB_WIDTH: u32 = 480;
+
+fn to_buffer(img: image::DynamicImage) -> HeroBuffer {
+    let rgba = img.into_rgba8();
+    HeroBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height())
+}
+
+/// welcome page image: `welcome.hero_image[_dark]`, else the system wallpaper, else the bundled one.
+/// Also returns a small copy for the theme page.
+fn decode_hero(dark: bool) -> (HeroBuffer, HeroBuffer) {
     let (key, wallpaper, bundled): (_, _, &[u8]) = if dark {
         (
             "welcome.hero_image_dark",
@@ -249,8 +258,14 @@ fn decode_hero(dark: bool) -> HeroBuffer {
     } else {
         img
     };
-    let rgba = img.into_rgba8();
-    HeroBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height())
+    // the renderers sample without mipmaps, so drawing the full image into a small card skips
+    // most of its pixels and aliases. Filter it down here instead.
+    let thumb = if img.width() > HERO_THUMB_WIDTH {
+        img.resize(HERO_THUMB_WIDTH, u32::MAX, image::imageops::FilterType::Lanczos3)
+    } else {
+        img.clone()
+    };
+    (to_buffer(img), to_buffer(thumb))
 }
 
 /// decodes the welcome images on a separate thread, since decoding a 4K wallpaper on the UI thread
@@ -261,8 +276,10 @@ fn load_hero_images(ui: slint::Weak<crate::ui::AppWindow>) {
         let set = ui.upgrade_in_event_loop(move |ui| {
             use slint::ComponentHandle;
             let cfg = ui.global::<crate::ui::Cfg<'_>>();
-            cfg.set_hero_light(slint::Image::from_rgba8(light));
-            cfg.set_hero_dark(slint::Image::from_rgba8(dark));
+            cfg.set_hero_light(slint::Image::from_rgba8(light.0));
+            cfg.set_hero_dark(slint::Image::from_rgba8(dark.0));
+            cfg.set_hero_light_thumb(slint::Image::from_rgba8(light.1));
+            cfg.set_hero_dark_thumb(slint::Image::from_rgba8(dark.1));
         });
         if let Err(e) = set {
             tracing::error!(?e, "cannot set hero images");
