@@ -62,8 +62,9 @@ export component AppWindow inherits Window {
     property <int> summary-page: 11;
     // pages that are jumped to, rather than reached with Next and Back
     property <int> installing-page: 12;
-    property <int> done-page: 13;
-    property <int> error-page: 14;
+    // read from Rust, which moves to them when the installation ends (`src/install.rs`)
+    out property <int> done-page: 13;
+    out property <int> error-page: 14;
 
     // move keyboard focus to the page being shown, unless a dialog has it
     function focus-page() {
@@ -122,13 +123,6 @@ export component AppWindow inherits Window {
             if !Modal.returned { focus-page(); }
             Modal.returned = false;
         }
-    }
-
-    // leave the installing page once the installation ends
-    property <InstallState> install-state: Install.state;
-    changed install-state => {
-        if install-state == InstallState.done { pagenum = done-page; }
-        else if install-state == InstallState.failed { pagenum = error-page; }
     }
 
     MenuBar {

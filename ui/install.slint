@@ -26,6 +26,8 @@ export global Install {
     in property <bool> used-internet;
     // restarting from the done page failed, it can be tried again
     in property <bool> reboot-failed;
+    // `finish()` is running, so the done page's buttons wait. Cleared if restarting fails
+    in property <bool> finishing;
     // set by the error page to retry offline, e.g. when a mirror is broken. Cleared by `reset()`
     in-out property <bool> force-offline;
 

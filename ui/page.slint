@@ -64,6 +64,13 @@ export component TdnBasePg {
     }
 
     @children
+
+    // a page sliding out stays visible for a moment, this keeps it from taking clicks, e.g. Back
+    // on the summary once the installation has started
+    if !root.active: TouchArea {
+        width: 100%;
+        height: 100%;
+    }
 }
 
 // the welcome image with the distro caption, for the first and last screens

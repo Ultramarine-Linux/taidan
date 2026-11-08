@@ -245,12 +245,16 @@ fn start(ui: &slint::Weak<AppWindow>) {
         let used_internet = !settings.nointernet;
         let set = ui.upgrade_in_event_loop(move |ui| {
             let install = ui.global::<Install<'_>>();
+            // the page moves here rather than on a `changed Install.state` in Slint, which can
+            // miss a retry that fails right away, as Failed → Running → Failed may coalesce
             if let Some(error) = error {
                 install.set_used_internet(used_internet);
                 install.set_error(error.into());
                 install.set_state(InstallState::Failed);
+                ui.set_pagenum(ui.get_error_page());
             } else {
                 install.set_state(InstallState::Done);
+                ui.set_pagenum(ui.get_done_page());
             }
         });
         if let Err(e) = set {
@@ -308,7 +312,11 @@ async fn finish(ui: &slint::Weak<AppWindow>, reboot: bool) {
         if reboot && !reboot_now().await {
             // the drivers may need it, so rather than quitting, the button can be pressed again
             FINISHING.store(false, std::sync::atomic::Ordering::SeqCst);
-            _ = ui.upgrade_in_event_loop(|app| app.global::<Install<'_>>().set_reboot_failed(true));
+            _ = ui.upgrade_in_event_loop(|app| {
+                let install = app.global::<Install<'_>>();
+                install.set_reboot_failed(true);
+                install.set_finishing(false);
+            });
             return;
         }
     }
@@ -378,6 +386,9 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
             // once, a second press on Done would run it all again
             if FINISHING.swap(true, std::sync::atomic::Ordering::SeqCst) {
                 return;
+            }
+            if let Some(app) = ui.upgrade() {
+                app.global::<Install<'_>>().set_finishing(true);
             }
             let ui = ui.clone();
             std::thread::spawn(move || crate::RT.block_on(finish(&ui, reboot)));

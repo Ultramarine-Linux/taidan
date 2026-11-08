@@ -382,6 +382,8 @@ page-drivers-desc = Install additional drivers, codecs, and tools to support har
 page-drivers-proprietary = Some drivers may be proprietary.
 # toggle
 page-drivers-install = Install Drivers
+# toggle, the same as page-drivers-install, when codecs are installed along with the drivers
+page-drivers-install-codecs = Install Drivers and Codecs
 # .nvidia, .broadcom-*, .builtin, .codecs: items in the list of drivers to install
 page-drivers-nvidia = NVIDIA Graphics
 page-drivers-broadcom-wifi = Broadcom WiFi
@@ -423,6 +425,8 @@ page-done-drivers-failed = Some drivers couldn't be installed. Everything else i
 page-done-reboot-failed = Couldn't restart. Try again, or restart from the login screen.
 # btn, ends the setup and shows the login screen, when no reboot is needed
 page-done-login = Log In
+# for screen readers, the spinner shown while the setup ends and the system restarts or shows the login screen
+page-done-finishing = Finishing up…
 
 ## [Error]
 

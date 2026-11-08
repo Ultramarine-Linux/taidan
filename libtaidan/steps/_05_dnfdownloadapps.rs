@@ -1,5 +1,12 @@
 use crate::{i18n::I18nImf, prelude::*};
 
+/// how dnf installs the extras (codecs, input methods, the language pack), here and in
+/// `DnfInstallApps`. None of them is worth failing the installation over: `--skip-unavailable`
+/// skips packages that aren't in the repos, e.g. an input method the distro doesn't package, and
+/// `--skip-broken` the ones whose dependencies don't resolve. dnf5 split the two, so neither
+/// implies the other, see <https://dnf5.readthedocs.io/en/latest/changes_from_dnf4.7.html>
+pub(super) const DNF_EXTRAS_ARGS: &[&str] = &["in", "-y", "--skip-broken", "--skip-unavailable"];
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DnfDownloadApps;
 impl super::Step for DnfDownloadApps {
@@ -74,8 +81,8 @@ impl super::Step for DnfDownloadApps {
                 crate::pkexec("root", "dnf5", &["copr", "enable", "-y", copr]).await?;
             }
         }
-        // with `--skip-broken`, these are extras (codecs, input methods, the language pack), and
-        // RPM Fusion's `@multimedia` breaks for a while whenever it lags behind a Fedora update
+        // RPM Fusion's `@multimedia` breaks for a while whenever it lags behind a Fedora update,
+        // see `DNF_EXTRAS_ARGS`
         let pkgs: &[String] = if dnf { &settings.actions[1] } else { &[] };
 
         match (pkgs.is_empty(), settings.actions[2].is_empty()) {
@@ -90,7 +97,7 @@ impl super::Step for DnfDownloadApps {
             }
             (false, true) => {
                 super::super::dnf::handle_dnf(callback, |dnf| {
-                    dnf.args(["in", "-y", "--skip-broken", "--downloadonly"]).args(pkgs)
+                    dnf.args(DNF_EXTRAS_ARGS).arg("--downloadonly").args(pkgs)
                 })
                 .await?;
             }
@@ -104,7 +111,7 @@ impl super::Step for DnfDownloadApps {
                             .args(&settings.actions[2])
                     }),
                     super::super::dnf::handle_dnf(callback, |dnf| {
-                        dnf.args(["in", "-y", "--skip-broken", "--downloadonly"]).args(pkgs)
+                        dnf.args(DNF_EXTRAS_ARGS).arg("--downloadonly").args(pkgs)
                     }),
                 )
                 .await?;

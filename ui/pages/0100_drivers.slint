@@ -98,7 +98,8 @@ export component DriversPage inherits TdnPage {
             }
 
             toggle := TdnToggleRow {
-                text: Lang.t("page-drivers-install", []);
+                // codecs come with the drivers on purpose, and when dnf is skipped there are none
+                text: Lang.t(Drivers.codecs ? "page-drivers-install-codecs" : "page-drivers-install", []);
                 checked: Drivers.install;
                 toggled(on) => { Drivers.install = on; }
                 accepted => { root.try-next(); }

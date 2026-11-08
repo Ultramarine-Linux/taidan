@@ -3,10 +3,17 @@ import { TdnBasePg, TdnHero } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
 import { Install } from "../install.slint";
-import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
+import { TdnText, TdnBtn, TdnStyle, TdnSpinner } from "../components.slint";
 
 export component DonePage inherits TdnBasePg {
     forward-focus: reboot;
+
+    // the buttons are off while finishing, which drops their focus, so it comes back if
+    // restarting fails
+    property <bool> finishing: Install.finishing;
+    changed finishing => {
+        if !root.finishing && root.active { reboot.focus(); }
+    }
 
     // a named group around the page, like `TdnPage`'s, so screen readers say which page it is
     VerticalLayout {
@@ -74,21 +81,32 @@ export component DonePage inherits TdnBasePg {
                 HorizontalLayout {
                     spacing: 0.75rem;
 
+                    // while the system is marked configured and restarts or logs out
+                    if Install.finishing: VerticalLayout {
+                        alignment: center;
+                        TdnSpinner {
+                            accessible-label: Lang.t("page-done-finishing", []);
+                        }
+                    }
+
                     // logging in comes first, updating can wait for whenever the user restarts
                     if !Install.needs-reboot && Install.updates-ready: TdnBtn {
                         text: Lang.t("page-done-restart-update", []);
+                        enabled: !Install.finishing;
                         clicked => { Install.finish(true); }
                     }
 
                     // a way out when restarting doesn't work
                     if Install.needs-reboot && Install.reboot-failed: TdnBtn {
                         text: Lang.t("page-done-login", []);
+                        enabled: !Install.finishing;
                         clicked => { Install.finish(false); }
                     }
 
                     reboot := TdnBtn {
                         layout-order: Dir.order(1);
                         enter-hint: true;
+                        enabled: !Install.finishing;
                         background-color: TdnStyle.accent;
                         foreground-color: TdnStyle.accent-foreground;
                         text: Lang.t(
