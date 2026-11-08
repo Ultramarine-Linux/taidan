@@ -212,11 +212,17 @@ fn config_color(path: &str) -> Option<slint::Color> {
     color
 }
 
-fn parse_color(code: &str) -> Option<slint::Color> {
-    let bytes = hex::decode(code.strip_prefix('#')?).ok()?;
-    match bytes[..] {
-        [alpha, red, green, blue] => Some(slint::Color::from_argb_u8(alpha, red, green, blue)),
-        [red, green, blue] => Some(slint::Color::from_rgb_u8(red, green, blue)),
+/// `#rrggbb` or `#aarrggbb` as a color
+pub(crate) fn parse_color(code: &str) -> Option<slint::Color> {
+    let digits = code.strip_prefix('#')?;
+    // `from_str_radix` would also take a sign
+    if !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let value = u32::from_str_radix(digits, 16).ok()?;
+    match digits.len() {
+        8 => Some(slint::Color::from_argb_encoded(value)),
+        6 => Some(slint::Color::from_argb_encoded(0xff00_0000 | value)),
         _ => None,
     }
 }
@@ -269,7 +275,7 @@ mod tests {
     fn colors() {
         assert_eq!(parse_color("#00078f"), Some(slint::Color::from_rgb_u8(0, 7, 0x8f)));
         assert_eq!(parse_color("#8000078f"), Some(slint::Color::from_argb_u8(0x80, 0, 7, 0x8f)));
-        for bad in ["00078f", "#00078", "#zz078f", "#", "blue"] {
+        for bad in ["00078f", "#00078", "#zz078f", "#", "blue", "#+0078f", "#-0078f"] {
             assert_eq!(parse_color(bad), None, "{bad}");
         }
     }

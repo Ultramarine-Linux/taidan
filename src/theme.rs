@@ -3,10 +3,9 @@ use slint::{Color, ModelRc, VecModel};
 
 use crate::ui::{AccentItem, Appearance};
 
-/// `#rrggbb` as a [`Color`]
+/// `#rrggbb` as a [`Color`], for the accents' colors, which are always valid
 fn parse_hex(hex: &str) -> Color {
-    let rgb = u32::from_str_radix(hex.trim_start_matches('#'), 16).unwrap_or_default();
-    Color::from_argb_encoded(0xff00_0000 | rgb)
+    crate::cfg::parse_color(hex).unwrap_or_default()
 }
 
 /// WCAG relative luminance
