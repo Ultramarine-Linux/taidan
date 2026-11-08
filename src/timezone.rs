@@ -26,6 +26,8 @@ struct Zone {
     countries: Vec<String>,
     lat: f64,
     lon: f64,
+    /// from `zone1970.tab`, not only `zone.tab`, whose extra zones are mostly links to these
+    main: bool,
 }
 
 /// `±DDMM` or `±DDMMSS` (`±DDDMM…` for longitude) as degrees
@@ -59,7 +61,7 @@ fn parse_tab(tab: &str) -> Vec<Zone> {
             let countries = cols.next()?.split(',').map(str::to_owned).collect();
             let (lat, lon) = parse_coords(cols.next()?)?;
             let id = cols.next()?.to_owned();
-            Some(Zone { id, countries, lat, lon })
+            Some(Zone { id, countries, lat, lon, main: true })
         })
         .collect()
 }
@@ -75,7 +77,7 @@ fn merge_tabs(mut zones: Vec<Zone>, more: Vec<Zone>) -> Vec<Zone> {
                 }
             }
         } else {
-            zones.push(zone);
+            zones.push(Zone { main: false, ..zone });
         }
     }
     zones
@@ -196,6 +198,10 @@ fn map_zones(zones: &[Zone]) -> Vec<Zone> {
         .collect()
 }
 
+/// how much farther, in degrees, a `zone1970.tab` zone may be than a nearer `zone.tab` one that
+/// keeps the same clocks and still be picked over it, e.g. Rome over the Vatican
+const MAIN_SLACK: f64 = 0.5;
+
 /// the zone nearest a spot on the map, given as fractions of its width and height
 fn nearest(zones: &[Zone], x: f64, y: f64) -> Option<&Zone> {
     let lon = x.mul_add(360., -180.);
@@ -204,12 +210,19 @@ fn nearest(zones: &[Zone], x: f64, y: f64) -> Option<&Zone> {
         // the map wraps around at the date line, and longitude shrinks toward the poles
         let dlon = (z.lon - lon).abs();
         let dlon = dlon.min(360. - dlon) * lat.to_radians().cos();
-        dlon.mul_add(dlon, (z.lat - lat).powi(2))
+        dlon.mul_add(dlon, (z.lat - lat).powi(2)).sqrt()
     };
-    zones
-        .iter()
-        .filter(|z| (MAP_SOUTH..=MAP_NORTH).contains(&z.lat))
-        .min_by(|a, b| dist(a).total_cmp(&dist(b)))
+    let on_map = || zones.iter().filter(|z| (MAP_SOUTH..=MAP_NORTH).contains(&z.lat));
+    let best = on_map().min_by(|a, b| dist(a).total_cmp(&dist(b)))?;
+    if best.main {
+        return Some(best);
+    }
+    // a zone.tab zone is mostly a link to a zone1970.tab one close by, which is the real zone
+    let (limit, clocks) = (dist(best) + MAIN_SLACK, rules(&best.id));
+    let main = on_map()
+        .filter(|z| z.main && dist(z) <= limit && rules(&z.id) == clocks)
+        .min_by(|a, b| dist(a).total_cmp(&dist(b)));
+    Some(main.unwrap_or(best))
 }
 
 /// the system's zone `name` as one of `zones`, under its current name if it's an old one, or
@@ -230,7 +243,13 @@ fn system_zone(
     }
     let id = [current, name].into_iter().find(|id| jiff::tz::TimeZone::get(id).is_ok())?;
     // nowhere on the map, but it can be picked in the list
-    zones.push(Zone { id: id.to_owned(), countries: vec![], lat: f64::NAN, lon: f64::NAN });
+    zones.push(Zone {
+        id: id.to_owned(),
+        countries: vec![],
+        lat: f64::NAN,
+        lon: f64::NAN,
+        main: true,
+    });
     Some(id.to_owned())
 }
 
@@ -416,7 +435,9 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tz: &Tz<'_>) {
         move |x, y| {
             let Some(ui) = ui.upgrade() else { return };
             let mut state = state.borrow_mut();
-            let Some(id) = nearest(&state.on_map, x.into(), y.into()).map(|z| z.id.clone()) else {
+            // every zone rather than only the dots, which leave out ones that differ only in
+            // history and may be nearer
+            let Some(id) = nearest(&state.zones, x.into(), y.into()).map(|z| z.id.clone()) else {
                 return;
             };
             state.touched = true;
@@ -433,18 +454,20 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tz: &Tz<'_>) {
             crate::SETTINGS.write().timezone = if keep { String::new() } else { id.into() };
         }
     });
-    // keeps the clock under the map current
-    let timer = slint::Timer::default();
-    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_secs(15), {
-        let ui = ui.clone();
-        move || {
-            let Some(ui) = ui.upgrade() else { return };
-            let id = ui.global::<Tz<'_>>().get_current().id;
-            ui.global::<Tz<'_>>()
-                .set_current_time(local_time(&id, &locale(&ui)).to_shared_string());
-        }
+    tick_clock(ui.clone());
+}
+
+/// keeps the clock under the map current, updating it just after each minute starts
+fn tick_clock(ui: slint::Weak<AppWindow>) {
+    let into_minute = jiff::Timestamp::now().as_millisecond().rem_euclid(60_000);
+    // a little after, so the minute has surely turned when it's read
+    let wait = u64::try_from(60_050 - into_minute).unwrap_or(60_000);
+    slint::Timer::single_shot(std::time::Duration::from_millis(wait), move || {
+        let Some(app) = ui.upgrade() else { return };
+        let id = app.global::<Tz<'_>>().get_current().id;
+        app.global::<Tz<'_>>().set_current_time(local_time(&id, &locale(&app)).to_shared_string());
+        tick_clock(ui);
     });
-    std::mem::forget(timer);
 }
 
 #[cfg(test)]
@@ -484,6 +507,59 @@ mod tests {
         assert_eq!(at(-2., 52.), "Europe/London");
         // across the date line from Auckland
         assert_eq!(at(-178., -38.), "Pacific/Auckland");
+    }
+
+    /// x and y on the map for a zone's own coordinates
+    fn spot(z: &Zone) -> (f64, f64) {
+        ((z.lon + 180.) / 360., (MAP_NORTH - z.lat) / (MAP_NORTH - MAP_SOUTH))
+    }
+
+    #[test]
+    fn nearest_prefers_main_zones() {
+        let zones = merge_tabs(
+            parse_tab("IT,SM,VA\t+4154+01229\tEurope/Rome\nAT\t+4813+01620\tEurope/Vienna\n"),
+            parse_tab("VA\t+415408+0122711\tEurope/Vatican\nSM\t+4355+01228\tEurope/San_Marino\n"),
+        );
+        let at = |id: &str| {
+            let (x, y) = spot(zones.iter().find(|z| z.id == id).unwrap());
+            nearest(&zones, x, y).unwrap().id.clone()
+        };
+        // the Vatican links to Rome, a few hundredths of a degree away
+        assert_eq!(at("Europe/Vatican"), "Europe/Rome");
+        // two degrees away, too far to be taken for Rome
+        assert_eq!(at("Europe/San_Marino"), "Europe/San_Marino");
+        assert_eq!(at("Europe/Rome"), "Europe/Rome");
+    }
+
+    #[test]
+    fn real_tables_pick_each_zone_by_its_coords() {
+        let (Ok(main), Ok(more)) =
+            (std::fs::read_to_string(ZONE_TAB), std::fs::read_to_string(COUNTRY_TAB))
+        else {
+            return;
+        };
+        let zones = merge_tabs(parse_tab(&main), parse_tab(&more));
+        let on_map = || zones.iter().filter(|z| (MAP_SOUTH..=MAP_NORTH).contains(&z.lat));
+        for id in [
+            "Australia/Sydney",
+            "Australia/Melbourne",
+            "America/Sao_Paulo",
+            "America/Indiana/Indianapolis",
+            "Europe/Volgograd",
+        ] {
+            assert!(on_map().any(|z| z.id == id), "{id} not on the map");
+        }
+        for zone in on_map() {
+            let (x, y) = spot(zone);
+            let picked = nearest(&zones, x, y).unwrap();
+            assert_eq!(
+                rules(&picked.id),
+                rules(&zone.id),
+                "clicking {} picks {}, which keeps other clocks",
+                zone.id,
+                picked.id
+            );
+        }
     }
 
     #[test]
