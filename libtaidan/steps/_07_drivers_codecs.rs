@@ -1,40 +1,111 @@
-use crate::{prelude::*, root};
+use crate::{prelude::*, root, root_with_stdin};
 use tokio::process::Command;
-static NVIDIA_PREFIXES: std::sync::LazyLock<std::collections::HashMap<&str, &str>> =
-    std::sync::LazyLock::new(|| {
-        [
-            // List of chipset prefixes with its corresponding last supported driver version
-            // if it's not in the list, it's probably supported by the latest driver
-            // but... if it's really really old, then you're out of luck
-            // We're gonna be supporting GPUs from the 8000 series and up
-            ("NV", "unsupported"),
-            ("MCP", "unsupported"),
-            // nForce chipset graphics, e.g. `C51 [GeForce 6150 LE]`
-            ("C5", "unsupported"),
-            ("C6", "unsupported"),
-            ("C7", "unsupported"),
-            ("G7", "unsupported"),
-            // 340xx isn't packaged by RPM Fusion anymore
-            ("G8", "unsupported"),
-            // wtf this goes from like 8000 to 100 series
-            ("G9", "unsupported"),
-            // finally, a sane naming scheme
-            // Tesla GPUs
-            ("GT", "unsupported"),
-            // Fermi and Kepler, 390xx and 470xx have no GBM, which the Wayland-only desktops need,
-            // so they stay on nouveau
-            ("GF", "unsupported"),
-            ("GK", "unsupported"),
-            // Maxwell, Pascal and Volta, dropped in the 590 driver
-            ("GM", "580xx"),
-            ("GP", "580xx"),
-            ("GV", "580xx"),
-            // Turing and newer should be supported by the latest driver, at least as of
-            // late 2026
-        ]
-        .into_iter()
-        .collect()
-    });
+/// an NVIDIA driver branch RPM Fusion packages, oldest first, so the oldest of several sorts
+/// lowest
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum NvidiaBranch {
+    /// the last branch for Maxwell, Pascal and Volta, `akmod-nvidia-580xx`
+    R580,
+    /// `akmod-nvidia`, Turing and newer
+    Latest,
+}
+
+impl NvidiaBranch {
+    /// the akmod, the driver and the CUDA libraries, which also have Vulkan and OpenGL
+    fn packages(self) -> [&'static str; 3] {
+        match self {
+            Self::R580 => [
+                "akmod-nvidia-580xx",
+                "xorg-x11-drv-nvidia-580xx",
+                "xorg-x11-drv-nvidia-580xx-cuda",
+            ],
+            Self::Latest => ["akmod-nvidia", "xorg-x11-drv-nvidia", "xorg-x11-drv-nvidia-cuda"],
+        }
+    }
+}
+
+/// which packaged branches drive an NVIDIA chip, from its name in `lspci`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NvidiaChip {
+    /// every branch from `oldest` to `newest`
+    Supported { oldest: NvidiaBranch, newest: NvidiaBranch },
+    /// older than any packaged branch supports
+    TooOld,
+    /// not a chip this knows, e.g. `Device 2c05` when `pci.ids` doesn't have it yet
+    Unknown,
+}
+
+impl NvidiaChip {
+    fn from_chipset(chipset: &str) -> Self {
+        use NvidiaBranch::{Latest, R580};
+        const fn branches(oldest: NvidiaBranch, newest: NvidiaBranch) -> NvidiaChip {
+            NvidiaChip::Supported { oldest, newest }
+        }
+        let prefix = |p: &[&str]| p.iter().any(|p| chipset.starts_with(p));
+        // RPM Fusion stopped packaging 340xx, and 390xx (Fermi) and 470xx (Kepler) have no GBM,
+        // which the Wayland-only desktops need, so those stay on nouveau. `C5x` to `C7x` are
+        // nForce chipset graphics, e.g. `C51 [GeForce 6150 LE]`
+        if prefix(&["NV", "MCP", "C5", "C6", "C7", "G7", "G8", "G9", "GT", "GF", "GK"]) {
+            Self::TooOld
+        // Maxwell, Pascal and Volta, dropped in the 590 driver
+        } else if prefix(&["GM", "GP", "GV"]) {
+            branches(R580, R580)
+        // Turing, Ampere, Hopper, Ada and Blackwell. 580 drives all of them too
+        } else if prefix(&["TU", "GA", "GH", "AD", "GB"]) {
+            branches(R580, Latest)
+        } else {
+            Self::Unknown
+        }
+    }
+}
+
+/// what to install for every NVIDIA GPU in the system
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NvidiaDriver {
+    Branch(NvidiaBranch),
+    /// every GPU is too old for a packaged driver, nouveau drives them
+    TooOld,
+    /// no GPU was found, or one isn't known, so nothing is installed rather than a driver that
+    /// might take the display away
+    Unknown,
+    /// no single branch drives every GPU, e.g. a Kepler card next to a Turing one
+    Incompatible,
+}
+
+impl NvidiaDriver {
+    /// the oldest branch any of the GPUs needs, if it drives the rest too
+    fn for_chipsets<S: AsRef<str>>(chipsets: &[S]) -> Self {
+        let chips: Vec<_> = chipsets.iter().map(|c| NvidiaChip::from_chipset(c.as_ref())).collect();
+        if chips.is_empty() || chips.contains(&NvidiaChip::Unknown) {
+            return Self::Unknown;
+        }
+        if chips.iter().all(|c| *c == NvidiaChip::TooOld) {
+            return Self::TooOld;
+        }
+        let mut oldest = NvidiaBranch::R580;
+        let mut newest = NvidiaBranch::Latest;
+        for chip in chips {
+            let NvidiaChip::Supported { oldest: o, newest: n } = chip else {
+                return Self::Incompatible;
+            };
+            oldest = oldest.max(o);
+            newest = newest.min(n);
+        }
+        if oldest > newest {
+            return Self::Incompatible;
+        }
+        Self::Branch(newest)
+    }
+}
+
+/// makes the NVIDIA GPU drive the displays instead of the integrated one, for `STELLAR_OPTION`
+const NVIDIA_PRIMARY_GPU_CONF: &str = r#"Section "OutputClass"
+	Identifier "nvidia-primary"
+	MatchDriver "nvidia-drm"
+	Driver "nvidia"
+	Option "PrimaryGPU" "yes"
+EndSection
+"#;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DriversCodecs;
@@ -117,9 +188,7 @@ pub struct Hardware {
 pub async fn detect_hardware() -> Hardware {
     let pci = pci_devices().await;
     let nvidia = has_nvidia_gpu(&pci)
-        && Drivers::get_nvidia_chipset()
-            .await
-            .is_ok_and(|chipset| Drivers::get_nvidia_driver(&chipset) != "unsupported");
+        && matches!(Drivers::get_nvidia_driver().await, Ok(NvidiaDriver::Branch(_)));
     let broadcom_wifi = has_wl_only_wifi(&pci);
     Hardware {
         nvidia,
@@ -330,49 +399,21 @@ async fn install_pkgs(cfg: &crate::cfg::Config, pkgs: &[&str]) -> Res<Installed>
 }
 
 impl Drivers {
-    /// Returns the latest supported driver for the given chipset
-    fn get_nvidia_driver(chipset: &str) -> &str {
-        for (prefix, driver) in &*NVIDIA_PREFIXES {
-            if chipset.starts_with(prefix) {
-                return driver;
-            }
-        }
-        "latest"
-    }
-
-    async fn get_nvidia_chipset() -> Res<String> {
+    /// the driver for every NVIDIA GPU `lspci` lists
+    async fn get_nvidia_driver() -> Res<NvidiaDriver> {
         let out = Command::new("lspci")
             .output()
             .await
             .map_err(|e| Err::FailToRunProgram("lspci", e))
             .wrap_msg("cannot detect nvidia chipset")?;
-        Ok(nvidia_chipset(&String::from_utf8_lossy(&out.stdout)).unwrap_or_default().to_owned())
-    }
-
-    ///    Returns a list of Nvidia packages to install
-    ///
-    /// Returns `None` if no packaged driver supports the GPU.
-    async fn list_nvidia_packages() -> Res<Option<Vec<String>>> {
-        let mut pkgs = vec!["nvidia-gpu-firmware".into(), "libva-nvidia-driver".into()];
-        let chipset = Self::get_nvidia_chipset().await?;
-        match Self::get_nvidia_driver(&chipset) {
-            "unsupported" => {
-                tracing::info!(chipset, "Nvidia GPU is too old for any packaged driver");
-                return Ok(None);
-            }
-            // TODO: nvidia-driver
-            "latest" => pkgs.extend_from_slice(&[
-                "akmod-nvidia".into(),
-                "xorg-x11-drv-nvidia".into(),
-                "xorg-x11-drv-nvidia-cuda".into(),
-            ]),
-            v => pkgs.extend_from_slice(&[
-                format!("akmod-nvidia-{v}"),
-                format!("xorg-x11-drv-nvidia-{v}"),
-                format!("xorg-x11-drv-nvidia-{v}-cuda"),
-            ]),
+        if !out.status.success() {
+            return Err(Err::program_fail("lspci", &out)).wrap_msg("cannot detect nvidia chipset");
         }
-        Ok(Some(pkgs))
+        let lspci = String::from_utf8_lossy(&out.stdout);
+        let chipsets = nvidia_chipsets(&lspci);
+        let driver = NvidiaDriver::for_chipsets(&chipsets);
+        tracing::info!(?chipsets, ?driver, "detected Nvidia GPUs");
+        Ok(driver)
     }
 
     async fn setup_nvidia_kargs() -> Res<()> {
@@ -463,40 +504,55 @@ impl Drivers {
             );
             return Ok(Setup::default());
         }
-        let Some(pkgs) = Self::list_nvidia_packages().await? else {
-            return Ok(Setup::default());
-        };
-        let pkgs: Vec<_> = pkgs.iter().map(String::as_str).collect();
-        match install_pkgs(cfg, &pkgs).await? {
-            Installed::Dnf => {}
-            Installed::Skipped => return Ok(Setup::default()),
-            Installed::Ostree => {
-                // the kmod is built inside the rpm-ostree transaction, which needs a reboot anyway
-                Self::setup_nvidia_kargs().await?;
-                return Ok(Setup { reboot: true, failed: false });
+        // nouveau keeps driving the GPU unless a driver is sure to support it
+        let branch = match Self::get_nvidia_driver().await? {
+            NvidiaDriver::Branch(branch) => branch,
+            NvidiaDriver::TooOld => {
+                tracing::info!("Nvidia GPU is too old for any packaged driver");
+                return Ok(Setup::default());
             }
+            NvidiaDriver::Unknown => {
+                tracing::warn!("cannot tell which Nvidia GPU this is, not installing a driver");
+                return Ok(Setup { reboot: false, failed: true });
+            }
+            NvidiaDriver::Incompatible => {
+                tracing::warn!("no packaged Nvidia driver supports every GPU, not installing one");
+                return Ok(Setup { reboot: false, failed: true });
+            }
+        };
+        let mut pkgs = vec!["nvidia-gpu-firmware", "libva-nvidia-driver"];
+        pkgs.extend(branch.packages());
+        let installed = install_pkgs(cfg, &pkgs).await?;
+        if installed == Installed::Skipped {
+            return Ok(Setup::default());
         }
-
+        // the driver works without it, so the done page mentions it but it's not worth more
+        let mut primary_failed = false;
         if primary_gpu {
-            root(
-                "sh",
-                &[
-                    "-c",
-                    r#"
-                    cp -p /usr/share/X11/xorg.conf.d/nvidia.conf /etc/X11/xorg.conf.d/nvidia.conf
-                    sed -i '10i\\\tOption "PrimaryGPU" "yes"' /etc/X11/xorg.conf.d/nvidia.conf
-                "#,
-                ],
+            // a snippet of its own, the packaged `nvidia.conf` stays as it is. Xorg applies every
+            // `OutputClass` that matches, so this only adds the option
+            if let Err(e) = root_with_stdin(
+                "install",
+                ["-Dm644", "/dev/stdin", "/etc/X11/xorg.conf.d/10-nvidia-primary.conf"],
+                NVIDIA_PRIMARY_GPU_CONF.as_bytes(),
             )
             .await
-            .wrap_msg("cannot set nvidia as primary gpu")?;
+            {
+                tracing::warn!(?e, "cannot set nvidia as primary gpu");
+                primary_failed = true;
+            }
+        }
+        if installed == Installed::Ostree {
+            // the kmod is built inside the rpm-ostree transaction, which needs a reboot anyway
+            Self::setup_nvidia_kargs().await?;
+            return Ok(Setup { reboot: true, failed: primary_failed });
         }
 
         let built = Self::kmod_built("nvidia").await?;
         if !built {
             tracing::warn!("Nvidia kernel module isn't built, not asking for a reboot");
         }
-        Ok(Setup { reboot: built, failed: !built })
+        Ok(Setup { reboot: built, failed: !built || primary_failed })
     }
 
     /// Returns whether a reboot would load the drivers, i.e. the `wl` kernel module is ready or
@@ -582,14 +638,15 @@ async fn secure_boot_enforced() -> Option<bool> {
     }
 }
 
-/// the chip of the first NVIDIA GPU in `lspci`'s output, e.g. `GA106` from
+/// the chips of every NVIDIA GPU in `lspci`'s output, e.g. `GA106` from
 /// `01:00.0 VGA compatible controller: NVIDIA Corporation GA106 [GeForce RTX 3060] (rev a1)`
-fn nvidia_chipset(lspci: &str) -> Option<&str> {
+fn nvidia_chipsets(lspci: &str) -> Vec<&str> {
     lspci
         .lines()
         .filter(|l| l.contains("VGA compatible controller") || l.contains("3D controller"))
         .filter_map(|l| l.split_once(": ")?.1.strip_prefix("NVIDIA Corporation "))
-        .find_map(|desc| desc.split_whitespace().next())
+        .filter_map(|desc| desc.split_whitespace().next())
+        .collect()
 }
 
 #[cfg(test)]
@@ -597,35 +654,70 @@ mod tests {
     use super::*;
 
     #[test]
-    fn nvidia_chipset_from_lspci() {
+    fn nvidia_chipsets_from_lspci() {
         let lspci = "\
 00:02.0 VGA compatible controller: Intel Corporation Alder Lake-P GT2 [Iris Xe Graphics] (rev 0c)
 01:00.1 Audio device: NVIDIA Corporation GA106 High Definition Audio Controller (rev a1)
 01:00.0 3D controller: NVIDIA Corporation GA106M [GeForce RTX 3060 Mobile / Max-Q] (rev a1)
 ";
-        assert_eq!(nvidia_chipset(lspci), Some("GA106M"));
-        let lspci = "01:00.0 VGA compatible controller: NVIDIA Corporation GK208B [GeForce GT 710] (rev a1)";
-        assert_eq!(nvidia_chipset(lspci), Some("GK208B"));
-        assert_eq!(Drivers::get_nvidia_driver(nvidia_chipset(lspci).unwrap()), "unsupported");
-        assert_eq!(Drivers::get_nvidia_driver("C51"), "unsupported");
-        assert_eq!(
-            nvidia_chipset("00:02.0 VGA compatible controller: Intel Corporation UHD"),
-            None
+        assert_eq!(nvidia_chipsets(lspci), ["GA106M"]);
+        let lspci = "\
+01:00.0 VGA compatible controller: NVIDIA Corporation GK208B [GeForce GT 710] (rev a1)
+02:00.0 VGA compatible controller: NVIDIA Corporation TU116 [GeForce GTX 1660 SUPER] (rev a1)
+";
+        assert_eq!(nvidia_chipsets(lspci), ["GK208B", "TU116"]);
+        // a GPU newer than `pci.ids`
+        let lspci = "01:00.0 VGA compatible controller: NVIDIA Corporation Device 2c05 (rev a1)";
+        assert_eq!(nvidia_chipsets(lspci), ["Device"]);
+        assert!(
+            nvidia_chipsets("00:02.0 VGA compatible controller: Intel Corporation UHD").is_empty()
         );
     }
 
     #[test]
-    fn test_get_nvidia_driver() {
-        assert_eq!(Drivers::get_nvidia_driver("NV34"), "unsupported");
-        assert_eq!(Drivers::get_nvidia_driver("GK104"), "unsupported");
-        assert_eq!(Drivers::get_nvidia_driver("GF108"), "unsupported");
-        assert_eq!(Drivers::get_nvidia_driver("GT218"), "unsupported");
-        assert_eq!(Drivers::get_nvidia_driver("GM107"), "580xx");
-        assert_eq!(Drivers::get_nvidia_driver("GP108"), "580xx");
-        assert_eq!(Drivers::get_nvidia_driver("GV100"), "580xx");
-        assert_eq!(Drivers::get_nvidia_driver("TU116"), "latest");
-        assert_eq!(Drivers::get_nvidia_driver("GA106M"), "latest");
-        assert_eq!(Drivers::get_nvidia_driver("AD104"), "latest");
+    fn nvidia_chip_support() {
+        use NvidiaBranch::{Latest, R580};
+        for chip in ["NV34", "MCP79", "C51", "G86", "G92", "GT218", "GF108", "GK104", "GK208B"] {
+            assert_eq!(NvidiaChip::from_chipset(chip), NvidiaChip::TooOld, "{chip}");
+        }
+        for chip in ["GM107", "GM204", "GP108", "GP102", "GV100"] {
+            let only_580 = NvidiaChip::Supported { oldest: R580, newest: R580 };
+            assert_eq!(NvidiaChip::from_chipset(chip), only_580, "{chip}");
+        }
+        for chip in ["TU116", "TU117M", "GA106M", "GH100", "AD104", "GB202", "GB206M"] {
+            let both = NvidiaChip::Supported { oldest: R580, newest: Latest };
+            assert_eq!(NvidiaChip::from_chipset(chip), both, "{chip}");
+        }
+        for chip in ["", "Device", "XX100"] {
+            assert_eq!(NvidiaChip::from_chipset(chip), NvidiaChip::Unknown, "{chip:?}");
+        }
+    }
+
+    #[test]
+    fn nvidia_driver_for_chipsets() {
+        use NvidiaBranch::{Latest, R580};
+        let driver = |chips: &[&str]| NvidiaDriver::for_chipsets(chips);
+        // nothing detected never means the latest driver
+        assert_eq!(driver(&[]), NvidiaDriver::Unknown);
+        assert_eq!(driver(&[""]), NvidiaDriver::Unknown);
+        assert_eq!(driver(&["Device"]), NvidiaDriver::Unknown);
+        assert_eq!(driver(&["TU116", "Device"]), NvidiaDriver::Unknown);
+        assert_eq!(driver(&["GK104"]), NvidiaDriver::TooOld);
+        assert_eq!(driver(&["GK104", "GF108"]), NvidiaDriver::TooOld);
+        assert_eq!(driver(&["GK208B", "TU116"]), NvidiaDriver::Incompatible);
+        assert_eq!(driver(&["GP108"]), NvidiaDriver::Branch(R580));
+        assert_eq!(driver(&["GM107", "GP104"]), NvidiaDriver::Branch(R580));
+        assert_eq!(driver(&["TU116"]), NvidiaDriver::Branch(Latest));
+        assert_eq!(driver(&["GA106M", "AD104"]), NvidiaDriver::Branch(Latest));
+        // the oldest branch that drives both
+        assert_eq!(driver(&["GP108", "TU116"]), NvidiaDriver::Branch(R580));
+        assert_eq!(driver(&["AD104", "GP108"]), NvidiaDriver::Branch(R580));
+    }
+
+    #[test]
+    fn nvidia_branch_packages() {
+        assert_eq!(NvidiaBranch::Latest.packages()[0], "akmod-nvidia");
+        assert!(NvidiaBranch::R580.packages().iter().all(|p| p.contains("-580xx")));
     }
 
     const fn dev(vendor: u16, device: u16, class: u32) -> PciDevice {
