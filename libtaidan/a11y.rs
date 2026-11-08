@@ -31,9 +31,18 @@ pub struct A11y {
 /// how far zoom is turned on, about what four presses of Meta+= give
 pub const ZOOM: f64 = 2.0;
 
-/// font sizes in points, for Plasma's default (Noto Sans 10) and with larger text
+/// Plasma's built-in fonts, for when the system's kdeglobals doesn't set them
 const FONT_SIZE: u8 = 10;
-const LARGER_FONT_SIZE: u8 = 12;
+const SANS: &str = "Noto Sans";
+const MONO: &str = "Hack";
+
+/// how many points larger text makes the fonts
+const LARGER_TEXT_STEP: u8 = 2;
+
+/// the system's kdeglobals, most important first, as Plasma's session on Fedora sets
+/// `XDG_CONFIG_DIRS`
+const SYSTEM_KDEGLOBALS: [&str; 2] =
+    ["/etc/xdg/kdeglobals", "/usr/share/kde-settings/kde-profile/default/xdg/kdeglobals"];
 
 const LEGIBLE_SANS: &str = "Atkinson Hyperlegible Next";
 const LEGIBLE_MONO: &str = "Atkinson Hyperlegible Mono";
@@ -100,6 +109,83 @@ fn font(family: &str, size: u8) -> String {
     format!("{family},{size},-1,5,400,0,0,0,0,0,0,0,0,0,0,1")
 }
 
+/// the fonts a new Plasma user starts with, which larger text only makes bigger
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SystemFonts {
+    sans: String,
+    mono: String,
+    /// in points
+    size: u8,
+}
+
+impl Default for SystemFonts {
+    fn default() -> Self {
+        Self { sans: SANS.to_owned(), mono: MONO.to_owned(), size: FONT_SIZE }
+    }
+}
+
+impl SystemFonts {
+    /// from the system's kdeglobals
+    fn read() -> Self {
+        let files = SYSTEM_KDEGLOBALS.iter().filter_map(|p| std::fs::read_to_string(p).ok());
+        Self::from_kdeglobals(&files.collect_vec())
+    }
+
+    /// from the contents of kdeglobals files, most important first. Like KConfig, each key comes
+    /// from the first file that has it
+    fn from_kdeglobals(files: &[String]) -> Self {
+        let get = |key: &str| {
+            files.iter().find_map(|f| kconfig_value(f, "General", key)).and_then(parse_font)
+        };
+        let default = Self::default();
+        let sans = get("font");
+        let mono = get("fixed");
+        Self {
+            size: sans.as_ref().and_then(|f| f.1).unwrap_or(default.size),
+            sans: sans.map_or(default.sans, |f| f.0),
+            mono: mono.map_or(default.mono, |f| f.0),
+        }
+    }
+}
+
+/// the value of `key` in `[group]` of a KDE config file, ignoring flags like `[$i]` after the key
+fn kconfig_value<'a>(file: &'a str, group: &str, key: &str) -> Option<&'a str> {
+    let mut in_group = false;
+    for line in file.lines().map(str::trim) {
+        if let Some(name) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
+            // `[$i]` alone on a line marks the whole file immutable, it's not a group
+            if !name.starts_with('$') {
+                in_group = name == group;
+            }
+            continue;
+        }
+        if !in_group {
+            continue;
+        }
+        let Some((k, v)) = line.split_once('=') else { continue };
+        let k = k.trim();
+        let k = k.split_once("[$").map_or(k, |(k, _)| k);
+        if k == key {
+            return Some(v.trim());
+        }
+    }
+    None
+}
+
+/// the family and the point size, if it has one, of a font in Qt's font string format
+fn parse_font(font: &str) -> Option<(String, Option<u8>)> {
+    let mut fields = font.split(',');
+    let family = fields.next()?.trim();
+    if family.is_empty() {
+        return None;
+    }
+    // -1 when the font has a pixel size instead, and it may have a fraction, which is dropped
+    let size = fields.next().map(str::trim).and_then(|s| {
+        s.split_once('.').map_or(s, |(whole, _)| whole).parse::<u8>().ok().filter(|&s| s > 0)
+    });
+    Some((family.to_owned(), size))
+}
+
 impl A11y {
     /// entries KWin reads while running, so the OOBE session can apply them right away
     #[must_use]
@@ -152,6 +238,11 @@ impl A11y {
     /// untouched
     #[must_use]
     pub fn user_entries(&self) -> Vec<Entry> {
+        self.user_entries_with(&SystemFonts::read())
+    }
+
+    /// [`Self::user_entries`], with larger text and the legible font based on `system`
+    fn user_entries_with(&self, system: &SystemFonts) -> Vec<Entry> {
         if *self == Self::default() {
             return vec![];
         }
@@ -164,11 +255,15 @@ impl A11y {
             self.zoom.then(|| ZOOM.to_string()),
         ));
         if self.larger_text || self.legible_font {
-            let size = if self.larger_text { LARGER_FONT_SIZE } else { FONT_SIZE };
+            let size = if self.larger_text {
+                system.size.saturating_add(LARGER_TEXT_STEP)
+            } else {
+                system.size
+            };
             let (sans, mono) = if self.legible_font {
                 (LEGIBLE_SANS, LEGIBLE_MONO)
             } else {
-                ("Noto Sans", "Hack")
+                (system.sans.as_str(), system.mono.as_str())
             };
             for key in ["font", "menuFont", "toolBarFont"] {
                 entries.push(Entry::value("kdeglobals", "General", key, Some(font(sans, size))));
@@ -177,7 +272,7 @@ impl A11y {
                 "kdeglobals",
                 "General",
                 "smallestReadableFont",
-                Some(font(sans, size - 2)),
+                Some(font(sans, size.saturating_sub(2).max(1))),
             ));
             entries.push(Entry::value("kdeglobals", "General", "fixed", Some(font(mono, size))));
             entries.push(Entry::value("kdeglobals", "WM", "activeFont", Some(font(sans, size))));
@@ -686,8 +781,8 @@ mod tests {
         assert!(!zoom.iter().any(|e| e.key == "font"));
         assert!(zoom.iter().any(|e| e.key == "InitialZoom" && e.value.as_deref() == Some("2")));
 
-        let legible =
-            A11y { legible_font: true, larger_text: true, ..A11y::default() }.user_entries();
+        let legible = A11y { legible_font: true, larger_text: true, ..A11y::default() }
+            .user_entries_with(&SystemFonts::default());
         let font = legible.iter().find(|e| e.key == "font").unwrap();
         assert_eq!(
             font.value.as_deref(),
@@ -695,6 +790,29 @@ mod tests {
         );
         let fixed = legible.iter().find(|e| e.key == "fixed").unwrap();
         assert!(fixed.value.as_deref().unwrap().starts_with("Atkinson Hyperlegible Mono,12,"));
+    }
+
+    #[test]
+    fn larger_text_keeps_the_system_fonts() {
+        let etc = "[$i]\n[General]\nfont[$e]=Inter,11,-1,5,400,0,0,0,0,0,0,0,0,0,0,1\n".to_owned();
+        let profile = "[General]\nfixed=Noto Sans Mono,10,-1,5,50,0,0,0,0,0\n\
+                       font=Noto Sans,10,-1,5,50,0,0,0,0,0\n[WM]\nfixed=Wrong,10\n"
+            .to_owned();
+        let system = SystemFonts::from_kdeglobals(&[etc, profile]);
+        assert_eq!(
+            system,
+            SystemFonts { sans: "Inter".to_owned(), mono: "Noto Sans Mono".to_owned(), size: 11 }
+        );
+        let larger = A11y { larger_text: true, ..A11y::default() }.user_entries_with(&system);
+        let value = |key: &str| larger.iter().find(|e| e.key == key).unwrap().value.clone();
+        assert!(value("font").unwrap().starts_with("Inter,13,"));
+        assert!(value("fixed").unwrap().starts_with("Noto Sans Mono,13,"));
+        assert!(value("smallestReadableFont").unwrap().starts_with("Inter,11,"));
+
+        assert_eq!(SystemFonts::from_kdeglobals(&[]), SystemFonts::default());
+        // a pixel size keeps the default point size
+        let px = SystemFonts::from_kdeglobals(&["[General]\nfont=Cantarell,-1,14,5\n".to_owned()]);
+        assert_eq!((px.sans.as_str(), px.size), ("Cantarell", FONT_SIZE));
     }
 
     #[test]
