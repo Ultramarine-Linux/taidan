@@ -61,7 +61,6 @@ i18n-embed = { version = "0.16.0", features = [
     "filesystem-assets",
     "fluent-system",
 ] }
-i18n-embed-fl = "0.10.1"
 icu = { version = "2.4.0", features = ["unstable"] }
 # time zone offsets and local times, from the system tzdata
 jiff = { version = "0.2.38", features = ["tzdb-zoneinfo"] }
@@ -135,6 +134,18 @@ unimplemented = "warn"
 unneeded_field_pattern = "warn"
 unwrap_in_result = "warn"
 needless_for_each = "allow"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "debuginfo"
+
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+[profile.dev.package."*"]
+debug = false
 
 # Optimize only the crates doing per-frame work (rendering, text, images) in dev builds,
 # so the UI is usable without paying to optimize every dependency.
