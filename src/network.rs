@@ -294,7 +294,11 @@ enum Cmd {
         /// [`PAGE_VISIT`] when it was asked for
         visit: u64,
     },
-    ConnectEnterprise(EnterpriseLogin),
+    ConnectEnterprise {
+        login: EnterpriseLogin,
+        /// whether the dialog only offered TLS, as it does for WPA3-Enterprise 192-bit
+        tls_only: bool,
+    },
     /// a network that doesn't announce its name, so it isn't in the list
     ConnectHidden {
         ssid: String,
@@ -306,7 +310,11 @@ enum Cmd {
         bypass: String,
     },
     /// with the proxy and the hosts it's not used for, if one is set
-    OpenPortal(Option<(String, String)>),
+    OpenPortal {
+        proxy: Option<(String, String)>,
+        /// [`PAGE_VISIT`] when it was asked for
+        visit: u64,
+    },
     ClosePortal,
     LoadIp(String),
     SaveIp(String, IpSettings),
@@ -333,6 +341,8 @@ const PORTAL_BROWSER: &str = "/usr/bin/cog";
 /// the network serves that gets past `WebKit` can't. `taidan-initial-setup.service` makes the user
 /// and removes it once the OOBE is done
 const PORTAL_USER: &str = "taidan-portal";
+/// the name of the display socket in its runtime dir
+const PORTAL_DISPLAY: &str = "wayland-0";
 /// the systemd unit it runs in, so taidan can stop it although it's another user's
 const PORTAL_UNIT: &str = "taidan-portal.service";
 /// checked through the proxy if `NetworkManager` has no connectivity check URI of its own
@@ -371,6 +381,9 @@ struct Nm {
     ui: slint::Weak<AppWindow>,
     /// access points from the last refresh, strongest per network
     aps: Vec<Ap>,
+    /// how every network the list has shown is secured, by SSID, for one that's gone from it
+    /// since
+    seen: HashMap<Vec<u8>, KeyMgmt>,
     /// IP settings for wi-fi networks without a saved connection yet by SSID, used once connecting
     pending_ip: HashMap<Vec<u8>, IpConfig>,
     /// the last snapshot shown
@@ -397,6 +410,7 @@ impl Nm {
             manager: nm,
             ui,
             aps: vec![],
+            seen: HashMap::new(),
             pending_ip: HashMap::new(),
             last: None,
             portal_open: false,
@@ -502,20 +516,33 @@ impl Nm {
         }
     }
 
-    /// saved wi-fi connections by SSID
-    fn known(&self) -> HashMap<Vec<u8>, OwnedObjectPath> {
+    /// saved wi-fi connections by SSID, every one of them, as there can be more than one
+    fn known(&self) -> HashMap<Vec<u8>, Vec<OwnedObjectPath>> {
         let settings: zbus::Result<nm::Settings<'_>> =
             zbus::blocking::proxy::Builder::new(&self.conn).build();
         let paths = settings.and_then(|s| s.list_connections()).unwrap_or_default();
-        paths
-            .into_iter()
-            .filter_map(|path| {
-                let mut settings =
-                    self.at::<nm::SettingsConnection<'_>>(&path).ok()?.get_settings().ok()?;
-                let ssid = settings.get_mut("802-11-wireless")?.remove("ssid")?;
-                Some((Vec::<u8>::try_from(ssid).ok()?, path))
-            })
-            .collect()
+        let mut known: HashMap<Vec<u8>, Vec<OwnedObjectPath>> = HashMap::new();
+        for path in paths {
+            let ssid = self
+                .at::<nm::SettingsConnection<'_>>(&path)
+                .and_then(|c| c.get_settings())
+                .ok()
+                .and_then(|mut s| s.get_mut("802-11-wireless")?.remove("ssid"))
+                .and_then(|ssid| Vec::<u8>::try_from(ssid).ok());
+            if let Some(ssid) = ssid {
+                known.entry(ssid).or_default().push(path);
+            }
+        }
+        known
+    }
+
+    /// the saved connection for `ssid` to use, the one that's up on some adapter, else the first
+    fn known_one(&self, ssid: &[u8]) -> Option<OwnedObjectPath> {
+        let saved = self.known().remove(ssid)?;
+        let active = (self.devices_of(DEVICE_TYPE_WIFI).iter())
+            .filter_map(|dev| self.active_on(dev))
+            .find(|active| saved.contains(active));
+        active.or_else(|| saved.into_iter().next())
     }
 
     /// the networks `devs` see, each once, and the ones they're connected to
@@ -610,6 +637,7 @@ impl Nm {
         networks.sort_by(|a, b| {
             (b.connected, b.strength).cmp(&(a.connected, a.strength)).then(a.ssid.cmp(&b.ssid))
         });
+        self.seen.extend(aps.iter().map(|ap| (ap.ssid.clone(), ap.key_mgmt)));
         self.aps = aps;
         Snapshot { state, wifi: true, radio, ethernet, wired, networks }
     }
@@ -711,17 +739,21 @@ impl Nm {
         mut settings: nm::ConnSettings<'_>,
     ) -> Result<(), Failure> {
         let dev = self.wifi_device_for(ssid).ok_or(FAILED)?;
-        let old = self.known().remove(ssid);
+        let old = self.known().remove(ssid).unwrap_or_default();
+        let was_active = self.active_on(&dev).filter(|active| old.contains(active));
         let ip = self.pending_ip.get(ssid).cloned().or_else(|| {
-            let old = self.settings_of(old.as_ref()?)?;
-            Some(IpConfig::from_settings(&old)).filter(|ip| *ip != IpConfig::default())
+            // the IP settings of the one in use, else of any that has some
+            let mut ordered = was_active.iter().chain(&old);
+            ordered.find_map(|path| {
+                let old = self.settings_of(path)?;
+                Some(IpConfig::from_settings(&old)).filter(|ip| *ip != IpConfig::default())
+            })
         });
         if let Some(ip) = ip {
             for (name, values) in ip.sections() {
                 settings.entry(name).or_default().extend(values);
             }
         }
-        let was_active = old.is_some() && self.active_on(&dev) == old;
         let root = ObjectPath::from_static_str_unchecked("/");
         let watch = self.watch(&dev);
         let (conn, active) =
@@ -734,8 +766,7 @@ impl Nm {
         if res.is_err() {
             self.delete(&conn);
             // go back to the network it was on before
-            if was_active
-                && let Some(old) = &old
+            if let Some(old) = &was_active
                 && let Err(e) = self.manager.activate_connection(old, &dev, &root)
             {
                 tracing::warn!(?e, "cannot reactivate the previous connection");
@@ -743,7 +774,8 @@ impl Nm {
         } else {
             // in the saved connection now, where later changes go
             self.pending_ip.remove(ssid);
-            if let Some(old) = old {
+            // every earlier one, so the network doesn't end up saved twice
+            for old in old {
                 self.delete(&old);
             }
         }
@@ -754,7 +786,7 @@ impl Nm {
     fn connect(&mut self, name: &str, password: &str) -> Result<(), Failure> {
         let ssid = self.ssid_of(name);
         let dev = self.wifi_device_for(&ssid).ok_or(FAILED)?;
-        let saved = self.known().remove(&ssid);
+        let saved = self.known_one(&ssid);
         if password.is_empty()
             && let Some(saved) = &saved
         {
@@ -766,16 +798,16 @@ impl Nm {
             })?;
             return self.wait(&active, &dev, watch);
         }
+        let saved = saved.and_then(|path| saved_security(&self.settings_of(&path)?));
         let (key_mgmt, hidden) = match self.aps.iter().find(|ap| ap.ssid == ssid) {
-            Some(ap) => (ap.key_mgmt, false),
-            // gone from the scan since it was picked, or a hidden network that only showed while
-            // connected, so go by how it was saved
-            None => saved.and_then(|path| saved_security(&self.settings_of(&path)?)).ok_or_else(
-                || {
-                    tracing::warn!(name, "network is gone");
-                    FAILED
-                },
-            )?,
+            // a hidden network that shows while connected stays hidden, or it'd stop connecting
+            // once it's out of the scan again
+            Some(ap) => (ap.key_mgmt, saved.is_some_and(|(_, hidden)| hidden)),
+            // gone from the scan since it was picked, so go by how it was saved
+            None => saved.ok_or_else(|| {
+                tracing::warn!(name, "network is gone");
+                FAILED
+            })?,
         };
         check_psk(key_mgmt, password)?;
         let mut settings = wifi_settings(&ssid, name, key_mgmt, password);
@@ -978,7 +1010,11 @@ fn eap_settings(login: &EnterpriseLogin) -> HashMap<&'static str, Value<'_>> {
         let key =
             if login.private_key.is_empty() { &login.client_cert } else { &login.private_key };
         x.insert("private-key", cert_path(key));
-        if !login.private_key_password.is_empty() {
+        if login.private_key_password.is_empty() {
+            // an unencrypted key has no password, NM_SETTING_SECRET_FLAG_NOT_REQUIRED says so,
+            // or NetworkManager fails with no secrets, which reads as a wrong password
+            x.insert("private-key-password-flags", Value::from(4u32));
+        } else {
             x.insert("private-key-password", login.private_key_password.as_str().into());
         }
     }
@@ -1351,7 +1387,17 @@ impl Nm {
         match cmd.args(["--", PORTAL_BROWSER, "--platform", "gtk4", &uri]).spawn() {
             Ok(child) => {
                 tracing::info!(uri, "Opened the captive portal browser");
-                *portal() = Some(child);
+                {
+                    let mut slot = portal();
+                    *slot = Some(child);
+                    // `shutdown` sets the flag before it takes the lock, so either it sees the
+                    // browser here or this sees the flag and closes it the same way
+                    if SHUT_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
+                        drop(slot);
+                        close_portal();
+                        return false;
+                    }
+                }
                 self.portal_checked = None;
                 self.portal_offline = self.manager.connectivity() != Ok(CONNECTIVITY_FULL);
                 true
@@ -1520,7 +1566,7 @@ impl Nm {
             let dev = self.ethernet_device()?;
             self.ethernet_connection(&dev)
         } else {
-            self.known().remove(&self.ssid_of(ssid))
+            self.known_one(&self.ssid_of(ssid))
         }
     }
 
@@ -1552,6 +1598,11 @@ impl Nm {
             let section = settings.entry(name.to_owned()).or_default();
             // the dialog only sets IPv6 DNS, a manual or disabled IPv6 stays as it was
             let v6 = name == "ipv6";
+            // NetworkManager refuses DNS servers without IPv6 addressing, so leave it alone then
+            let method = section.get("method").and_then(|m| m.downcast_ref::<&str>().ok());
+            if v6 && matches!(method, Some("ignore" | "disabled" | "link-local")) {
+                continue;
+            }
             let replaced = |key: &str| {
                 IP_KEYS.contains(&key)
                     && (!v6 || matches!(key, "dns" | "dns-data" | "ignore-auto-dns"))
@@ -1585,7 +1636,7 @@ impl Nm {
         };
         if !ssid.is_empty() {
             let bytes = self.ssid_of(ssid);
-            let Some(conn) = self.known().remove(&bytes) else {
+            let Some(conn) = self.known_one(&bytes) else {
                 // applied once connecting creates the connection
                 self.pending_ip.insert(bytes, ip);
                 return Ok(());
@@ -1644,15 +1695,19 @@ fn portal_command(proxy: Option<(String, String)>) -> Option<std::process::Comma
     let runtime = std::env::var("XDG_RUNTIME_DIR").ok().filter(|d| d.starts_with('/'))?;
     let display = std::env::var("WAYLAND_DISPLAY").ok().filter(|d| !d.is_empty())?;
     let socket = if display.starts_with('/') { display } else { format!("{runtime}/{display}") };
-    // the session's own files are only taidan's, the browser may get to the display and no more
-    for (perms, path) in [("x", runtime.as_str()), ("rw", socket.as_str())] {
-        let acl = format!("u:{PORTAL_USER}:{perms}");
-        match std::process::Command::new("setfacl").args(["-m", &acl, "--", path]).status() {
-            Ok(status) if status.success() => {}
-            res => {
-                tracing::error!(?res, path, "cannot let the portal browser use the display");
-                return None;
-            }
+    // bound into the browser's own runtime dir below, which takes the path unquoted
+    if socket.contains(|c: char| c == ':' || c.is_whitespace()) {
+        tracing::error!(socket, "cannot give the portal browser a display at this path");
+        return None;
+    }
+    // the session's own files are only taidan's, so the browser gets the display socket bound into
+    // its own runtime dir and nothing else. Connecting still needs write access to the socket
+    let acl = format!("u:{PORTAL_USER}:rw");
+    match std::process::Command::new("setfacl").args(["-m", &acl, "--", &socket]).status() {
+        Ok(status) if status.success() => {}
+        res => {
+            tracing::error!(?res, socket, "cannot let the portal browser use the display");
+            return None;
         }
     }
     // a crashed taidan's may still be there, it can't be started again while it is
@@ -1671,7 +1726,8 @@ fn portal_command(proxy: Option<(String, String)>) -> Option<std::process::Comma
             "--property=ProtectHome=yes",
             "--property=ProtectSystem=full",
         ])
-        .arg(format!("--setenv=WAYLAND_DISPLAY={socket}"))
+        .arg(format!("--property=BindReadOnlyPaths={socket}:{home}/{PORTAL_DISPLAY}"))
+        .arg(format!("--setenv=WAYLAND_DISPLAY={PORTAL_DISPLAY}"))
         .arg(format!("--setenv=XDG_RUNTIME_DIR={home}"))
         .arg(format!("--setenv=HOME={home}"));
     if let Ok(lang) = std::env::var("LANG") {
@@ -1849,9 +1905,15 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
         Cmd::ConnectHidden { ssid, key_mgmt, password } => {
             return connect_hidden(nm, ui, ssid, key_mgmt, &password);
         }
-        Cmd::ConnectEnterprise(login) => return connect_enterprise(nm, ui, login),
+        Cmd::ConnectEnterprise { login, tls_only } => {
+            return connect_enterprise(nm, ui, login, tls_only);
+        }
         Cmd::SetProxy { url, bypass } => return set_proxy(nm, ui, &url, &bypass),
-        Cmd::OpenPortal(proxy) => {
+        Cmd::OpenPortal { proxy, visit } => {
+            // the page was left meanwhile, which closed the browser without waiting for this
+            if PAGE_VISIT.load(std::sync::atomic::Ordering::SeqCst) != visit {
+                return;
+            }
             let open = nm.open_portal(proxy);
             push(ui, move |net| net.set_portal_open(open));
             return;
@@ -1866,6 +1928,10 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
         Cmd::LoadIp(ssid) => {
             let ip = nm.load_ip(&ssid).display();
             push(ui, move |net| {
+                // closed or opened for another network meanwhile, whose values these aren't
+                if !net.get_ip_open() || net.get_ip_ssid().as_str() != ssid.as_str() {
+                    return;
+                }
                 net.set_ip(ip);
                 net.set_ip_loading(false);
             });
@@ -1922,7 +1988,12 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
 }
 
 /// [`Cmd::ConnectEnterprise`], the dialog closes once it's connected and shows why if it can't
-fn connect_enterprise(nm: &mut Nm, ui: &slint::Weak<AppWindow>, mut login: EnterpriseLogin) {
+fn connect_enterprise(
+    nm: &mut Nm,
+    ui: &slint::Weak<AppWindow>,
+    mut login: EnterpriseLogin,
+    tls_only: bool,
+) {
     // spaces around a typed hidden network's name are a slip, but a network in the list
     // can really have them
     if !nm.aps.iter().any(|ap| ap.name == login.ssid.as_str()) {
@@ -1935,10 +2006,17 @@ fn connect_enterprise(nm: &mut Nm, ui: &slint::Weak<AppWindow>, mut login: Enter
         let res = if login.wired {
             nm.connect_wired_8021x(&login)
         } else {
-            let ap = nm.aps.iter().find(|ap| ap.name == login.ssid.as_str());
-            let (hidden, key_mgmt) =
-                ap.map_or((true, KeyMgmt::Enterprise), |ap| (false, ap.key_mgmt));
             let ssid = nm.ssid_of(&login.ssid);
+            let (hidden, key_mgmt) = match nm.aps.iter().find(|ap| ap.ssid == ssid) {
+                Some(ap) => (false, ap.key_mgmt),
+                // dropped out of the scan since the dialog opened, so go by how it was seen
+                None => match nm.seen.get(&ssid) {
+                    Some(&key_mgmt) => (false, key_mgmt),
+                    // never in the list, so typed in for a hidden network
+                    None if tls_only => (true, KeyMgmt::EnterpriseSuiteB),
+                    None => (true, KeyMgmt::Enterprise),
+                },
+            };
             nm.add_and_connect(&ssid, enterprise_settings(&login, &ssid, hidden, key_mgmt))
         };
         certs.finish(res.is_ok());
@@ -1996,15 +2074,40 @@ fn start_connecting(ui: &slint::Weak<AppWindow>, ssid: &str) {
     });
 }
 
-fn worker(ui: &slint::Weak<AppWindow>, rx: &mpsc::Receiver<Cmd>) {
-    let mut nm = match Nm::new(ui.clone()) {
-        Ok(nm) => nm,
-        Err(e) => {
+/// waits for `NetworkManager`, which may start late or restart, trying again less and less often.
+/// [`None`] once there's no point anymore, as taidan is exiting
+fn connect_nm(ui: &slint::Weak<AppWindow>, rx: &mpsc::Receiver<Cmd>) -> Option<Nm> {
+    const MAX_BACKOFF: Duration = Duration::from_secs(30);
+    let mut backoff = Duration::from_secs(1);
+    loop {
+        if SHUT_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
+            return None;
+        }
+        let e = match Nm::new(ui.clone()) {
+            Ok(nm) => return Some(nm),
+            Err(e) => e,
+        };
+        if backoff == Duration::from_secs(1) {
             tracing::error!(?e, "cannot talk to NetworkManager");
             push(ui, |net| net.set_wifi_available(false));
-            return;
+        } else {
+            tracing::debug!(?e, "still cannot talk to NetworkManager");
         }
-    };
+        let deadline = Instant::now() + backoff;
+        // what's asked meanwhile can't be done, so it fails rather than spinning
+        while let Some(left) = deadline.checked_duration_since(Instant::now()) {
+            match rx.recv_timeout(left) {
+                Ok(_) => push(ui, stop_busy),
+                Err(mpsc::RecvTimeoutError::Timeout) => break,
+                Err(mpsc::RecvTimeoutError::Disconnected) => return None,
+            }
+        }
+        backoff = (backoff * 2).min(MAX_BACKOFF);
+    }
+}
+
+fn worker(ui: &slint::Weak<AppWindow>, rx: &mpsc::Receiver<Cmd>) {
+    let Some(mut nm) = connect_nm(ui, rx) else { return };
     nm.scan();
     // right away, whether it's online decides how the installation runs, even if the network
     // page is skipped
@@ -2129,7 +2232,11 @@ struct WorkerGone(slint::Weak<AppWindow>);
 
 impl Drop for WorkerGone {
     fn drop(&mut self) {
-        tracing::error!("network worker stopped");
+        if SHUT_DOWN.load(std::sync::atomic::Ordering::SeqCst) && !std::thread::panicking() {
+            tracing::debug!("network worker stopped for the shutdown");
+        } else {
+            tracing::error!("network worker stopped");
+        }
         push(&self.0, stop_busy);
     }
 }
@@ -2163,7 +2270,8 @@ fn init_portal(
                 let url = net.get_proxy_url();
                 (!url.is_empty()).then(|| (url.into(), net.get_proxy_bypass().into()))
             });
-            send(Cmd::OpenPortal(proxy));
+            let visit = PAGE_VISIT.load(std::sync::atomic::Ordering::SeqCst);
+            send(Cmd::OpenPortal { proxy, visit });
         }
     });
     net.on_close_portal(move || send(Cmd::ClosePortal));
@@ -2215,15 +2323,18 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
         let (send, ui) = (send.clone(), ui.clone());
         move |login| {
             // right away, so a second click doesn't queue another login
-            if let Some(ui) = ui.upgrade() {
+            let tls_only = if let Some(ui) = ui.upgrade() {
                 let net = ui.global::<Network<'_>>();
                 if net.get_enterprise_busy() {
                     return;
                 }
                 net.set_enterprise_busy(true);
                 net.set_enterprise_error_id("".into());
-            }
-            send(Cmd::ConnectEnterprise(login));
+                net.get_enterprise_tls_only()
+            } else {
+                false
+            };
+            send(Cmd::ConnectEnterprise { login, tls_only });
         }
     });
     net.on_set_proxy({
@@ -2263,7 +2374,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
             send(Cmd::SaveIp(ssid.into(), ip));
         }
     });
-    init_portal(ui, net, send.clone());
+    init_portal(ui, net, send);
     net.on_page_changed(|page| {
         ON_PAGE.store(page == NETWORK_PAGE, std::sync::atomic::Ordering::Relaxed);
         PAGE_VISIT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -2272,8 +2383,12 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
         let ui = ui.clone();
         move |offline| {
             PAGE_VISIT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            // done with the network page, so done logging in to the portal too
-            send(Cmd::ClosePortal);
+            // done with the network page, so done logging in to the portal too. Not through the
+            // worker, which may be busy connecting for a while yet
+            std::thread::spawn(close_portal);
+            if let Some(ui) = ui.upgrade() {
+                ui.global::<Network<'_>>().set_portal_open(false);
+            }
             if let Some(ui) = ui.upgrade() {
                 save(&ui.global::<Network<'_>>(), offline);
             }
@@ -2551,8 +2666,20 @@ mod tests {
         assert!(!x.contains_key("anonymous-identity"));
         assert_eq!(x["client-cert"], x["private-key"]);
         assert_eq!(x["private-key-password"], Value::from("secret"));
+        assert!(!x.contains_key("private-key-password-flags"));
         assert!(is_pkcs12("/c/ME.PFX"));
         assert!(!is_pkcs12("/c/me.pem"));
+    }
+
+    #[test]
+    fn tls_unencrypted_key_needs_no_password() {
+        let mut l = login(EapMethod::Tls, "");
+        l.client_cert = "/c/me.pem".into();
+        l.private_key = "/c/me.key".into();
+        let x = eap_settings(&l);
+        assert!(!x.contains_key("private-key-password"));
+        // NM_SETTING_SECRET_FLAG_NOT_REQUIRED
+        assert_eq!(x["private-key-password-flags"], Value::from(4u32));
     }
 
     #[test]
