@@ -60,9 +60,6 @@ export component TdnBasePg {
     callback next_page;
     callback prev_page;
 
-    out property <length> h <=> self.height;
-    out property <length> w <=> self.width;
-
     width: 100%;
     height: 100%;
     x: index < current ? -self.width : (index > current ? self.width : 0);
