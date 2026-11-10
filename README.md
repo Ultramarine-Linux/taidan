@@ -77,7 +77,7 @@ ones Taidan installs itself, are only taken when `tdnx` runs as root.
 TAIDAN_LOG=trace cargo r
 ```
 
-- `TAIDAN_SIMULATE_HW=nvidia,broadcom-wifi,broadcom-bluetooth` (or `all`) pretends that
+- `TAIDAN_SIMULATE_HW=nvidia,broadcom-wifi` (or `all`) pretends that
   hardware is present, to see the drivers list (with `nvidia`, the simulated install asks for a
   reboot)
 - `TAIDAN_SIMULATE_ERROR=1` makes the simulated install fail halfway

@@ -395,7 +395,6 @@ page-drivers-install-codecs = Install Drivers and Codecs
 # .nvidia, .broadcom-*, .builtin, .codecs: items in the list of drivers to install
 page-drivers-nvidia = NVIDIA Graphics
 page-drivers-broadcom-wifi = Broadcom WiFi
-page-drivers-broadcom-bluetooth = Broadcom Bluetooth
 page-drivers-builtin = Built-in Drivers
 page-drivers-codecs = Multimedia Codecs
 # next to a QR code to a guide, when Secure Boot keeps the NVIDIA or Broadcom WiFi driver from being installed

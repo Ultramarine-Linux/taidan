@@ -973,15 +973,15 @@ impl Ctx {
                     .args(["offline", "reboot", "-y"]),
                 None,
             ),
+            // RPM Fusion's own kargs, as its `%posttrans` sets with grubby on dnf systems. simpledrm
+            // stays, the LUKS prompt and a failed driver need it, and nvidia-drm hands off from it.
             // append-if-missing so a retry doesn't duplicate kargs. rpm-ostree exits 0 on no changes
             Verb::NvidiaKargs => self.exec(
                 "rpm-ostree",
                 &[
                     "kargs",
-                    "--append-if-missing=rd.driver.blacklist=nouveau",
-                    "--append-if-missing=modprobe.blacklist=nouveau",
-                    "--append-if-missing=nvidia-drm.modeset=1",
-                    "--append-if-missing=initcall_blacklist=simpledrm_platform_driver_init",
+                    "--append-if-missing=rd.driver.blacklist=nouveau,nova_core",
+                    "--append-if-missing=modprobe.blacklist=nouveau,nova_core",
                 ],
             ),
             Verb::NvidiaPrimaryGpu => {
@@ -1591,8 +1591,7 @@ mod tests {
             Verb::DnfDrivers { pkgs: pkgs.iter().map(|p| s(p)).collect() }.validate(root)
         };
         assert!(
-            drivers(&["nvidia-gpu-firmware", "akmod-nvidia-580xx", "broadcom-bt-firmware"], false)
-                .is_ok()
+            drivers(&["nvidia-gpu-firmware", "akmod-nvidia-580xx", "broadcom-wl"], false).is_ok()
         );
         assert!(drivers(&["@multimedia"], false).is_err());
         let ostree = Verb::RpmOstreeInstall { pkgs: vec![s("akmod-wl"), s("broadcom-wl")] };

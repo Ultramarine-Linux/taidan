@@ -63,12 +63,6 @@ export component DriverList inherits VerticalLayout {
         icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
         text: Lang.t("page-drivers-broadcom-wifi", []);
     }
-
-    if Drivers.broadcom-bluetooth: DriverRow {
-        dimmed: root.optional-dimmed;
-        icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
-        text: Lang.t("page-drivers-broadcom-bluetooth", []);
-    }
 }
 
 export component DriversPage inherits TdnPage {

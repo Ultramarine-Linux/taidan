@@ -84,7 +84,7 @@ fn qr_code(url: &str) -> Option<slint::Image> {
 }
 
 /// whether `TAIDAN_SIMULATE_HW` pretends `name` is present, a comma-separated list of `nvidia`,
-/// `broadcom-wifi`, `broadcom-bluetooth`, `secure-boot` (that it blocks the drivers), or `all`
+/// `broadcom-wifi`, `secure-boot` (that it blocks the drivers), or `all`
 fn simulated_hw(name: &str) -> bool {
     std::env::var("TAIDAN_SIMULATE_HW")
         .is_ok_and(|sim| sim.split(',').any(|s| s.trim() == name || s.trim() == "all"))
@@ -376,7 +376,6 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
         if cfg!(debug_assertions) && std::env::var_os("TAIDAN_SIMULATE_HW").is_some() {
             hw.nvidia |= simulated_hw("nvidia");
             hw.broadcom_wifi |= simulated_hw("broadcom-wifi");
-            hw.broadcom_bluetooth |= simulated_hw("broadcom-bluetooth");
             // only matters with drivers it blocks, as on real hardware
             hw.secure_boot_blocks |= simulated_hw("secure-boot") && (hw.nvidia || hw.broadcom_wifi);
             tracing::debug!(?hw, "Simulated hardware (TAIDAN_SIMULATE_HW)");
@@ -385,7 +384,6 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
             let drivers = ui.global::<Drivers<'_>>();
             drivers.set_nvidia(hw.nvidia);
             drivers.set_broadcom_wifi(hw.broadcom_wifi);
-            drivers.set_broadcom_bluetooth(hw.broadcom_bluetooth);
             if hw.secure_boot_blocks {
                 drivers.set_secure_boot_url(SECURE_BOOT_URL.into());
                 if let Some(qr) = qr_code(SECURE_BOOT_URL) {

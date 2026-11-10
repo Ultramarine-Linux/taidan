@@ -12,13 +12,7 @@ enum NvidiaBranch {
 
 /// every driver package Taidan may install, which are all the helper takes for drivers
 pub(crate) fn driver_packages() -> Vec<&'static str> {
-    let mut pkgs = vec![
-        "nvidia-gpu-firmware",
-        "libva-nvidia-driver",
-        "broadcom-wl",
-        "akmod-wl",
-        "broadcom-bt-firmware",
-    ];
+    let mut pkgs = vec!["nvidia-gpu-firmware", "libva-nvidia-driver", "broadcom-wl", "akmod-wl"];
     pkgs.extend(NvidiaBranch::R580.packages());
     pkgs.extend(NvidiaBranch::Latest.packages());
     pkgs
@@ -187,12 +181,10 @@ impl std::ops::BitOrAssign for Setup {
 
 /// hardware that needs extra drivers, as installed by [`DriversCodecs`]
 #[derive(Clone, Copy, Debug, Default)]
-#[allow(clippy::struct_excessive_bools)]
 pub struct Hardware {
     /// an NVIDIA GPU a packaged driver supports
     pub nvidia: bool,
     pub broadcom_wifi: bool,
-    pub broadcom_bluetooth: bool,
     /// Secure Boot keeps the NVIDIA or Broadcom Wi-Fi driver from loading, so they aren't
     /// installed, see `Drivers::kmods_would_load`
     pub secure_boot_blocks: bool,
@@ -207,7 +199,6 @@ pub async fn detect_hardware() -> Hardware {
     Hardware {
         nvidia,
         broadcom_wifi,
-        broadcom_bluetooth: has_broadcom_bluetooth(&pci, &usb_interfaces().await),
         secure_boot_blocks: (nvidia || broadcom_wifi) && !Drivers::kmods_would_load().await,
     }
 }
@@ -288,91 +279,6 @@ fn has_nvidia_gpu(pci: &[PciDevice]) -> bool {
 
 fn has_wl_only_wifi(pci: &[PciDevice]) -> bool {
     pci.iter().any(|d| d.vendor == PCI_VENDOR_BROADCOM && WL_ONLY_DEVICES.contains(&d.device))
-}
-
-/// USB vendors whose vendor-specific Bluetooth interfaces are Broadcom chips that need patchram
-/// firmware (`broadcom-bt-firmware`), Broadcom's own and the rebrands. From the
-/// `BTUSB_BCM_PATCHRAM` entries in the kernel's `drivers/bluetooth/btusb_main.c`. Apple's are
-/// left out, `btusb` doesn't load firmware for them
-const BCM_PATCHRAM_USB_VENDORS: &[u16] = &[
-    0x0a5c, // Broadcom
-    0x0489, // Foxconn / Hon Hai
-    0x04ca, // Lite-On
-    0x050d, // Belkin
-    0x0930, // Toshiba
-    0x0b05, // ASUS
-    0x0bb4, // HTC
-    0x105b, // Foxconn / Lenovo
-    0x13d3, // IMC Networks
-    0x413c, // Dell
-];
-
-/// a USB interface, e.g. `1-4:1.0` in `/sys/bus/usb/devices`, with its device's ids
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct UsbInterface {
-    vendor: u16,
-    product: u16,
-    /// class, subclass and protocol
-    class: [u8; 3],
-}
-
-impl UsbInterface {
-    /// read the interface `name` from `devices`, `None` if it isn't one
-    async fn read(devices: &std::path::Path, name: &str) -> Option<Self> {
-        let (device, _) = name.split_once(':')?;
-        let intf = devices.join(name);
-        let device = devices.join(device);
-        let read = async |path: std::path::PathBuf| {
-            let s = tokio::fs::read_to_string(path).await.ok()?;
-            u16::from_str_radix(s.trim(), 16).ok()
-        };
-        let class = async |name| u8::try_from(read(intf.join(name)).await?).ok();
-        Some(Self {
-            vendor: read(device.join("idVendor")).await?,
-            product: read(device.join("idProduct")).await?,
-            class: [
-                class("bInterfaceClass").await?,
-                class("bInterfaceSubClass").await?,
-                class("bInterfaceProtocol").await?,
-            ],
-        })
-    }
-
-    /// matches `btusb`'s Broadcom patchram entries
-    fn is_broadcom_bluetooth(self) -> bool {
-        // Broadcom BCM20702B0 (Dynex/Insignia), the one listed by its product id
-        (self.vendor == 0x19ff && self.product == 0x0239)
-            || (BCM_PATCHRAM_USB_VENDORS.contains(&self.vendor) && self.class == [0xff, 0x01, 0x01])
-    }
-}
-
-/// every USB interface in sysfs, or none if it can't be read
-async fn usb_interfaces() -> Vec<UsbInterface> {
-    let devices = std::path::Path::new("/sys/bus/usb/devices");
-    let mut dir = match tokio::fs::read_dir(devices).await {
-        Ok(dir) => dir,
-        Err(e) => {
-            tracing::warn!(?e, "cannot list USB devices");
-            return vec![];
-        }
-    };
-    let mut interfaces = vec![];
-    while let Ok(Some(entry)) = dir.next_entry().await {
-        // devices and hubs have no `:` in their names, they're read through their interfaces
-        if let Some(intf) = UsbInterface::read(devices, &entry.file_name().to_string_lossy()).await
-        {
-            interfaces.push(intf);
-        }
-    }
-    interfaces
-}
-
-/// a Broadcom Bluetooth controller that needs `broadcom-bt-firmware`, usually over USB, but a
-/// few are PCI
-fn has_broadcom_bluetooth(pci: &[PciDevice], usb: &[UsbInterface]) -> bool {
-    // 0x0d11 is a Bluetooth controller
-    pci.iter().any(|d| d.vendor == PCI_VENDOR_BROADCOM && d.class >> 8 == 0x0d11)
-        || usb.iter().any(|i| i.is_broadcom_bluetooth())
 }
 
 // NOTE: added during `_05_dnfdownloadapps.rs`
@@ -472,8 +378,8 @@ impl Drivers {
     }
 
     /// whether a module akmods builds would load: Secure Boot is off, or the key akmods signs with
-    /// is enrolled. Otherwise the kernel refuses it, and as the driver packages turn off nouveau
-    /// (and simpledrm on rpm-ostree), the next boot would have no display at all
+    /// is enrolled. Otherwise the kernel refuses it, and as the driver packages turn off nouveau,
+    /// the next boot would be stuck on the firmware framebuffer
     async fn kmods_would_load() -> bool {
         const AKMODS_KEY: &str = "/etc/pki/akmods/certs/public_key.der";
         match secure_boot_enforced().await {
@@ -563,7 +469,6 @@ impl Drivers {
         } else if has_wl_only_wifi(pci) {
             tracing::info!("Setting up broadcom wifi drivers");
             // broadcom-wl blacklists the in-kernel drivers, so wl only takes over after a reboot
-            // the Bluetooth firmware below doesn't depend on wl, so a failure here doesn't stop it
             match install_pkgs(cfg, &["broadcom-wl", "akmod-wl"]).await {
                 Ok(Installed::Dnf) => {
                     let built = Self::kmod_built("wl").await.unwrap_or_else(|e| {
@@ -580,18 +485,6 @@ impl Drivers {
                 Ok(Installed::Skipped) => {}
                 Err(e) => {
                     tracing::warn!(?e, "fail to install broadcom wifi drivers");
-                    done.failed = true;
-                }
-            }
-        }
-        if has_broadcom_bluetooth(pci, &usb_interfaces().await) {
-            tracing::info!("Setting up broadcom bluetooth drivers");
-            // not worth losing the wifi driver's reboot over
-            match install_pkgs(cfg, &["broadcom-bt-firmware"]).await {
-                // layered packages only show up after a reboot
-                Ok(installed) => done.reboot |= installed == Installed::Ostree,
-                Err(e) => {
-                    tracing::warn!(?e, "cannot install broadcom bluetooth firmware");
                     done.failed = true;
                 }
             }
@@ -718,7 +611,6 @@ mod tests {
             &NvidiaBranch::R580.packages(),
             &NvidiaBranch::Latest.packages(),
             &["broadcom-wl", "akmod-wl"],
-            &["broadcom-bt-firmware"],
         ];
         assert!(used.concat().iter().all(|p| all.contains(p)));
     }
@@ -757,43 +649,6 @@ mod tests {
         assert!(!has_wl_only_wifi(&[dev(0x14e4, 0x43ba, 0x028000)]));
         // a non-Broadcom device with a matching id
         assert!(!has_wl_only_wifi(&[dev(0x8086, 0x4360, 0x028000)]));
-    }
-
-    const fn usb(vendor: u16, product: u16, class: [u8; 3]) -> UsbInterface {
-        UsbInterface { vendor, product, class }
-    }
-
-    #[test]
-    fn broadcom_bluetooth() {
-        // BCM20702A0 and a Dell rebrand
-        assert!(has_broadcom_bluetooth(&[], &[usb(0x0a5c, 0x21e8, [0xff, 0x01, 0x01])]));
-        assert!(has_broadcom_bluetooth(&[], &[usb(0x413c, 0x8197, [0xff, 0x01, 0x01])]));
-        assert!(has_broadcom_bluetooth(&[], &[usb(0x19ff, 0x0239, [0xe0, 0x01, 0x01])]));
-        // a Foxconn MediaTek one is a standard Bluetooth interface, and Apple's need no firmware
-        assert!(!has_broadcom_bluetooth(&[], &[usb(0x0489, 0xe0cd, [0xe0, 0x01, 0x01])]));
-        assert!(!has_broadcom_bluetooth(&[], &[usb(0x05ac, 0x828f, [0xff, 0x01, 0x01])]));
-        // the Broadcom Wi-Fi function isn't it
-        assert!(!has_broadcom_bluetooth(&[dev(0x14e4, 0x43a0, 0x028000)], &[]));
-        assert!(has_broadcom_bluetooth(&[dev(0x14e4, 0x4359, 0x0d1100)], &[]));
-    }
-
-    #[tokio::test]
-    async fn reads_sysfs_usb_interface() {
-        let dir = std::env::temp_dir().join(format!("taidan-usb-{}", std::process::id()));
-        std::fs::create_dir_all(dir.join("1-4:1.0")).unwrap();
-        std::fs::create_dir_all(dir.join("1-4")).unwrap();
-        std::fs::write(dir.join("1-4/idVendor"), "0a5c\n").unwrap();
-        std::fs::write(dir.join("1-4/idProduct"), "21e8\n").unwrap();
-        for (name, val) in
-            [("bInterfaceClass", "ff"), ("bInterfaceSubClass", "01"), ("bInterfaceProtocol", "01")]
-        {
-            std::fs::write(dir.join("1-4:1.0").join(name), format!("{val}\n")).unwrap();
-        }
-        let read = UsbInterface::read(&dir, "1-4:1.0").await;
-        let device = UsbInterface::read(&dir, "1-4").await;
-        std::fs::remove_dir_all(&dir).unwrap();
-        assert_eq!(read, Some(usb(0x0a5c, 0x21e8, [0xff, 0x01, 0x01])));
-        assert_eq!(device, None);
     }
 
     #[tokio::test]
