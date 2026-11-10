@@ -114,6 +114,17 @@ impl Proxy {
         vars
     }
 
+    /// a systemd drop-in that gives a service [`Self::vars`]
+    fn systemd_dropin(&self) -> String {
+        let mut dropin = "[Service]\n".to_owned();
+        for (key, value) in self.vars() {
+            // quoted, and `%` is a specifier in unit files, e.g. a password's `%40`
+            let value = value.replace('\\', "\\\\").replace('"', "\\\"").replace('%', "%%");
+            dropin.push_str(&format!("Environment=\"{key}={value}\"\n"));
+        }
+        dropin
+    }
+
     /// `KEY=value` lines of [`Self::vars`]
     #[must_use]
     pub fn env(&self) -> Vec<String> {
@@ -201,8 +212,61 @@ impl Proxy {
             env.push('\n');
         }
         crate::helper::write_atomic(std::path::Path::new(ETC_ENVIRONMENT), env.as_bytes(), 0o644)
-            .map_err(|e| format!("cannot write the proxy to {ETC_ENVIRONMENT}: {e}"))
+            .map_err(|e| format!("cannot write the proxy to {ETC_ENVIRONMENT}: {e}"))?;
+        // rpm-ostree has its daemon download, which reads neither of the above. Only root may
+        // read it, it has the password
+        if std::path::Path::new("/ostree").exists() {
+            let dropin = self.systemd_dropin();
+            crate::helper::write_atomic(
+                std::path::Path::new(RPM_OSTREED_ETC),
+                dropin.as_bytes(),
+                0o600,
+            )
+            .map_err(|e| format!("cannot write the proxy for rpm-ostree: {e}"))?;
+        }
+        Ok(())
     }
+}
+
+/// where [`Proxy::persist`] saves the proxy for `rpm-ostreed`
+const RPM_OSTREED_ETC: &str = "/etc/systemd/system/rpm-ostreed.service.d/50-taidan-proxy.conf";
+/// the proxy for `rpm-ostreed` until the reboot, see [`rpm_ostreed_as_root`]
+const RPM_OSTREED_RUN: &str = "/run/systemd/system/rpm-ostreed.service.d/50-taidan-proxy.conf";
+
+/// points `rpm-ostreed` at `proxy`, or at none, until the reboot. The `rpm-ostree` command only
+/// asks the daemon, which downloads with its own environment rather than the command's. It's
+/// restarted when that changes, so the next transaction has it
+///
+/// # Errors
+/// Cannot write the drop-in, or systemd doesn't take it.
+pub(crate) fn rpm_ostreed_as_root(proxy: Option<&Proxy>) -> Result<(), String> {
+    let path = std::path::Path::new(RPM_OSTREED_RUN);
+    let old = std::fs::read_to_string(path).ok();
+    let new = match proxy {
+        Some(proxy) if !proxy.is_safe() => {
+            return Err("the proxy has control characters in it".to_owned());
+        }
+        Some(proxy) => Some(proxy.systemd_dropin()),
+        None => None,
+    };
+    if old == new {
+        return Ok(());
+    }
+    match &new {
+        Some(dropin) => crate::helper::write_atomic(path, dropin.as_bytes(), 0o600),
+        None => std::fs::remove_file(path),
+    }
+    .map_err(|e| format!("cannot write the proxy for rpm-ostree: {e}"))?;
+    let systemctl = |args: &[&str]| {
+        std::process::Command::new("systemctl")
+            .args(args)
+            .status()
+            .map_err(|e| format!("cannot run systemctl: {e}"))
+            .and_then(|s| s.success().then_some(()).ok_or(format!("systemctl {args:?}: {s}")))
+    };
+    systemctl(&["daemon-reload"])?;
+    // only if it's running, otherwise D-Bus starts it with the drop-in when it's asked
+    systemctl(&["try-restart", "rpm-ostreed.service"])
 }
 
 /// login sessions' environment, see pam_env(8)
@@ -405,6 +469,7 @@ pub(crate) fn clear_as_root() -> std::io::Result<()> {
         res => res,
     };
     remove(REPO_OVERRIDE)?;
+    remove(RPM_OSTREED_ETC)?;
     if std::path::Path::new(DNF_DROPIN).exists() {
         let env = std::fs::read_to_string(ETC_ENVIRONMENT).unwrap_or_default();
         let cleaned = without_proxy_vars(&env);
@@ -428,6 +493,15 @@ pub(crate) fn sh_quote(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn systemd_dropin_escapes() {
+        let proxy = Proxy::new("http://bob:p%40ss@proxy:3128", "localhost").unwrap();
+        let dropin = proxy.systemd_dropin();
+        assert!(dropin.starts_with("[Service]\n"), "{dropin}");
+        assert!(dropin.contains("Environment=\"https_proxy=http://bob:p%%40ss@proxy:3128\"\n"));
+        assert!(dropin.contains("Environment=\"no_proxy=localhost\"\n"), "{dropin}");
+    }
 
     #[test]
     fn debug_hides_the_password() {

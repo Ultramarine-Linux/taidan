@@ -952,6 +952,7 @@ impl Ctx {
                 self.exec("dnf", &args)
             }
             Verb::RpmOstreeInstall { pkgs } => {
+                crate::proxy::rpm_ostreed_as_root(self.proxy.as_ref())?;
                 // idempotent, so a retried install doesn't fail on packages it already layered
                 let mut args = vec!["install", "-y", "--idempotent"];
                 args.extend(pkgs.iter().map(String::as_str));
