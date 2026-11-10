@@ -414,6 +414,9 @@ export component NetworkPage inherits TdnPage {
                             layout-order: Dir.order(1);
                             text: Lang.t("page-internet-hidden", []);
                             min-size: 1.9rem;
+                            // its dialog can't connect until the connect going on is done, and
+                            // would open with nothing to focus
+                            enabled: Network.connecting-ssid == "";
                             clicked => {
                                 Network.error-id = "";
                                 Network.error-ssid = "";
@@ -642,6 +645,9 @@ component FileRow inherits TdnField {
     callback clear();
     callback refocused();
 
+    // the chosen file's name, also what the buttons describe to screen readers
+    property <string> file: root.path == "" ? Lang.t("page-internet-8021x-nofile", []) : Network.file-name(root.path);
+
     init => {
         if root.refocus {
             choose.focus();
@@ -653,7 +659,7 @@ component FileRow inherits TdnField {
         spacing: 0.5rem;
 
         TdnText {
-            text: root.path == "" ? Lang.t("page-internet-8021x-nofile", []) : Network.file-name(root.path);
+            text: root.file;
             color: root.path == "" ? Tokens.color-muted-foreground : Tokens.color-foreground;
             horizontal-alignment: Dir.text-start;
             overflow: elide;
@@ -664,7 +670,8 @@ component FileRow inherits TdnField {
             in-dialog: true;
             outline: true;
             text: "✕";
-            accessible-label: Lang.t("page-internet-8021x-clear", []);
+            accessible-label: Lang.t("page-internet-8021x-clear-for", [{ key: "field", value: root.label }]);
+            accessible-description: root.file;
             foreground-color: Tokens.color-foreground;
             min-size: 1.8rem;
             padding-x: 0.5rem;
@@ -677,6 +684,8 @@ component FileRow inherits TdnField {
             in-dialog: true;
             outline: true;
             text: Lang.t("page-internet-8021x-choose", []);
+            accessible-label: Lang.t("page-internet-8021x-choose-for", [{ key: "field", value: root.label }]);
+            accessible-description: root.file;
             foreground-color: Tokens.color-foreground;
             min-size: 1.8rem;
             padding-x: 0.6rem;
@@ -869,6 +878,11 @@ export component EnterpriseDialog inherits TdnDialog {
         root.picking = "";
     }
     property <bool> show-all-files;
+    // why the login failed, also the identity's and password's description for screen readers
+    property <string> error: Network.enterprise-error-id == "" ? ""
+        : Lang.t(Network.enterprise-error-id != "page-internet-error-password" ? Network.enterprise-error-id
+            : root.method == EapMethod.tls ? "page-internet-8021x-error-tls"
+            : "page-internet-error-login", []);
 
     property <bool> complete: root.username != ""
         && (root.method == EapMethod.tls || root.password != "")
@@ -956,6 +970,7 @@ export component EnterpriseDialog inherits TdnDialog {
             TdnInput {
                 in-dialog: true;
                 label: identity-field.label;
+                description: root.error;
                 text <=> root.username;
                 placeholder: Lang.t("page-internet-username-placeholder", []);
                 // unless a file row takes it back from the file browser
@@ -977,6 +992,7 @@ export component EnterpriseDialog inherits TdnDialog {
             TdnInput {
                 in-dialog: true;
                 label: eap-pw-field.label;
+                description: root.error;
                 text <=> root.password;
                 password: true;
                 enabled: !root.busy;
@@ -1151,15 +1167,16 @@ export component EnterpriseDialog inherits TdnDialog {
                 accepted => { root.submit(); }
             }
         }
+    }
 
-        if Network.enterprise-error-id != "": TdnText {
-            text: Lang.t(Network.enterprise-error-id != "page-internet-error-password" ? Network.enterprise-error-id
-                : root.method == EapMethod.tls ? "page-internet-8021x-error-tls"
-                : "page-internet-error-login", []);
-            color: Tokens.color-destructive;
-            horizontal-alignment: Dir.text-start;
-            wrap: word-wrap;
-        }
+    // by the buttons rather than at the end of the list, where it'd be scrolled out of sight
+    if root.picking == "" && root.error != "": TdnText {
+        text: root.error;
+        color: Tokens.color-destructive;
+        horizontal-alignment: Dir.text-start;
+        wrap: word-wrap;
+        accessible-role: text;
+        accessible-label: root.error;
     }
 
     if root.picking == "": HorizontalLayout {
@@ -1237,20 +1254,33 @@ export component OfflineDialog inherits TdnDialog {
 export component ProxyDialog inherits TdnDialog {
     title: Lang.t("page-internet-proxy", []);
     dialog-width: 24rem;
-    dismissed => { Network.proxy-open = false; }
+    // made each time it opens, see `Network.proxy-visit`. A check from before is still running if
+    // it was cancelled, it no longer counts, so it mustn't keep this one busy
+    init => {
+        Network.proxy-visit += 1;
+        Network.proxy-busy = false;
+    }
+    dismissed => {
+        Network.proxy-open = false;
+        Network.proxy-busy = false;
+    }
 
     // whether to keep the proxy after setup, only saved along with the rest
     property <bool> persist: Network.proxy-persist;
+    // the server field shows the proxy without its username and password, so they aren't on screen
+    // or read out. Left as it is, it's still the proxy in use, with them
+    property <string> url: server.text == Network.proxy-public ? Network.proxy-url : server.text;
 
     function submit() {
         if Network.proxy-busy || server.text == "" {
             // nothing to save
-        } else if server.text == Network.proxy-url && bypass.text == Network.proxy-bypass {
-            // no need to check the same proxy again
+        } else if root.url == Network.proxy-url && bypass.text == Network.proxy-bypass
+            && Network.proxy-checked-on == Network.primary-connection {
+            // no need to check the same proxy again, unless that was on another network
             Network.proxy-persist = root.persist;
             root.dismissed();
         } else {
-            Network.set-proxy(server.text, bypass.text, root.persist);
+            Network.set-proxy(root.url, bypass.text, root.persist);
         }
     }
 
@@ -1270,7 +1300,7 @@ export component ProxyDialog inherits TdnDialog {
             in-dialog: true;
             label: server-field.label;
             description: server-field.description;
-            text: Network.proxy-url;
+            text: Network.proxy-public;
             placeholder: "proxy.example.com:3128";
             auto-focus: true;
             enabled: !Network.proxy-busy;

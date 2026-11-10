@@ -7,7 +7,7 @@ use slint::ComponentHandle;
 use v4l::io::traits::CaptureStream;
 use v4l::video::Capture;
 
-use crate::ui::{Account, AppWindow, Avatar, Camera};
+use crate::ui::{Account, AppWindow, Avatar, AvatarRow, Camera};
 
 #[cfg(not(debug_assertions))]
 const AVATARS_DIR: &str = "/usr/share/taidan/avatars";
@@ -353,14 +353,65 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, camera: &Camera<'_>) {
                     image: slint::Image::from_rgba8(buf),
                 })
                 .collect::<slint::VecModel<_>>();
-            ui.global::<Account<'_>>().set_avatars(slint::ModelRc::new(avatars));
+            let rows = picker_rows(slint::Model::row_count(&avatars))
+                .into_iter()
+                .map(|slots| AvatarRow { slots: slint::ModelRc::new(slint::VecModel::from(slots)) })
+                .collect::<slint::VecModel<_>>();
+            let account = ui.global::<Account<'_>>();
+            account.set_avatars(slint::ModelRc::new(avatars));
+            account.set_avatar_rows(slint::ModelRc::new(rows));
         });
     });
+}
+
+/// rows of the icon picker for `presets` icons, indices into them and -1 for the camera. The
+/// camera is in the middle row with a preset on each side, and the rest go in rows above and below
+/// it, two, then three, then two and so on, so they stagger like a honeycomb. Rows on either side
+/// get the same number, the one above gets the odd one out
+fn picker_rows(presets: usize) -> Vec<Vec<i32>> {
+    let middle = if presets >= 2 { 2 } else { 0 };
+    let (mut above, mut below) = (vec![], vec![]);
+    let mut left = presets - middle;
+    for width in [2, 3].into_iter().cycle() {
+        if left == 0 {
+            break;
+        }
+        let taken = left.min(2 * width);
+        above.push(taken.div_ceil(2));
+        below.push(taken / 2);
+        left -= taken;
+    }
+    // (presets, whether it's the camera's row)
+    let sizes = above.into_iter().rev().map(|n| (n, false)).chain([(middle, true)]);
+    let sizes = sizes.chain(below.into_iter().filter(|&n| n > 0).map(|n| (n, false)));
+    let mut next = 0..;
+    sizes
+        .map(|(n, camera)| {
+            let mut row: Vec<i32> = next.by_ref().take(n).collect();
+            if camera {
+                row.insert(n / 2, -1);
+            }
+            row
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn picker_rows_around_the_camera() {
+        assert_eq!(picker_rows(0), [vec![-1]]);
+        assert_eq!(picker_rows(1), [vec![0], vec![-1]]);
+        assert_eq!(picker_rows(2), [vec![0, -1, 1]]);
+        assert_eq!(picker_rows(6), [vec![0, 1], vec![2, -1, 3], vec![4, 5]]);
+        assert_eq!(picker_rows(5), [vec![0, 1], vec![2, -1, 3], vec![4]]);
+        assert_eq!(
+            picker_rows(12),
+            [vec![0, 1, 2], vec![3, 4], vec![5, -1, 6], vec![7, 8], vec![9, 10, 11]]
+        );
+    }
 
     #[test]
     fn yuyv_grey_stays_grey() {

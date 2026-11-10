@@ -90,12 +90,12 @@ impl super::Step for SystemSetup {
                 "the settings don't say which tweaks to turn on, leaving them as they are"
             );
         }
-        // GeoClue is D-Bus activated, so only a mask keeps apps from starting it. Unmasked when
-        // it's on, for a retry after an attempt with it off. Left alone when the page was skipped,
-        // the distro may have masked it on purpose
+        // GNOME's location switch, off by default when it's off here, so the user can still turn
+        // it on in Settings. Back to GNOME's default when it's on, for a retry after an attempt
+        // with it off. Left alone when the page was skipped
         if let Some(on) = settings.location {
             let what = if on { "on" } else { "off" };
-            if let Err(e) = crate::root(crate::Verb::Geoclue { on }).await {
+            if let Err(e) = crate::root(crate::Verb::Location { on }).await {
                 tracing::warn!(?e, "cannot turn {what} location services");
             }
         }
@@ -133,10 +133,14 @@ fn langpack_candidates(locale: &str) -> Vec<String> {
     if lang != name {
         names.push(lang);
     }
-    ["ultramarine-langpacks-", "langpacks-"]
+    let mut pkgs: Vec<_> = ["ultramarine-langpacks-", "langpacks-"]
         .iter()
         .flat_map(|prefix| names.iter().map(move |n| format!("{prefix}{n}")))
-        .collect()
+        .collect();
+    // for languages without a `langpacks-*`, glibc's has at least the locale, and only comes per
+    // language
+    pkgs.push(format!("glibc-langpack-{lang}"));
+    pkgs
 }
 
 /// which of `pkgs` the repositories have
@@ -158,10 +162,14 @@ mod tests {
                 "ultramarine-langpacks-pt_BR",
                 "ultramarine-langpacks-pt",
                 "langpacks-pt_BR",
-                "langpacks-pt"
+                "langpacks-pt",
+                "glibc-langpack-pt"
             ]
         );
-        assert_eq!(langpack_candidates("eo.UTF-8"), ["ultramarine-langpacks-eo", "langpacks-eo"]);
+        assert_eq!(
+            langpack_candidates("eo.UTF-8"),
+            ["ultramarine-langpacks-eo", "langpacks-eo", "glibc-langpack-eo"]
+        );
         assert!(langpack_candidates("C.UTF-8").is_empty());
         assert!(langpack_candidates("").is_empty());
     }

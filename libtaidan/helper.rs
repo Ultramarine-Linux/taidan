@@ -55,6 +55,27 @@ const TWEAKS_DIR: &str = "/usr/share/taidan/tweaks";
 /// the polkit rule `start-taidan` drops when it gives up
 const POLKIT_RULE: &str = "/run/polkit-1/rules.d/100-taidan.rules";
 
+/// GDM's dconf profile, which on Fedora reads the `gdm` system database too
+pub const GDM_DCONF_PROFILE: &str = "/usr/share/dconf/profile/gdm";
+
+/// the `gdm` system database's keyfile that starts Orca on the login screen
+const GDM_SCREEN_READER: &str = "/etc/dconf/db/gdm.d/50-taidan-screen-reader";
+const GDM_SCREEN_READER_KEYFILE: &str = "# written by Taidan, the screen reader was on during setup
+[org/gnome/desktop/a11y/applications]
+screen-reader-enabled=true
+";
+
+/// the `local` system database's keyfile with location services off by default, under what the
+/// user sets, so GNOME's own location switch can turn them back on
+/// masked to turn location services off where there's no desktop switch for them, see
+/// [`Verb::Location`]
+const GEOCLUE: &str = "geoclue.service";
+const LOCATION_OFF: &str = "/etc/dconf/db/local.d/50-taidan-location";
+const LOCATION_OFF_KEYFILE: &str = "# written by Taidan, location services were off during setup
+[org/gnome/system/location]
+enabled=false
+";
+
 /// the captive portal browser's unit and user, see `src/network.rs`
 const PORTAL_UNIT: &str = "taidan-portal.service";
 const PORTAL_USER: &str = "taidan-portal";
@@ -163,8 +184,14 @@ pub enum Verb {
     ProxyRepoOverrides,
     /// removes a proxy saved by [`Self::ProxyPersist`]
     ProxyClear,
-    /// unmasks GeoClue if `on`, masks it otherwise
-    Geoclue {
+    /// location services on or off. On GNOME by default through dconf, see [`LOCATION_OFF`], which
+    /// its location switch can undo. Other desktops have no such switch, so GeoClue is masked
+    /// there
+    Location {
+        on: bool,
+    },
+    /// the screen reader on GDM's login screen, on or back off, nothing without GDM
+    GdmScreenReader {
         on: bool,
     },
     EnableNtp,
@@ -293,7 +320,8 @@ impl Verb {
             Self::ProxyPersist => "proxy-persist",
             Self::ProxyRepoOverrides => "proxy-repo-overrides",
             Self::ProxyClear => "proxy-clear",
-            Self::Geoclue { .. } => "geoclue",
+            Self::Location { .. } => "location",
+            Self::GdmScreenReader { .. } => "gdm-screen-reader",
             Self::EnableNtp => "enable-ntp",
             Self::SetTimezone { .. } => "set-timezone",
             Self::SetHostname { .. } => "set-hostname",
@@ -341,6 +369,7 @@ impl Verb {
                 // made, see `created_user`
                 | Self::AsUser { .. }
                 | Self::AsUserHomed { .. }
+                | Self::GdmScreenReader { .. }
         )
     }
 
@@ -386,7 +415,8 @@ impl Verb {
             | Self::ProxyPersist
             | Self::ProxyRepoOverrides
             | Self::ProxyClear
-            | Self::Geoclue { .. }
+            | Self::Location { .. }
+            | Self::GdmScreenReader { .. }
             | Self::EnableNtp
             | Self::DnfSwapFfmpeg
             | Self::DnfUpgradeOffline
@@ -496,9 +526,7 @@ impl Verb {
                 if refs.is_empty() {
                     return Err("no flatpaks".to_owned());
                 }
-                refs.iter().try_for_each(|r| {
-                    check(word(r, "._/-") && !r.starts_with(['-', '/']), "flatpak", r)
-                })
+                refs.iter().try_for_each(|r| check(flatpak_ref(r), "flatpak", r))
             }
             Self::EnableRepo { repo } => {
                 root_only("a custom repo")?;
@@ -555,6 +583,26 @@ fn word(s: &str, extra: &str) -> bool {
         && s.chars().all(|c| c.is_ascii_alphanumeric() || extra.contains(c))
 }
 
+/// whether `r` is an app ID like `org.mozilla.firefox` or a full `app/<id>/<arch>/<branch>` ref,
+/// never a `.flatpakref` or bundle, or a path to one, which flatpak would install from a file
+fn flatpak_ref(r: &str) -> bool {
+    // flatpak wants at least three parts in an ID
+    let id = |id: &str| {
+        let lower = id.to_ascii_lowercase();
+        id.split('.').count() >= 3
+            && id.split('.').all(|part| word(part, "_-") && !part.starts_with('-'))
+            && !lower.ends_with(".flatpakref")
+            && !lower.ends_with(".flatpak")
+    };
+    match r.split('/').collect::<Vec<_>>().as_slice() {
+        [app] => id(app),
+        ["app", app, arch, branch] => {
+            id(app) && word(arch, "_") && word(branch, "._-") && !branch.starts_with(['-', '.'])
+        }
+        _ => false,
+    }
+}
+
 /// a username the OOBE would take, which can't be an option or a reserved name like root
 fn check_user(user: &str) -> Result<(), String> {
     match crate::passwd::username_syntax_problem(user) {
@@ -600,7 +648,7 @@ fn check_pkgs(pkgs: &[String], allowed: impl Fn(&str) -> bool) -> Result<(), Str
 /// methods, and language packs
 fn allowed_extra(pkg: &str) -> bool {
     use crate::i18n::I18nImf;
-    let langpack = ["ultramarine-langpacks-", "langpacks-"]
+    let langpack = ["ultramarine-langpacks-", "langpacks-", "glibc-langpack-"]
         .iter()
         .find_map(|prefix| pkg.strip_prefix(prefix))
         .is_some_and(|lang| word(lang, "_@"));
@@ -676,8 +724,9 @@ fn serve() -> Result<i32, String> {
         p => p,
     };
     let caller = caller_uid();
-    // defense in depth, the polkit rule is gone by then too
-    if !crate::marked_unconfigured() && !verb.after_setup() {
+    // defense in depth, the polkit rule is gone by then too. Root, like `tdnx` run as root, could
+    // do all of it anyway
+    if caller != 0 && !crate::marked_unconfigured() && !verb.after_setup() {
         return Err(format!("the setup is done, `{name}` isn't taken anymore"));
     }
     verb.validate(caller == 0)?;
@@ -916,8 +965,25 @@ impl Ctx {
                 crate::proxy::clear_as_root().map_err(io("cannot remove the saved proxy"))?;
                 Ok(0)
             }
-            Verb::Geoclue { on } => {
-                self.exec("systemctl", &[if *on { "unmask" } else { "mask" }, "geoclue.service"])
+            // a default under the user's own settings rather than a GeoClue mask, which nothing in
+            // the desktop could undo
+            Verb::Location { on } => {
+                // GNOME Shell is what goes by the dconf key, and a masked GeoClue would keep its
+                // switch from turning location back on
+                let gnome = Path::new("/usr/bin/gnome-shell").exists();
+                let mask = !on && !gnome;
+                let code =
+                    self.exec("systemctl", &[if mask { "mask" } else { "unmask" }, GEOCLUE])?;
+                if code != 0 {
+                    return Ok(code);
+                }
+                self.dconf_keyfile(LOCATION_OFF, (!on && gnome).then_some(LOCATION_OFF_KEYFILE))
+            }
+            Verb::GdmScreenReader { on } => {
+                if !Path::new(GDM_DCONF_PROFILE).exists() {
+                    return Ok(0);
+                }
+                self.dconf_keyfile(GDM_SCREEN_READER, on.then_some(GDM_SCREEN_READER_KEYFILE))
             }
             Verb::EnableNtp => self.exec("timedatectl", &["set-ntp", "true"]),
             Verb::SetTimezone { timezone } => {
@@ -1042,6 +1108,23 @@ impl Ctx {
                 Ok(0)
             }
         }
+    }
+
+    /// writes `content` into a dconf system database's keyfile at `path`, or removes it for
+    /// [`None`], then rebuilds the databases if that changed anything. Nothing without dconf
+    fn dconf_keyfile(&self, path: &str, content: Option<&str>) -> Result<i32, String> {
+        if !Path::new("/usr/bin/dconf").exists() {
+            return Ok(0);
+        }
+        let file = Path::new(path);
+        match content {
+            Some(content) => write_atomic(file, content.as_bytes(), 0o644).map_err(io(path))?,
+            None if std::fs::symlink_metadata(file).is_ok() => {
+                remove_any(file).map_err(io(path))?;
+            }
+            None => return Ok(0),
+        }
+        self.exec("dconf", &["update"])
     }
 
     /// the request's proxy, for the verbs that save it
@@ -1463,7 +1546,8 @@ mod tests {
             Verb::ProxyPersist,
             Verb::ProxyRepoOverrides,
             Verb::ProxyClear,
-            Verb::Geoclue { on: false },
+            Verb::Location { on: false },
+            Verb::GdmScreenReader { on: true },
             Verb::EnableNtp,
             Verb::SetTimezone { timezone: s("America/Denver") },
             Verb::SetHostname { hostname: s("cypresss-laptop"), pretty: false },
@@ -1619,8 +1703,29 @@ mod tests {
         };
         assert!(flatpak("org.mozilla.firefox").is_ok());
         assert!(flatpak("app/org.gimp.GIMP/x86_64/stable").is_ok());
+        assert!(flatpak("app/org.gimp.GIMP/aarch64/beta").is_ok());
+        assert!(flatpak("io.github.some_dev.App-Name").is_ok());
         assert!(flatpak("--from=https://evil/x.flatpakref").is_err());
         assert!(flatpak("/tmp/x.flatpak").is_err());
+        // relative paths flatpak would install from the helper's working directory
+        for bad in [
+            "evil.app.flatpakref",
+            "org.evil.App.flatpak",
+            "org.evil.App.FLATPAKREF",
+            "tmp/x.flatpakref",
+            "x.flatpak",
+            "./org.evil.App",
+            "../org.evil.App",
+            "org.evil.App/../x",
+            "runtime/org.gnome.Platform/x86_64/49",
+            "app/org.gimp.GIMP/x86_64",
+            "app/org.gimp.GIMP/x86_64/../x",
+            "org.mozilla",
+            "org..firefox",
+            "org.mozilla.-firefox",
+        ] {
+            assert!(flatpak(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]
@@ -1779,6 +1884,7 @@ mod tests {
                 "as-user",
                 "as-user-homed",
                 "clear-tweak-record",
+                "gdm-screen-reader",
             ]
         );
     }

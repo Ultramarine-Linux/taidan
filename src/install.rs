@@ -125,8 +125,9 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
                 install.set_stage_num(i32::from(u8::from(stage)) + 1);
                 install.set_stage_progress(-1.0);
             }
-            #[expect(clippy::cast_possible_truncation, reason = "a fraction, for display")]
-            InstallMsg::StageProgress(frac) => install.set_stage_progress(frac as f32),
+            InstallMsg::StageProgress(frac) => {
+                install.set_stage_progress(stage_progress(install.get_stage_progress(), frac));
+            }
             InstallMsg::NeedsReboot => install.set_needs_reboot(true),
             InstallMsg::DriversFailed => install.set_drivers_failed(true),
             InstallMsg::LocaleFailed => install.set_locale_failed(true),
@@ -137,6 +138,14 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
     if let Err(e) = set {
         tracing::error!(?e, "cannot update install progress");
     }
+}
+
+/// the progress bar after `frac` comes in, which never goes back within a stage. dnf counts
+/// downloads, then the transaction, from 0 again each, and a stage may run it more than once.
+/// [`InstallMsg::UpdStage`] resets it to -1, so it starts over with the next stage
+#[expect(clippy::cast_possible_truncation, reason = "a fraction, for display")]
+const fn stage_progress(current: f32, frac: f64) -> f32 {
+    current.max(frac as f32)
 }
 
 fn start(ui: &slint::Weak<AppWindow>) {
@@ -406,6 +415,15 @@ mod tests {
     fn secure_boot_qr_code() {
         let qr = qr_code(SECURE_BOOT_URL).unwrap();
         assert!(qr.size().width > 0);
+    }
+
+    #[test]
+    fn stage_progress_never_goes_back() {
+        // -1 until the stage reports any
+        assert!((stage_progress(-1.0, 0.25) - 0.25).abs() < f32::EPSILON);
+        assert!((stage_progress(0.25, 0.5) - 0.5).abs() < f32::EPSILON);
+        // the transaction after the downloads
+        assert!((stage_progress(1.0, 0.1) - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]

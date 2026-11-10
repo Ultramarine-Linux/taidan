@@ -2,7 +2,10 @@
 use std::cell::OnceCell;
 use std::rc::Rc;
 
+use slint::winit_030::winit::event::WindowEvent;
 use slint::winit_030::winit::event_loop::ActiveEventLoop;
+use slint::winit_030::winit::monitor::MonitorHandle;
+use slint::winit_030::winit::window::{Window, WindowId};
 use slint::winit_030::{CustomApplicationHandler, EventResult};
 
 use crate::ui::AppWindow;
@@ -25,7 +28,9 @@ fn height_for(screen_height: f64) -> f64 {
 fn scale_for(screen: (f64, f64)) -> f64 {
     let height = height_for(screen.1).min(MAX_FILL * screen.1);
     let fill = (height / DESIGN.1).min(MAX_FILL * screen.0 / DESIGN.0);
-    // at least the designs' size, unless the screen itself is smaller than that
+    // at least the designs' size, unless the screen itself is smaller than that. Wayland gives a
+    // rotated panel's size before the rotation, which only makes a usual portrait panel turned
+    // landscape come out smaller, never too big
     let fit = (screen.0 / DESIGN.0).min(screen.1 / DESIGN.1);
     let scale = fill.max(1.).min(fit);
     // whole hundredths, so `rem`s land on round-ish pixel sizes
@@ -33,40 +38,83 @@ fn scale_for(screen: (f64, f64)) -> f64 {
     (scale.mul_add(100., 1e-6)).floor() / 100.
 }
 
-/// the logical size of the smallest screen, so the window fits whichever one it's placed on,
-/// `TAIDAN_SCREEN=WIDTHxHEIGHT` pretends to have a screen of that size
-fn screen_size(event_loop: &ActiveEventLoop) -> Option<(f64, f64)> {
-    if let Some((w, h)) = std::env::var("TAIDAN_SCREEN").ok().and_then(|s| {
-        let (w, h) = s.split_once('x')?;
-        let (w, h): (f64, f64) = (w.trim().parse().ok()?, h.trim().parse().ok()?);
-        // `parse` takes `0`, `-5`, `inf` and `NaN`, which would break the scale math
-        let valid = |v: f64| v.is_finite() && v > 0.;
-        (valid(w) && valid(h)).then_some((w, h))
-    }) {
-        return Some((w, h));
-    }
-    event_loop
-        .available_monitors()
+/// `TAIDAN_SCREEN=WIDTHxHEIGHT` pretends to have a screen of that logical size
+fn screen_override() -> Option<(f64, f64)> {
+    let s = std::env::var("TAIDAN_SCREEN").ok()?;
+    let (w, h) = s.split_once('x')?;
+    let (w, h): (f64, f64) = (w.trim().parse().ok()?, h.trim().parse().ok()?);
+    // `parse` takes `0`, `-5`, `inf` and `NaN`, which would break the scale math
+    let valid = |v: f64| v.is_finite() && v > 0.;
+    (valid(w) && valid(h)).then_some((w, h))
+}
+
+/// the logical size of the smallest screen, so the window fits whichever one it's placed on.
+/// `window` is the window's real scale once it's shown, with its screen if winit knows it yet, or
+/// [`None`] for every screen: winit only knows each screen's whole-number scale (Wayland's
+/// `wl_output.scale`, rounded up from a fractional one), which makes the screen look smaller than
+/// it is
+fn screen_size(
+    monitors: impl Iterator<Item = MonitorHandle>,
+    window: Option<(Option<&MonitorHandle>, f64)>,
+) -> Option<(f64, f64)> {
+    monitors
         .map(|m| {
-            let size = m.size().to_logical::<f64>(m.scale_factor());
-            tracing::debug!(name = ?m.name(), ?size, scale = m.scale_factor(), "Found a screen");
+            let scale = window
+                .filter(|&(on, scale)| {
+                    on.is_none_or(|on| *on == m) && scale.is_finite() && scale > 0.
+                })
+                .map_or_else(|| m.scale_factor(), |(_, scale)| scale);
+            let size = m.size().to_logical::<f64>(scale);
+            tracing::debug!(name = ?m.name(), ?size, scale, "Found a screen");
             (size.width, size.height)
         })
         .filter(|&(w, h)| w > 0. && h > 0.)
         .min_by(|a, b| (a.0 * a.1).total_cmp(&(b.0 * b.1)))
 }
 
-/// sets `Tokens.scale` once winit knows the screens, which is right before the window is created
+/// sets `Tokens.scale` once winit knows the screens, which is right before the window is created,
+/// and again once the window has its real scale, which Slint resizes it to
 struct ScaleToScreen(Rc<OnceCell<slint::Weak<AppWindow>>>);
+
+impl ScaleToScreen {
+    fn apply(&self, screen: (f64, f64)) {
+        let Some(ui) = self.0.get().and_then(slint::Weak::upgrade) else { return };
+        let scale = scale_for(screen);
+        tracing::info!(?screen, scale, "Scaling the window to the screen");
+        #[expect(clippy::cast_possible_truncation, reason = "a scale around 1–3")]
+        ui.set_ui_scale(scale as f32);
+    }
+}
 
 impl CustomApplicationHandler for ScaleToScreen {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) -> EventResult {
-        let ui = self.0.get().and_then(slint::Weak::upgrade);
-        if let (Some(ui), Some(screen)) = (ui, screen_size(event_loop)) {
-            let scale = scale_for(screen);
-            tracing::info!(?screen, scale, "Scaling the window to the screen");
-            #[expect(clippy::cast_possible_truncation, reason = "a scale around 1–3")]
-            ui.set_ui_scale(scale as f32);
+        if let Some(screen) =
+            screen_override().or_else(|| screen_size(event_loop.available_monitors(), None))
+        {
+            self.apply(screen);
+        }
+        EventResult::Propagate
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        winit_window: Option<&Window>,
+        _slint_window: Option<&slint::Window>,
+        event: &WindowEvent,
+    ) -> EventResult {
+        // the fractional scale comes once the window is on a screen. With fractional-scale-v1 it
+        // may come before winit knows which screen, then it's taken for all of them
+        if let WindowEvent::ScaleFactorChanged { scale_factor, .. } = event
+            && screen_override().is_none()
+            && let monitor = winit_window.and_then(Window::current_monitor)
+            && let Some(screen) = screen_size(
+                event_loop.available_monitors(),
+                Some((monitor.as_ref(), *scale_factor)),
+            )
+        {
+            self.apply(screen);
         }
         EventResult::Propagate
     }

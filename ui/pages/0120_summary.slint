@@ -8,7 +8,7 @@ import { Tweaks } from "../tweaks.slint";
 import { Ims } from "../ims.slint";
 import { Cfg } from "../cfg.slint";
 import { Modal } from "../modal.slint";
-import { TdnText, TdnStyle, TdnBtn, TdnToggleRow } from "../components.slint";
+import { TdnText, TdnStyle, TdnBtn, TdnToggleRow, TdnScrollList } from "../components.slint";
 import { DriverList, DriverRow } from "0100_drivers.slint";
 import { UserIcon } from "0040_whoareyou.slint";
 import { Card } from "../slintcn/components/card.slint";
@@ -69,162 +69,180 @@ export component SummaryPage inherits TdnPage {
 
     review := FocusScope {
         enabled: !Modal.open;
+        // takes what the buttons leave, the review scrolls when it doesn't fit, e.g. on 1024x600
+        vertical-stretch: 1;
         // a named group, or screen readers skip the FocusScope and say nothing when it's focused
         accessible-role: groupbox;
         accessible-label: root.name;
 
-        HorizontalLayout {
-            spacing: 2rem;
+        // most of the review isn't focusable, so the arrow keys scroll it
+        key-pressed(event) => {
+            let step = event.text == Key.UpArrow ? 3rem
+                : event.text == Key.DownArrow ? -3rem
+                : event.text == Key.PageUp ? scroll.visible-height
+                : event.text == Key.PageDown ? -scroll.visible-height
+                : 0px;
+            if step == 0px { return reject; }
+            scroll.content-y = min(0, max(scroll.visible-height - scroll.content-height, scroll.content-y + step));
+            accept
+        }
 
-            VerticalLayout {
-                alignment: start;
-                horizontal-stretch: 1;
-                spacing: 0.75rem;
+        scroll := TdnScrollList {
+            spacing: 0;
 
-                SectionTitle {
-                    text: Lang.t("page-summary-account", []);
-                }
+            HorizontalLayout {
+                spacing: 2rem;
 
-                HorizontalLayout {
+                VerticalLayout {
+                    alignment: start;
+                    horizontal-stretch: 1;
                     spacing: 0.75rem;
 
-                    UserIcon {
-                        width: 2.75rem;
+                    SectionTitle {
+                        text: Lang.t("page-summary-account", []);
                     }
 
-                    VerticalLayout {
-                        layout-order: Dir.order(1);
-                        alignment: center;
+                    HorizontalLayout {
+                        spacing: 0.75rem;
 
-                        TdnText {
-                            text: Account.fullname != "" ? Account.fullname : Account.username;
-                            font-weight: Tokens.typography-weight-medium;
-                            horizontal-alignment: Dir.text-start;
-                            overflow: elide;
+                        UserIcon {
+                            width: 2.75rem;
                         }
 
-                        TdnText {
-                            text: Account.username;
-                            color: Tokens.color-muted-foreground;
-                            horizontal-alignment: Dir.text-start;
-                            overflow: elide;
+                        VerticalLayout {
+                            layout-order: Dir.order(1);
+                            alignment: center;
+
+                            TdnText {
+                                text: Account.fullname != "" ? Account.fullname : Account.username;
+                                font-weight: Tokens.typography-weight-medium;
+                                horizontal-alignment: Dir.text-start;
+                                overflow: elide;
+                            }
+
+                            TdnText {
+                                text: Account.username;
+                                color: Tokens.color-muted-foreground;
+                                horizontal-alignment: Dir.text-start;
+                                overflow: elide;
+                            }
                         }
                     }
-                }
 
-                Rectangle {
-                    height: 0.5rem;
-                }
+                    Rectangle {
+                        height: 0.5rem;
+                    }
 
-                SectionTitle {
-                    text: Lang.t("page-summary-region", []);
-                }
+                    SectionTitle {
+                        text: Lang.t("page-summary-region", []);
+                    }
 
-                InfoRow {
-                    icon: @image-url("../../data/icons/globe-symbolic.svg");
-                    label: Lang.t("page-language", []);
-                    value: Lang.name(Lang.current_language);
-                }
+                    InfoRow {
+                        icon: @image-url("../../data/icons/globe-symbolic.svg");
+                        label: Lang.t("page-language", []);
+                        value: Lang.name(Lang.current_language);
+                    }
 
-                InfoRow {
-                    icon: @image-url("../../data/icons/input-keyboard-symbolic.svg");
-                    label: Lang.t("page-keyboard", []);
-                    value: Lang.current_variant.id == "" ? Lang.current_keymap.name : Lang.current_variant.name;
-                }
+                    InfoRow {
+                        icon: @image-url("../../data/icons/input-keyboard-symbolic.svg");
+                        label: Lang.t("page-keyboard", []);
+                        value: Lang.current_variant.id == "" ? Lang.current_keymap.name : Lang.current_variant.name;
+                    }
 
-                if Ims.enabled != "": InfoRow {
-                    icon: @image-url("../../data/icons/input-keyboard-symbolic.svg");
-                    label: Lang.t("page-keyboard-ims", []);
-                    value: Ims.enabled;
-                }
+                    if Ims.enabled != "": InfoRow {
+                        icon: @image-url("../../data/icons/input-keyboard-symbolic.svg");
+                        label: Lang.t("page-keyboard-ims", []);
+                        value: Ims.enabled;
+                    }
 
-                InfoRow {
-                    icon: @image-url("../../data/icons/location-active-symbolic.svg");
-                    label: Lang.t("page-timezone", []);
-                    value: Lang.t("page-summary-timezone", [
-                        { key: "place", value: Lang.place(Tz.current.city, Tz.current.region) },
-                        { key: "offset", value: Tz.current.offset },
-                    ]);
-                }
+                    InfoRow {
+                        icon: @image-url("../../data/icons/location-active-symbolic.svg");
+                        label: Lang.t("page-timezone", []);
+                        value: Lang.t("page-summary-timezone", [
+                            { key: "place", value: Lang.place(Tz.current.city, Tz.current.region) },
+                            { key: "offset", value: Tz.current.offset },
+                        ]);
+                    }
 
-                InfoRow {
-                    icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
-                    label: Lang.t("page-summary-network", []);
-                    // what the install will go by, see `Network.install-online`
-                    value: Network.offline-chosen ? Lang.t("page-summary-network-offline", [])
-                        : !Network.online ? Lang.t("page-summary-network-none", [])
-                        : root.connected-ssid != "" ? root.connected-ssid
-                        : Lang.t("page-internet-wired", []);
-                }
-            }
-
-            // packed at the top like the account column, the card only as tall as what's in it
-            VerticalLayout {
-                layout-order: Dir.order(1);
-                alignment: start;
-                horizontal-stretch: 1;
-                spacing: 0.75rem;
-
-                SectionTitle {
-                    vertical-stretch: 0;
-                    text: Lang.t("page-summary-software", []);
-                }
-
-                Card {
-                    vertical-stretch: 0;
-                    card-radius: md;
-
-                    VerticalLayout {
-                        alignment: start;
-                        padding: 0.75rem;
-
-                        spacing: 0.5rem;
-
-                        if Drivers.install: DriverList {
-                            offline: !Network.install-online;
-                        }
-
-                        for name in Tweaks.enabled-names: DriverRow {
-                            icon: @image-url("../../data/icons/systemsettings-symbolic.svg");
-                            text: Lang.t(name, []);
-                        }
-
-                        if !Drivers.install && Tweaks.enabled-names.length == 0: TdnText {
-                            text: Lang.t("page-summary-software-none", []);
-                            color: Tokens.color-muted-foreground;
-                            horizontal-alignment: Dir.text-start;
-                            wrap: word-wrap;
-                        }
+                    InfoRow {
+                        icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
+                        label: Lang.t("page-summary-network", []);
+                        // what the install will go by, see `Network.install-online`
+                        value: Network.offline-chosen ? Lang.t("page-summary-network-offline", [])
+                            : !Network.online ? Lang.t("page-summary-network-none", [])
+                            : root.connected-ssid != "" ? root.connected-ssid
+                            : Lang.t("page-internet-wired", []);
                     }
                 }
 
-                // installed on the next restart, so only when there's internet to download them with
-                if Install.can-download-updates: TdnToggleRow {
-                    vertical-stretch: 0;
-                    enabled: Network.install-online;
-                    text: Lang.t("page-summary-updates", []);
-                    checked: Install.download-updates && Network.install-online;
-                    toggled(on) => { Install.download-updates = on; }
-                }
+                // packed at the top like the account column, the card only as tall as what's in it
+                VerticalLayout {
+                    layout-order: Dir.order(1);
+                    alignment: start;
+                    horizontal-stretch: 1;
+                    spacing: 0.75rem;
 
-                // the proxy without its credentials, and whether the installed system keeps it
-                if Network.proxy-url != "": TdnToggleRow {
-                    vertical-stretch: 0;
-                    text: Lang.t("page-summary-proxy", [{ key: "proxy", value: Network.proxy-public }]);
-                    checked: Network.proxy-persist;
-                    toggled(on) => { Network.proxy-persist = on; }
-                }
+                    SectionTitle {
+                        vertical-stretch: 0;
+                        text: Lang.t("page-summary-software", []);
+                    }
 
-                // only when the distro ships tweaks
-                if Tweaks.items.length > 0 && !Cfg.skip-tweaks: HorizontalLayout {
-                    vertical-stretch: 0;
-                    alignment: Dir.start;
+                    Card {
+                        vertical-stretch: 0;
+                        card-radius: md;
 
-                    TdnBtn {
-                        text: Lang.t("page-summary-tweaks", []);
-                        icon: @image-url("../../data/icons/move-symbolic.svg");
-                        icon-size: 1rem;
-                        clicked => { Tweaks.open = true; }
+                        VerticalLayout {
+                            alignment: start;
+                            padding: 0.75rem;
+
+                            spacing: 0.5rem;
+
+                            if Drivers.install: DriverList {
+                                offline: !Network.install-online;
+                            }
+
+                            for name in Tweaks.enabled-names: DriverRow {
+                                icon: @image-url("../../data/icons/systemsettings-symbolic.svg");
+                                text: Lang.t(name, []);
+                            }
+
+                            if !Drivers.install && Tweaks.enabled-names.length == 0: TdnText {
+                                text: Lang.t("page-summary-software-none", []);
+                                color: Tokens.color-muted-foreground;
+                                horizontal-alignment: Dir.text-start;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+
+                    // installed on the next restart, so only when there's internet to download them with
+                    if Install.can-download-updates: TdnToggleRow {
+                        vertical-stretch: 0;
+                        enabled: Network.install-online;
+                        text: Lang.t("page-summary-updates", []);
+                        checked: Install.download-updates && Network.install-online;
+                        toggled(on) => { Install.download-updates = on; }
+                    }
+
+                    // the proxy without its credentials, and whether the installed system keeps it
+                    if Network.proxy-url != "": TdnToggleRow {
+                        vertical-stretch: 0;
+                        text: Lang.t("page-summary-proxy", [{ key: "proxy", value: Network.proxy-public }]);
+                        checked: Network.proxy-persist;
+                        toggled(on) => { Network.proxy-persist = on; }
+                    }
+
+                    // only when the distro ships tweaks
+                    if Tweaks.items.length > 0 && !Cfg.skip-tweaks: HorizontalLayout {
+                        vertical-stretch: 0;
+                        alignment: Dir.start;
+
+                        TdnBtn {
+                            text: Lang.t("page-summary-tweaks", []);
+                            icon: @image-url("../../data/icons/move-symbolic.svg");
+                            icon-size: 1rem;
+                            clicked => { Tweaks.open = true; }
+                        }
                     }
                 }
             }

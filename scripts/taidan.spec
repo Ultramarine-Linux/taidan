@@ -24,9 +24,8 @@ Requires:       shadow-utils
 Requires:       util-linux
 Requires:       systemd
 Requires:       systemd-udev
-# chvt for the unit, pkill for start-taidan
+# chvt for the unit and start-taidan
 Requires:       kbd
-Requires:       procps-ng
 Requires:       bash
 # config-manager enables the repos asked for in the settings
 Requires:       (dnf5 and dnf5-command(copr) and dnf5-command(config-manager))

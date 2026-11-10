@@ -126,14 +126,22 @@ component IconButton inherits Rectangle {
     }
 }
 
-component Preset inherits IconButton {
+// the camera when `index` is -1, otherwise a preset icon
+component Slot inherits IconButton {
     in property <int> index;
-    image: Account.avatars[root.index].image;
-    selected: Account.avatar-id == Account.avatars[root.index].id;
-    label: Lang.t("page-whoareyou-icon-n", [{ key: "n", value: root.index + 1 }]);
+    property <bool> camera: root.index < 0;
+    symbolic: root.camera;
+    image: root.camera ? @image-url("../../data/icons/camera-photo-symbolic.svg") : Account.avatars[root.index].image;
+    selected: !root.camera && Account.avatar-id == Account.avatars[root.index].id;
+    label: root.camera ? Lang.t("page-whoareyou-camera", []) : Lang.t("page-whoareyou-icon-n", [{ key: "n", value: root.index + 1 }]);
+    enabled: !root.camera || Camera.available;
     clicked => {
-        Account.avatar-id = Account.avatars[root.index].id;
-        Account.avatar = Account.avatars[root.index].image;
+        if root.camera {
+            Camera.start();
+        } else {
+            Account.avatar-id = Account.avatars[root.index].id;
+            Account.avatar = Account.avatars[root.index].image;
+        }
     }
 }
 
@@ -189,21 +197,17 @@ component IconPicker inherits VerticalLayout {
         }
     }
 
-    // the camera, then however many presets there are, wrapping into rows
-    FlexboxLayout {
-        alignment: center;
-        spacing-horizontal: 0.4rem;
-        spacing-vertical: 0.15rem;
+    // the camera in the middle, with the presets around it in staggered rows, see
+    // `avatar::picker_rows`
+    VerticalLayout {
+        spacing: 0.15rem;
 
-        IconButton {
-            symbolic: true;
-            image: @image-url("../../data/icons/camera-photo-symbolic.svg");
-            label: Lang.t("page-whoareyou-camera", []);
-            enabled: Camera.available;
-            clicked => { Camera.start(); }
+        for row in Account.avatar-rows: HorizontalLayout {
+            alignment: center;
+            spacing: 0.4rem;
+
+            for slot in row.slots: Slot { index: slot; }
         }
-
-        for _[i] in Account.avatars: Preset { index: i; }
     }
 }
 

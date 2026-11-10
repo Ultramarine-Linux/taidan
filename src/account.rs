@@ -48,26 +48,38 @@ fn spawn_username_checker(
     tx
 }
 
-/// suggest a username from the full name: the first word if usable, otherwise the last
+/// suggest a username from the full name: the first word if usable, otherwise the last, romanized
+/// first so e.g. `José` gives `jose` and `Иван` gives `ivan`
 ///
-/// returns [`None`] if neither word can be turned into a valid username
-fn derive_username(fullname: &str) -> Option<String> {
+/// returns an empty string if neither word can be turned into a valid username, so the field
+/// doesn't keep a suggestion from what was typed before
+fn derive_username(fullname: &str) -> String {
     fn derive_part(part: &str) -> Option<String> {
         (part.chars().all(|c: char| c.is_ascii_alphanumeric())
             && part.chars().next().is_some_and(|c| c.is_ascii_alphabetic()))
         .then(|| part.to_ascii_lowercase())
     }
 
+    // Chinese characters are read differently in Chinese and Japanese, a guess would likely be
+    // wrong for one of them. A `?` makes their word unusable
+    let script = icu::properties::CodePointMapData::<icu::properties::props::Script>::new();
+    let fullname = fullname
+        .chars()
+        .map(|c| if script.get(c) == icu::properties::props::Script::Han { '?' } else { c })
+        .collect::<String>();
+    let fullname = deunicode::deunicode(&fullname);
     let fullname = fullname.trim();
     if fullname.is_empty() {
-        return Some(String::new());
+        return String::new();
     }
 
     let first = fullname.split_once(char::is_whitespace).map_or(fullname, |(a, _)| a);
-    derive_part(first).or_else(|| {
-        let last = fullname.rsplit_once(char::is_whitespace).map_or(fullname, |(_, b)| b);
-        derive_part(last)
-    })
+    derive_part(first)
+        .or_else(|| {
+            let last = fullname.rsplit_once(char::is_whitespace).map_or(fullname, |(_, b)| b);
+            derive_part(last)
+        })
+        .unwrap_or_default()
 }
 
 pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, account: &crate::ui::Account<'_>) {
@@ -84,9 +96,8 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, account: &crate::ui:
     });
     account.on_valid_fullname(|s| valid_fullname(&s));
     account.on_long_password(|s| s.len() > libtaidan::passwd::PASSWORD_MAX_LEN);
-    account.on_suggest_username(|fullname, current| {
-        derive_username(&fullname).map_or(current, Into::into)
-    });
+    // only asked while the username is the suggestion, so one that can't be derived clears it
+    account.on_suggest_username(|fullname, _current| derive_username(&fullname).into());
     account.on_first_name(|fullname, username| {
         fullname.split_whitespace().next().map_or(username, Into::into)
     });
@@ -118,22 +129,33 @@ mod tests {
 
     #[test]
     fn empty_input_clears_username() {
-        assert_eq!(derive_username(""), Some(String::new()));
+        assert_eq!(derive_username(""), "");
     }
 
     #[test]
     fn valid_input_derives_lowercase_username() {
-        assert_eq!(derive_username("Alice Smith"), Some(String::from("alice")));
+        assert_eq!(derive_username("Alice Smith"), "alice");
     }
 
     #[test]
     fn falls_back_to_last_word() {
-        assert_eq!(derive_username("Dr. Smith"), Some(String::from("smith")));
+        assert_eq!(derive_username("Dr. Smith"), "smith");
     }
 
     #[test]
-    fn non_convertible_input_does_not_overwrite_username() {
-        assert_eq!(derive_username("!!!"), None);
+    fn non_convertible_input_clears_username() {
+        assert_eq!(derive_username("!!!"), "");
+    }
+
+    #[test]
+    fn non_ascii_names_are_romanized() {
+        assert_eq!(derive_username("José García"), "jose");
+        assert_eq!(derive_username("Jörg Müller"), "jorg");
+        assert_eq!(derive_username("Иван Петров"), "ivan");
+        // no guessing how to read them, and nothing left from a name typed before
+        assert_eq!(derive_username("山田 太郎"), "");
+        assert_eq!(derive_username("Jos 山田"), "jos");
+        assert_eq!(derive_username("山田 Taro"), "taro");
     }
 
     #[test]

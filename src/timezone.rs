@@ -291,13 +291,12 @@ fn offset_matches(offset: &str, query: &str) -> bool {
 /// what a zone is found by: its city, every country it's for, and its name
 fn search_text(tz: &TimeZone, zone: Option<&Zone>, regions: &Regions) -> String {
     let countries = zone.into_iter().flat_map(|z| &z.countries).map(|c| regions.name(c));
-    [tz.city.to_string(), tz.id.to_string()]
+    let text = [tz.city.to_string(), tz.id.to_string()]
         .into_iter()
         .chain(countries)
         .collect::<Vec<_>>()
-        .join("\n")
-        .to_lowercase()
-        .replace('−', "-")
+        .join("\n");
+    crate::l10n::fold_search(&text).replace('−', "-")
 }
 
 struct State {
@@ -332,7 +331,8 @@ fn show_results(ui: &AppWindow, state: &State) {
         .collect::<Vec<_>>();
     // one that's exactly what was typed first, e.g. UTC for `utc`, which Enter then picks
     let exact = |e: &TimeZone| {
-        !query.is_empty() && (e.city.to_lowercase() == *query || e.id.to_lowercase() == *query)
+        !query.is_empty()
+            && (crate::l10n::fold_search(&e.city) == *query || e.id.to_lowercase() == *query)
     };
     results.sort_by(|a, b| exact(b).cmp(&exact(a)).then_with(|| a.city.cmp(&b.city)));
     ui.global::<Tz<'_>>().set_results(slint::ModelRc::new(slint::VecModel::from(results)));
@@ -414,7 +414,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tz: &Tz<'_>) {
         move |query| {
             let Some(ui) = ui.upgrade() else { return };
             let mut state = state.borrow_mut();
-            state.query = query.trim().to_lowercase();
+            state.query = crate::l10n::fold_search(query.trim());
             if state.cached_for == locale(&ui) {
                 show_results(&ui, &state);
             } else {

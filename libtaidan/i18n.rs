@@ -328,10 +328,86 @@ impl XkbKeymap {
             entry("VariantList", &["--", &self.variants]),
             entry("Options", &["--", &self.options]),
         ];
-        if self.has_latin_fallback() {
+        if !self.options.is_empty() {
             entries.push(entry("ResetOldOptions", &["--type=bool", "true"]));
         }
         entries
+    }
+
+    /// the X11 keymap in `/etc/vconsole.conf`, [`None`] if none of its `XKB*` keys are set, which
+    /// is when `systemd-localed` goes on to the xorg config, see [`Self::parse_xorg`]
+    #[must_use]
+    pub fn parse_vconsole(conf: &str) -> Option<Self> {
+        let mut found = false;
+        let mut keymap =
+            Self { layouts: String::new(), variants: String::new(), options: String::new() };
+        for line in conf.lines().map(str::trim) {
+            let Some((key, val)) = line.split_once('=') else { continue };
+            let key = key.trim();
+            if line.starts_with('#')
+                || !matches!(key, "XKBLAYOUT" | "XKBMODEL" | "XKBVARIANT" | "XKBOPTIONS")
+            {
+                continue;
+            }
+            let val = val.trim();
+            let val = val
+                .strip_prefix('"')
+                .and_then(|v| v.strip_suffix('"'))
+                .or_else(|| val.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
+                .unwrap_or(val);
+            found |= !val.is_empty();
+            match key {
+                "XKBLAYOUT" => val.clone_into(&mut keymap.layouts),
+                "XKBVARIANT" => val.clone_into(&mut keymap.variants),
+                "XKBOPTIONS" => val.clone_into(&mut keymap.options),
+                _ => {}
+            }
+        }
+        found.then_some(keymap)
+    }
+
+    /// the X11 keymap in the `InputClass` section of `/etc/X11/xorg.conf.d/00-keyboard.conf`
+    #[must_use]
+    pub fn parse_xorg(conf: &str) -> Self {
+        let mut keymap =
+            Self { layouts: String::new(), variants: String::new(), options: String::new() };
+        let mut in_section = false;
+        for line in conf.lines().map(str::trim).filter(|l| !l.starts_with('#')) {
+            let words = line.split_whitespace().map(|w| w.trim_matches('"')).collect_vec();
+            match words.as_slice() {
+                ["Section", "InputClass"] => in_section = true,
+                ["EndSection", ..] => in_section = false,
+                ["Option", "XkbLayout", val] if in_section => {
+                    (*val).clone_into(&mut keymap.layouts);
+                }
+                ["Option", "XkbVariant", val] if in_section => {
+                    (*val).clone_into(&mut keymap.variants);
+                }
+                ["Option", "XkbOptions", val] if in_section => {
+                    (*val).clone_into(&mut keymap.options);
+                }
+                _ => {}
+            }
+        }
+        keymap
+    }
+
+    /// the system's (locale1) keymap with all its layouts, variants and options, read from the
+    /// files `systemd-localed` keeps it in the way it does, `vconsole.conf` first. [`None`] if it
+    /// has no layout
+    pub async fn system() -> Option<Self> {
+        let read = async |path: &str| {
+            tokio::fs::read_to_string(path)
+                .await
+                .inspect_err(|e| tracing::debug!(?e, path, "cannot read the keymap"))
+                .ok()
+        };
+        let keymap =
+            match read("/etc/vconsole.conf").await.as_deref().and_then(Self::parse_vconsole) {
+                Some(keymap) => keymap,
+                None => Self::parse_xorg(&read("/etc/X11/xorg.conf.d/00-keyboard.conf").await?),
+            };
+        (!keymap.layouts.trim_matches(',').trim().is_empty()).then_some(keymap)
     }
 
     /// GNOME's `input-sources` entries, `('xkb', 'layout+variant')` for each layout
@@ -406,7 +482,17 @@ pub async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> Res<()
 
 /// `kwriteconfig6` arguments, after `--file`, that put the layout picked in `settings` into
 /// `kxkbrc`, [`None`] if there's no layout
-fn kxkbrc_entries(settings: &crate::settings::Settings) -> Option<Vec<Vec<String>>> {
+async fn kxkbrc_entries(settings: &crate::settings::Settings) -> Option<Vec<Vec<String>>> {
+    // one that wasn't picked is the system's first layout. The whole of the system's keymap keeps
+    // its other layouts and its options, unless it's a lone layout that can't type ASCII, which
+    // gets US English after it like a picked one
+    if !settings.kb_picked
+        && let Some(system) = XkbKeymap::system().await
+        && (system.layouts.contains(',')
+            || !XkbKeymap::new(&system.layouts, Some(&system.variants)).has_latin_fallback())
+    {
+        return Some(system.kxkbrc_entries());
+    }
     if settings.kb_layout.is_empty() {
         return None;
     }
@@ -426,7 +512,7 @@ pub async fn apply_keymap_to_user(
     if cfg.taidan0.systemd_homed || !crate::a11y::is_plasma() {
         return Ok(());
     }
-    let Some(entries) = kxkbrc_entries(settings) else { return Ok(()) };
+    let Some(entries) = kxkbrc_entries(settings).await else { return Ok(()) };
     let home = crate::a11y::home_of(&settings.username).await?;
     let file = home.join(".config/kxkbrc");
     let file = file.to_string_lossy();
@@ -450,9 +536,10 @@ pub async fn write_keymap_to_skel(
     settings: &crate::settings::Settings,
     skel: &std::path::Path,
 ) -> Res<bool> {
-    let Some(entries) = kxkbrc_entries(settings).filter(|_| crate::a11y::is_plasma()) else {
+    if !crate::a11y::is_plasma() {
         return Ok(false);
-    };
+    }
+    let Some(entries) = kxkbrc_entries(settings).await else { return Ok(false) };
     let config = skel.join(".config");
     tokio::fs::create_dir_all(&config).await.map_err(Err::Io)?;
     let file = config.join("kxkbrc");
@@ -550,6 +637,28 @@ impl I18nImf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn system_keymap_files() {
+        let conf = "# Written by systemd-localed(8)\nKEYMAP=de\nXKBLAYOUT=\"de,us\"\nXKBMODEL=pc105\nXKBVARIANT=nodeadkeys,\nXKBOPTIONS=grp:alt_shift_toggle\n";
+        let km = XkbKeymap::parse_vconsole(conf).unwrap();
+        assert_eq!(
+            (km.layouts.as_str(), km.variants.as_str(), km.options.as_str()),
+            ("de,us", "nodeadkeys,", "grp:alt_shift_toggle")
+        );
+        // localed then goes on to the xorg config
+        assert!(XkbKeymap::parse_vconsole("KEYMAP=us\n#XKBLAYOUT=de\n").is_none());
+        let conf = "Section \"InputClass\"\n        Option \"XkbLayout\" \"cz,us\"\n        Option \"XkbVariant\" \"qwerty,\"\n        Option \"XkbOptions\" \"grp:win_space_toggle\"\nEndSection\n";
+        let km = XkbKeymap::parse_xorg(conf);
+        assert_eq!(
+            (km.layouts.as_str(), km.variants.as_str(), km.options.as_str()),
+            ("cz,us", "qwerty,", "grp:win_space_toggle")
+        );
+        // the options take effect without a latin fallback too
+        let entries = km.kxkbrc_entries();
+        assert!(entries.iter().any(|e| e[3] == "ResetOldOptions"));
+        assert!(entries.iter().any(|e| e[3] == "LayoutList" && e.last().unwrap() == "cz,us"));
+    }
 
     #[test]
     fn latin_fallback() {

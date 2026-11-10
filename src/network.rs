@@ -71,6 +71,8 @@ mod nm {
         fn connectivity(&self) -> zbus::Result<u32>;
         #[zbus(property)]
         fn connectivity_check_uri(&self) -> zbus::Result<String>;
+        #[zbus(property)]
+        fn primary_connection(&self) -> zbus::Result<OwnedObjectPath>;
         fn check_connectivity(&self) -> zbus::Result<u32>;
     }
 
@@ -241,6 +243,26 @@ impl KeyMgmt {
         }
     }
 
+    /// how a network with access points secured as `self` and `other` is connected to, as if
+    /// their flags were one AP's. Bands of one network can differ, like WPA3 only on 6 GHz, and
+    /// `NetworkManager` picks an AP that matches what's saved, so a password network is saved as
+    /// WPA-PSK when any band offers it, which SAE transition APs take too
+    const fn merge(self, other: Self) -> Self {
+        // in the order `from_flags` checks them
+        const fn rank(k: KeyMgmt) -> u8 {
+            match k {
+                KeyMgmt::Enterprise => 0,
+                KeyMgmt::EnterpriseSuiteB => 1,
+                KeyMgmt::Psk => 2,
+                KeyMgmt::Sae => 3,
+                KeyMgmt::Owe => 4,
+                KeyMgmt::Wep => 5,
+                KeyMgmt::Open => 6,
+            }
+        }
+        if rank(other) < rank(self) { other } else { self }
+    }
+
     const fn security(self) -> Security {
         match self {
             Self::Open | Self::Owe => Security::Open,
@@ -267,6 +289,8 @@ struct Ap {
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Snapshot {
     state: NetState,
+    /// the active connection with the default route, `/` if none, see `Network.primary-connection`
+    primary: String,
     wifi: bool,
     radio: Radio,
     ethernet: bool,
@@ -310,6 +334,8 @@ enum Cmd {
         bypass: String,
         /// whether to keep it after setup, see `Network.proxy-persist`
         persist: bool,
+        /// `Network.proxy-visit` of the dialog it was sent from
+        visit: i32,
     },
     /// with the proxy and the hosts it's not used for, if one is set
     OpenPortal {
@@ -335,6 +361,8 @@ const FAILED_SECRETS: Failure = "page-internet-error-password";
 const FAILED_PSK_LENGTH: Failure = "page-internet-error-password-length";
 const FAILED_TIMEOUT: Failure = "page-internet-error-timeout";
 const FAILED_IP: Failure = "page-internet-ip-error";
+/// the IP settings were saved, but the connection didn't come back up with them
+const FAILED_IP_RECONNECT: Failure = "page-internet-ip-error-reconnect";
 const PROXY_INVALID: Failure = "page-internet-proxy-invalid";
 const PROXY_FAILED: Failure = "page-internet-proxy-error";
 /// the browser for logging in to captive portals, a `WPE WebKit` shell
@@ -395,6 +423,12 @@ struct Nm {
     portal_offline: bool,
     /// when the scan the user asked for should be done
     scanning_until: Option<Instant>,
+    /// the worker's commands, so [`Self::wait`] can answer quick ones while it connects
+    rx: Option<mpsc::Receiver<Cmd>>,
+    /// commands that came in during [`Self::wait`], for the worker to run once it's done
+    deferred: std::collections::VecDeque<Cmd>,
+    /// the primary connection the proxy was last checked again for, see [`Self::recheck_proxy`]
+    rechecked_for: String,
 }
 
 impl Nm {
@@ -415,7 +449,64 @@ impl Nm {
             portal_checked: None,
             portal_offline: false,
             scanning_until: None,
+            rx: None,
+            deferred: std::collections::VecDeque::new(),
+            rechecked_for: String::new(),
         })
+    }
+
+    /// the active connection with the default route, `/` if none
+    fn primary(&self) -> String {
+        self.manager.primary_connection().map_or_else(|_| "/".to_owned(), |p| p.as_str().to_owned())
+    }
+
+    /// what [`check_proxy`] fetches, `NetworkManager`'s own connectivity check if it has one
+    fn check_uri(&self) -> String {
+        (self.manager.connectivity_check_uri().ok())
+            .filter(|uri| !uri.is_empty())
+            .unwrap_or_else(|| CHECK_URI.to_owned())
+    }
+
+    /// checks the proxy in use, if any and not checked on `primary` yet, on another thread, so
+    /// `Network.online` only counts it for the connection it works on
+    fn recheck_proxy(&self, primary: String) {
+        let (ui, uri) = (self.ui.clone(), self.check_uri());
+        push(&self.ui, move |net| {
+            let url = net.get_proxy_url();
+            if url.is_empty() || net.get_proxy_checked_on().as_str() == primary {
+                return;
+            }
+            let Some(proxy) = libtaidan::proxy::Proxy::new(&url, &net.get_proxy_bypass()) else {
+                return;
+            };
+            std::thread::spawn(move || recheck_proxy(&ui, &proxy, &uri, primary));
+        });
+    }
+
+    /// the next command that came in during [`Self::wait`], else waits up to `timeout` for one
+    fn next_cmd(&mut self, timeout: Duration) -> Result<Cmd, mpsc::RecvTimeoutError> {
+        if let Some(cmd) = self.deferred.pop_front() {
+            return Ok(cmd);
+        }
+        let rx = self.rx.as_ref().ok_or(mpsc::RecvTimeoutError::Disconnected)?;
+        rx.recv_timeout(timeout)
+    }
+
+    /// runs the commands that came in while connecting that don't have to wait for it, like
+    /// loading IP settings or a scan, and keeps the rest for later in the order they came.
+    /// Once one is kept, all after it are too, so none overtakes one sent before it
+    fn service(&mut self) {
+        let Some(rx) = self.rx.take() else { return };
+        while let Ok(cmd) = rx.try_recv() {
+            let quick = matches!(cmd, Cmd::Refresh | Cmd::LoadIp(_) | Cmd::SetProxy { .. });
+            if quick && self.deferred.is_empty() {
+                let ui = self.ui.clone();
+                handle(self, &ui, cmd);
+            } else {
+                self.deferred.push_back(cmd);
+            }
+        }
+        self.rx = Some(rx);
     }
 
     /// the SSID of the network the UI calls `name`, which is lossy for SSIDs that aren't UTF-8
@@ -438,6 +529,15 @@ impl Nm {
             push(&self.ui, move |net| net.set_portal_open(open));
         }
         let snap = self.snapshot();
+        // a proxy checked on another network may not work on this one, so it's checked again once
+        // NetworkManager says this one doesn't reach the internet on its own
+        if matches!(snap.state, NetState::Limited | NetState::Portal)
+            && snap.primary != "/"
+            && self.rechecked_for != snap.primary
+        {
+            self.rechecked_for.clone_from(&snap.primary);
+            self.recheck_proxy(snap.primary.clone());
+        }
         // replacing the model rebuilds every row, so only do it when something changed
         if self.last.as_ref() != Some(&snap) {
             self.last = Some(snap.clone());
@@ -579,9 +679,10 @@ impl Nm {
                     Some(a)
                         if connected || (a.strength < ap.strength && !active.contains(&a.ssid)) =>
                     {
-                        *a = ap;
+                        let key_mgmt = a.key_mgmt.merge(ap.key_mgmt);
+                        *a = Ap { key_mgmt, ..ap };
                     }
-                    Some(_) => {}
+                    Some(a) => a.key_mgmt = a.key_mgmt.merge(ap.key_mgmt),
                     None => aps.push(ap),
                 }
             }
@@ -600,6 +701,7 @@ impl Nm {
             40 => NetState::Connecting,
             _ => NetState::Offline,
         };
+        let primary = self.primary();
         let ethernet_devices = self.devices_of(DEVICE_TYPE_ETHERNET);
         let ethernet = !ethernet_devices.is_empty();
         let wired = ethernet_devices.iter().any(|path| {
@@ -617,7 +719,15 @@ impl Nm {
         let devs = self.ranked_devices(DEVICE_TYPE_WIFI);
         if devs.is_empty() {
             self.aps.clear();
-            return Snapshot { state, wifi: false, radio, ethernet, wired, networks: vec![] };
+            return Snapshot {
+                state,
+                primary,
+                wifi: false,
+                radio,
+                ethernet,
+                wired,
+                networks: vec![],
+            };
         }
         let (aps, active) = self.access_points(&devs);
         let known = self.known();
@@ -637,7 +747,7 @@ impl Nm {
         });
         self.seen.extend(aps.iter().map(|ap| (ap.ssid.clone(), ap.key_mgmt)));
         self.aps = aps;
-        Snapshot { state, wifi: true, radio, ethernet, wired, networks }
+        Snapshot { state, primary, wifi: true, radio, ethernet, wired, networks }
     }
 
     fn delete(&self, path: &ObjectPath<'_>) {
@@ -707,6 +817,7 @@ impl Nm {
                 published = Instant::now();
                 self.publish();
             }
+            self.service();
             std::thread::sleep(Duration::from_millis(300));
         }
         // the device fails before the active connection goes down, so it should be in by now
@@ -1190,46 +1301,85 @@ fn browse_places() -> Vec<crate::ui::FileEntry> {
         .collect()
 }
 
-/// checks the internet is reachable through the proxy, then uses it
-fn set_proxy(nm: &Nm, ui: &slint::Weak<AppWindow>, url: &str, bypass: &str, persist: bool) {
-    let res = if url.is_empty() {
-        Ok(None)
-    } else {
-        libtaidan::proxy::Proxy::new(url, bypass).ok_or(PROXY_INVALID).and_then(|proxy| {
-            let uri = nm
-                .manager
-                .connectivity_check_uri()
-                .ok()
-                .filter(|uri| !uri.is_empty())
-                .unwrap_or_else(|| CHECK_URI.to_owned());
-            let client = proxy.client().map_err(|_| PROXY_INVALID)?;
-            let res = crate::RT.block_on(async {
-                client.get(&uri).timeout(Duration::from_secs(15)).send().await?.error_for_status()
-            });
-            res.map(|_| Some(proxy)).map_err(|e| {
-                tracing::warn!(?e, uri, "cannot reach the internet through the proxy");
-                PROXY_FAILED
-            })
-        })
-    };
+/// whether the internet is reachable through `proxy`, fetching `uri`
+fn check_proxy(proxy: &libtaidan::proxy::Proxy, uri: &str) -> Result<(), Failure> {
+    let client = proxy.client().map_err(|_| PROXY_INVALID)?;
+    let res = crate::RT.block_on(async {
+        client.get(uri).timeout(Duration::from_secs(15)).send().await?.error_for_status()
+    });
+    res.map(|_| ()).map_err(|e| {
+        tracing::warn!(?e, uri, "cannot reach the internet through the proxy");
+        PROXY_FAILED
+    })
+}
+
+/// [`Nm::recheck_proxy`] on its own thread, which counts the proxy as working on `primary` if it
+/// is
+fn recheck_proxy(
+    ui: &slint::Weak<AppWindow>,
+    proxy: &libtaidan::proxy::Proxy,
+    uri: &str,
+    primary: String,
+) {
+    if check_proxy(proxy, uri).is_err() {
+        return;
+    }
+    let url = proxy.url.clone();
     push(ui, move |net| {
-        net.set_proxy_busy(false);
-        // cancelled while it was checked, the user gave up on it
-        if !net.get_proxy_open() {
-            return;
+        // removed or replaced meanwhile
+        if net.get_proxy_url().as_str() == url {
+            net.set_proxy_checked_on(primary.into());
         }
-        match res {
-            Ok(proxy) => {
-                let public = proxy.as_ref().map(libtaidan::proxy::Proxy::public_url);
-                net.set_proxy_public(public.unwrap_or_default().into());
-                let (url, bypass) = proxy.map(|p| (p.url, p.no_proxy)).unwrap_or_default();
-                net.set_proxy_url(url.into());
-                net.set_proxy_persist(persist);
-                net.set_proxy_bypass(bypass.replace(',', ", ").into());
-                net.set_proxy_open(false);
+    });
+}
+
+/// the bypass list a new proxy starts with, as `Network.proxy-bypass` has it
+const DEFAULT_BYPASS: &str = "localhost, 127.0.0.1, ::1";
+
+/// checks the internet is reachable through the proxy, then uses it. The check runs on its own
+/// thread, so it doesn't wait for a connect or hold up the worker
+fn set_proxy(
+    nm: &Nm,
+    ui: &slint::Weak<AppWindow>,
+    url: String,
+    bypass: String,
+    persist: bool,
+    visit: i32,
+) {
+    let (uri, primary, ui) = (nm.check_uri(), nm.primary(), ui.clone());
+    std::thread::spawn(move || {
+        let res = if url.is_empty() {
+            Ok(None)
+        } else {
+            libtaidan::proxy::Proxy::new(&url, &bypass)
+                .ok_or(PROXY_INVALID)
+                .and_then(|proxy| check_proxy(&proxy, &uri).map(|()| Some(proxy)))
+        };
+        push(&ui, move |net| {
+            // cancelled while it was checked, maybe opened again since, the user gave up on it
+            if !net.get_proxy_open() || net.get_proxy_visit() != visit {
+                return;
             }
-            Err(failure) => net.set_proxy_error_id(failure.into()),
-        }
+            net.set_proxy_busy(false);
+            match res {
+                Ok(proxy) => {
+                    let public = proxy.as_ref().map(libtaidan::proxy::Proxy::public_url);
+                    net.set_proxy_public(public.unwrap_or_default().into());
+                    let (url, bypass) = proxy.map_or_else(
+                        || (String::new(), DEFAULT_BYPASS.to_owned()),
+                        |p| (p.url, p.no_proxy.replace(',', ", ")),
+                    );
+                    net.set_proxy_checked_on(
+                        if url.is_empty() { "" } else { primary.as_str() }.into(),
+                    );
+                    net.set_proxy_url(url.into());
+                    net.set_proxy_persist(persist);
+                    net.set_proxy_bypass(bypass.into());
+                    net.set_proxy_open(false);
+                }
+                Err(failure) => net.set_proxy_error_id(failure.into()),
+            }
+        });
     });
 }
 
@@ -1630,15 +1780,16 @@ impl Nm {
         conn.update(settings)
     }
 
-    /// (re)connects `conn` on `dev`, so new settings take effect
-    fn activate(&mut self, conn: &ObjectPath<'_>, dev: &ObjectPath<'_>) -> Result<(), Failure> {
+    /// (re)connects `conn` on `dev`, so new IP settings take effect. They're saved by then, so a
+    /// failure says that rather than blaming the password, which the IP dialog can't change
+    fn reactivate(&mut self, conn: &ObjectPath<'_>, dev: &ObjectPath<'_>) -> Result<(), Failure> {
         let root = ObjectPath::from_static_str_unchecked("/");
         let watch = self.watch(dev);
         let active = self.manager.activate_connection(conn, dev, &root).map_err(|e| {
             tracing::error!(?e, "cannot activate connection");
-            FAILED_IP
+            FAILED_IP_RECONNECT
         })?;
-        self.wait(&active, dev, watch)
+        self.wait(&active, dev, watch).map_err(|_| FAILED_IP_RECONNECT)
     }
 
     fn save_ip(&mut self, ssid: &str, ip: IpConfig) -> Result<(), Failure> {
@@ -1658,7 +1809,7 @@ impl Nm {
             // on whichever adapter it's up on
             for dev in self.devices_of(DEVICE_TYPE_WIFI) {
                 if self.active_on(&dev).as_ref() == Some(&conn) {
-                    return self.activate(&conn, &dev);
+                    return self.reactivate(&conn, &dev);
                 }
             }
             return Ok(());
@@ -1688,7 +1839,7 @@ impl Nm {
             .at::<nm::Device<'_>>(&dev)
             .and_then(|d| d.state())
             .is_ok_and(|s| s >= DEVICE_STATE_DISCONNECTED);
-        if plugged { self.activate(&conn, &dev) } else { Ok(()) }
+        if plugged { self.reactivate(&conn, &dev) } else { Ok(()) }
     }
 }
 
@@ -1806,6 +1957,7 @@ fn push(ui: &slint::Weak<AppWindow>, f: impl FnOnce(&Network<'_>) + Send + 'stat
 fn push_snapshot(ui: &slint::Weak<AppWindow>, snap: Snapshot) {
     push(ui, move |net| {
         net.set_state(snap.state);
+        net.set_primary_connection(snap.primary.into());
         net.set_wifi_available(snap.wifi);
         net.set_wifi_enabled(snap.radio == Radio::On);
         net.set_wifi_hardware_enabled(snap.radio != Radio::HardwareOff);
@@ -1884,8 +2036,8 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
         Cmd::ConnectEnterprise { login, tls_only, visit } => {
             return connect_enterprise(nm, ui, login, tls_only, visit);
         }
-        Cmd::SetProxy { url, bypass, persist } => {
-            return set_proxy(nm, ui, &url, &bypass, persist);
+        Cmd::SetProxy { url, bypass, persist, visit } => {
+            return set_proxy(nm, ui, url, bypass, persist, visit);
         }
         Cmd::OpenPortal { proxy, visit } => {
             // the page was left meanwhile, which closed the browser without waiting for this
@@ -2092,8 +2244,9 @@ fn connect_nm(ui: &slint::Weak<AppWindow>, rx: &mpsc::Receiver<Cmd>) -> Option<N
     }
 }
 
-fn worker(ui: &slint::Weak<AppWindow>, rx: &mpsc::Receiver<Cmd>) {
-    let Some(mut nm) = connect_nm(ui, rx) else { return };
+fn worker(ui: &slint::Weak<AppWindow>, rx: mpsc::Receiver<Cmd>) {
+    let Some(mut nm) = connect_nm(ui, &rx) else { return };
+    nm.rx = Some(rx);
     nm.scan();
     // right away, whether it's online decides how the installation runs, even if the network
     // page is skipped
@@ -2107,7 +2260,7 @@ fn worker(ui: &slint::Weak<AppWindow>, rx: &mpsc::Receiver<Cmd>) {
         // sooner if a scan is due to end
         let timeout = (nm.scanning_until)
             .map_or(poll, |until| until.saturating_duration_since(Instant::now()).min(poll));
-        match rx.recv_timeout(timeout) {
+        match nm.next_cmd(timeout) {
             Ok(cmd) => handle(&mut nm, ui, cmd),
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => {
@@ -2271,7 +2424,7 @@ fn spawn_worker(ui: &slint::Weak<AppWindow>) -> mpsc::Sender<Cmd> {
     std::thread::spawn(move || {
         // also when it panics, so the dialogs don't spin forever
         let _guard = WorkerGone(ui.clone());
-        worker(&ui, &rx);
+        worker(&ui, rx);
     });
     tx
 }
@@ -2333,12 +2486,13 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
     net.on_set_proxy({
         let (send, ui) = (send.clone(), ui.clone());
         move |url, bypass, persist| {
-            if let Some(ui) = ui.upgrade() {
+            let visit = ui.upgrade().map_or(0, |ui| {
                 let net = ui.global::<Network<'_>>();
                 net.set_proxy_busy(true);
                 net.set_proxy_error_id("".into());
-            }
-            send(Cmd::SetProxy { url: url.trim().into(), bypass: bypass.into(), persist });
+                net.get_proxy_visit()
+            });
+            send(Cmd::SetProxy { url: url.trim().into(), bypass: bypass.into(), persist, visit });
         }
     });
     net.on_open_ip({
@@ -2407,6 +2561,29 @@ fn save(net: &Network<'_>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn key_mgmt_merges_across_bands() {
+        let psk = KeyMgmt::from_flags(AP_FLAGS_PRIVACY, 0, AP_SEC_KEY_MGMT_PSK);
+        let sae = KeyMgmt::from_flags(AP_FLAGS_PRIVACY, 0, AP_SEC_KEY_MGMT_SAE);
+        // WPA3 only on 6 GHz, WPA2 on the others, in either order
+        assert_eq!(sae.merge(psk), KeyMgmt::Psk);
+        assert_eq!(psk.merge(sae), KeyMgmt::Psk);
+        assert_eq!(sae.merge(sae), KeyMgmt::Sae);
+        // as if the flags were one AP's
+        for (a, b) in [
+            (AP_SEC_KEY_MGMT_OWE, 0),
+            (AP_SEC_KEY_MGMT_SAE, AP_SEC_KEY_MGMT_OWE),
+            (AP_SEC_KEY_MGMT_802_1X, AP_SEC_KEY_MGMT_PSK),
+            (AP_SEC_KEY_MGMT_EAP_SUITE_B_192, AP_SEC_KEY_MGMT_SAE),
+        ] {
+            let one = KeyMgmt::from_flags(AP_FLAGS_PRIVACY, 0, a | b);
+            let merged =
+                KeyMgmt::from_flags(AP_FLAGS_PRIVACY, 0, a).merge(KeyMgmt::from_flags(0, 0, b));
+            assert_eq!(merged, one, "{a:#x} {b:#x}");
+        }
+        assert_eq!(KeyMgmt::Open.merge(KeyMgmt::Wep), KeyMgmt::Wep);
+    }
 
     #[test]
     fn hostnames() {

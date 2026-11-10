@@ -240,6 +240,8 @@ page-internet-ip-error-gateway = Enter the gateway like 192.168.1.1.
 page-internet-ip-error-dns = Enter DNS servers like 1.1.1.1, 9.9.9.9.
 page-internet-ip-error-dns-needed = Enter at least one DNS server.
 page-internet-ip-error = Couldn't apply these settings.
+# the IP settings were saved, but the network didn't connect again with them
+page-internet-ip-error-reconnect = Saved, but couldn't reconnect with these settings.
 page-internet-devicename = Device Name
 page-internet-devicename-desc = How this device shows up to others on the network.
 # $hostname: the name derived from the device name, e.g. janes-laptop
@@ -300,7 +302,10 @@ page-internet-8021x-pac = PAC File
 page-internet-8021x-pac-desc = Optional when provisioning is allowed.
 # btn, picks a file
 page-internet-8021x-choose = Choose…
-page-internet-8021x-clear = Remove File
+# for screen readers, the Choose… button, $field is the file it picks, like "CA Certificate"
+page-internet-8021x-choose-for = Choose { $field }
+# for screen readers, the ✕ button that forgets the chosen file, $field is which file, like "CA Certificate"
+page-internet-8021x-clear-for = Remove { $field }
 page-internet-8021x-nofile = No file chosen
 page-internet-8021x-error-tls = Couldn't connect. Check your identity, certificate and private key password.
 page-internet-8021x-error-file = Couldn't copy the certificate files.
@@ -328,6 +333,8 @@ page-internet-offline-choose-desc = Drivers, codecs, and updates won't be instal
 ## [Tweaks]
 page-tweaks = System Tweaks
 page-tweaks-desc = Optional changes from your distribution. You can change them again later.
+# instead of a tweak's description when setting up offline, as it downloads something
+page-tweaks-needs-internet = Needs an internet connection.
 # btn, closes the tweaks dialog
 page-tweaks-done = Done
 ## [Codecs and Drivers]
@@ -432,7 +439,8 @@ page-done-reboot = Restart
 page-done-restart-update = Restart and Update
 page-done-updates = Updates are ready and will install the next time you restart
 page-done-updates-drivers = Your drivers need a restart, which will install updates
-page-done-drivers-failed = Some drivers couldn't be installed. Everything else is set up, and you can install them later.
+# shown when a driver didn't install or its kernel module didn't build. The screen still works with a basic driver
+page-done-drivers-failed = Some drivers couldn't be set up, so your graphics or Wi-Fi might not work properly. Everything else is set up.
 # shown when the language pack for the chosen language isn't installed, e.g. when setting up offline
 page-done-locale-failed = The system language couldn't be changed, likely because its language pack isn't installed. Everything else is set up, and you can change it later in Settings.
 page-done-reboot-failed = Couldn't restart. Try again, or restart from the login screen.

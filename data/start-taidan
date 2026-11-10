@@ -9,16 +9,20 @@
 # half-set-up system. It prints what happened on its own VT instead and waits there until the
 # machine is rebooted or powered off.
 
-status_file="${RUNTIME_DIRECTORY:-/run/taidan}/exit-status"
+# one per attempt, so a session left over from an earlier one can't answer for the next
+status_file() {
+	echo "${RUNTIME_DIRECTORY:-/run/taidan}/exit-status.$1"
+}
 
-# inside the KWin session
+# inside the KWin session, which KWin ends with when this exits (--exit-with-session)
 if [ "$1" = session ]; then
 	swaybg -i /usr/share/backgrounds/default.png -m fill -c '#113344' >/dev/null 2>&1 &
 	TAIDAN_LOG=trace /usr/bin/taidan
-	echo $? >"$status_file"
-	pkill kwin_wayland
+	echo $? >"$(status_file "$TAIDAN_ATTEMPT")"
 	exit 0
 fi
+
+uid=$(id -u)
 
 unconfigured() {
 	[ -e /.unconfigured ] || [ -e /var/.unconfigured ]
@@ -35,6 +39,45 @@ leftovers() {
 	return 0
 }
 
+# the last attempt's own processes, the ones running as taidan (taidan, Orca, swaybg…). When KWin
+# crashes, the session it started keeps running. Sets $own to their pids. Not in a subshell, so
+# the only other ones it sees are its own short-lived helpers, the children of this script
+own_leftovers() {
+	own=
+	cgroup=$(sed -n 's/^0:://p' /proc/self/cgroup)
+	while read -r pid; do
+		# this script and systemd-inhibit, which runs it
+		{ [ "$pid" = $$ ] || [ "$pid" = "$PPID" ]; } && continue
+		stat=$(cat "/proc/$pid/stat" 2>/dev/null) || continue
+		# after the name in parentheses: the state, then the parent's pid
+		# shellcheck disable=SC2086
+		set -- ${stat##*) }
+		[ "$2" = $$ ] && continue
+		[ "$(stat -c %u "/proc/$pid" 2>/dev/null)" = "$uid" ] && own="$own $pid"
+	done <"/sys/fs/cgroup$cgroup/cgroup.procs"
+	return 0
+}
+
+# stops them before the next KWin starts, so the old taidan can't act alongside the new one
+stop_own_leftovers() {
+	own_leftovers
+	[ -n "$own" ] || return 0
+	echo "stopping what the last session left running:$own" >&2
+	# shellcheck disable=SC2086
+	kill $own 2>/dev/null
+	waited=0
+	while own_leftovers && [ -n "$own" ] && [ "$waited" -lt 5 ]; do
+		sleep 1
+		waited=$((waited + 1))
+	done
+	own_leftovers
+	if [ -n "$own" ]; then
+		echo "killing what didn't stop:$own" >&2
+		# shellcheck disable=SC2086
+		kill -KILL $own 2>/dev/null
+	fi
+}
+
 # runs taidan-helper's verb $1, which polkit lets through while the OOBE runs. Verbs without
 # arguments need nothing on stdin
 helper() {
@@ -44,6 +87,8 @@ helper() {
 # asks them to stop, rpm finishes the transaction it's in first, and kills what's left after a
 # few minutes. The helper finds them itself, the same way
 stop_leftovers() {
+	# polkit only lets the helper through while this session's VT is in front, see give_up
+	chvt 7 2>/dev/null
 	# the captive portal browser runs in a unit of its own
 	helper stop-portal 2>/dev/null
 	pids=$(leftovers)
@@ -101,20 +146,26 @@ give_up() {
 
 restarts=0
 while :; do
+	status_file=$(status_file "$restarts")
 	rm -f "$status_file"
-	dbus-run-session kwin_wayland --no-lockscreen 'sh /usr/libexec/start-taidan session'
+	# KWin passes its environment on to the session
+	TAIDAN_ATTEMPT=$restarts dbus-run-session kwin_wayland --no-lockscreen \
+		--exit-with-session 'sh /usr/libexec/start-taidan session'
 	status=$(cat "$status_file" 2>/dev/null)
+	rm -f "$status_file"
 	if [ "$status" = 0 ] || ! unconfigured; then
 		exit 0
 	fi
 	# no status means KWin went down before taidan exited
 	if [ "$restarts" -ge 3 ]; then
 		echo "taidan keeps failing (exit status ${status:-none}), giving up" >&2
+		stop_own_leftovers
 		stop_leftovers
 		give_up $((restarts + 1))
 	fi
 	restarts=$((restarts + 1))
 	echo "taidan exited before the setup was done (exit status ${status:-none}), restarting with the software renderer" >&2
+	stop_own_leftovers
 	stop_leftovers
 	# Slint only falls back on its own when it can't create the renderer at all. femtovg failing
 	# later, in resume(), comes out of ui.run() and ends taidan. KWin passes this on to the session

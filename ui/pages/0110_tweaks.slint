@@ -1,5 +1,6 @@
 import { Lang, Dir } from "../lang.slint";
 import { Tweaks } from "../tweaks.slint";
+import { Network } from "../network.slint";
 import { TdnText, TdnBtn, TdnToggleRow, TdnDialog, TdnStyle, TdnScrollList } from "../components.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
@@ -18,12 +19,16 @@ export component TweaksDialog inherits TdnDialog {
 
     scroll := TdnScrollList {
         for tweak[i] in Tweaks.items: VerticalLayout {
+            // it would be skipped, so it can't be turned on and shows as off. It keeps the choice
+            // for when the install goes online again
+            property <bool> unavailable: tweak.needs-internet && !Network.install-online;
             spacing: 0.4rem;
 
             TdnToggleRow {
                 in-dialog: true;
                 text: Lang.t(tweak.name, []);
-                checked: tweak.on;
+                enabled: !unavailable;
+                checked: tweak.on && !unavailable;
                 toggled(on) => { Tweaks.set(i, on); }
                 focus-in(y, height) => { scroll.reveal(y, height); }
                 // Enter closes it like Done, Space toggles
@@ -31,7 +36,7 @@ export component TweaksDialog inherits TdnDialog {
             }
 
             TdnText {
-                text: Lang.t(tweak.desc, []);
+                text: unavailable ? Lang.t("page-tweaks-needs-internet", []) : Lang.t(tweak.desc, []);
                 color: Tokens.color-muted-foreground;
                 font-size: Tokens.typography-body-sm-size;
                 horizontal-alignment: Dir.text-start;

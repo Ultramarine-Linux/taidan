@@ -530,6 +530,8 @@ pub async fn apply_to_user(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
 ) -> Res<()> {
+    // off too, for a retry after an attempt with it on
+    apply_to_greeter(settings.a11y.screen_reader).await;
     if cfg.taidan0.systemd_homed || settings.a11y == A11y::default() {
         return Ok(());
     }
@@ -549,7 +551,22 @@ pub async fn reapply_to_user(
     if settings.a11y == applied {
         return Ok(());
     }
+    if settings.a11y.screen_reader != applied.screen_reader {
+        apply_to_greeter(settings.a11y.screen_reader).await;
+    }
     write_to_home(settings, cfg, Some(applied)).await
+}
+
+/// starts the screen reader on the login screen too, or stops it again, on GDM only. Plasma Login
+/// Manager and SDDM have no setting for it, and slick-greeter keeps its own in the `lightdm`
+/// user's dconf
+async fn apply_to_greeter(on: bool) {
+    if !std::path::Path::new(crate::helper::GDM_DCONF_PROFILE).exists() {
+        return;
+    }
+    if let Err(e) = crate::root(crate::Verb::GdmScreenReader { on }).await {
+        tracing::warn!(?e, on, "cannot set the screen reader on the login screen");
+    }
 }
 
 /// a command to run as the user in their home, with what to feed its stdin

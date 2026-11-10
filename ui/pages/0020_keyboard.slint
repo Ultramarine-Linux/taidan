@@ -122,6 +122,10 @@ export component KeyboardPage inherits TdnPage {
     // used: the first match
     property <bool> first-layout-match: search-layout.text != "" && layout-cursor < 0
         && current-layout-row < 0 && Lang.keymaps.length > 0;
+    // the same for the variants. The pinned "Default" row isn't a match, so this also applies
+    // when the current variant is the default one
+    property <bool> first-variant-match: search-variant.text != "" && variant-cursor < 0
+        && current-variant-row < 0 && Lang.variants.length > 0;
 
     function select-keymap(keymap: Keymap) {
         if keymap.id != Lang.current_keymap.id {
@@ -272,6 +276,7 @@ export component KeyboardPage inherits TdnPage {
                     description: root.variant-cursor == 0 ? Lang.t("default", [])
                         : root.variant-cursor > 0 && root.variant-cursor <= Lang.variants.length
                         ? Lang.variants[root.variant-cursor - 1].name
+                        : root.first-variant-match ? Lang.variants[0].name
                         : Lang.current_variant.id == "" ? Lang.t("default", []) : Lang.current_variant.name;
                     edited(text) => {
                         variant-cursor = -1;
@@ -282,6 +287,9 @@ export component KeyboardPage inherits TdnPage {
                     accepted => {
                         if root.variant-cursor >= 0 && root.variant-cursor <= Lang.variants.length {
                             select-variant(root.variant-cursor);
+                        } else if root.first-variant-match {
+                            // `Lang.variants[0]`, after the "Default" row
+                            select-variant(1);
                         }
                         root.try-next();
                     }
@@ -310,7 +318,7 @@ export component KeyboardPage inherits TdnPage {
                             height: row-height;
                             text: variant.name;
                             selected: variant.id == Lang.current_variant.id;
-                            highlighted: root.variant-cursor == i + 1;
+                            highlighted: root.variant-cursor == i + 1 || (i == 0 && root.first-variant-match);
                             clicked => { select-variant(i + 1); }
                         }
                     }

@@ -166,8 +166,12 @@ pub fn set_lang(lang: &str) -> String {
         }
         *PO_LOADER.write() = new_loader(locales);
     }
+    let posix = posix_locale(lang).unwrap_or_default();
+    if !posix.is_empty() {
+        crate::a11y::language_changed(&posix);
+    }
     // applied to the system by the installation's `SetLocale` step
-    crate::SETTINGS.write().locale = posix_locale(lang).unwrap_or_default();
+    crate::SETTINGS.write().locale = posix;
     shown
 }
 
@@ -299,50 +303,18 @@ fn first_of(list: &str) -> Option<String> {
     (!first.is_empty()).then(|| first.to_owned())
 }
 
-/// the X11 keymap in `/etc/vconsole.conf`, `None` if none of its `XKB*` keys are set, which is
-/// when `systemd-localed` goes on to the xorg config
+/// the first layout and variant of the X11 keymap in `/etc/vconsole.conf`, see
+/// [`libtaidan::i18n::XkbKeymap::parse_vconsole`]
 fn parse_vconsole_keymap(conf: &str) -> Option<(Option<String>, Option<String>)> {
-    let mut found = false;
-    let (mut layout, mut variant) = (None, None);
-    for line in conf.lines().map(str::trim) {
-        let Some((key, val)) = line.split_once('=') else { continue };
-        let key = key.trim();
-        if line.starts_with('#')
-            || !matches!(key, "XKBLAYOUT" | "XKBMODEL" | "XKBVARIANT" | "XKBOPTIONS")
-        {
-            continue;
-        }
-        let val = val.trim();
-        let val = val
-            .strip_prefix('"')
-            .and_then(|v| v.strip_suffix('"'))
-            .or_else(|| val.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
-            .unwrap_or(val);
-        found |= !val.is_empty();
-        match key {
-            "XKBLAYOUT" => layout = first_of(val),
-            "XKBVARIANT" => variant = first_of(val),
-            _ => {}
-        }
-    }
-    found.then_some((layout, variant))
+    libtaidan::i18n::XkbKeymap::parse_vconsole(conf)
+        .map(|km| (first_of(&km.layouts), first_of(&km.variants)))
 }
 
-/// the keymap in the `InputClass` section of `/etc/X11/xorg.conf.d/00-keyboard.conf`
+/// the first layout and variant of the keymap in `/etc/X11/xorg.conf.d/00-keyboard.conf`, see
+/// [`libtaidan::i18n::XkbKeymap::parse_xorg`]
 fn parse_xorg_keymap(conf: &str) -> (Option<String>, Option<String>) {
-    let (mut layout, mut variant) = (None, None);
-    let mut in_section = false;
-    for line in conf.lines().map(str::trim).filter(|l| !l.starts_with('#')) {
-        let words = line.split_whitespace().map(|w| w.trim_matches('"')).collect_vec();
-        match words.as_slice() {
-            ["Section", "InputClass"] => in_section = true,
-            ["EndSection", ..] => in_section = false,
-            ["Option", "XkbLayout", val] if in_section => layout = first_of(val),
-            ["Option", "XkbVariant", val] if in_section => variant = first_of(val),
-            _ => {}
-        }
-    }
-    (layout, variant)
+    let km = libtaidan::i18n::XkbKeymap::parse_xorg(conf);
+    (first_of(&km.layouts), first_of(&km.variants))
 }
 
 /// the keymap the system already has, so the keyboard page starts there instead of changing it.
@@ -366,8 +338,25 @@ fn system_keymap() -> Option<(String, Option<String>)> {
 /// a search query shared between a Slint callback and the [`slint::FilterModel`] it drives
 type Query = Rc<RefCell<String>>;
 
+/// `text` lowercased and without accents, so a search for `sao paulo` finds `São Paulo`
+///
+/// only the combining diacritics of Latin, Greek and Cyrillic are dropped, and the composed form
+/// comes back, so e.g. kana with dakuten and Hangul are left as they are
+#[must_use]
+pub fn fold_search(text: &str) -> String {
+    use icu::normalizer::{ComposingNormalizerBorrowed, DecomposingNormalizerBorrowed};
+    let lower = text.to_lowercase();
+    let stripped = DecomposingNormalizerBorrowed::new_nfd()
+        .normalize(&lower)
+        .chars()
+        .filter(|c| !matches!(c, '\u{300}'..='\u{36f}'))
+        .collect::<String>();
+    ComposingNormalizerBorrowed::new_nfc().normalize(&stripped).into_owned()
+}
+
+/// whether any of `haystacks` has `query`, which is already [`fold_search`]ed
 fn matches(query: &str, haystacks: &[&str]) -> bool {
-    query.is_empty() || haystacks.iter().any(|h| h.to_lowercase().contains(query))
+    query.is_empty() || haystacks.iter().any(|h| fold_search(h).contains(query))
 }
 
 /// # Panics
@@ -465,7 +454,7 @@ fn init_language_list(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::
     lang.on_filter_languages({
         let ui = ui.clone();
         move |q| {
-            *query.borrow_mut() = q.to_lowercase();
+            *query.borrow_mut() = fold_search(&q);
             *query_lang.borrow_mut() =
                 ui.upgrade().map(|ui| ui.global::<crate::ui::Lang<'_>>().get_current_language());
             model.reset();
@@ -516,7 +505,7 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
     }));
     lang.set_keymaps(ModelRc::from(Rc::clone(&keymap_model)));
     lang.on_filter_keymaps(move |q| {
-        *keymap_query.borrow_mut() = q.to_lowercase();
+        *keymap_query.borrow_mut() = fold_search(&q);
         keymap_model.reset();
     });
 
@@ -530,7 +519,7 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
         let variant_query = Rc::clone(&variant_query);
         let ui = ui.clone();
         move |q| {
-            *variant_query.borrow_mut() = q.to_lowercase();
+            *variant_query.borrow_mut() = fold_search(&q);
             if let Some(ui) = ui.upgrade() {
                 let lang = ui.global::<crate::ui::Lang<'_>>();
                 lang.set_variants(ModelRc::new(FilterModel::new(
@@ -605,6 +594,25 @@ fn display_name(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn search_ignores_accents() {
+        let found = |query: &str, text: &str| matches(&fold_search(query), &[text]);
+        assert!(found("sao paulo", "São Paulo"));
+        assert!(found("SÃO", "sao paulo"));
+        assert!(found("francais", "Français"));
+        assert!(found("mexico", "México"));
+        assert!(found("cestina", "Čeština"));
+        assert!(found("ελληνικα", "Ελληνικά"));
+        assert!(found("istanbul", "İstanbul"));
+        // CJK and Hangul are left alone
+        assert!(found("日本", "日本語"));
+        assert!(found("が", "がっこう"));
+        assert!(!found("か", "が"));
+        assert!(found("한국", "한국어"));
+        assert!(!found("하", "한"));
+        assert_eq!(fold_search("東京"), "東京");
+    }
 
     #[test]
     fn languages_without_icu_names_are_listed() {

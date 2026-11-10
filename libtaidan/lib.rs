@@ -92,20 +92,12 @@ pub async fn start_install(
         tracing::warn!(?e, "cannot keep dnf from using the proxy for the bypassed hosts");
     }
     // the user may log in now, it was locked so a half-installed system couldn't be logged in to.
-    // A few tries, `pkexec` can fail for a moment after a VT switch
-    let mut unlocked = steps::unlock_user(settings, cfg).await;
-    for attempt in 1..3 {
-        let Err(e) = &unlocked else { break };
-        tracing::warn!(?e, attempt, "cannot unlock the user, retrying");
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        unlocked = steps::unlock_user(settings, cfg).await;
-    }
-    unlocked?;
+    steps::unlock_user(settings, cfg).await?;
     steps::fix_homed_ims(settings, cfg).await;
     // the user is theirs now, so no later run of Taidan should remove it. Not marked configured
     // if the record stays, since a machine that leaves the OOBE with it could later have the
     // account and its home removed by a rerun
-    clear_record_retrying().await?;
+    passwd::clear_record().await?;
     // the tweaks are the user's now too, a later rerun shouldn't undo them. After the user record,
     // which a retry needs, while this is only needed if the install doesn't finish. If it dies
     // before this, the repair in Taidan's startup clears it
@@ -121,21 +113,6 @@ pub async fn start_install(
     mark_configured().await;
     callback.send(InstallMsg::Finish);
     Ok(())
-}
-
-/// [`passwd::clear_record`], tried a few times since the `pkexec` it needs can fail for a moment
-/// (the session going inactive after a VT switch)
-async fn clear_record_retrying() -> Res<()> {
-    for attempt in 1..3 {
-        match passwd::clear_record().await {
-            Ok(()) => return Ok(()),
-            Err(e) => {
-                tracing::warn!(?e, attempt, "cannot remove the created user record, retrying")
-            }
-        }
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-    }
-    passwd::clear_record().await
 }
 
 #[allow(clippy::arithmetic_side_effects)]
@@ -210,9 +187,7 @@ pub async fn root(verb: Verb) -> Res<()> {
 /// - the helper failed to run
 /// - it refused the request, or what it ran exited with a non-zero status code
 pub async fn root_output(verb: Verb) -> Res<String> {
-    tracing::debug!(?verb, "running taidan-helper");
-    let out =
-        run_cmd(helper::command(&verb), verb.name(), Some(&helper::stdin(&verb, &[]))).await?;
+    let out = run_helper(&verb, &[]).await?;
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
@@ -223,8 +198,37 @@ pub async fn root_output(verb: Verb) -> Res<String> {
 /// - the helper failed to run
 /// - it refused the request, or what it ran exited with a non-zero status code
 pub async fn root_with_stdin(verb: Verb, input: &[u8]) -> Res<()> {
+    run_helper(&verb, input).await.map(drop)
+}
+
+/// how long [`run_helper`] waits before each try again when `pkexec` itself fails
+const PKEXEC_BACKOFF: [std::time::Duration; 2] =
+    [std::time::Duration::from_secs(2), std::time::Duration::from_secs(4)];
+
+/// runs the helper for `verb` with `input`, and returns its stdout. Tried again a few times when
+/// `pkexec` refuses, which it can for a moment after a VT switch makes the session inactive
+async fn run_helper(verb: &Verb, input: &[u8]) -> Res<Vec<u8>> {
     tracing::debug!(?verb, "running taidan-helper");
-    run_cmd(helper::command(&verb), verb.name(), Some(&helper::stdin(&verb, input))).await.map(drop)
+    let stdin = helper::stdin(verb, input);
+    let run = || run_cmd(helper::command(verb), verb.name(), Some(&stdin));
+    for (attempt, backoff) in PKEXEC_BACKOFF.into_iter().enumerate() {
+        match run().await {
+            Err(e) if pkexec_refused(&e) => {
+                tracing::warn!(?e, attempt, verb = verb.name(), "pkexec refused, retrying");
+                tokio::time::sleep(backoff).await;
+            }
+            res => return res,
+        }
+    }
+    run().await
+}
+
+/// whether `pkexec` refused to run the helper at all, i.e. it wasn't authorized or there was no
+/// agent, not the helper refusing the request (exit 2) or what it ran failing
+fn pkexec_refused(e: &Err) -> bool {
+    // pkexec's messages aren't translated
+    matches!(e, Err::ProgramFail { rc: Some(126 | 127), output, .. }
+        if output.contains("Error executing command as another user"))
 }
 
 /// runs `argv` as `user`, with `input` on its stdin, directly if that's who this runs as already,
@@ -256,4 +260,27 @@ pub async fn mark_configured() {
 #[must_use]
 pub fn marked_unconfigured() -> bool {
     ["/var/.unconfigured", "/.unconfigured"].iter().any(|m| std::path::Path::new(m).exists())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pkexec_refused_only_for_pkexec() {
+        let fail = |rc, output: &str| Err::ProgramFail {
+            name: "unlock-user",
+            output: output.to_owned(),
+            rc: Some(rc),
+        };
+        let denied = "Error executing command as another user: Not authorized\n\nThis incident has \
+                      been reported.\n";
+        assert!(pkexec_refused(&fail(127, denied)));
+        let dismissed = "Error executing command as another user: Request dismissed\n";
+        assert!(pkexec_refused(&fail(126, dismissed)));
+        // the helper refusing the request, and what it ran failing
+        assert!(!pkexec_refused(&fail(2, "taidan-helper: the input is over 4096 bytes\n")));
+        assert!(!pkexec_refused(&fail(127, "sh: line 1: foo: command not found\n")));
+        assert!(!pkexec_refused(&fail(1, denied)));
+    }
 }

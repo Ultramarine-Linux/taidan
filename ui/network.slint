@@ -125,6 +125,9 @@ export global Network {
 
     // whether the proxy dialog is open
     in-out property <bool> proxy-open;
+    // counts the times the proxy dialog was opened, so a check sent from one that has closed since
+    // doesn't close or show errors in the one open now
+    in-out property <int> proxy-visit;
     // the proxy in use, empty if none
     in property <string> proxy-url;
     in property <string> proxy-bypass: "localhost, 127.0.0.1, ::1";
@@ -132,10 +135,16 @@ export global Network {
     in property <string> proxy-public;
     // whether the installed system keeps using the proxy, else it's only for setup
     in-out property <bool> proxy-persist: true;
-    // checking the proxy reaches the internet
-    in property <bool> proxy-busy;
+    // checking the proxy reaches the internet, cleared when the dialog is cancelled, as the check
+    // it was waiting for no longer counts
+    in-out property <bool> proxy-busy;
     // translation id of why the proxy can't be used
     in-out property <string> proxy-error-id;
+    // the active connection with the default route, as a D-Bus path, "/" if none
+    in property <string> primary-connection;
+    // the `primary-connection` the proxy was last found to reach the internet on. Another network
+    // may not have it, so it only counts as online on this one, until it's checked again there
+    in property <string> proxy-checked-on;
 
     // whether the IP settings dialog is open, for `ip-ssid`, or the wired connection if empty
     in-out property <bool> ip-open;
@@ -148,7 +157,8 @@ export global Network {
     in property <string> ip-error-id;
 
     // reaching the internet, directly or through the proxy, which NetworkManager can't check
-    out property <bool> online: state == NetState.online || (proxy-url != "" && state != NetState.offline && state != NetState.connecting);
+    out property <bool> online: state == NetState.online || (proxy-url != "" && proxy-checked-on == primary-connection
+        && state != NetState.offline && state != NetState.connecting);
     // whether the install would use the internet if it started now, what the summary shows and
     // `install::start` goes by
     out property <bool> install-online: online && !offline-chosen;

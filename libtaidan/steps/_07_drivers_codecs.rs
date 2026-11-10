@@ -379,7 +379,8 @@ impl Drivers {
 
     /// whether a module akmods builds would load: Secure Boot is off, or the key akmods signs with
     /// is enrolled. Otherwise the kernel refuses it, and as the driver packages turn off nouveau,
-    /// the next boot would be stuck on the firmware framebuffer
+    /// the next boot would be stuck on the firmware framebuffer. On atomic systems rpm-ostree
+    /// builds the kmods in its transaction without that key, so Secure Boot always blocks them
     async fn kmods_would_load() -> bool {
         const AKMODS_KEY: &str = "/etc/pki/akmods/certs/public_key.der";
         match secure_boot_enforced().await {
@@ -389,6 +390,9 @@ impl Drivers {
                 tracing::warn!("cannot tell whether Secure Boot is on, taking it to be");
                 return false;
             }
+        }
+        if super::is_ostree().await {
+            return false;
         }
         if !tokio::fs::try_exists(AKMODS_KEY).await.unwrap_or_default() {
             return false;
@@ -407,8 +411,8 @@ impl Drivers {
         }
         if !Self::kmods_would_load().await {
             tracing::warn!(
-                "Secure Boot is on and the akmods signing key isn't enrolled, so the NVIDIA \
-                 module wouldn't load. Not installing it, the open driver keeps working"
+                "Secure Boot is on and the module wouldn't be signed with an enrolled key, so \
+                 the NVIDIA module wouldn't load. Not installing it, the open driver keeps working"
             );
             return Ok(Setup::default());
         }
@@ -419,13 +423,14 @@ impl Drivers {
                 tracing::info!("Nvidia GPU is too old for any packaged driver");
                 return Ok(Setup::default());
             }
+            // skipped on purpose when unsure, so the done page doesn't call it a failure
             NvidiaDriver::Unknown => {
                 tracing::warn!("cannot tell which Nvidia GPU this is, not installing a driver");
-                return Ok(Setup { reboot: false, failed: true });
+                return Ok(Setup::default());
             }
             NvidiaDriver::Incompatible => {
                 tracing::warn!("no packaged Nvidia driver supports every GPU, not installing one");
-                return Ok(Setup { reboot: false, failed: true });
+                return Ok(Setup::default());
             }
         };
         let mut pkgs = vec!["nvidia-gpu-firmware", "libva-nvidia-driver"];
@@ -463,8 +468,8 @@ impl Drivers {
         let mut done = Setup::default();
         if has_wl_only_wifi(pci) && !Self::kmods_would_load().await {
             tracing::warn!(
-                "Secure Boot is on and the akmods signing key isn't enrolled, so wl wouldn't load. \
-                 Not installing it"
+                "Secure Boot is on and the module wouldn't be signed with an enrolled key, so \
+                 wl wouldn't load. Not installing it"
             );
         } else if has_wl_only_wifi(pci) {
             tracing::info!("Setting up broadcom wifi drivers");

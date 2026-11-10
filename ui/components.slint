@@ -1045,7 +1045,8 @@ export component TdnDialog inherits Rectangle {
 }
 
 // a list in a dialog that scrolls once the dialog shrinks it to fit the window, otherwise as tall
-// as what's in it. Items call `reveal` from their `focus-in`, Tab doesn't scroll on its own
+// as what's in it. Slint scrolls a focused item into view on its own, items also call `reveal`
+// from their `focus-in` so their focus ring isn't cut off at the edge
 export component TdnScrollList inherits ScrollView {
     in property <length> spacing: 1rem;
 

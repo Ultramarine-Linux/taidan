@@ -4,6 +4,11 @@ export struct Avatar {
     image: image,
 }
 
+// a row of the icon picker, indices into `Account.avatars`, -1 for the camera
+export struct AvatarRow {
+    slots: [int],
+}
+
 // the user account being created, written to the backend settings by `save()`
 export global Account {
     in-out property <string> fullname;
@@ -12,6 +17,8 @@ export global Account {
     in-out property <string> password-repeat;
     // preset user icons
     in property <[Avatar]> avatars;
+    // how the picker lays out the camera and `avatars`, from Rust
+    in property <[AvatarRow]> avatar-rows: [{ slots: [-1] }];
     // the chosen user icon, `avatar-id` is empty if none
     in-out property <string> avatar-id;
     in-out property <image> avatar;
@@ -43,7 +50,7 @@ export global Account {
     pure callback valid-fullname(fullname: string) -> bool;
     // whether `password` is longer than the system can hash
     pure callback long-password(password: string) -> bool;
-    // username suggested by the full name, or `current` if none can be derived
+    // username suggested by the full name, empty if none can be derived
     pure callback suggest-username(fullname: string, current: string) -> string;
     // what to call the user: their first name, else their username
     pure callback first-name(fullname: string, username: string) -> string;

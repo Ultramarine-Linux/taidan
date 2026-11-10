@@ -1,6 +1,7 @@
 //! the accessibility page: applies the options to the OOBE's own KWin session as they change, and
 //! keeps them in the settings so they're carried over to the new user
 use std::sync::mpsc;
+use std::time::{Duration, Instant};
 
 use libtaidan::a11y::A11y as Opts;
 use slint::ComponentHandle;
@@ -27,6 +28,94 @@ const ORCA_WATCH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(
 /// set by [`shutdown`], so a change still queued doesn't start Orca again as taidan exits
 static SHUT_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// the UI's language as a POSIX locale, which Orca is started in, see [`language_changed`]
+static ORCA_LOCALE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// the worker, once [`initialize_ui`] started it
+static WORKER: std::sync::OnceLock<mpsc::Sender<Msg>> = std::sync::OnceLock::new();
+
+/// where the options are kept while the OOBE runs, so they survive taidan (and KWin) restarting.
+/// In the unit's runtime directory, which is gone on the next boot
+const SAVED: &str = "a11y.json";
+
+/// how long the language has to stay the same before Orca restarts to speak it
+const ORCA_RESTART_DELAY: Duration = Duration::from_millis(1500);
+
+enum Msg {
+    Opts(Opts),
+    /// Orca is started again, if it runs, to speak the new language
+    RestartOrca,
+}
+
+/// called when the UI's language changes, `locale` being its POSIX locale (`pt_BR.UTF-8`).
+/// Doesn't block, a running Orca is restarted by the worker
+pub fn language_changed(locale: &str) {
+    let mut current = ORCA_LOCALE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if current.as_deref() == Some(locale) {
+        return;
+    }
+    *current = Some(locale.to_owned());
+    drop(current);
+    // before the worker exists Orca can't be running yet
+    if let Some(tx) = WORKER.get()
+        && let Err(e) = tx.send(Msg::RestartOrca)
+    {
+        tracing::error!(?e, "accessibility worker is gone");
+    }
+}
+
+fn saved_path() -> Option<std::path::PathBuf> {
+    // set by systemd for `RuntimeDirectory=`, and passed on through KWin to the session
+    std::env::var_os("RUNTIME_DIRECTORY")
+        .filter(|v| !v.is_empty())
+        .map(|dir| std::path::PathBuf::from(dir).join(SAVED))
+}
+
+/// the options saved by an earlier taidan in this boot, or the defaults
+fn load() -> Opts {
+    let Some(path) = saved_path() else { return Opts::default() };
+    match std::fs::read(&path) {
+        Ok(json) => parse(&json),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Opts::default(),
+        Err(e) => {
+            tracing::warn!(?e, ?path, "cannot read the saved accessibility options");
+            Opts::default()
+        }
+    }
+}
+
+fn parse(json: &[u8]) -> Opts {
+    serde_json::from_slice(json)
+        .inspect_err(|e| tracing::warn!(?e, "the saved accessibility options are broken"))
+        .unwrap_or_default()
+}
+
+/// saves the options for [`load`], replacing the file so a crash never leaves half of it
+fn save(opts: &Opts) {
+    let Some(path) = saved_path() else { return };
+    let saved = serde_json::to_vec(opts).map_err(std::io::Error::other).and_then(|json| {
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, json)?;
+        std::fs::rename(&tmp, &path)
+    });
+    if let Err(e) = saved {
+        tracing::warn!(?e, ?path, "cannot save the accessibility options");
+    }
+}
+
+fn set(a11y: &A11y<'_>, opts: &Opts) {
+    a11y.set_screen_reader(opts.screen_reader);
+    a11y.set_zoom(opts.zoom);
+    a11y.set_sticky_keys(opts.sticky_keys);
+    a11y.set_slow_keys(opts.slow_keys);
+    a11y.set_bounce_keys(opts.bounce_keys);
+    a11y.set_dwell_click(opts.dwell_click);
+    a11y.set_larger_text(opts.larger_text);
+    a11y.set_legible_font(opts.legible_font);
+    a11y.set_reduce_motion(opts.reduce_motion);
+    a11y.set_color_filter(i32::from(opts.color_filter));
+}
+
 /// stops Orca, which would outlive taidan otherwise
 pub fn shutdown() {
     SHUT_DOWN.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -40,9 +129,16 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, a11y: &A11y<'_>) {
         let ui = ui.clone();
         move || worker(&rx, &ui)
     });
-    // resets anything an earlier run left in the session's config
-    if let Err(e) = tx.send(Opts::default()) {
+    // what was on before taidan restarted, if it did in this boot, otherwise all off. Either way
+    // the worker writes all of it, resetting anything else an earlier run left in the config
+    let opts = load();
+    set(a11y, &opts);
+    crate::SETTINGS.write().a11y = opts;
+    if let Err(e) = tx.send(Msg::Opts(opts)) {
         tracing::error!(?e, "accessibility worker is gone");
+    }
+    if WORKER.set(tx.clone()).is_err() {
+        tracing::warn!("accessibility worker already started");
     }
     a11y.on_changed({
         let ui = ui.clone();
@@ -50,7 +146,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, a11y: &A11y<'_>) {
             let Some(ui) = ui.upgrade() else { return };
             let opts = read(&ui.global::<A11y<'_>>());
             crate::SETTINGS.write().a11y = opts;
-            if let Err(e) = tx.send(opts) {
+            if let Err(e) = tx.send(Msg::Opts(opts)) {
                 tracing::error!(?e, "accessibility worker is gone");
             }
         }
@@ -72,21 +168,49 @@ fn read(a11y: &A11y<'_>) -> Opts {
     }
 }
 
-fn worker(rx: &mpsc::Receiver<Opts>, ui: &slint::Weak<AppWindow>) {
+fn worker(rx: &mpsc::Receiver<Msg>, ui: &slint::Weak<AppWindow>) {
     let bus = Connection::session().inspect_err(|e| tracing::error!(?e, "no session bus")).ok();
     // the session's config may be left over from an earlier run, so the first one writes it all
     let mut applied: Option<Opts> = None;
-    while let Ok(mut next) = rx.recv() {
-        // only the latest matters if several came in at once
-        while let Ok(newer) = rx.try_recv() {
-            next = newer;
+    // when Orca restarts for a new language. Not right away, the arrow keys on the language page
+    // switch the language with every press, and each restart would cut Orca off
+    let mut restart_at: Option<Instant> = None;
+    loop {
+        let msg = match restart_at {
+            Some(at) => match rx.recv_timeout(at.saturating_duration_since(Instant::now())) {
+                Ok(msg) => Some(msg),
+                Err(mpsc::RecvTimeoutError::Timeout) => None,
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            },
+            None => match rx.recv() {
+                Ok(msg) => Some(msg),
+                Err(_) => break,
+            },
+        };
+        let mut next = None;
+        // only the latest options matter if several came in at once
+        for msg in msg.into_iter().chain(rx.try_iter()) {
+            match msg {
+                Msg::Opts(opts) => next = Some(opts),
+                Msg::RestartOrca => restart_at = Some(Instant::now() + ORCA_RESTART_DELAY),
+            }
+        }
+        let restart_orca = restart_at.is_some_and(|at| at <= Instant::now());
+        if restart_orca {
+            restart_at = None;
         }
         let prev = applied.unwrap_or_default();
-        write_config(applied.as_ref(), &next);
-        if let Some(bus) = &bus {
-            apply_effects(bus, applied.is_none(), &prev, &next);
+        let Some(next) = next.or(applied) else { continue };
+        if applied != Some(next) {
+            save(&next);
+            write_config(applied.as_ref(), &next);
+            if let Some(bus) = &bus {
+                apply_effects(bus, applied.is_none(), &prev, &next);
+            }
         }
-        if next.screen_reader != prev.screen_reader {
+        if next.screen_reader != prev.screen_reader || (restart_orca && next.screen_reader) {
+            // starting it picks up the latest language anyway
+            restart_at = None;
             stop_orca();
             if next.screen_reader {
                 start_orca(ui);
@@ -215,6 +339,11 @@ fn stop_orca() {
 fn start_orca(ui: &slint::Weak<AppWindow>) {
     let mut cmd = std::process::Command::new("orca");
     cmd.arg("--replace");
+    // in the UI's language, Orca's own messages through gettext and its voice
+    let locale = ORCA_LOCALE.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+    if let Some(locale) = locale {
+        cmd.envs(locale_env(&locale)).env_remove("LC_ALL").env_remove("LC_MESSAGES");
+    }
     // without it, Orca's help and links open apps that lead to a terminal, see `sandbox`
     if let Err(e) = sandbox::apply(&mut cmd) {
         tracing::error!(?e, "cannot set up Orca's sandbox, not starting it");
@@ -240,6 +369,13 @@ fn start_orca(ui: &slint::Weak<AppWindow>) {
             screen_reader_off(ui);
         }
     }
+}
+
+/// `LANG` and `LANGUAGE` for a POSIX locale, `LANGUAGE` being gettext's list of languages, which
+/// takes the name without the codeset
+fn locale_env(locale: &str) -> [(&'static str, String); 2] {
+    let language = locale.split_once('.').map_or(locale, |(name, _)| name);
+    [("LANG", locale.to_owned()), ("LANGUAGE", language.to_owned())]
 }
 
 /// turns the tile off when Orca `n` exits by itself, e.g. when it crashes
@@ -489,5 +625,29 @@ mod sandbox {
                 assert!(!out.contains("Registered applications"), "{ty}: {out}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_saved_options() {
+        let opts = Opts { screen_reader: true, color_filter: 3, ..Opts::default() };
+        assert_eq!(parse(&serde_json::to_vec(&opts).unwrap()), opts);
+        // missing fields are off, a broken file is all off
+        assert_eq!(parse(br#"{"zoom":true}"#), Opts { zoom: true, ..Opts::default() });
+        assert_eq!(parse(b"{\"zoom\":"), Opts::default());
+        assert_eq!(parse(b""), Opts::default());
+    }
+
+    #[test]
+    fn locale_envs() {
+        assert_eq!(
+            locale_env("pt_BR.UTF-8"),
+            [("LANG", "pt_BR.UTF-8".to_owned()), ("LANGUAGE", "pt_BR".to_owned())]
+        );
+        assert_eq!(locale_env("eo"), [("LANG", "eo".to_owned()), ("LANGUAGE", "eo".to_owned())]);
     }
 }
