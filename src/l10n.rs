@@ -87,6 +87,7 @@ pub static PO_LOADER: LazyLock<RwLock<FluentLanguageLoader>> = LazyLock::new(|| 
 pub struct LanguageRow {
     pub locale: &'static str,
     pub native_name: &'static str,
+    pub en_name: &'static str,
 }
 
 taidan_proc_macros::comptime_localedef_langrows!(LANGS);
