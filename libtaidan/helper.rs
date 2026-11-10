@@ -1,10 +1,17 @@
 //! `taidan-helper`, the one program the OOBE may run as root
 //!
 //! While the OOBE runs, its polkit rule lets the taidan user `pkexec` [`PATH`] and nothing else.
-//! The helper takes one [`Verb`] per run, checks its arguments, and does that one thing, so
-//! something else running as taidan (a browser Orca's help opened, say) can't just `pkexec sh`.
-//! It refuses to run at all once the setup is done (see [`Verb::after_setup`]), as a second line
+//! The helper takes one [`Verb`] per run, checks its arguments, and does that one thing, so a bug
+//! in the OOBE can't do more as root than the verbs allow, and nothing can just `pkexec sh`.
+//! It refuses most verbs once the setup is done (see [`Verb::after_setup`]), as a second line
 //! behind the rule being gone by then.
+//!
+//! It is not a boundary against code running as taidan, though. The OOBE's job is to make an
+//! admin with a password the caller picks and run things as them, so such code can do the same
+//! with these verbs and get root through `sudo`. That's why nothing untrusted may run as taidan,
+//! see the sandbox Orca's help and links go to in `src/a11y.rs` and the captive portal's own
+//! user. [`Verb::RecordCreated`] only takes one live user at a time, which keeps such code from
+//! adding a second admin once Taidan's exists, but not before.
 //!
 //! `pkexec` clears the environment and logs the arguments, so the request is passed on stdin
 //! instead: a line of JSON ([`Request`], with the proxy, which may carry a password), then
@@ -88,7 +95,9 @@ pub enum Verb {
     /// removes the polkit rule, so nothing running as taidan can use it anymore
     DropPolkitRule,
     /// writes [`crate::passwd::CREATED_RECORD`], only for a user that doesn't exist yet, so it
-    /// can't name someone else's account for the verbs below
+    /// can't name someone else's account for the verbs below. Refused while the user it or
+    /// [`CREATED_USER`] names still exists, so there's one at a time, an earlier attempt's is
+    /// removed first
     RecordCreated {
         user: String,
         keep_home: bool,
@@ -793,6 +802,14 @@ impl Ctx {
             Verb::RecordCreated { user, keep_home } => {
                 if user_exists(user) {
                     return Err(format!("`{user}` exists already, only a new user is recorded"));
+                }
+                let created = std::fs::read_to_string(CREATED_USER).ok();
+                let live = [crate::passwd::recorded_user(), created.map(|u| u.trim().to_owned())]
+                    .into_iter()
+                    .flatten()
+                    .find(|u| user_exists(u));
+                if let Some(live) = live {
+                    return Err(format!("`{live}` was made already, remove it first"));
                 }
                 crate::passwd::write_record(user, *keep_home)
                     .map_err(io("cannot write the record"))?;

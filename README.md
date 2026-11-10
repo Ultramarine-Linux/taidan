@@ -49,7 +49,13 @@ Taidan runs as the unprivileged `taidan` user. Everything it does as root goes t
 `/usr/libexec/taidan-helper` (a binary in the `libtaidan` crate, `libtaidan/helper.rs`), and while
 the OOBE runs, the polkit rule only lets the `taidan` user `pkexec` that exact path. The helper
 takes a fixed set of requests with checked arguments, and refuses everything but a few cleanup ones
-once the system is marked configured. Packaging has to install it there:
+once the system is marked configured.
+
+The helper limits what a bug in Taidan can do as root, but it isn't a boundary against other code
+running as `taidan`: making an admin with a chosen password and running things as them is what the
+OOBE is for, so anything that can make those requests can get root. Nothing untrusted may run as
+`taidan`, which is why Orca's help and links open in an empty sandbox and the captive portal
+browser runs as its own user. Packaging has to install the helper there:
 
 ```sh
 cargo build --release -p libtaidan --bin taidan-helper
