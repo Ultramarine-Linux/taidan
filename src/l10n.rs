@@ -403,16 +403,12 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
         native_name: initial.native_name.to_shared_string(),
     });
     lang.on__name(|lang, current_language| display_name(&lang, &current_language));
-    let refilter_languages = init_language_list(ui, lang);
+    init_language_list(ui, lang);
     lang.on_set_lang({
         let ui = ui.clone();
         move |lang| {
             let loaded =
                 if lang.locale == "en-owo" { set_lang("en-Xowo") } else { set_lang(&lang.locale) };
-            // a search also matches names in the UI language, so redo it once `current_language`
-            // changed. A timer as the model isn't `Send` for `upgrade_in_event_loop`
-            let refilter = Rc::clone(&refilter_languages);
-            slint::Timer::single_shot(std::time::Duration::ZERO, move || refilter());
             // before `current_language` changes, like the translations, see `Lang.select`
             if let Some(ui) = ui.upgrade() {
                 ui.global::<crate::ui::Lang<'_>>().set_rtl(is_rtl(&loaded));
@@ -437,11 +433,8 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
     init_keymaps(ui, lang);
 }
 
-/// fills [`crate::ui::Lang::set_languages`], returns what redoes an active search
-fn init_language_list(
-    ui: &slint::Weak<crate::ui::AppWindow>,
-    lang: &crate::ui::Lang<'_>,
-) -> Rc<dyn Fn()> {
+/// fills [`crate::ui::Lang::set_languages`]
+fn init_language_list(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
     use crate::ui::Language;
     use slint::{ComponentHandle, FilterModel, ModelRc, ToSharedString, VecModel};
     let all_langs = LANGS
@@ -453,34 +446,31 @@ fn init_language_list(
         })
         .collect::<VecModel<_>>();
     let query = Query::default();
+    // the UI language when the search was typed. The arrow keys switch the language while the
+    // search stays, and the matches mustn't change under them
+    let query_lang = Rc::new(RefCell::new(None::<Language>));
     let model = Rc::new(FilterModel::new(all_langs, {
-        let (query, ui) = (Rc::clone(&query), ui.clone());
+        let (query, query_lang) = (Rc::clone(&query), Rc::clone(&query_lang));
         move |row: &Language| {
             let query = query.borrow();
             if query.is_empty() {
                 return true;
             }
-            // also match the name as displayed, i.e. in the current UI language
-            let current = ui.upgrade().map_or_else(
-                || row.clone(),
-                |ui| ui.global::<crate::ui::Lang<'_>>().get_current_language(),
-            );
-            matches(&query, &[&row.locale, &row.native_name, &display_name(row, &current)])
+            // also match the name as displayed when the search was typed
+            let shown = query_lang.borrow().clone().unwrap_or_else(|| row.clone());
+            matches(&query, &[&row.locale, &row.native_name, &display_name(row, &shown)])
         }
     }));
     lang.set_languages(ModelRc::from(Rc::clone(&model)));
     lang.on_filter_languages({
-        let (query, model) = (Rc::clone(&query), Rc::clone(&model));
+        let ui = ui.clone();
         move |q| {
             *query.borrow_mut() = q.to_lowercase();
+            *query_lang.borrow_mut() =
+                ui.upgrade().map(|ui| ui.global::<crate::ui::Lang<'_>>().get_current_language());
             model.reset();
         }
     });
-    Rc::new(move || {
-        if !query.borrow().is_empty() {
-            model.reset();
-        }
-    })
 }
 
 fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
