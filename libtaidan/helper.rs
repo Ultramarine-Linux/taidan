@@ -1,26 +1,26 @@
 //! `taidan-helper`, the one program the OOBE may run as root
 //!
-//! While the OOBE runs, its polkit rule lets the taidan user `pkexec` [`PATH`] and nothing else.
-//! The helper takes one [`Verb`] per run, checks its arguments, and does that one thing, so a bug
-//! in the OOBE can't do more as root than the verbs allow, and nothing can just `pkexec sh`.
-//! It refuses most verbs once the setup is done (see [`Verb::after_setup`]), as a second line
+//! while the OOBE runs, its polkit rule lets the taidan user `pkexec` [`PATH`] and nothing else.
+//! the helper takes one [`Verb`] per run, checks its arguments, and does that one thing, so a bug
+//! in the OOBE can't do more as root than the verbs allow, and nothing can `pkexec sh`.
+//! it refuses most verbs once the setup is done (see [`Verb::after_setup`]), as a second line
 //! behind the rule being gone by then.
 //!
-//! It is not a boundary against code running as taidan, though. The OOBE's job is to make an
+//! it isn't a boundary against code running as taidan, though. the OOBE's job is to make an
 //! admin with a password the caller picks and run things as them, so such code can do the same
-//! with these verbs and get root through `sudo`. That's why nothing untrusted may run as taidan,
+//! with these verbs and get root through `sudo`. that's why nothing untrusted may run as taidan,
 //! see the sandbox Orca's help and links go to in `src/a11y.rs` and the captive portal's own
 //! user. [`Verb::RecordCreated`] only takes one live user at a time, which keeps such code from
 //! adding a second admin once Taidan's exists, but not before.
 //!
-//! `pkexec` clears the environment and logs the arguments, so the request is passed on stdin
-//! instead: a line of JSON ([`Request`], with the proxy, which may carry a password), then
-//! whatever the verb reads, like a password or a file. The verb's name is also the only
-//! argument, for the logs. With nothing on stdin, a verb without fields can be run by its name
+//! `pkexec` clears the environment and logs the arguments, so the request goes on stdin instead:
+//! a line of JSON ([`Request`], with the proxy, which may carry a password), then
+//! whatever the verb reads, like a password or a file. the verb's name is also the only
+//! argument, for the logs. with nothing on stdin, a verb without fields can be run by its name
 //! alone, which is how `start-taidan` uses it.
 //!
-//! Some verbs are still powerful, since the OOBE's job is to make an admin and install software.
-//! They're narrowed down as far as that allows, see each one's docs. A few (custom repos and
+//! some verbs are still powerful, since the OOBE's job is to make an admin and install software.
+//! they're narrowed down as far as that allows, see each one's docs. A few (custom repos and
 //! scripts, packages outside the ones Taidan installs itself) are only taken from a caller that's
 //! root already, like `tdnx` run as root, for whom they give nothing away.
 use std::{
@@ -34,7 +34,7 @@ use std::{
 /// where the helper is installed, the polkit rule allows exactly this path
 pub const PATH: &str = "/usr/libexec/taidan-helper";
 
-/// `PATH` for what the helper runs, `pkexec`'s for root without root's home
+/// `PATH` for what the helper runs: the one `pkexec` sets for root, without root's home
 const SAFE_PATH: &str = "/usr/sbin:/usr/bin:/sbin:/bin";
 
 /// the helper's own state, on a tmpfs, so it's gone after a reboot
@@ -48,8 +48,8 @@ const CREATED_USER: &str = "/run/taidan-helper/created-user";
 /// login attempt
 pub const CERT_DIR: &str = "/etc/pki/taidan/8021x";
 
-/// where tweaks are. Always the installed path, never the relative one debug builds list tweaks
-/// from, which would resolve against whatever directory root is in
+/// where tweaks are. always the installed path, never the relative one debug builds list tweaks
+/// from, which would resolve against whatever directory root is in.
 const TWEAKS_DIR: &str = "/usr/share/taidan/tweaks";
 
 /// the polkit rule `start-taidan` drops when it gives up
@@ -65,11 +65,11 @@ const GDM_SCREEN_READER_KEYFILE: &str = "# written by Taidan, the screen reader 
 screen-reader-enabled=true
 ";
 
-/// the `local` system database's keyfile with location services off by default, under what the
-/// user sets, so GNOME's own location switch can turn them back on
 /// masked to turn location services off where there's no desktop switch for them, see
 /// [`Verb::Location`]
 const GEOCLUE: &str = "geoclue.service";
+/// the `local` system database's keyfile with location services off by default, under what the
+/// user sets, so GNOME's own location switch can turn them back on
 const LOCATION_OFF: &str = "/etc/dconf/db/local.d/50-taidan-location";
 const LOCATION_OFF_KEYFILE: &str = "# written by Taidan, location services were off during setup
 [org/gnome/system/location]
@@ -82,9 +82,9 @@ const PORTAL_USER: &str = "taidan-portal";
 const PORTAL_DISPLAY: &str = "wayland-0";
 const PORTAL_BROWSER: &str = "/usr/bin/cog";
 
-/// the most the request line may be
+/// the request line's size limit
 const MAX_REQUEST: u64 = 1 << 20;
-/// the most a verb's input may be, enough for a large avatar
+/// the verb input's size limit, enough for a large avatar
 const MAX_INPUT: u64 = 32 << 20;
 
 /// what the helper does, one per run
@@ -108,17 +108,16 @@ pub enum Verb {
         uri: String,
     },
     StopPortal,
-    /// asks the root processes in the caller's cgroup, what an earlier taidan left running, to
-    /// stop
+    /// asks the root processes an earlier taidan left running in the caller's cgroup to stop
     KillLeftovers,
-    /// [`Self::KillLeftovers`], with `SIGKILL`
+    /// [`Self::KillLeftovers`] with `SIGKILL`
     KillLeftoversNow,
     /// removes the polkit rule, so nothing running as taidan can use it anymore
     DropPolkitRule,
     /// writes [`crate::passwd::CREATED_RECORD`], only for a user that doesn't exist yet, so it
-    /// can't name someone else's account for the verbs below. Refused while the user it or
-    /// [`CREATED_USER`] names still exists, so there's one at a time, an earlier attempt's is
-    /// removed first
+    /// can't name someone else's account for the verbs below. refused while the user it or
+    /// [`CREATED_USER`] names still exists, so there's only one at a time and an earlier attempt's
+    /// has to be removed first.
     RecordCreated {
         user: String,
         keep_home: bool,
@@ -157,8 +156,8 @@ pub enum Verb {
     AddToVideo {
         user: String,
     },
-    /// `argv` as the created user, with the rest of stdin as its stdin. Only for the user Taidan
-    /// made, never root, taidan or someone who was already there
+    /// `argv` as the created user, with the rest of stdin as its stdin. only for the user Taidan
+    /// made, never root, taidan or a user who was already there.
     AsUser {
         user: String,
         argv: Vec<String>,
@@ -184,13 +183,13 @@ pub enum Verb {
     ProxyRepoOverrides,
     /// removes a proxy saved by [`Self::ProxyPersist`]
     ProxyClear,
-    /// location services on or off. On GNOME by default through dconf, see [`LOCATION_OFF`], which
-    /// its location switch can undo. Other desktops have no such switch, so GeoClue is masked
-    /// there
+    /// location services on or off. on GNOME this sets the default through dconf (see
+    /// [`LOCATION_OFF`]), which its location switch can undo. other desktops have no such switch,
+    /// so GeoClue is masked there.
     Location {
         on: bool,
     },
-    /// the screen reader on GDM's login screen, on or back off, nothing without GDM
+    /// turns the screen reader on GDM's login screen on or back off, a no-op without GDM
     GdmScreenReader {
         on: bool,
     },
@@ -223,8 +222,8 @@ pub enum Verb {
     CoprEnable {
         copr: String,
     },
-    /// installs (or only downloads) the extras: codecs, input methods, language packs. Others only
-    /// for root callers
+    /// installs (or only downloads) the extras: codecs, input methods, language packs. other
+    /// packages only for root callers.
     DnfExtras {
         pkgs: Vec<String>,
         download_only: bool,
@@ -268,7 +267,7 @@ pub enum Verb {
         attempt: String,
         file: String,
     },
-    /// removes a network's certificates but the attempt in `keep`
+    /// removes a network's certificates except the attempt in `keep`
     PruneCerts {
         network: String,
         keep: Option<String>,
@@ -350,8 +349,8 @@ impl Verb {
     }
 
     /// whether the verb still runs once the setup is done (the markers are gone), for what
-    /// `install::finish` and `start-taidan` do after `mark_configured`. Everything else is refused
-    /// then
+    /// `install::finish` and `start-taidan` do after `mark_configured`. everything else is refused
+    /// then.
     #[must_use]
     pub const fn after_setup(&self) -> bool {
         matches!(
@@ -365,8 +364,8 @@ impl Verb {
                 | Self::DropPolkitRule
                 | Self::ClearRecord
                 | Self::ClearTweakRecord
-                // the accessibility options changed on the done page, only for the user this boot
-                // made, see `created_user`
+                // for accessibility options changed on the done page, and only for the user this
+                // boot made (see `created_user`)
                 | Self::AsUser { .. }
                 | Self::AsUserHomed { .. }
                 | Self::GdmScreenReader { .. }
@@ -392,11 +391,11 @@ impl Verb {
         )
     }
 
-    /// checks the arguments, without looking at the system. `root_caller` if whoever asked is
-    /// root already, who may use the verbs that are root only and install any package
+    /// checks the arguments without looking at the system. `root_caller` means the caller is root
+    /// already, so it may use the root-only verbs and install any package.
     ///
     /// # Errors
-    /// Why the arguments aren't taken.
+    /// why the arguments aren't taken
     #[allow(clippy::too_many_lines)]
     pub fn validate(&self, root_caller: bool) -> Result<(), String> {
         let root_only = |what: &str| {
@@ -583,8 +582,8 @@ fn word(s: &str, extra: &str) -> bool {
         && s.chars().all(|c| c.is_ascii_alphanumeric() || extra.contains(c))
 }
 
-/// whether `r` is an app ID like `org.mozilla.firefox` or a full `app/<id>/<arch>/<branch>` ref,
-/// never a `.flatpakref` or bundle, or a path to one, which flatpak would install from a file
+/// whether `r` is an app ID like `org.mozilla.firefox` or a full `app/<id>/<arch>/<branch>` ref.
+/// never a `.flatpakref`, a bundle, or a path to one, which flatpak would install from a file.
 fn flatpak_ref(r: &str) -> bool {
     // flatpak wants at least three parts in an ID
     let id = |id: &str| {
@@ -603,7 +602,7 @@ fn flatpak_ref(r: &str) -> bool {
     }
 }
 
-/// a username the OOBE would take, which can't be an option or a reserved name like root
+/// a username the OOBE would take, so it can't be an option or a reserved name like root
 fn check_user(user: &str) -> Result<(), String> {
     match crate::passwd::username_syntax_problem(user) {
         None => Ok(()),
@@ -613,7 +612,7 @@ fn check_user(user: &str) -> Result<(), String> {
     }
 }
 
-/// a full name that's a GECOS field already
+/// a full name that's already a valid GECOS field
 fn check_fullname(fullname: &str) -> Result<(), String> {
     check(crate::passwd::sanitize_fullname(fullname) == fullname, "full name", fullname)
 }
@@ -628,12 +627,12 @@ fn check_cert_dir(name: &str) -> Result<(), String> {
     check(word(name, "-") && !name.starts_with('-'), "network", name)
 }
 
-/// a login attempt's folder, a timestamp
+/// a login attempt's folder, which is a timestamp
 fn check_attempt(attempt: &str) -> Result<(), String> {
     check(word(attempt, "") && attempt.chars().all(|c| c.is_ascii_digit()), "attempt", attempt)
 }
 
-/// package names or `@group`s, which mustn't look like options or globs, each `allowed`
+/// package names or `@group`s that don't look like options or globs, each passing `allowed`
 fn check_pkgs(pkgs: &[String], allowed: impl Fn(&str) -> bool) -> Result<(), String> {
     if pkgs.is_empty() {
         return Err("no packages".to_owned());
@@ -670,17 +669,14 @@ fn allowed_driver(pkg: &str) -> bool {
     crate::steps::driver_packages().contains(&pkg)
 }
 
-/// runs the helper, returns its exit status: 0 if the verb worked, what the program it ran
-/// exited with if that failed, 2 for a request it doesn't take
+/// runs the helper and returns its exit status: 0 if the verb worked, the exit code of the program
+/// it ran if that failed, 2 for a request it refused
 #[must_use]
 pub fn main() -> i32 {
-    match serve() {
-        Ok(code) => code,
-        Err(e) => {
-            eprintln!("taidan-helper: {e}");
-            2
-        }
-    }
+    serve().unwrap_or_else(|e| {
+        eprintln!("taidan-helper: {e}");
+        2
+    })
 }
 
 fn serve() -> Result<i32, String> {
@@ -706,7 +702,7 @@ fn serve() -> Result<i32, String> {
         return Err(format!("the request is for `{}`, not `{name}`", verb.name()));
     }
     let mut input = vec![];
-    // one more, to tell an input that's too long from one that's just long enough
+    // one more byte, to tell an input that's too long from one that's exactly the limit
     stdin
         .take(MAX_INPUT + 1)
         .read_to_end(&mut input)
@@ -724,8 +720,8 @@ fn serve() -> Result<i32, String> {
         p => p,
     };
     let caller = caller_uid();
-    // defense in depth, the polkit rule is gone by then too. Root, like `tdnx` run as root, could
-    // do all of it anyway
+    // defense in depth, since the polkit rule is gone by then too. root (e.g. `tdnx` run as root)
+    // could do all of this anyway.
     if caller != 0 && !crate::marked_unconfigured() && !verb.after_setup() {
         return Err(format!("the setup is done, `{name}` isn't taken anymore"));
     }
@@ -734,7 +730,7 @@ fn serve() -> Result<i32, String> {
     ctx.execute(&verb)
 }
 
-/// the uid that ran `pkexec`, or the helper itself
+/// the uid that ran `pkexec`, or the one running the helper when it wasn't run through `pkexec`
 fn caller_uid() -> u32 {
     std::env::var("PKEXEC_UID")
         .ok()
@@ -775,7 +771,7 @@ impl Ctx {
         cmd
     }
 
-    /// runs `cmd` with `input` on stdin, or none, its output goes where the helper's does
+    /// runs `cmd` with `input` (or nothing) on stdin, its output going where the helper's does
     fn run(cmd: &mut Command, input: Option<&[u8]>) -> Result<i32, String> {
         let name = cmd.get_program().to_string_lossy().into_owned();
         cmd.stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() });
@@ -914,8 +910,8 @@ impl Ctx {
             Verb::AsUserHomed { user, argv } => {
                 check_created(user)?;
                 let password = self.input_line()?;
-                // homectl takes the password from `$PASSWORD`, which what runs in the home doesn't
-                // get
+                // homectl reads the password from `$PASSWORD`, which `env -u` hides from what runs
+                // in the home
                 Self::run(
                     self.cmd("homectl")
                         .env("PASSWORD", password)
@@ -965,11 +961,11 @@ impl Ctx {
                 crate::proxy::clear_as_root().map_err(io("cannot remove the saved proxy"))?;
                 Ok(0)
             }
-            // a default under the user's own settings rather than a GeoClue mask, which nothing in
-            // the desktop could undo
+            // on GNOME, a default under the user's own settings rather than a GeoClue mask, which
+            // nothing in the desktop could undo
             Verb::Location { on } => {
-                // GNOME Shell is what goes by the dconf key, and a masked GeoClue would keep its
-                // switch from turning location back on
+                // GNOME Shell reads the dconf key, and a masked GeoClue would keep its switch from
+                // turning location back on
                 let gnome = Path::new("/usr/bin/gnome-shell").exists();
                 let mask = !on && !gnome;
                 let code =
@@ -1009,7 +1005,7 @@ impl Ctx {
             }
             Verb::EnableRepo { repo } => {
                 if repo.starts_with("https://") {
-                    // overwritten, so a retried install doesn't fail on the file the first attempt
+                    // overwrite, so a retried install doesn't fail on the file the first attempt
                     // added
                     let from = format!("--from-repofile={repo}");
                     self.exec("dnf5", &["config-manager", "addrepo", "--overwrite", &from])
@@ -1050,16 +1046,17 @@ impl Ctx {
             Verb::RunScript { script } => self.exec("sh", &["-c", script]),
             Verb::DnfUpgradeOffline => self.exec("dnf5", &["upgrade", "--offline", "-y"]),
             Verb::DnfOfflineClean => self.exec("dnf5", &["offline", "clean", "-y"]),
-            // what `dnf5 offline reboot` does but the reboot, which is up to the user
+            // what `dnf5 offline reboot` does except the reboot, which is up to the user
             Verb::DnfOfflineArm => Self::run(
                 self.cmd("dnf5")
                     .env("DNF_SYSTEM_UPGRADE_NO_REBOOT", "1")
                     .args(["offline", "reboot", "-y"]),
                 None,
             ),
-            // RPM Fusion's own kargs, as its `%posttrans` sets with grubby on dnf systems. simpledrm
-            // stays, the LUKS prompt and a failed driver need it, and nvidia-drm hands off from it.
-            // append-if-missing so a retry doesn't duplicate kargs. rpm-ostree exits 0 on no changes
+            // the kargs RPM Fusion's `%posttrans` sets with grubby on dnf systems. simpledrm stays
+            // because the LUKS prompt and a failed driver need it, and nvidia-drm hands off from
+            // it. `--append-if-missing` keeps a retry from duplicating kargs, and rpm-ostree exits
+            // 0 when nothing changes.
             Verb::NvidiaKargs => self.exec(
                 "rpm-ostree",
                 &[
@@ -1111,7 +1108,7 @@ impl Ctx {
     }
 
     /// writes `content` into a dconf system database's keyfile at `path`, or removes it for
-    /// [`None`], then rebuilds the databases if that changed anything. Nothing without dconf
+    /// [`None`], then rebuilds the databases if that changed anything. does nothing without dconf.
     fn dconf_keyfile(&self, path: &str, content: Option<&str>) -> Result<i32, String> {
         if !Path::new("/usr/bin/dconf").exists() {
             return Ok(0);
@@ -1132,8 +1129,8 @@ impl Ctx {
         self.proxy.as_ref().ok_or_else(|| "the request has no proxy".to_owned())
     }
 
-    /// starts the captive portal browser, see [`Verb::StartPortal`]. It waits for the browser to
-    /// quit, which the caller watches for
+    /// starts the captive portal browser, see [`Verb::StartPortal`]. it waits for the browser to
+    /// quit, which the caller watches for.
     fn start_portal(&self, socket: &str, lang: Option<&str>, uri: &str) -> Result<i32, String> {
         // the caller's own display, not another session's
         if !socket.starts_with(&format!("/run/user/{}/", self.caller)) {
@@ -1163,9 +1160,9 @@ impl Ctx {
             cmd.arg(format!("--setenv=LANG={lang}"));
         }
         // through a file rather than `--setenv`, since anyone can read a command's arguments and
-        // the URL may carry a password. WebKit then uses GLib's default proxy resolver, and the
-        // libproxy one reads `http_proxy` and friends. GNOME's would go by its own settings
-        // instead, so it's picked explicitly
+        // the URL may carry a password. WebKit uses GLib's default proxy resolver, and the
+        // libproxy one reads `http_proxy` and friends. GNOME's would follow its own settings
+        // instead, so libproxy is picked explicitly.
         if let Some(proxy) = &self.proxy {
             let mut vars = String::new();
             for (key, value) in
@@ -1189,8 +1186,8 @@ impl Ctx {
         Self::run(&mut cmd, None)
     }
 
-    /// sends `signal` to the root processes in the helper's cgroup, which `pkexec` keeps the
-    /// caller's. That's what an earlier taidan started as root and left behind
+    /// sends `signal` to the root processes in the helper's cgroup, which `pkexec` keeps as the
+    /// caller's. those are what an earlier taidan started as root and left behind.
     fn kill_leftovers(&self, signal: &str) -> Result<i32, String> {
         let cgroup =
             std::fs::read_to_string("/proc/self/cgroup").map_err(io("/proc/self/cgroup"))?;
@@ -1225,7 +1222,7 @@ impl Ctx {
         if logins == Some(true) {
             return Err(format!("`{user}` has logged in, it's someone's account now"));
         }
-        // if it can't be told whether it was used, its home stays
+        // if there's no telling whether it was used, its home stays
         let keep_home = keep_home || record.keep_home || logins.is_none();
         let code = if crate::passwd::HOMED_UIDS.contains(&uid) {
             // homed can't remove a user and keep its home
@@ -1277,7 +1274,7 @@ impl Ctx {
         if code != 0 {
             return Ok(code);
         }
-        // until the installation finishes, see `steps::unlock_user`
+        // locked until the installation finishes, see `steps::unlock_user`
         self.exec("usermod", &["-L", "--", user])
     }
 
@@ -1295,7 +1292,7 @@ impl Ctx {
             "--enforce-password-policy=no".into(),
         ];
         if let Some(skel) = skel {
-            // copied into the new home as root, so it must be the caller's own, not, say, /root
+            // copied into the new home as root, so it must be the caller's own and not, say, /root
             let meta = std::fs::symlink_metadata(skel).map_err(io(&skel.to_string_lossy()))?;
             let canonical = std::fs::canonicalize(skel).map_err(io(&skel.to_string_lossy()))?;
             if !meta.is_dir() || meta.uid() != self.caller || canonical != skel {
@@ -1406,7 +1403,7 @@ fn check_created(user: &str) -> Result<(), String> {
     }
 }
 
-/// [`RUN_DIR`], only root's
+/// creates [`RUN_DIR`], accessible only to root
 fn ensure_run_dir() -> std::io::Result<()> {
     std::fs::create_dir_all(RUN_DIR)?;
     std::fs::set_permissions(RUN_DIR, std::fs::Permissions::from_mode(0o700))
@@ -1419,8 +1416,8 @@ fn write_created(user: &str) -> Result<(), String> {
         .map_err(io(CREATED_USER))
 }
 
-/// removes `path`, a directory with what's in it, or nothing if it isn't there. A symlink is
-/// removed, never followed
+/// removes `path`, recursively for a directory, and does nothing if it isn't there. A symlink is
+/// removed, never followed.
 fn remove_any(path: &Path) -> std::io::Result<()> {
     match std::fs::symlink_metadata(path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -1430,8 +1427,8 @@ fn remove_any(path: &Path) -> std::io::Result<()> {
     }
 }
 
-/// replaces `path` with `content`, with `mode`, all at once and on disk before it returns, so a
-/// full disk or a power cut can't leave it half written. Makes the folders it's in
+/// replaces `path` with `content` at `mode`, atomically and synced to disk before it returns, so a
+/// full disk or a power cut can't leave it half written. creates the parent directories.
 pub(crate) fn write_atomic(path: &Path, content: &[u8], mode: u32) -> std::io::Result<()> {
     use std::os::unix::fs::OpenOptionsExt as _;
     let dir = path.parent().ok_or_else(|| std::io::Error::other("no parent directory"))?;
@@ -1444,7 +1441,7 @@ pub(crate) fn write_atomic(path: &Path, content: &[u8], mode: u32) -> std::io::R
     remove_any(&tmp)?;
     let mut file =
         std::fs::OpenOptions::new().write(true).create_new(true).mode(mode).open(&tmp)?;
-    // the mode is masked by the umask
+    // `open` masks the mode with the umask
     file.set_permissions(std::fs::Permissions::from_mode(mode))?;
     file.write_all(content)?;
     file.sync_all()?;
@@ -1617,8 +1614,8 @@ mod tests {
     fn unknown_fields_and_verbs_are_refused() {
         let parse = |j: &str| serde_json::from_str::<Request>(j);
         assert!(parse(r#"{"verb":{"verb":"reboot"}}"#).is_ok());
-        // serde ignores extra fields on a unit variant, harmless since there's nothing to read
-        // them into, but not on the others
+        // serde ignores extra fields on a unit variant, which is harmless since there's nothing to
+        // read them into, but not on the others
         assert!(parse(r#"{"verb":{"verb":"set-locale","locale":"C","argv":["sh"]}}"#).is_err());
         assert!(parse(r#"{"verb":{"verb":"as-user","user":"a","argv":["sh"],"env":[]}}"#).is_err());
         assert!(parse(r#"{"verb":{"verb":"exec","argv":["sh"]}}"#).is_err());

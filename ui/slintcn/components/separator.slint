@@ -2,13 +2,11 @@ import { Tokens } from "../theme/tokens.slint";
 
 export enum SeparatorOrientation { horizontal, vertical }
 
-// 1px hairline divider, designed for use inside a layout — the layout decides
-// the long axis (full width in VerticalLayout / full height in HorizontalLayout),
-// while min/max constraints pin the cross axis to exactly 1px
+// 1px hairline divider for use inside a layout. the layout sets the long axis (full width in a
+// VerticalLayout, full height in a HorizontalLayout), and min/max pin the cross axis to 1px
 //
-// outside layouts, set the unconstrained dimension explicitly
+// outside layouts, set the long axis explicitly
 export component Separator inherits Rectangle {
-    // `horizontal` (default) or `vertical`
     in property <SeparatorOrientation> orientation: SeparatorOrientation.horizontal;
     background: Tokens.color-border-hairline;
 

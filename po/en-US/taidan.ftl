@@ -49,7 +49,7 @@ page-accessibility-desc = Press the Feature to Enable
 page-accessibility-screen-reader = Screen Reader
 page-accessibility-zoom = Zoom
 page-accessibility-sticky-keys = Sticky Keys
-# shown next to a picture of the accessibility button, which is in the top right corner of the
+# shown next to a picture of the accessibility button, which is in the top right corner of
 # later pages
 page-accessibility-hint = You can come back to this page any time with the accessibility button in the top right corner.
 # btn, opens the dialog with the rest of the options
@@ -227,7 +227,7 @@ page-internet-proxy-persist = Keep Using This Proxy After Setup
 page-internet-proxy-remove = Remove
 # btn, in the proxy and IP settings dialogs
 page-internet-save = Save
-# dialog title, and the label of the settings button next to each network; $name is the network
+# dialog title, and the label of the settings button next to each network. $name is the network
 page-internet-ip = { $name } Settings
 page-internet-ip-manual = Set the IP Address Manually
 page-internet-ip-address = IP Address
@@ -246,7 +246,7 @@ page-internet-devicename = Device Name
 page-internet-devicename-desc = How this device shows up to others on the network.
 # $hostname: the name derived from the device name, e.g. janes-laptop
 page-internet-hostname = Hostname: { $hostname }
-# dialog title; $ssid is the name of the wi-fi network
+# dialog title, $ssid is the name of the wi-fi network
 page-internet-connect-to = Connect to { $ssid }
 # opens a dialog for wi-fi networks that don't show up in the list
 page-internet-hidden = Hidden Network…
@@ -321,7 +321,8 @@ page-internet-files-empty-pac = No PAC files in this folder.
 # dialog when continuing without internet
 page-internet-offline = No Network Selected
 page-internet-offline-desc = If you don't connect to the internet, drivers and codecs won't be installed.
-# btn, skips everything that needs the internet, even if the device gets online later. Also confirms it in its dialog
+# btn, skips everything that needs the internet, even if the device gets online later. also the
+# confirm button in its dialog
 page-internet-offline-choose = Set Up Offline
 # dialog title, after page-internet-offline-choose
 page-internet-offline-choose-title = Set Up Without Internet?
@@ -377,7 +378,7 @@ page-theme-accent-slate = Slate
 ## [Installing]
 
 page-installing-configuring = Configuring your Device
-# the step being done, and which one it is out of how many, e.g. "Creating your Account  (1/12)"
+# the step being done, and which one it is out of how many, e.g. "Creating Your Account…  (1/11)"
 page-installing-stage = { $stage }  ({ $num }/{ $count })
 ## [Finish]
 
@@ -423,7 +424,7 @@ page-summary-software = Additional Software
 page-summary-software-none = No additional software will be installed.
 # toggle, downloads updates during setup to install on the next restart
 page-summary-updates = Download Updates
-# toggle, $proxy is the proxy server's address. Off means the proxy is only used while setting up
+# toggle, $proxy is the proxy server's address. off means the proxy is only used while setting up
 page-summary-proxy = Keep Using the Proxy { $proxy }
 # btn, opens the distribution's optional tweaks
 page-summary-tweaks = Advanced Tweaks
@@ -439,7 +440,7 @@ page-done-reboot = Restart
 page-done-restart-update = Restart and Update
 page-done-updates = Updates are ready and will install the next time you restart
 page-done-updates-drivers = Your drivers need a restart, which will install updates
-# shown when a driver didn't install or its kernel module didn't build. The screen still works with a basic driver
+# shown when a driver didn't install or its kernel module didn't build. the screen still works with a basic driver
 page-done-drivers-failed = Some drivers couldn't be set up, so your graphics or Wi-Fi might not work properly. Everything else is set up.
 # shown when the language pack for the chosen language isn't installed, e.g. when setting up offline
 page-done-locale-failed = The system language couldn't be changed, likely because its language pack isn't installed. Everything else is set up, and you can change it later in Settings.

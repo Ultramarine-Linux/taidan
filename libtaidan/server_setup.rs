@@ -55,11 +55,11 @@ impl std::fmt::Display for ValidationError {
 
 impl std::error::Error for ValidationError {}
 
-/// operations every step may run, they only touch the OOBE's own state
+/// operations any step may run, since they only touch the OOBE's own state
 const ANY_STEP: &[&str] = &["state.patch", "state.reset"];
 
-/// the operations `step` may run besides [`ANY_STEP`], as `server-oobe` calls them from each step,
-/// [`None`] if it isn't a step
+/// the operations `step` may run besides [`ANY_STEP`], matching what `server-oobe` calls from each
+/// step. [`None`] for an unknown step.
 fn step_operations(step: &str) -> Option<&'static [&'static str]> {
     Some(match step {
         "welcome" => &[],
@@ -88,7 +88,7 @@ fn step_operations(step: &str) -> Option<&'static [&'static str]> {
 }
 
 /// Validate the narrow operation vocabulary exposed by the local OOBE API.
-/// Arbitrary commands, executable paths, and argument vectors are rejected, and so is an operation
+/// arbitrary commands, executable paths, and argument vectors are rejected, and so is an operation
 /// sent from a step other than its own, e.g. `user.create` from `internet`.
 pub fn validate_operation(operation: &SetupOperation) -> Result<(), ValidationError> {
     let allowed = step_operations(&operation.step).ok_or(ValidationError::InvalidStep)?;

@@ -12,7 +12,7 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 global A11yIcons {
     out property <string> ear: "M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0 M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4";
     out property <string> zoom-in: "M3 11a8 8 0 1 0 16 0a8 8 0 1 0-16 0 M21 21l-4.35-4.35 M11 8v6 M8 11h6";
-    // the keys are short dashes rather than Lucide's dots, `Icon` has no round line caps
+    // the keys are short dashes instead of Lucide's dots, since `Icon` has no round line caps
     out property <string> keyboard: "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M5.5 8h1.5 M9.5 8h1.5 M13.5 8h1.5 M17.5 8h1.5 M7.5 12h1.5 M11.5 12h1.5 M15.5 12h1.5 M7 16h10";
 }
 
@@ -46,8 +46,8 @@ component A11yTile inherits Rectangle {
     background: Tokens.color-card;
     animate border-color { duration: Tokens.motion-fast; }
 
-    // the tints are layers that fade in, animating between the opaque card color and a
-    // translucent one would dip through the page color on the way
+    // the tints are layers that fade in. animating from the opaque card color to a translucent one
+    // would dip through the page color on the way
     Rectangle {
         border-radius: root.border-radius;
         background: TdnStyle.accent;
@@ -138,7 +138,7 @@ component A11yContent inherits VerticalLayout {
     callback next;
 
     // whether "More Options" was opened from here, so its button gets the focus back when it
-    // closes, cleared by the page once it's left
+    // closes. the page clears it once it's left
     in-out property <bool> opened-more;
 
     public function focus-first() {
@@ -220,8 +220,8 @@ component A11yContent inherits VerticalLayout {
         }
     }
 
-    // the header button drawn next to the hint, which names it in words for screen readers and
-    // so a translation doesn't need to fit around a picture
+    // a picture of the header button next to the hint. the hint names it in words for screen
+    // readers, and so a translation doesn't need to fit around a picture
     HorizontalLayout {
         spacing: 0.6rem;
         alignment: center;
@@ -296,10 +296,10 @@ export component AccessibilityPage inherits TdnBasePg {
     // Enter goes on, unless a tile or button has focus and takes it first
     focus := FocusScope {
         enabled: !Modal.open;
-        // not a Tab stop of its own, it has nothing to show focus on
+        // not a Tab stop of its own, since it has nothing to show focus on
         focus-on-tab-navigation: false;
-        // focused when the page is shown, and when the window refocuses the page after a dialog
-        // closes, the content takes it from here
+        // focused when the page is shown or the window refocuses it after a dialog closes. the
+        // content takes the focus from here
         focus-gained(reason) => {
             if reason == FocusReason.programmatic { content.focus-first(); }
         }
@@ -330,7 +330,7 @@ export component AccessibilityDialog inherits Rectangle {
     TouchArea { }
 
     FocusScope {
-        // keys bubble up to it, it needn't be a Tab stop
+        // keys bubble up to it, so it needn't be a Tab stop
         focus-on-tab-navigation: false;
         key-pressed(event) => {
             if event.text == Key.Escape && !A11y.more-open {
@@ -361,7 +361,7 @@ component OptionRow inherits VerticalLayout {
     in property <string> desc;
     in property <bool> checked;
     callback toggled(bool);
-    // Enter, which closes the dialog like Done
+    // fired on Enter, which closes the dialog like Done
     callback accepted();
     callback focus-in(length, length);
 

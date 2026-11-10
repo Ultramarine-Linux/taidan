@@ -25,7 +25,7 @@ const POLL_MS: i32 = 100;
 
 type Buffer = slint::SharedPixelBuffer<slint::Rgba8Pixel>;
 
-/// `img` (square) as a circle, transparent outside, done here rather than by clipping in Slint,
+/// `img` (square) as a circle, transparent outside. done here rather than by clipping in Slint,
 /// since the software renderer can't clip to rounded shapes
 fn to_round_buffer(img: &image::RgbImage) -> Buffer {
     #[expect(clippy::cast_precision_loss, reason = "image sizes are small")]
@@ -89,7 +89,7 @@ fn decode(fmt: &v4l::Format, data: &[u8]) -> Option<image::RgbImage> {
     }
 }
 
-/// converts packed YUYV 4:2:2 (BT.601) to RGB. Each line starts `stride` bytes after the last,
+/// converts packed YUYV 4:2:2 (BT.601) to RGB. each line starts `stride` bytes after the last,
 /// which drivers may pad past `width * 2`
 fn yuyv_to_rgb(width: u32, height: u32, stride: u32, data: &[u8]) -> Option<image::RgbImage> {
     let row_len = usize::try_from(width).ok()? * 2;
@@ -132,7 +132,7 @@ fn find_camera() -> Option<v4l::Device> {
     })
 }
 
-/// a running camera, dropping the flag's last user stops it
+/// the running camera stream, which ends once `stop` is set
 struct Running {
     stop: Arc<AtomicBool>,
     /// latest full frame, for [`capture`]
@@ -143,7 +143,7 @@ thread_local! {
     static RUNNING: std::cell::RefCell<Option<Running>> = const { std::cell::RefCell::new(None) };
 }
 
-/// shows `error`, unless the stream it's from was stopped by then, a newer one may be showing
+/// shows `error` unless its stream was stopped by then, since a newer one may be showing
 fn set_error(ui: &slint::Weak<AppWindow>, stop: Arc<AtomicBool>, error: String) {
     tracing::error!(error, "camera error");
     _ = ui.upgrade_in_event_loop(move |ui| {
@@ -172,11 +172,11 @@ fn stream(
     tracing::debug!(?fmt, "Camera started");
     let handle = dev.handle();
     let mut stream = v4l::io::mmap::Stream::with_buffers(&dev, v4l::buffer::Type::VideoCapture, 4)?;
-    // only for the first frame, which starts the stream, the rest wait in `poll` below. A timed out
-    // `next()` leaves its buffer queued and can't be called again
+    // only for the first frame, which starts the stream. the rest wait in `poll` below, since a
+    // timed out `next()` leaves its buffer queued and can't be called again
     stream.set_timeout(FIRST_FRAME_TIMEOUT);
     let mut started = false;
-    // a preview the UI hasn't shown yet, newer frames are dropped until it has
+    // set while the UI hasn't shown the last preview. newer frames get no preview until it has
     let in_flight = Arc::new(AtomicBool::new(false));
     while !stop.load(Ordering::Relaxed) {
         // waits for a frame in short steps, so a stop is noticed even if the camera stalls
@@ -188,7 +188,7 @@ fn stream(
         let data = buf.get(..usize::try_from(meta.bytesused).unwrap_or(buf.len())).unwrap_or(buf);
         let Some(frame) = decode(&fmt, data) else { continue };
         let preview = (!in_flight.load(Ordering::Acquire))
-            // mirrored, as people expect to see themselves. The saved photo isn't, so text in
+            // mirrored, as people expect to see themselves. the saved photo isn't, so text in
             // it reads the right way
             .then(|| to_round_buffer(&image::imageops::flip_horizontal(&square(&frame, PREVIEW_SIZE))));
         if let Ok(mut last) = last.lock() {
@@ -199,7 +199,7 @@ fn stream(
         let done = Arc::clone(&in_flight);
         let stopped = Arc::clone(stop);
         let sent = ui.upgrade_in_event_loop(move |ui| {
-            // a stopped stream's frame would show in a newer one before it has any
+            // otherwise a stopped stream's frame could show up in a newer stream before its own
             if !stopped.load(Ordering::Relaxed) {
                 ui.global::<Camera<'_>>().set_frame(slint::Image::from_rgba8(preview));
             }
@@ -226,9 +226,9 @@ fn start(ui: &slint::Weak<AppWindow>) {
     let ui = ui.clone();
     let previous = STREAM_THREAD.lock().ok().and_then(|mut t| t.take());
     let thread = std::thread::spawn(move || {
-        // the last stream lets go of the camera once it notices it's stopped, within `POLL_MS`,
-        // or `FIRST_FRAME_TIMEOUT` while it waits for its first frame. Opening it before then
-        // fails as busy. Not forever, in case it's stuck
+        // the previous stream releases the camera once it notices it's stopped, within `POLL_MS`,
+        // or `FIRST_FRAME_TIMEOUT` while it waits for its first frame. opening it before then
+        // fails as busy. the wait is bounded in case it's stuck
         if let Some(previous) = previous {
             let tries = FIRST_FRAME_TIMEOUT.as_millis() / 50 + 20;
             for _ in 0..tries {
@@ -247,9 +247,9 @@ fn start(ui: &slint::Weak<AppWindow>) {
     }
 }
 
-/// checks again whether there's a camera, it may have been plugged in after the OOBE started
+/// checks for a camera again, since one may have been plugged in after the OOBE started
 fn refresh(ui: &slint::Weak<AppWindow>) {
-    // a running stream holds the camera, and it's there anyway
+    // a running stream holds the camera, so it's there anyway
     if RUNNING.with_borrow(Option::is_some) {
         return;
     }
@@ -364,10 +364,10 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, camera: &Camera<'_>) {
     });
 }
 
-/// rows of the icon picker for `presets` icons, indices into them and -1 for the camera. The
-/// camera is in the middle row with a preset on each side, and the rest go in rows above and below
-/// it, two, then three, then two and so on, so they stagger like a honeycomb. Rows on either side
-/// get the same number, the one above gets the odd one out
+/// rows of the icon picker for `presets` icons, as indices into them, with -1 for the camera. the
+/// camera is in the middle row with a preset on each side. the rest go in rows above and below
+/// it, two, then three, then two and so on, so they stagger like a honeycomb. rows mirror each
+/// other across the middle, and the one above gets any odd one out
 fn picker_rows(presets: usize) -> Vec<Vec<i32>> {
     let middle = if presets >= 2 { 2 } else { 0 };
     let (mut above, mut below) = (vec![], vec![]);
@@ -381,7 +381,7 @@ fn picker_rows(presets: usize) -> Vec<Vec<i32>> {
         below.push(taken / 2);
         left -= taken;
     }
-    // (presets, whether it's the camera's row)
+    // (preset count, whether it's the camera's row)
     let sizes = above.into_iter().rev().map(|n| (n, false)).chain([(middle, true)]);
     let sizes = sizes.chain(below.into_iter().filter(|&n| n > 0).map(|n| (n, false)));
     let mut next = 0..;

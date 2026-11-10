@@ -12,7 +12,7 @@ Window Minimize=none,Meta+PgDown,Minimize Window
 Window Operations Menu=none,Alt+F3,Window Menu
 
 # apps launched from /usr/share/kglobalaccel/*.desktop, `_launch` is the app itself and the rest
-# are its desktop actions. The screen reader toggle stays.
+# are its desktop actions. the screen reader toggle stays.
 [services][org.kde.dolphin.desktop]
 _launch=none
 

@@ -12,10 +12,10 @@ use crate::ui::AppWindow;
 
 /// the designs' size, which is also the smallest the window gets
 const DESIGN: (f64, f64) = (600., 500.);
-/// the window's height on screens of two heights, in logical pixels: it grows slower than the
-/// screen, so bigger screens get more margin around it, about half of a 1440p one
+/// the window's height at two screen heights, in logical pixels. it grows slower than the
+/// screen, so bigger screens get more margin around it, and it's about half of a 1440p one
 const HEIGHT_AT: ((f64, f64), (f64, f64)) = ((720., 620.), (1440., 680.));
-/// the most of the screen the window takes in either direction, on small screens
+/// the largest share of the screen the window takes in either direction, on small screens
 const MAX_FILL: f64 = 0.9;
 
 /// the window's height on a screen this tall, before fitting it to the screen
@@ -33,8 +33,8 @@ fn scale_for(screen: (f64, f64)) -> f64 {
     // landscape come out smaller, never too big
     let fit = (screen.0 / DESIGN.0).min(screen.1 / DESIGN.1);
     let scale = fill.max(1.).min(fit);
-    // whole hundredths, so `rem`s land on round-ish pixel sizes
-    // with a little slack, so 1.62 doesn't come out as 1.6199… and floor to 1.61
+    // whole hundredths, so `rem`s land on round-ish pixel sizes. the slack keeps 1.62 from
+    // coming out as 1.6199… and flooring to 1.61
     (scale.mul_add(100., 1e-6)).floor() / 100.
 }
 
@@ -49,10 +49,10 @@ fn screen_override() -> Option<(f64, f64)> {
 }
 
 /// the logical size of the smallest screen, so the window fits whichever one it's placed on.
-/// `window` is the window's real scale once it's shown, with its screen if winit knows it yet, or
-/// [`None`] for every screen: winit only knows each screen's whole-number scale (Wayland's
-/// `wl_output.scale`, rounded up from a fractional one), which makes the screen look smaller than
-/// it is
+/// `window` is the window's real scale once it's shown, with its screen if winit knows it yet
+/// ([`None`] applies the scale to every screen). without it, winit only knows each screen's
+/// whole-number scale (Wayland's `wl_output.scale`, rounded up from a fractional one), which makes
+/// the screen look smaller than it is
 fn screen_size(
     monitors: impl Iterator<Item = MonitorHandle>,
     window: Option<(Option<&MonitorHandle>, f64)>,
@@ -104,8 +104,8 @@ impl CustomApplicationHandler for ScaleToScreen {
         _slint_window: Option<&slint::Window>,
         event: &WindowEvent,
     ) -> EventResult {
-        // the fractional scale comes once the window is on a screen. With fractional-scale-v1 it
-        // may come before winit knows which screen, then it's taken for all of them
+        // the fractional scale comes once the window is on a screen. with fractional-scale-v1 it
+        // may come before winit knows which screen, so it's applied to all of them
         if let WindowEvent::ScaleFactorChanged { scale_factor, .. } = event
             && screen_override().is_none()
             && let monitor = winit_window.and_then(Window::current_monitor)
@@ -120,8 +120,8 @@ impl CustomApplicationHandler for ScaleToScreen {
     }
 }
 
-/// selects the backend with the screen scaling, call before creating the window and pass it
-/// to the returned cell
+/// selects the backend with the screen scaling. call it before creating the window, then put the
+/// window in the returned cell
 #[must_use]
 pub fn init() -> Rc<OnceCell<slint::Weak<AppWindow>>> {
     let ui = Rc::new(OnceCell::new());

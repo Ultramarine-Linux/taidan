@@ -10,8 +10,8 @@ pub struct Settings {
 
     pub kb_layout: String,
     pub kb_variant: Option<String>,
-    /// whether the user picked [`Self::kb_layout`] themselves, else it's the one the system has
-    /// already, which the system keeps rather than getting it back with only its first layout
+    /// whether the user picked [`Self::kb_layout`] themselves. if not, it's the system's current
+    /// layout, which is left alone so the system doesn't get it back with only its first layout.
     pub kb_picked: bool,
 
     pub device_name: String,
@@ -31,11 +31,11 @@ pub struct Settings {
     pub avatar: Option<std::path::PathBuf>,
 
     pub install_codecs_drivers: bool,
-    /// whether to download updates to install on the next restart, on unless turned off
+    /// whether to download updates to install on the next restart, on by default
     #[serde(default = "yes")]
     pub download_updates: bool,
-    /// whether apps may ask GeoClue for the device's location, [`None`] to leave GeoClue as the
-    /// distro has it, when the location page is skipped
+    /// whether apps may ask GeoClue for the device's location. [`None`] (the location page was
+    /// skipped) leaves GeoClue as the distro set it.
     pub location: Option<bool>,
     /// accessibility options, carried over to the new user
     pub a11y: crate::a11y::A11y,
@@ -48,8 +48,8 @@ pub struct Settings {
 
     /// for networks that only reach the internet through a proxy
     pub proxy: Option<crate::proxy::Proxy>,
-    /// whether the installed system keeps using [`Self::proxy`], for dnf and login sessions,
-    /// else it's only used during setup. On unless turned off
+    /// whether the installed system keeps using [`Self::proxy`] for dnf and login sessions, else
+    /// it's only used during setup. on by default.
     #[serde(default = "yes")]
     pub proxy_persist: bool,
 
@@ -71,9 +71,9 @@ const fn yes() -> bool {
     true
 }
 
-/// ids of the tweaks to turn on, see [`crate::tweaks::Tweak::id()`], the rest are turned off.
-/// Unknown for settings in the old format, a `bool` per tweak in an order that wasn't stable, so
-/// there's no telling which ones they were, then no tweak is run at all
+/// ids of the tweaks to turn on (see [`crate::tweaks::Tweak::id()`]), the rest are turned off.
+/// unknown for settings in the old format, which stored a `bool` per tweak in an unstable order.
+/// there's no telling which ones those were, so no tweak runs at all.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(transparent)]
 pub struct TweakIds(Option<Vec<String>>);
@@ -143,7 +143,7 @@ mod tests {
         let settings =
             Settings { passwd: "correct_horse_battery_staple".into(), ..Settings::default() };
         let mut json = serde_json::to_value(&settings).unwrap();
-        // Add `passwd`: match previous serialization behavior to test existing files
+        // add `passwd` back, as older versions serialized it
         json["passwd"] = serde_json::Value::String("correct_horse_battery_staple".into());
         let restored: Settings = serde_json::from_value(json).unwrap();
         assert_eq!(restored.passwd.expose_secret(), "correct_horse_battery_staple");
@@ -185,7 +185,7 @@ mod tests {
         assert_eq!(restored.tweaks.ids().unwrap(), ["rpmfusion", "flathub"]);
         let json = serde_json::to_value(&restored).unwrap();
         assert_eq!(json["tweaks"], serde_json::json!(["rpmfusion", "flathub"]));
-        // ones that never picked any turn them all off
+        // settings without `tweaks` turn them all off
         let restored: Settings = serde_json::from_value(serde_json::json!({})).unwrap();
         assert_eq!(restored.tweaks.ids(), Some(&[][..]));
         assert_eq!(restored.location, None);

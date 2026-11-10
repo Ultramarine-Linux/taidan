@@ -11,7 +11,7 @@ impl super::Step for SetupImf {
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        // written into the skeleton the home was created from, see `write_to_skel`
+        // homed homes get it from the skeleton they're created from, see `write_to_skel`
         if cfg.taidan0.systemd_homed {
             return Ok(());
         }
@@ -37,9 +37,9 @@ impl super::Step for SetupImf {
     }
 }
 
-/// `settings` with only the input methods that are installed, [`None`] if that leaves none. Ones
+/// `settings` with only the input methods that are installed, [`None`] if that leaves none. ones
 /// installed here may still be missing, as dnf skips broken packages, and offline or without dnf
-/// only the image's are there. Before the installation (`installed` false, e.g. for homed's
+/// only the image's are there. before the installation (`installed` false, e.g. for homed's
 /// skeleton), the ones dnf is about to install count too
 async fn with_installed_ims(
     settings: &crate::settings::Settings,
@@ -67,7 +67,7 @@ async fn with_installed_ims(
 }
 
 /// `kwriteconfig6` arguments, after `--file`, that select Fcitx5 as KWin's input method
-/// https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg?ref_type=heads
+/// <https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg>
 const KWINRC_FCITX5: [[&str; 6]; 2] = [
     [
         "--group",
@@ -85,9 +85,9 @@ const KWINRC_FCITX5: [[&str; 6]; 2] = [
 const FCITX5_PROFILE_MARKER: &str = "# written by Taidan";
 
 /// removes the Fcitx5 profile and the kwinrc keys an earlier attempt wrote (see
-/// [`write_fcitx5_profile`]), for a retry without input methods. A home kept from before the
-/// install would keep them otherwise, a new one never has them. Nothing goes unless the profile
-/// is still the one written here
+/// [`write_fcitx5_profile`]), for a retry without input methods. only a home kept from before
+/// the install can have them. nothing is removed unless the profile is still the one written
+/// here
 async fn remove_fcitx5_config(settings: &crate::settings::Settings) -> Res<()> {
     const SCRIPT: &str = r#"
         profile="$1/fcitx5/profile"
@@ -236,10 +236,10 @@ pub async fn write_to_skel(
 }
 
 /// the `dconf write`s that hand IBus the chosen engines, for [`crate::a11y::one_session`] to run
-/// through one D-Bus,
-/// [`None`] if none of them have an IBus engine. IBus reads `preload-engines`, but GNOME (and
-/// Budgie) drive IBus from their own `input-sources`, ignoring it, so the engines go in there too
-/// after the layout. Arguments rather than a shell script, the layout comes from the settings
+/// through one D-Bus, [`None`] if none of them have an IBus engine. IBus reads
+/// `preload-engines`, but GNOME (and Budgie) drive IBus from their own `input-sources` and
+/// ignore it, so the engines go in there too, after the layout. arguments rather than a shell
+/// script, since the layout comes from the settings
 fn ibus_dconf_writes(settings: &crate::settings::Settings) -> Option<Vec<Vec<String>>> {
     let any = settings.ims.iter().any(|s| i18n::find_im(s).is_some_and(|im| im.ibus_ref.is_some()));
     any.then(|| ibus_dconf_writes_all(settings))
@@ -250,7 +250,7 @@ fn ibus_dconf_writes_all(
     crate::settings::Settings { ims, kb_layout, kb_variant, .. }: &crate::settings::Settings,
 ) -> Vec<Vec<String>> {
     let engines: Vec<_> = ims.iter().filter_map(|s| i18n::find_im(s)?.ibus_ref).collect();
-    // an empty array has no type dconf can tell otherwise
+    // dconf can't infer the type of an empty array
     let order = if engines.is_empty() {
         "@as []".to_owned()
     } else {
@@ -259,7 +259,9 @@ fn ibus_dconf_writes_all(
 
     // without an xkb source first GNOME would type through an IBus engine all the time
     let layout = if kb_layout.is_empty() { "us" } else { kb_layout };
-    let sources = (i18n::XkbKeymap::new(layout, kb_variant.as_deref()).gnome_sources().into_iter())
+    let sources = i18n::XkbKeymap::new(layout, kb_variant.as_deref())
+        .gnome_sources()
+        .into_iter()
         .chain(engines.iter().map(|r| format!("('ibus', '{r}')")))
         .collect::<Vec<_>>()
         .join(", ");
@@ -280,7 +282,7 @@ fn ibus_dconf_writes_all(
 }
 
 /// on systemd-homed, the skeleton the home was made from counted the input methods dnf was about
-/// to install, see [`write_to_skel`]. Once the installation is over and the user is unlocked, this
+/// to install, see [`write_to_skel`]. once the installation is over and the user is unlocked, this
 /// drops the ones that didn't install from the home, failures are logged
 pub async fn fix_homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) {
     if !cfg.taidan0.systemd_homed || settings.ims.is_empty() {
@@ -339,7 +341,7 @@ async fn write_ibus_to_skel(
 
 async fn write_ibus_profile(settings: &crate::settings::Settings) -> Res<()> {
     let username = &settings.username;
-    // dconf writes through its D-Bus service, which a bus of its own starts
+    // dconf writes through its D-Bus service, which the bus `one_session` starts activates
     let Some(cmd) = ibus_dconf_writes(settings).and_then(crate::a11y::one_session) else {
         return Ok(());
     };

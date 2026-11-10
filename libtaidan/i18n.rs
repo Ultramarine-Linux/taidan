@@ -276,8 +276,8 @@ fn is_non_latin(layout: &str, variant: &str) -> bool {
     NON_LATIN_VARIANTS.iter().any(|&(l, v)| l == layout && variant_matches(v, variant))
 }
 
-/// switches between the layouts of an [`XkbKeymap`] with a Latin one added, Super+Space as on
-/// GNOME, which does it with its own shortcut instead
+/// switches between the layouts of an [`XkbKeymap`] with a Latin one added, on Super+Space like
+/// GNOME (which uses its own shortcut instead of this option)
 pub const LAYOUT_SWITCH: &str = "grp:win_space_toggle";
 
 /// the xkb layouts, variants and options for a picked layout, each comma-separated
@@ -393,8 +393,8 @@ impl XkbKeymap {
     }
 
     /// the system's (locale1) keymap with all its layouts, variants and options, read from the
-    /// files `systemd-localed` keeps it in the way it does, `vconsole.conf` first. [`None`] if it
-    /// has no layout
+    /// files `systemd-localed` keeps it in, the way localed reads them (`vconsole.conf` first).
+    /// [`None`] if it has no layout
     pub async fn system() -> Option<Self> {
         let read = async |path: &str| {
             tokio::fs::read_to_string(path)
@@ -441,7 +441,7 @@ async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<
         ["--reply-timeout=100", "--reply-timeout=100"],
         ["/Layouts", "org.kde.keyboard.reloadConfig"],
     ];
-    // the layout is written already, a session without the tool or a KWin to hear it just picks
+    // the layout is written already, so a session without dbus-send or a KWin to hear it picks
     // it up on its next login
     let mut argv = vec!["dbus-send".to_owned()];
     argv.extend(args.concat().into_iter().map(str::to_owned));
@@ -483,7 +483,7 @@ pub async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> Res<()
 /// `kwriteconfig6` arguments, after `--file`, that put the layout picked in `settings` into
 /// `kxkbrc`, [`None`] if there's no layout
 async fn kxkbrc_entries(settings: &crate::settings::Settings) -> Option<Vec<Vec<String>>> {
-    // one that wasn't picked is the system's first layout. The whole of the system's keymap keeps
+    // one that wasn't picked is the system's first layout. the whole of the system's keymap keeps
     // its other layouts and its options, unless it's a lone layout that can't type ASCII, which
     // gets US English after it like a picked one
     if !settings.kb_picked
@@ -555,7 +555,7 @@ pub async fn write_keymap_to_skel(
 #[allow(clippy::equatable_if_let)]
 #[allow(clippy::missing_panics_doc)]
 /// applies the keymap to `user`'s session (the current user's for [`None`]), and to the system
-/// (locale1, which the login screen and console use) if `system`. Returns whether the system's
+/// (locale1, which the login screen and console use) if `system`. returns whether the system's
 /// was saved, `true` if it wasn't asked for. A failure there is logged and the session still gets
 /// the keymap, the installation's `SetLocale` step tries the system again
 ///
@@ -654,7 +654,7 @@ mod tests {
             (km.layouts.as_str(), km.variants.as_str(), km.options.as_str()),
             ("cz,us", "qwerty,", "grp:win_space_toggle")
         );
-        // the options take effect without a latin fallback too
+        // the options take effect without a Latin fallback too
         let entries = km.kxkbrc_entries();
         assert!(entries.iter().any(|e| e[3] == "ResetOldOptions"));
         assert!(entries.iter().any(|e| e[3] == "LayoutList" && e.last().unwrap() == "cz,us"));
@@ -721,7 +721,7 @@ mod tests {
 
     #[test]
     fn every_non_latin_variant_exists() {
-        // the patterns follow xkeyboard-config, each should still match one of its variants. These
+        // the patterns follow xkeyboard-config, each should still match one of its variants. these
         // aren't in `evdev.lst`, the `ru` ones are only in the extras and `kana86` in older ones
         let extras = [("de", "ru-recom"), ("de", "ru-translit"), ("jp", "kana86")];
         for &(layout, pattern) in NON_LATIN_VARIANTS {

@@ -3,33 +3,6 @@ use crate::prelude::*;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemSetup;
 impl super::Step for SystemSetup {
-    /// adds the language pack for the user's language to the apps to install
-    #[tracing::instrument(skip(settings))]
-    async fn pre<C: crate::Callback>(
-        &self,
-        settings: &mut crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        _: &C,
-    ) -> Res<()> {
-        if settings.nointernet || settings.locale.is_empty() || !super::can_use_dnf(cfg).await {
-            return Ok(());
-        }
-        let candidates = langpack_candidates(&settings.locale);
-        match available(&candidates).await {
-            Ok(found) => {
-                // the first one that exists, the most specific of the distro's own
-                if let Some(pkg) = candidates.into_iter().find(|c| found.contains(c)) {
-                    tracing::info!(pkg, "Installing the language pack");
-                    settings.actions[1].push(pkg);
-                } else {
-                    tracing::info!(locale = settings.locale, "No language pack for this locale");
-                }
-            }
-            Err(e) => tracing::warn!(?e, "cannot look up language packs"),
-        }
-        Ok(())
-    }
-
     #[tracing::instrument(skip(settings))]
     async fn run<C: crate::Callback>(
         &self,
@@ -40,7 +13,7 @@ impl super::Step for SystemSetup {
         if let Some(ids) = settings.tweaks.ids() {
             let sett = crate::tweaks::settings_json(settings)?;
             // the ones an earlier attempt turned on, to turn off again if they aren't anymore.
-            // Recorded as it goes, so an attempt cut short still says what it turned on
+            // recorded as it goes, so an attempt cut short still says what it turned on
             let mut recorded = crate::tweaks::recorded_on();
             let record = |ids: &[String]| {
                 let ids = ids.to_vec();
@@ -56,14 +29,14 @@ impl super::Step for SystemSetup {
                 let id = tweak.id().to_string_lossy().into_owned();
                 let started = format!("{}{id}", crate::tweaks::STARTED);
                 let on = ids.contains(&id);
-                // one that may be only partly applied runs again whichever way it's wanted
+                // skip one already in the wanted state, unless it may be only partly applied
                 if !recorded.contains(&started) && on == recorded.contains(&id) {
                     continue;
                 }
                 if on && settings.nointernet && tweak.needs_internet {
                     tracing::info!(id, "skipping tweak that needs the internet");
-                    // one an earlier attempt only got partway through turning on is turned off
-                    // again instead, nothing would after this install
+                    // turn off one an earlier attempt only got partway through turning on, since
+                    // nothing would after this install
                     if recorded.contains(&started) && tweak.run(&sett, false).await {
                         recorded.retain(|r| *r != started);
                         record(&recorded).await;
@@ -90,9 +63,9 @@ impl super::Step for SystemSetup {
                 "the settings don't say which tweaks to turn on, leaving them as they are"
             );
         }
-        // GNOME's location switch, off by default when it's off here, so the user can still turn
-        // it on in Settings. Back to GNOME's default when it's on, for a retry after an attempt
-        // with it off. Left alone when the page was skipped
+        // GNOME's location switch. off here only makes it off by default, so the user can still
+        // turn it on in Settings. on resets it to GNOME's default, for a retry after an attempt
+        // with it off. left alone when the page was skipped
         if let Some(on) = settings.location {
             let what = if on { "on" } else { "off" };
             if let Err(e) = crate::root(crate::Verb::Location { on }).await {
@@ -119,10 +92,38 @@ impl super::Step for SystemSetup {
         }
         Ok(())
     }
+
+    /// adds the language pack for the user's language to the apps to install
+    #[tracing::instrument(skip(settings))]
+    async fn pre<C: crate::Callback>(
+        &self,
+        settings: &mut crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        _: &C,
+    ) -> Res<()> {
+        if settings.nointernet || settings.locale.is_empty() || !super::can_use_dnf(cfg).await {
+            return Ok(());
+        }
+        let candidates = langpack_candidates(&settings.locale);
+        match available(&candidates).await {
+            Ok(found) => {
+                // the first one that exists, the most specific of the distro's own
+                if let Some(pkg) = candidates.into_iter().find(|c| found.contains(c)) {
+                    tracing::info!(pkg, "Installing the language pack");
+                    settings.actions[1].push(pkg);
+                } else {
+                    tracing::info!(locale = settings.locale, "No language pack for this locale");
+                }
+            }
+            Err(e) => tracing::warn!(?e, "cannot look up language packs"),
+        }
+        Ok(())
+    }
 }
 
-/// language pack packages for a POSIX locale like `pt_BR.UTF-8`, best first: Ultramarine's, which
-/// pull in Fedora's, then Fedora's, each for the language in that country and then on its own
+/// language pack packages for a POSIX locale like `pt_BR.UTF-8`, best first: Ultramarine's (which
+/// pull in Fedora's), then Fedora's, each for the language in that country and then on its own,
+/// then glibc's
 fn langpack_candidates(locale: &str) -> Vec<String> {
     let name = locale.split(['.', '@']).next().unwrap_or_default();
     let lang = name.split('_').next().unwrap_or_default();
@@ -137,7 +138,7 @@ fn langpack_candidates(locale: &str) -> Vec<String> {
         .iter()
         .flat_map(|prefix| names.iter().map(move |n| format!("{prefix}{n}")))
         .collect();
-    // for languages without a `langpacks-*`, glibc's has at least the locale, and only comes per
+    // glibc's has at least the locale, for languages without a `langpacks-*`. it only comes per
     // language
     pkgs.push(format!("glibc-langpack-{lang}"));
     pkgs

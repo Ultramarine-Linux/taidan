@@ -1,7 +1,7 @@
 //! what the new user's desktop looks like: light or dark, the accent color, and the GTK theme that
 //! goes with them on desktops where `color-scheme` alone doesn't reach GTK 3 apps
 
-/// an accent color, named as GNOME's `org.gnome.desktop.interface accent-color` names them
+/// an accent color, named like GNOME's `org.gnome.desktop.interface accent-color` values
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Accent {
@@ -50,7 +50,7 @@ impl Accent {
         Self::ALL.into_iter().find(|a| a.id() == id)
     }
 
-    /// libadwaita's color for it, which Plasma gets too so both look the same, as `#rrggbb`
+    /// libadwaita's color for it as `#rrggbb`, which Plasma gets too so both match
     #[must_use]
     pub const fn hex(self) -> &'static str {
         match self {
@@ -69,13 +69,14 @@ impl Accent {
 
 /// whether the edition's desktop follows an accent color all the way through: GNOME 47+ (shell
 /// and libadwaita apps) and Plasma. Budgie and Xfce use GTK 3 themes that ignore `accent-color`.
-/// Plasma is told by its binary, as the theme step and the rest of the setup tell it
+/// Plasma is detected by whether `plasmashell` is installed, the same check the theme step and
+/// the rest of the setup use.
 #[must_use]
 pub fn accent_supported(edition: &str) -> bool {
     accent_supported_with(edition, crate::a11y::is_plasma())
 }
 
-/// [`accent_supported`], with whether the desktop is Plasma given
+/// [`accent_supported`] with the Plasma check passed in
 fn accent_supported_with(edition: &str, plasma: bool) -> bool {
     plasma || crate::cfg::desktop(edition) == "gnome"
 }
@@ -140,7 +141,7 @@ mod tests {
     fn accent_only_where_it_works() {
         assert!(accent_supported_with("gnome", false));
         assert!(accent_supported_with("atomic-gnome", false));
-        // the binary decides, whatever the edition says
+        // `plasmashell` decides, whatever the edition says
         assert!(accent_supported_with("kde", true));
         assert!(accent_supported_with("", true));
         assert!(!accent_supported_with("kde", false));

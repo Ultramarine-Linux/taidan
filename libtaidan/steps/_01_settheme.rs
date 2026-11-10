@@ -1,7 +1,8 @@
 //! light or dark mode and the accent color for the new user, through `plasma-apply-colorscheme` on
-//! Plasma and `gsettings` elsewhere, plus the GTK theme that goes with the mode, see [`crate::theme`]
+//! Plasma and `gsettings` or `xfconf-query` elsewhere, plus the GTK theme that goes with the mode,
+//! see [`crate::theme`]
 //!
-//! both write into the home given in `HOME` and `XDG_CONFIG_HOME`, so this goes into the user's
+//! they all write into the home given in `HOME` and `XDG_CONFIG_HOME`, so this goes into the user's
 //! home during setup, or on systemd-homed into the skeleton it's created from, see
 //! [`write_to_skel`]
 use crate::prelude::*;
@@ -44,7 +45,6 @@ fn commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String
     let mut cmds = vec![];
     // plasma-apply-colorscheme comes with plasmashell, in plasma-workspace
     if crate::a11y::is_plasma() {
-        // a `QGuiApplication`, so it needs a platform even though it shows nothing
         let scheme = if dark { "BreezeDark" } else { "BreezeLight" };
         let owned = |cmd: &[&str]| cmd.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
         let kdeglobals = |key: &str, value: &str| {
@@ -59,9 +59,11 @@ fn commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String
                 value,
             ])
         };
+        // plasma-apply-colorscheme is a `QGuiApplication`, so it needs a platform even though it
+        // shows nothing
         cmds.push(owned(&["QT_QPA_PLATFORM=offscreen", "plasma-apply-colorscheme", scheme]));
         // it does nothing when the scheme is already the default, which the look and feel's
-        // defaults may still override, so it's written down either way
+        // defaults may still override, so write it to kdeglobals either way
         cmds.push(kdeglobals("ColorScheme", scheme));
         if let Some(accent) = accent {
             // with `--accent-color`, it ignores a scheme given with it and reapplies the saved
@@ -108,7 +110,6 @@ fn env_args(
     edition: &str,
 ) -> Vec<Vec<String>> {
     let Some(dark) = settings.dark_mode else { return vec![] };
-    // in one go, see `one_session`
     crate::a11y::one_session(commands(dark, settings.accent, edition))
         .map(|cmd| crate::a11y::in_home(home, cmd))
         .into_iter()

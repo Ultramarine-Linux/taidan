@@ -42,8 +42,7 @@ export component LanguagePage inherits TdnPage {
     Card {
         vertical-stretch: 1;
 
-        // finds the current language's row, which `ListView` can't tell as it only creates the
-        // rows in view
+        // finds the current language's row. `ListView` can't, since it only creates the rows in view
         for lang[i] in Lang.languages: Rectangle {
             property <bool> current: lang.locale == Lang.current_language.locale;
             width: 0;
@@ -67,8 +66,7 @@ export component LanguagePage inherits TdnPage {
                 description: root.first-match ? Lang.name(Lang.languages[0]) : Lang.name(Lang.current_language);
                 edited(text) => {
                     cursor = -1;
-                    // filtering drops the rows without telling them, the ones still there set it
-                    // again
+                    // filtering drops rows without notifying them, so the remaining ones set it again
                     root.current-row = -1;
                     list.content-y = 0;
                     Lang.filter_languages(text);

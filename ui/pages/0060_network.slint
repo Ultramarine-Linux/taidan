@@ -169,8 +169,8 @@ component NetworkRow inherits VerticalLayout {
                     description: root.info;
                 }
 
-                // one button through the whole attempt, which turns into a spinner, so keyboard and
-                // screen reader focus stay on it
+                // the same button stays for the whole attempt and turns into a spinner, so keyboard
+                // and screen reader focus stay on it
                 connect-btn := TdnIconButton {
                     visible: !root.net.connected;
                     // forward, which points left for right-to-left languages
@@ -524,7 +524,7 @@ export component HiddenDialog inherits TdnDialog {
     property <string> password;
     // nothing else can connect while the dialog is open
     property <bool> busy: Network.connecting-ssid != "";
-    // NetworkManager wants 8 to 63 characters for WPA, or 64 hex digits, WPA3 has no minimum
+    // NetworkManager wants 8 to 63 characters for WPA, or 64 hex digits. WPA3 has no minimum
     property <bool> complete: Network.trim(root.ssid) != "" && (!root.needs-password
         || (root.security == HiddenSecurity.wpa3 ? root.password != "" : root.password.character-count >= 8));
 
@@ -638,8 +638,8 @@ export component HiddenDialog inherits TdnDialog {
 component FileRow inherits TdnField {
     in property <string> path;
     in property <bool> enabled: true;
-    // whether the file browser was opened from here, so Choose gets the focus back when this is
-    // made again as it closes
+    // whether the file browser was opened from here, so Choose takes the focus back when the
+    // browser closes and this row is recreated
     in property <bool> refocus;
     callback pick();
     callback clear();
@@ -695,7 +695,7 @@ component FileRow inherits TdnField {
     }
 }
 
-// picks a file, the session may have no file chooser of its own
+// picks a file in-app, since the session may have no file chooser of its own
 component FileBrowser inherits VerticalLayout {
     // lists PAC files instead of certificates
     in property <bool> pac;
@@ -1254,8 +1254,8 @@ export component OfflineDialog inherits TdnDialog {
 export component ProxyDialog inherits TdnDialog {
     title: Lang.t("page-internet-proxy", []);
     dialog-width: 24rem;
-    // made each time it opens, see `Network.proxy-visit`. A check from before is still running if
-    // it was cancelled, it no longer counts, so it mustn't keep this one busy
+    // made each time it opens, see `Network.proxy-visit`. A check from before may still be running
+    // if it was canceled. it no longer counts, so it mustn't keep this one busy
     init => {
         Network.proxy-visit += 1;
         Network.proxy-busy = false;
@@ -1268,7 +1268,7 @@ export component ProxyDialog inherits TdnDialog {
     // whether to keep the proxy after setup, only saved along with the rest
     property <bool> persist: Network.proxy-persist;
     // the server field shows the proxy without its username and password, so they aren't on screen
-    // or read out. Left as it is, it's still the proxy in use, with them
+    // or read out. left unedited, it still stands for the proxy in use, credentials included
     property <string> url: server.text == Network.proxy-public ? Network.proxy-url : server.text;
 
     function submit() {
@@ -1385,7 +1385,7 @@ export component IpDialog inherits TdnDialog {
     title: Lang.t("page-internet-ip", [{ key: "name", value: Network.ip-ssid != "" ? Network.ip-ssid : Lang.t("page-internet-wired", []) }]);
     dialog-width: 24rem;
     dismissed => { Network.ip-open = false; }
-    // the switch takes it over once the settings load, see its `init`
+    // Cancel holds the focus until the settings load, then the switch takes it (see its `init`)
     init => { if Network.ip-loading { cancel.focus(); } }
 
     function submit() {
@@ -1471,7 +1471,7 @@ export component IpDialog inherits TdnDialog {
         }
     }
 
-    // wired networks at work or school can want a login before they let anything through
+    // wired networks at work or school may require a login before they let anything through
     if Network.ip-ssid == "" && !Network.ip-loading: HorizontalLayout {
         alignment: Dir.start;
 

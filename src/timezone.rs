@@ -22,7 +22,7 @@ const UTC: &str = "UTC";
 #[derive(Clone, Debug, PartialEq)]
 struct Zone {
     id: String,
-    /// ISO 3166 codes, the first is the one the zone is mainly for
+    /// ISO 3166 codes, the first being the one the zone is mainly for
     countries: Vec<String>,
     lat: f64,
     lon: f64,
@@ -66,8 +66,8 @@ fn parse_tab(tab: &str) -> Vec<Zone> {
         .collect()
 }
 
-/// adds the zones of `zone.tab` to those of `zone1970.tab`, and the countries it gives to the
-/// ones they share
+/// adds the zones of `zone.tab` to those of `zone1970.tab`, and its countries to the zones both
+/// list
 fn merge_tabs(mut zones: Vec<Zone>, more: Vec<Zone>) -> Vec<Zone> {
     for zone in more {
         if let Some(z) = zones.iter_mut().find(|z| z.id == zone.id) {
@@ -149,7 +149,7 @@ impl Regions {
 }
 
 fn entry(zone: &Zone, regions: &Regions) -> TimeZone {
-    // Antarctic stations are south of the map, they can still be searched for
+    // Antarctic stations are south of the map but can still be searched for
     let on_map = (MAP_SOUTH..=MAP_NORTH).contains(&zone.lat);
     TimeZone {
         id: zone.id.as_str().into(),
@@ -185,9 +185,8 @@ fn rules(id: &str) -> Option<(i32, i32)> {
     Some((at(1)?, at(7)?))
 }
 
-/// the zones shown on the map: the first, and so main, one of each country that keeps its clocks
-/// the same way, the rest differ only in history (e.g. the counties of Indiana) and are still
-/// found by searching
+/// the zones shown on the map: the first (main) zone of each country for each set of clock rules.
+/// the rest differ only in history (e.g. the counties of Indiana) and are still found by searching
 fn map_zones(zones: &[Zone]) -> Vec<Zone> {
     let mut seen = std::collections::HashSet::new();
     zones
@@ -226,7 +225,7 @@ fn nearest(zones: &[Zone], x: f64, y: f64) -> Option<&Zone> {
 }
 
 /// the system's zone `name` as one of `zones`, under its current name if it's an old one, or
-/// added if jiff knows it but the tables don't. None for UTC, which is what a fresh install has
+/// added if jiff knows it but the tables don't. none for UTC, which is what a fresh install has
 /// and says nothing about where the user is
 fn system_zone(
     zones: &mut Vec<Zone>,
@@ -270,8 +269,8 @@ fn suggest(zones: &[Zone], system: Option<&str>, locale: &str) -> Option<String>
 }
 
 /// whether `query` is `offset` (`UTC+5:30`), with or without the `UTC`, or it without the
-/// minutes, so `utc+1` finds `UTC+1:30` but not `UTC+10`. Not any part of it, every offset has
-/// `utc` in it
+/// minutes, so `utc+1` finds `UTC+1:30` but not `UTC+10`. any other prefix doesn't count, since
+/// every offset starts with `utc`
 fn offset_matches(offset: &str, query: &str) -> bool {
     let offset = offset.to_lowercase().replace('−', "-");
     let query = query.replace('−', "-");
@@ -307,7 +306,7 @@ struct State {
     system: Option<String>,
     /// set once the user picks one, so changing the language no longer changes it
     touched: bool,
-    /// whether to guess from the language's country when the system has no zone. Off when the
+    /// whether to guess from the language's country when the system has no zone. off when the
     /// timezone page is skipped, since nothing saves the guess and the system keeps its zone
     guess: bool,
     query: String,
@@ -322,14 +321,14 @@ fn locale(ui: &AppWindow) -> String {
     if locale == "en-owo" { "en-US".to_owned() } else { locale.into() }
 }
 
-/// the zones [`State::query`] finds, from [`State::cache`]
+/// shows the zones [`State::query`] finds, from [`State::cache`]
 fn show_results(ui: &AppWindow, state: &State) {
     let query = &state.query;
     let mut results = (state.cache.iter())
         .filter(|(e, text)| text.contains(query.as_str()) || offset_matches(&e.offset, query))
         .map(|(e, _)| e.clone())
         .collect::<Vec<_>>();
-    // one that's exactly what was typed first, e.g. UTC for `utc`, which Enter then picks
+    // exact matches first, e.g. UTC for `utc`, so Enter picks them
     let exact = |e: &TimeZone| {
         !query.is_empty()
             && (crate::l10n::fold_search(&e.city) == *query || e.id.to_lowercase() == *query)
@@ -384,8 +383,8 @@ fn read(path: &str) -> String {
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tz: &Tz<'_>) {
     let mut zones = merge_tabs(parse_tab(&read(ZONE_TAB)), parse_tab(&read(COUNTRY_TAB)));
-    // from all of them, `zone1970.tab` leaves out countries whose clocks have matched another's
-    // since 1970 (e.g. Sweden's are Germany's), whose nearest dot could then be in another zone
+    // from both tables, since `zone1970.tab` leaves out countries whose clocks have matched
+    // another's since 1970 (e.g. Sweden's are Germany's), so their nearest dot could be elsewhere
     let on_map = map_zones(&zones);
     let links = parse_links(&read(TZDATA_ZI));
     let system_tz = jiff::tz::TimeZone::system();

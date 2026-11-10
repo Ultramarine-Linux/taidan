@@ -8,7 +8,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::err::{Res, TaidanErrHelper};
 
-/// every valid tweak this CPU supports. What to offer or run is [`available()`], which also
+/// every valid tweak this CPU supports. what to offer or run is [`available()`], which also
 /// checks [`Tweak::needs_dnf`] and [`Tweak::secure_boot`]
 pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
     let tweaks = Tweak::list()
@@ -70,17 +70,17 @@ pub async fn available(can_use_dnf: bool) -> Vec<&'static Tweak> {
 /// `up 1` turns the tweak on. `up 0` turns it back off, and only runs for a tweak an earlier,
 /// unfinished attempt turned on (see [`ON_RECORD`]) that the user has since turned off.
 ///
-/// The `tweak.toml` file is optional, and so are all of its fields:
+/// the `tweak.toml` file is optional, and so are all of its fields:
 /// - `ftl_name` (alias `name`): the fluent ID for the name of the tweak, defaults to `<id>-name`
 /// - `ftl_desc` (alias `desc`): the fluent ID for the description of the tweak, defaults to `<id>-desc`
 /// - `x86_64_level`: the minimum x86-64 microarchitecture level (1 to 4) the tweak needs.
-///   Tweaks that set it are hidden on CPUs below that level and on other architectures.
-/// - `needs_internet`: whether `up` downloads anything, e.g. packages. Such tweaks aren't run
+///   tweaks that set it are hidden on CPUs below that level and on other architectures.
+/// - `needs_internet`: whether `up` downloads anything, e.g. packages. such tweaks aren't run
 ///   when setting up without internet, off by default
-/// - `needs_dnf`: whether `up` installs packages with dnf. Such tweaks are hidden on atomic
+/// - `needs_dnf`: whether `up` installs packages with dnf. such tweaks are hidden on atomic
 ///   (rpm-ostree) systems and with `taidan0.skip_dnf`, off by default
-/// - `secure_boot`: if set, the tweak is only offered when whether Secure Boot is enforced matches
-///   it, e.g. `false` hides it while Secure Boot is on
+/// - `secure_boot`: if set, the tweak is only offered when it matches whether Secure Boot is
+///   enforced, e.g. `false` hides it while Secure Boot is on
 #[derive(Clone, Debug, Default, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Tweak {
@@ -118,7 +118,7 @@ impl Tweak {
     ///
     /// # Errors
     ///
-    /// Returns an error if `tweak.toml` exists but cannot be read or parsed. Falling back to the
+    /// Returns an error if `tweak.toml` exists but cannot be read or parsed. falling back to the
     /// defaults there would drop requirements like [`Self::x86_64_level`], and offer the tweak on
     /// machines it doesn't support.
     ///
@@ -151,13 +151,13 @@ impl Tweak {
         Ok(tweak)
     }
 
-    /// Whether this machine meets the tweak's requirements, see [`Self::x86_64_level`].
+    /// whether this machine meets the tweak's requirements, see [`Self::x86_64_level`]
     #[must_use]
     pub fn is_supported(&self) -> bool {
         self.x86_64_level.is_none_or(|level| x86_64_level() >= level)
     }
-    /// Whether the tweak can be offered, given whether dnf can install packages and whether Secure
-    /// Boot is enforced, see [`Self::needs_dnf`] and [`Self::secure_boot`].
+    /// whether the tweak can be offered, given whether dnf can install packages and whether Secure
+    /// Boot is enforced, see [`Self::needs_dnf`] and [`Self::secure_boot`]
     #[must_use]
     pub fn is_allowed(&self, can_use_dnf: bool, secure_boot: bool) -> bool {
         (can_use_dnf || !self.needs_dnf) && self.secure_boot.is_none_or(|sb| sb == secure_boot)
@@ -229,9 +229,9 @@ impl Tweak {
         self.path.file_name().unwrap()
     }
 
-    /// Run `up` with the serialized `settings`, as root through the helper, which finds it in
-    /// `/usr/share/taidan/tweaks` by the id. Whether it succeeded, failures are logged
-    // not the settings, which have the user's name and the proxy in them
+    /// runs `up` with the serialized `settings` as root through the helper, which finds it in
+    /// `/usr/share/taidan/tweaks` by id. returns whether it succeeded, failures are logged
+    // skip the settings, they have the user's name and the proxy in them
     #[tracing::instrument(skip(settings))]
     pub async fn run(&self, settings: &[u8], on: bool) -> bool {
         let verb = crate::Verb::RunTweak { id: self.id().to_string_lossy().into_owned(), on };
@@ -270,7 +270,7 @@ impl Tweak {
 /// out is left out altogether
 ///
 /// # Errors
-/// The settings can't be serialized.
+/// - cannot serialize the settings
 pub fn settings_json(settings: &crate::settings::Settings) -> serde_json::Result<Vec<u8>> {
     let mut settings = settings.clone();
     settings.proxy = settings.proxy.as_ref().and_then(crate::proxy::Proxy::without_credentials);
@@ -278,8 +278,8 @@ pub fn settings_json(settings: &crate::settings::Settings) -> serde_json::Result
 }
 
 /// ids of the tweaks an unfinished install turned on, one per line, so a retry with one of them
-/// turned off can turn it off again. One that was started but may not have finished, turning on
-/// or off, has [`STARTED`] in front, a retry runs it again either way. Removed once the install
+/// turned off can turn it off again. one that was started but may not have finished, turning on
+/// or off, has [`STARTED`] in front, a retry runs it again either way. removed once the install
 /// finishes, from then on they're the user's
 pub const ON_RECORD: &str = "/var/lib/taidan/tweaks-on";
 
@@ -298,7 +298,7 @@ pub fn recorded_on() -> Vec<String> {
 /// removes it when there are none
 ///
 /// # Errors
-/// Cannot write or remove the file.
+/// - cannot write or remove the file
 pub async fn record_on(ids: &[String]) -> Res<()> {
     if ids.is_empty() {
         return clear_on_record().await;
@@ -308,8 +308,9 @@ pub async fn record_on(ids: &[String]) -> Res<()> {
         .wrap_msg("cannot record the tweaks turned on")
 }
 
-/// what [`record_on`] does, run by the helper as root. Replaced whole, so a full disk can't
-/// leave it empty, and on disk before what it records is done, a power cut mustn't lose it
+/// what [`record_on`] does, run by the helper as root. the file is replaced whole, so a full
+/// disk can't leave it empty, and synced before what it records is done, so a power cut can't
+/// lose it
 pub(crate) fn write_on_record(ids: &[String]) -> std::io::Result<()> {
     let content: String = ids.iter().map(|id| format!("{id}\n")).collect();
     crate::helper::write_atomic(Path::new(ON_RECORD), content.as_bytes(), 0o644)
@@ -318,7 +319,7 @@ pub(crate) fn write_on_record(ids: &[String]) -> std::io::Result<()> {
 /// removes [`ON_RECORD`], if it's there
 ///
 /// # Errors
-/// Cannot remove the file.
+/// - cannot remove the file
 pub async fn clear_on_record() -> Res<()> {
     if !tokio::fs::try_exists(ON_RECORD).await.unwrap_or(true) {
         return Ok(());
@@ -326,9 +327,9 @@ pub async fn clear_on_record() -> Res<()> {
     crate::root(crate::Verb::ClearTweakRecord).await.wrap_msg("cannot remove the tweaks record")
 }
 
-/// The x86-64 microarchitecture level of the running CPU, or 0 on other architectures.
+/// the x86-64 microarchitecture level of the running CPU, or 0 on other architectures
 ///
-/// See <https://gitlab.com/x86-psABIs/x86-64-ABI> for the features each level needs.
+/// see <https://gitlab.com/x86-psABIs/x86-64-ABI> for the features each level needs
 #[must_use]
 pub fn x86_64_level() -> u8 {
     #[cfg(target_arch = "x86_64")]

@@ -1,7 +1,7 @@
 // installed to /run/polkit-1/rules.d by taidan-initial-setup.service only while the OOBE runs,
-// and removed again when it stops, so none of this outlives the setup.
+// and removed again when it stops, so none of this outlives the setup
 //
-// the OOBE runs as the taidan user before any admin account exists to authenticate as. It runs
+// the OOBE runs as the taidan user before any admin account exists to authenticate as. it runs
 // the installation steps as root through pkexec and taidan-helper, which only takes a fixed set
 // of requests, and adds system-wide network connections (so the new user stays online).
 //
@@ -15,7 +15,7 @@ polkit.addRule(function(action, subject) {
         if (action.lookup("program") == "/usr/libexec/taidan-helper") {
             return polkit.Result.YES;
         }
-        // nothing else, not even with an admin's password, the taidan user has no business there
+        // anything else is refused, even with an admin's password
         return polkit.Result.NO;
     }
     if (action.id == "org.freedesktop.NetworkManager.settings.modify.system" ||

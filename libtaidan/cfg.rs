@@ -1,13 +1,13 @@
 pub const ACTION_TYPES: usize = 5;
 
-/// `/etc/taidan.toml`, what both the backend and the UI read from it
+/// `/etc/taidan.toml`, read by both the backend and the UI
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct Config {
     #[serde(skip)]
     pub distro: String,
-    /// set when the OOBE shouldn't run, taidan's `main` exits on it so the log and Sentry guards
-    /// still flush
+    /// set when the OOBE shouldn't run. taidan's `main` exits on it, so the log and Sentry guards
+    /// still flush.
     #[serde(skip)]
     pub should_exit: bool,
     #[serde(default)]
@@ -25,8 +25,8 @@ pub struct Config {
     #[serde(default)]
     pub taidan0: Taidan0Config,
 
-    /// keys only the UI reads (e.g. `accent_color`, `welcome.*`), looked up through `Cfg` in Slint,
-    /// this also takes keys older versions had (`internet_timeout`, …) so those configs still parse
+    /// keys only the UI reads (e.g. `accent_color`, `welcome.*`), looked up through `Cfg` in Slint.
+    /// it also takes keys older versions had (`internet_timeout`, …) so those configs still parse.
     #[serde(flatten)]
     pub ui: serde_json::Map<String, serde_json::Value>,
 }
@@ -38,7 +38,7 @@ impl Default for Config {
     }
 }
 
-/// keys from before the Slint rewrite that are ignored, they set how the internet page pinged
+/// keys from before the Slint rewrite that are now ignored. they set how the internet page pinged.
 pub const IGNORED_KEYS: [&str; 2] = ["internet_timeout", "internet_retry_interval"];
 
 fn _default_org() -> String {
@@ -57,11 +57,11 @@ pub enum SkipPage {
     Timezone,
     Network,
     Location,
-    /// the drivers and codecs page, they're still installed without it
+    /// the drivers and codecs page. skipping it still installs them.
     Drivers,
-    /// not a page anymore, but the tweaks button on the summary page
+    /// no longer a page, hides the tweaks button on the summary page
     Tweaks,
-    /// not a page anymore either, but the keyboard page's input methods, so none are set up
+    /// no longer a page either, hides the keyboard page's input methods so none are set up
     InputMethod,
 }
 
@@ -83,7 +83,7 @@ impl SkipPage {
             "devicename" | "analytics" | "crashreport" => {
                 return Err("this page no longer exists");
             }
-            // the install can't create the account without these
+            // the account and the install itself depend on these
             "whoareyou" | "password" | "summary" | "installing" | "finish" | "done" | "error" => {
                 return Err("this page can't be skipped");
             }
@@ -109,7 +109,7 @@ fn de_skip_pages<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Vec<SkipPage
 impl Config {
     /// Create a new [`Config`] by reading from `/etc/taidan.toml`, else [`Self::default()`].
     ///
-    /// Remember to fill in [`Self::read_os_release`] afterwards.
+    /// remember to fill in [`Self::read_os_release`] afterwards.
     ///
     /// # Errors
     /// Failure to parse `/etc/taidan.toml`.
@@ -122,7 +122,7 @@ impl Config {
         basic_toml::from_str(&s).inspect(Self::warn_ignored_keys)
     }
 
-    /// warns about keys older versions read that do nothing now. They still parse, see [`Self::ui`]
+    /// warns about keys older versions read that do nothing now. they still parse, see [`Self::ui`]
     fn warn_ignored_keys(&self) {
         for key in IGNORED_KEYS.into_iter().filter(|key| self.ui.contains_key(*key)) {
             tracing::warn!(
@@ -164,7 +164,9 @@ pub fn parse_os_release(file: &str) -> (String, String) {
     let get = |key: &str| {
         let value =
             file.lines().find_map(|line| line.trim().strip_prefix(key)?.strip_prefix('='))?;
-        let value = (value.strip_prefix('"').and_then(|v| v.strip_suffix('"')))
+        let value = value
+            .strip_prefix('"')
+            .and_then(|v| v.strip_suffix('"'))
             .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
             .unwrap_or(value);
         Some(value.to_owned())
@@ -180,8 +182,8 @@ pub fn parse_os_release(file: &str) -> (String, String) {
     (name, variant_id)
 }
 
-/// the desktop an edition (`VARIANT_ID`) runs, lowercase, the same for its atomic image:
-/// `atomic-gnome` is `gnome`
+/// the lowercase desktop an edition (`VARIANT_ID`) runs, the same for its atomic image
+/// (`atomic-gnome` is `gnome`)
 #[must_use]
 pub fn desktop(edition: &str) -> String {
     let edition = edition.to_ascii_lowercase();

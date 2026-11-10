@@ -1,8 +1,8 @@
-//! Generates the time zone page's maps from Natural Earth (public domain) `GeoJSON`:
+//! generates the time zone page's maps from Natural Earth (public domain) `GeoJSON`:
 //! `data/icons/world-map.svg` from the 1:110m land and `data/icons/world-map-zones.svg` from the
-//! 1:10m time zones. Run with `just maps`.
+//! 1:10m time zones. run with `just maps`.
 //!
-//! The projection is equirectangular from [`NORTH`] to [`SOUTH`], which `src/timezone.rs` and
+//! the projection is equirectangular from [`NORTH`] to [`SOUTH`], which `src/timezone.rs` and
 //! `ui/pages/0055_timezone.slint` assume too.
 use std::collections::HashSet;
 use std::fmt::Write;
@@ -75,7 +75,7 @@ fn land(geojson: &Value) -> String {
     svg("land from Natural Earth 1:110m (public domain)", "fill=\"#000\"", &d)
 }
 
-/// Douglas-Peucker: drops points that stay within `tolerance` of the line between their neighbours
+/// Douglas-Peucker: drops points that stay within `tolerance` of the line between their neighbors
 fn simplify(points: &[Point], tolerance: f64) -> Vec<Point> {
     let (Some(&(x1, y1)), Some(&(x2, y2))) = (points.first(), points.last()) else {
         return points.to_vec();
@@ -115,7 +115,7 @@ fn on_frame(a: Point, b: Point) -> bool {
 
 /// the borders between time zones, each drawn once
 fn zones(geojson: &Value) -> String {
-    // to 0.0001°, coordinates are at most ±180°
+    // rounded to 0.0001°. coordinates are at most ±180°, so it fits an `i64`
     #[expect(clippy::cast_possible_truncation, reason = "a rounded coordinate")]
     let key = |(x, y): Point| ((x * 1e4).round() as i64, (y * 1e4).round() as i64);
     let mut seen = HashSet::new();

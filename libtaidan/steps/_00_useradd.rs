@@ -12,16 +12,16 @@ impl super::Step for UserAdd {
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        // it goes into commands run as root, so make sure the UI's check held. Reserved names too,
-        // `remove_previous` couldn't remove one on a retry. One an earlier attempt made counts as
-        // free, see `username_problem`
+        // the name goes into commands run as root, so recheck what the UI checked. reserved names
+        // too, since `remove_previous` couldn't remove one on a retry. A user an earlier attempt
+        // made counts as free, see `username_problem`
         if let Some(problem) = crate::passwd::username_problem(&settings.username) {
             return Err(Err::Message(format!(
                 "username `{}` can't be used: {problem:?}",
                 settings.username
             )));
         }
-        // a passwordless wheel user would be root for anyone at the keyboard. The UI never sends
+        // a passwordless wheel user would be root for anyone at the keyboard. the UI never sends
         // one, but settings from elsewhere (tdnx) can leave it out
         if settings.passwd.expose_secret().is_empty() {
             return Err(Err::Msg("refusing to create a user without a password"));
@@ -32,7 +32,7 @@ impl super::Step for UserAdd {
             return Err(Err::Message(format!("user `{}` already exists", settings.username)));
         }
         remove_previous().await?;
-        // left behind if it couldn't be removed
+        // still there if `remove_previous` couldn't remove it
         if exists() {
             return Err(Err::Message(format!("user `{}` already exists", settings.username)));
         }
@@ -52,8 +52,9 @@ impl super::Step for UserAdd {
                 )));
             }
         }
-        // before the user is made, so it's never there without the record, which would keep the
-        // next attempt from removing it. A record of a user that never got made is cleared then
+        // recorded before the user is made, so the user never exists without a record, which would
+        // keep the next attempt from removing it. the next attempt clears a record of a user that
+        // never got made
         crate::passwd::record_created(&settings.username, keep_home).await?;
         if cfg.taidan0.systemd_homed {
             homed(settings, cfg).await?;
@@ -86,37 +87,37 @@ async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
     let pass = hash_password(settings)?;
     let fullname = crate::passwd::sanitize_fullname(&settings.fullname);
     let user = settings.username.as_str();
-    // a home kept from a reinstall stays its old owner's, `useradd` doesn't change that, so the
-    // user gets that uid back, or they couldn't get into it
+    // `useradd` doesn't chown a home kept from a reinstall, so the user gets its old uid back to
+    // be able to get into it
     let uid = previous_uid(user);
     if let Some(uid) = uid {
         tracing::info!(uid, "giving the user the uid that owns its home");
     }
-    // the hash through stdin, since anyone can read a command's arguments. The helper sets the
-    // password and locks the user until the installation finishes, see `unlock`
+    // the hash goes through stdin since anyone can read a command's arguments. the helper sets
+    // the password and locks the user until the installation finishes, see `unlock`
     let verb = crate::Verb::UserAdd { user: user.to_owned(), fullname, uid };
-    super::super::root_with_stdin(verb, format!("{pass}\n").as_bytes())
+    super::root_with_stdin(verb, format!("{pass}\n").as_bytes())
         .await
         .wrap_msg("cannot create the user")
 }
 
-/// lets the user log in once the installation is done. until then, it's locked, so if the OOBE
-/// gives up partway (it keeps crashing, the power goes, etc.) the display manager can't log in
-/// to an account the installation never finished. logging in would make it look like someone's
-/// account, see `passwd::login_state`, and the next run of the OOBE would keep it as it is
+/// lets the user log in once the installation is done. until then the user is locked, so if the
+/// OOBE gives up partway (it keeps crashing, the power goes out) the display manager can't log
+/// in to an unfinished account. A login would make it look like someone's account (see
+/// `passwd::login_state`), and the next run of the OOBE would keep it as it is
 ///
 /// # Errors
-/// The user can't be unlocked.
+/// - cannot unlock the user
 pub async fn unlock(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
     let user = settings.username.as_str();
     if !cfg.taidan0.systemd_homed {
-        return super::super::root(crate::Verb::UnlockUser { user: user.to_owned() })
+        return super::root(crate::Verb::UnlockUser { user: user.to_owned() })
             .await
             .wrap_msg("cannot unlock the user");
     }
     // updating an inactive home needs its password, through stdin, since anyone can read a
     // command's arguments
-    super::super::root_with_stdin(
+    super::root_with_stdin(
         crate::Verb::HomedUnlock { user: user.to_owned() },
         format!("{}\n", settings.passwd.expose_secret()).as_bytes(),
     )
@@ -127,9 +128,9 @@ pub async fn unlock(settings: &crate::settings::Settings, cfg: &crate::cfg::Conf
 async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
     let user = settings.username.as_str();
     let fullname = crate::passwd::sanitize_fullname(&settings.fullname);
-    // the password goes through stdin, as the plain text one homed encrypts the home with and the
-    // hash it checks logins against, so homectl doesn't need a terminal to ask for it
-    // locked until the installation finishes, see `unlock`
+    // the password goes through stdin, in plain text to encrypt the home with and hashed to check
+    // logins against, so homectl doesn't need a terminal to ask for it. the user stays locked
+    // until the installation finishes, see `unlock`
     let identity = serde_json::json!({
         "secret": { "password": [settings.passwd.expose_secret()] },
         "privileged": { "hashedPassword": [hash_password(settings)?] },
@@ -138,7 +139,7 @@ async fn homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -
     let skel = stage_skel(settings, cfg).await;
     // in `wheel` and `video`, groups that don't exist are left out
     let verb = crate::Verb::HomedCreate { user: user.to_owned(), fullname, skel };
-    super::super::root_with_stdin(verb, identity.to_string().as_bytes())
+    super::root_with_stdin(verb, identity.to_string().as_bytes())
         .await
         .wrap_msg("cannot create the user with homectl")
 }
@@ -161,15 +162,16 @@ pub(crate) fn previous_uid(user: &str) -> Option<u32> {
     use std::os::unix::fs::MetadataExt;
     let meta = home_path(user).symlink_metadata().ok().filter(std::fs::Metadata::is_dir)?;
     let uid = meta.uid();
-    // not one of homed's, a retry would take the user for a homed one and fail to remove it
+    // with a homed uid, a retry would take the user for a homed one and fail to remove it
     (crate::passwd::REGULAR_UIDS.contains(&uid)
         && crate::passwd::removable(user, uid)
         && uzers::get_user_by_uid(uid).is_none())
     .then_some(uid)
 }
 
-/// whether the home `useradd -m` would give `user` is already there. If it can't be told, it's
-/// taken to be, since that only leaves a home behind while the opposite can remove someone's files
+/// whether the home `useradd -m` would give `user` is already there. when that can't be told,
+/// assume it is. wrongly keeping a home only leaves it behind, wrongly taking it over can get
+/// someone's files removed
 fn home_exists(user: &str) -> bool {
     // a dangling symlink counts too, userdel -r would remove what it points to
     match home_path(user).symlink_metadata() {
@@ -184,14 +186,14 @@ fn home_exists(user: &str) -> bool {
 
 /// removes the user an earlier, unfinished attempt created (see
 /// [`crate::passwd::CREATED_RECORD`]), so retrying, renaming the user or changing the password
-/// all start over from no user. Only a regular user the record names that nobody has logged in as
+/// all start over from no user. only a regular user the record names that nobody has logged in as
 /// is removed, and the record stays if it can't be, so the user is never left behind without it
 async fn remove_previous() -> Res<()> {
     let Some(crate::passwd::Record { user: prev, keep_home }) = crate::passwd::record() else {
         return Ok(());
     };
     let logins = crate::passwd::login_state(&prev);
-    // if it can't be told whether it was used, it's removed but its home stays
+    // if lastlog2 can't tell whether it was used, remove it but keep its home
     let keep_home = keep_home || logins.is_none();
     match uzers::get_user_by_name(&prev) {
         None => tracing::info!(prev, "user from an earlier attempt is already gone"),
@@ -215,13 +217,13 @@ async fn remove_previous() -> Res<()> {
         }
         Some(u) => {
             tracing::info!(prev, "removing the user from an earlier attempt");
-            // by uid rather than the config, in case it changed since the user was made. The
-            // helper checks again that it's the recorded user and removable, and takes its icon
-            // along
+            // homed or not by uid rather than the config, in case that changed since the user was
+            // made. the helper checks again that it's the recorded, removable user, and removes its
+            // icon too
             if keep_home && !crate::passwd::HOMED_UIDS.contains(&u.uid()) {
                 tracing::info!(prev, "its home may be in use, keeping it");
             }
-            super::super::root(crate::Verb::RemoveUser { user: prev.clone(), keep_home })
+            super::root(crate::Verb::RemoveUser { user: prev.clone(), keep_home })
                 .await
                 .wrap_msg("cannot remove the user from an earlier attempt")?;
         }
@@ -229,9 +231,9 @@ async fn remove_previous() -> Res<()> {
     crate::passwd::clear_record().await
 }
 
-/// a copy of `/etc/skel` with the user's settings written in, for homed, where the home isn't
-/// mounted after it's created so they can't be written there later, [`None`] if there's nothing to
-/// write or it can't be made, then homed uses `/etc/skel`
+/// a copy of `/etc/skel` with the user's settings written in, for homed, which doesn't leave the
+/// home mounted after creating it, so they can't be written there later. [`None`] if there's
+/// nothing to write or it can't be made, then homed uses `/etc/skel`
 async fn stage_skel(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,

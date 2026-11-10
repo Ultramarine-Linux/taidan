@@ -13,10 +13,10 @@ export struct TweakItem {
 // distro tweaks from /usr/share/taidan/tweaks, driven from Rust (`src/tweaks.rs`)
 export global Tweaks {
     in property <[TweakItem]> items;
-    // translation ids of the names of the ones turned on, and of those that don't need the internet
+    // name translation ids of the enabled tweaks, all of them or only those that don't need the internet
     in property <[string]> enabled-names-online;
     in property <[string]> enabled-names-offline;
-    // the ones that will run, for the summary. Those that need the internet are skipped when the
+    // the ones that will run, for the summary. those that need the internet are skipped when the
     // install goes without it, see `Network.install-online`
     out property <[string]> enabled-names: Network.install-online ? enabled-names-online : enabled-names-offline;
     // whether the dialog is open, from the summary page

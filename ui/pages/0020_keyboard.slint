@@ -10,8 +10,8 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 import { Card } from "../slintcn/components/card.slint";
 import { Separator } from "../slintcn/components/separator.slint";
 
-// a row like the toggles elsewhere that says which input methods are on and opens the dialog to
-// change them
+// a row styled like the toggles elsewhere, showing which input methods are on and opening the
+// dialog to change them
 component ImsRow inherits Rectangle {
     property <bool> pointer-focus;
     property <string> value: Ims.enabled == "" ? Lang.t("page-keyboard-ims-none", []) : Ims.enabled;
@@ -74,7 +74,7 @@ component ImsRow inherits Rectangle {
             accessible-role: none;
         }
 
-        // points the way the language reads
+        // points in the reading direction
         VerticalLayout {
             layout-order: Dir.order(2);
             alignment: center;
@@ -109,8 +109,8 @@ export component KeyboardPage inherits TdnPage {
     forward-focus: search-layout;
 
     property <length> row-height: 2.25rem;
-    // rows moved to with the arrow keys, -1 until the user does so. They're only highlighted, Enter
-    // or a click applies them, since applying a layout changes what typing in the search does
+    // rows moved to with the arrow keys, -1 until the user does so. they're only highlighted until
+    // Enter or a click applies them, since applying a layout changes what typing in the search does
     // (e.g. Cyrillic after passing Russian)
     property <int> layout-cursor: -1;
     // 0 is the "Default" row, `n` is `Lang.variants[n - 1]`
@@ -122,7 +122,7 @@ export component KeyboardPage inherits TdnPage {
     // used: the first match
     property <bool> first-layout-match: search-layout.text != "" && layout-cursor < 0
         && current-layout-row < 0 && Lang.keymaps.length > 0;
-    // the same for the variants. The pinned "Default" row isn't a match, so this also applies
+    // the same for the variants. the pinned "Default" row isn't a match, so this also applies
     // when the current variant is the default one
     property <bool> first-variant-match: search-variant.text != "" && variant-cursor < 0
         && current-variant-row < 0 && Lang.variants.length > 0;
@@ -179,8 +179,8 @@ export component KeyboardPage inherits TdnPage {
     Card {
         vertical-stretch: 1;
 
-        // find the current layout's and variant's rows for the arrow keys to start from, the
-        // layouts' `ListView` only creates the rows in view so its rows can't tell
+        // find the current layout's and variant's rows for the arrow keys to start from. the layouts'
+        // `ListView` only creates the rows in view, so its rows can't
         for keymap[i] in Lang.keymaps: Rectangle {
             property <bool> current: keymap.id == Lang.current_keymap.id;
             width: 0;
@@ -221,8 +221,8 @@ export component KeyboardPage inherits TdnPage {
                         : root.first-layout-match ? Lang.keymaps[0].name : Lang.current_keymap.name;
                     edited(text) => {
                         layout-cursor = -1;
-                        // filtering drops the rows without telling them, the ones still there
-                        // set it again
+                        // filtering drops rows without notifying them, so the remaining ones set
+                        // it again
                         root.current-layout-row = -1;
                         layouts.content-y = 0;
                         Lang.filter_keymaps(text);

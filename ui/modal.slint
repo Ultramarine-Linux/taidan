@@ -19,12 +19,12 @@ export global Modal {
 }
 
 // gives the keyboard focus back to the control that opened a dialog once it closes, as Slint drops
-// it with the dialog. Put one in the control, call `opened()` right after opening the dialog, and
+// it with the dialog. put one in the control, call `opened()` right after opening the dialog, and
 // focus the control in `restore`
 export component DialogOpener {
     callback restore();
 
-    // the page the dialog was opened from, -1 while this didn't open the one that's open
+    // the page the dialog was opened from, -1 unless this opened the current dialog
     property <int> opened-on: -1;
     property <bool> modal-open: Modal.open;
 

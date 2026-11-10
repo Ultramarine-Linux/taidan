@@ -40,7 +40,8 @@ fn panic_msg(payload: &(dyn std::any::Any + Send)) -> String {
         .unwrap_or_else(|| "unknown panic".to_owned())
 }
 
-/// runs the installation (or [`simulate_install`]), the error message if it fails or panics
+/// runs the installation (or [`simulate_install`]) and returns the error message if it fails or
+/// panics
 fn run_install(
     settings: &mut libtaidan::settings::Settings,
     callback: &(impl libtaidan::Callback + Sync),
@@ -51,7 +52,7 @@ fn run_install(
             return crate::RT.block_on(simulate_install(callback)).map_err(|e| e.to_string());
         }
         crate::RT.block_on(libtaidan::start_install(settings, &crate::CFG, callback)).map_err(|e| {
-            // not an error, those go to Sentry, and this may name the user
+            // debug rather than error, since errors go to Sentry and this may name the user
             tracing::debug!(?e, "installation error");
             e.to_string()
         })
@@ -90,7 +91,7 @@ fn simulated_hw(name: &str) -> bool {
         .is_ok_and(|sim| sim.split(',').any(|s| s.trim() == name || s.trim() == "all"))
 }
 
-/// pretends to install, for [`is_dev_session`], set `TAIDAN_SIMULATE_ERROR` to fail halfway
+/// pretends to install in a [`is_dev_session`]. set `TAIDAN_SIMULATE_ERROR` to fail partway
 async fn simulate_install(
     callback: &(impl libtaidan::Callback + Sync),
 ) -> libtaidan::prelude::Res<()> {
@@ -141,7 +142,7 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
 }
 
 /// the progress bar after `frac` comes in, which never goes back within a stage. dnf counts
-/// downloads, then the transaction, from 0 again each, and a stage may run it more than once.
+/// downloads, then the transaction, each from 0, and a stage may run it more than once.
 /// [`InstallMsg::UpdStage`] resets it to -1, so it starts over with the next stage
 #[expect(clippy::cast_possible_truncation, reason = "a fraction, for display")]
 const fn stage_progress(current: f32, frac: f64) -> f32 {
@@ -156,11 +157,11 @@ fn start(ui: &slint::Weak<AppWindow>) {
     }
     install.set_state(InstallState::Running);
     install.set_error("".into());
-    // not `needs_reboot`, drivers an earlier attempt installed still need it
+    // not `needs_reboot`, since drivers an earlier attempt installed still need it
     install.set_updates_ready(false);
     install.set_drivers_failed(false);
     install.set_locale_failed(false);
-    // not where a failed attempt stopped, until the first stage starts
+    // don't show where a failed attempt stopped until the first stage starts
     install.set_stage_id("".into());
     install.set_stage_num(0);
     install.set_stage_progress(-1.0);
@@ -171,30 +172,30 @@ fn start(ui: &slint::Weak<AppWindow>) {
         (!crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Location))
             .then(|| app.global::<Location<'_>>().get_enabled());
     crate::SETTINGS.write().download_updates = install.get_download_updates();
-    // here rather than when leaving the network page, the summary can still change it
+    // here rather than when leaving the network page, since the summary can still change it
     crate::SETTINGS.write().proxy_persist = app.global::<Network<'_>>().get_proxy_persist();
-    // what the theme page shows, unless it's skipped, then the distro's default stays
+    // what the theme page shows, or the distro's default if it's skipped
     crate::SETTINGS.write().dark_mode =
         (!crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Theme))
             .then(|| app.global::<Theme<'_>>().get_mode() == ThemeMode::Dark);
-    // with the mode only, a skipped theme page keeps the distro's accent too
+    // only with the mode, so a skipped theme page keeps the distro's accent too
     let accent = crate::SETTINGS.read().dark_mode.and_then(|_| crate::theme::picked(&app.global()));
     crate::SETTINGS.write().accent = accent;
-    // like the theme, a skipped language page keeps the distro's system locale. The UI language
+    // like the theme, a skipped language page keeps the distro's system locale. the UI language
     // only comes from the system's then anyway, or is English if it's one we don't have
     if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::Language) {
         crate::SETTINGS.write().locale.clear();
     }
-    // only "Set Up Offline" on the network page skips the online steps no matter what. Otherwise
+    // only "Set Up Offline" on the network page skips the online steps no matter what. otherwise
     // this goes by the connection right now, as the summary does, also when the network page is
-    // skipped. Leaving `nointernet` off on an offline machine makes the dnf steps fail.
+    // skipped. leaving `nointernet` off on an offline machine makes the dnf steps fail.
     let net = app.global::<Network<'_>>();
     let online = net.get_install_online();
     let mut settings = crate::SETTINGS.read().clone();
     // before anything that names them can be logged
     crate::set_private_values(&settings);
     // the input methods the keyboard page and summary show, even the ones that only followed the
-    // UI language, since the locale they came from may have just been cleared. Only on this
+    // UI language, since the locale they came from may have just been cleared. only on this
     // attempt's copy, so they keep following the language if it changes before a retry
     settings.ims = crate::ims::enabled(&app.global());
     settings.ims_picked = true;
@@ -204,15 +205,15 @@ fn start(ui: &slint::Weak<AppWindow>) {
     if !online {
         tracing::info!(chosen = net.get_offline_chosen(), "Installing without the online steps");
     }
-    // the error page's way out when an online step keeps failing. Skipping them all still leaves
-    // a working system, just without updates and the extra software
+    // the error page's way out when an online step keeps failing. skipping them all still leaves
+    // a working system, only without updates and the extra software
     if install.get_force_offline() {
         tracing::warn!("Retrying without the online steps");
         settings.nointernet = true;
     }
     // the password is in `SETTINGS` now, so drop the plaintext copies in the UI instead of keeping
-    // them around for the rest of the session. Going back from the error page to its page means
-    // typing it again, retrying from the summary keeps the saved one.
+    // them around for the rest of the session. going back from the error page to its page means
+    // typing it again. retrying from the summary keeps the saved one.
     let account = app.global::<crate::ui::Account<'_>>();
     account.set_password("".into());
     account.set_password_repeat("".into());
@@ -253,8 +254,8 @@ fn start(ui: &slint::Weak<AppWindow>) {
 static APPLIED_A11Y: std::sync::Mutex<Option<(String, libtaidan::a11y::A11y)>> =
     std::sync::Mutex::new(None);
 
-/// the accessibility options as they are now, if they changed since the installation carried them
-/// over to the user
+/// gives the user the accessibility options as they are now, if they changed since the
+/// installation carried them over
 async fn reapply_a11y() {
     let applied = APPLIED_A11Y.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
     let Some((username, applied)) = applied else { return };
@@ -279,7 +280,7 @@ async fn finish(ui: &slint::Weak<AppWindow>, reboot: bool) {
         tracing::warn!(reboot, "Dev session: not marking the system configured, nor rebooting");
     } else {
         reapply_a11y().await;
-        // libtaidan did this at the end of the installation already, this only makes sure. It
+        // libtaidan already did this at the end of the installation, this only makes sure. it
         // succeeds when there's nothing left to do
         libtaidan::mark_configured().await;
         if reboot && !reboot_now().await {
@@ -301,8 +302,8 @@ async fn finish(ui: &slint::Weak<AppWindow>, reboot: bool) {
     }
 }
 
-/// asks systemd to reboot, a few times since `pkexec` can fail for a moment after a VT switch,
-/// whether it did
+/// asks systemd to reboot, retrying since `pkexec` can fail for a moment after a VT switch.
+/// returns whether it did
 async fn reboot_now() -> bool {
     for attempt in 1..=3 {
         match libtaidan::root(libtaidan::Verb::Reboot).await {
@@ -356,7 +357,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
                 tracing::error!(?state, "not finishing, the installation hasn't succeeded");
                 return;
             }
-            // once, a second press on Done would run it all again
+            // only once, since a second press on Done would run it all again
             if FINISHING.swap(true, std::sync::atomic::Ordering::SeqCst) {
                 return;
             }
@@ -369,9 +370,9 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
     });
     if let Some(app) = ui.upgrade() {
         let drivers = app.global::<Drivers<'_>>();
-        // a skipped drivers (`codecs`) page still installs them, as on the GTK version, hiding
-        // it is how a distro installs them without asking
-        // codecs come from dnf, see `DnfDownloadApps`
+        // a skipped drivers (`codecs`) page still installs them, as on the GTK version. hiding
+        // it is how a distro installs them without asking. codecs come from dnf, see
+        // `DnfDownloadApps`
         drivers.set_codecs(can_use_dnf());
     }
 
@@ -380,8 +381,8 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
     std::thread::spawn(move || {
         let mut hw = crate::RT.block_on(libtaidan::steps::detect_hardware());
         tracing::debug!(?hw, "Detected hardware");
-        // pretend to have hardware, to see the drivers list
-        // debug builds only, a stray variable mustn't list hardware that isn't there
+        // pretend to have hardware, to see the drivers list. debug builds only, so a stray
+        // variable can't list hardware that isn't there
         if cfg!(debug_assertions) && std::env::var_os("TAIDAN_SIMULATE_HW").is_some() {
             hw.nvidia |= simulated_hw("nvidia");
             hw.broadcom_wifi |= simulated_hw("broadcom-wifi");
@@ -422,7 +423,7 @@ mod tests {
         // -1 until the stage reports any
         assert!((stage_progress(-1.0, 0.25) - 0.25).abs() < f32::EPSILON);
         assert!((stage_progress(0.25, 0.5) - 0.5).abs() < f32::EPSILON);
-        // the transaction after the downloads
+        // the transaction starting from 0 after the downloads
         assert!((stage_progress(1.0, 0.1) - 1.0).abs() < f32::EPSILON);
     }
 

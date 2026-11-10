@@ -63,9 +63,9 @@ export component TdnBasePg {
     width: 100%;
     height: 100%;
     x: index < current ? -self.width : (index > current ? self.width : 0);
-    // off-screen pages are hidden, so Tab can't reach their inputs. Only the page that was shown
-    // slides out, the ones a jump passes over stay hidden, so a failed install doesn't flash the
-    // done page on its way to the error one
+    // off-screen pages are hidden so Tab can't reach their inputs. only the page that was shown
+    // slides out. pages a jump passes over stay hidden, so a failed install doesn't flash the done
+    // page on its way to the error page
     visible: active || (leaving && self.x > -self.width && self.x < self.width);
 
     // whether this was the page shown before the current one
@@ -84,7 +84,7 @@ export component TdnBasePg {
 
     @children
 
-    // a page sliding out stays visible for a moment, this keeps it from taking clicks, e.g. Back
+    // a page sliding out stays visible for a moment, so this keeps it from taking clicks, e.g. Back
     // on the summary once the installation has started
     if !root.active: TouchArea {
         width: 100%;
@@ -104,8 +104,8 @@ export component TdnHero inherits Rectangle {
         accessible-role: none;
     }
 
-    // marks a dev session, kept where the artwork expects it in every language. Distros can also
-    // set their own caption, which production shows alone.
+    // marks a dev session in English, so it fits where the artwork expects it in every language.
+    // Distros can set their own caption, shown without the version outside dev sessions
     property <string> caption: Cfg.get_string("welcome.t0", Cfg.dev-session ? "Development Session" : "");
 
     if root.caption != "" || Cfg.dev-session: VerticalLayout {
@@ -157,7 +157,7 @@ export component TdnHeader inherits HorizontalLayout {
             accessible-label: StepHdl.label(StepHdl.steps[root.step_i]);
             accessible-value: (root.step_i + 1) + "/" + StepHdl.steps.length;
 
-            // filled from the start edge, the right one for right-to-left languages
+            // filled from the start edge, which is the right one in right-to-left languages
             for step[i] in StepHdl.steps: Rectangle {
                 layout-order: Dir.order(i);
                 height: 6 * Tokens.unit;
@@ -244,7 +244,7 @@ export component TdnPage inherits TdnBasePg {
             font-weight: 500;
             horizontal-alignment: Dir.text-start;
             wrap: word-wrap;
-            // readable text when reviewing the screen, the group above announces it on focus
+            // the group above announces the name on focus. this keeps it readable when reviewing the screen
             text: root.name;
         }
 

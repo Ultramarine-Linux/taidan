@@ -8,7 +8,7 @@ import { ListView } from "std-widgets.slint";
 
 // the world map, clicking it picks the nearest zone
 component WorldMap inherits Rectangle {
-    // width over height of `world-map.svg`, 360° by 142° of latitude
+    // aspect ratio of `world-map.svg`, 360° of longitude by 142° of latitude
     property <float> aspect: 360 / 142;
 
     accessible-role: none;
@@ -44,7 +44,7 @@ component WorldMap inherits Rectangle {
             background: Tokens.color-muted-foreground.transparentize(0.4);
         }
 
-        // the chosen zone, UTC isn't anywhere on the map
+        // the chosen zone, if it's on the map (UTC isn't)
         if Tz.current.x >= 0: Rectangle {
             x: Tz.current.x * map.width - self.width / 2;
             y: Tz.current.y * map.height - self.height / 2;
@@ -115,7 +115,7 @@ export component TimezonePage inherits TdnPage {
                 list.content-y = 0;
                 Tz.search(text);
             }
-            // Enter takes the highlighted match, the first unless the arrow keys moved
+            // Enter takes the highlighted match, see `active-row`
             accepted => {
                 if root.searching && Tz.results.length > 0 { root.pick(Tz.results[root.active-row]); }
                 else if !root.searching { root.try-next(); }
@@ -134,8 +134,7 @@ export component TimezonePage inherits TdnPage {
             vertical-stretch: 1;
             card-radius: md;
 
-            // finds the current zone's row, which `ListView` can't tell as it only creates the
-            // rows in view
+            // finds the current zone's row. `ListView` can't, since it only creates the rows in view
             for zone[i] in Tz.results: Rectangle {
                 property <bool> current: zone.id == Tz.current.id;
                 width: 0;
@@ -159,7 +158,7 @@ export component TimezonePage inherits TdnPage {
                 color: Tokens.color-muted-foreground;
             }
 
-            // always there, so the arrow keys can scroll it, hidden when there's nothing to list
+            // not behind an `if`, so the arrow keys can scroll it. hidden when there's nothing to list
             list := ListView {
                 visible: root.searching && Tz.results.length > 0;
                 x: 0.25rem;

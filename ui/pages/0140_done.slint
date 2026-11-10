@@ -52,7 +52,7 @@ export component DonePage inherits TdnBasePg {
                     wrap: word-wrap;
                 }
 
-                // not an error, the system works without them, but nobody should have to guess
+                // not an error since the system works without them, but nobody should have to guess
                 // why their GPU or Wi-Fi isn't any better
                 if Install.drivers-failed: TdnText {
                     text: Lang.t("page-done-drivers-failed", []);
@@ -80,8 +80,8 @@ export component DonePage inherits TdnBasePg {
                 }
             }
 
-            // centered vertically, a HorizontalLayout alone would stretch the buttons to the row's
-            // height
+            // centered vertically, since a HorizontalLayout alone would stretch the buttons to the
+            // row's height
             VerticalLayout {
                 layout-order: Dir.order(1);
                 alignment: center;

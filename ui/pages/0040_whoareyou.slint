@@ -154,8 +154,8 @@ component IconPicker inherits VerticalLayout {
 
         UserIcon { }
 
-        // once an icon and a username are chosen, preview the account instead of the hint
-        // `username-error` rather than `username-valid`, so it doesn't flicker while the
+        // once an icon and a username are chosen, preview the account instead of the hint. this
+        // checks `username-error` rather than `username-valid` so it doesn't flicker while the
         // background check runs
         if Account.avatar-id != "" && Account.username != "" && Account.username-error == "": VerticalLayout {
             layout-order: Dir.order(1);
@@ -281,19 +281,20 @@ export component WhoAreYouPage inherits TdnPage {
     can-next: Account.username-valid && Account.fullname-valid;
     forward-focus: nameinput;
 
-    // Enter pressed while the username was still being checked, it goes on once that's done
+    // Enter was pressed while the username was still being checked, so the page goes on once
+    // that's done
     property <bool> next-pending;
     property <string> checked-for: Account.checked-username;
     changed checked-for => {
         if self.next-pending && self.active {
             self.next-pending = false;
-            // does nothing if it turned out to be taken, nor while a dialog is over the page
+            // does nothing if it turned out to be taken or while a dialog is over the page
             if !Modal.open { self.try-next(); }
         }
     }
     changed active => {
         if self.active {
-            // it may have been plugged in since the OOBE started
+            // a camera may have been plugged in since the OOBE started
             Camera.refresh();
         } else {
             self.next-pending = false;
@@ -331,7 +332,7 @@ export component WhoAreYouPage inherits TdnPage {
                     }
                     accepted => {
                         userinput.focus();
-                        // typing replaces the suggestion, enter accepts it
+                        // typing replaces the suggestion, Enter accepts it
                         userinput.select-all();
                     }
                 }

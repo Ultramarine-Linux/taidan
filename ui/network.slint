@@ -46,7 +46,7 @@ export struct EnterpriseLogin {
     wired: bool,
     ssid: string,
     method: EapMethod,
-    // inner method for PEAP, TTLS and FAST, as named by NetworkManager, `mschapv2-plain` is
+    // inner method for PEAP, TTLS and FAST, as named by NetworkManager. `mschapv2-plain` is
     // TTLS's "MSCHAPv2 (no EAP)"
     inner: string,
     // the identity, for TLS too
@@ -100,7 +100,7 @@ export global Network {
     // network the password dialog is open for, empty if closed
     in-out property <string> password-ssid;
     // the network whose password or 802.1X dialog was last closed without connecting, so a connect
-    // that fails afterwards doesn't open it again. Cleared when a new connect starts
+    // that fails afterwards doesn't open it again. cleared when a new connect starts
     in-out property <string> dismissed-ssid;
     // whether the 802.1X login dialog is open, for the WPA-Enterprise network `enterprise-ssid`,
     // or the wired connection when `enterprise-wired`
@@ -119,7 +119,7 @@ export global Network {
     // rather than Next, which makes it the explicit choice that `offline-chosen` keeps
     in-out property <bool> offline-prompt;
     in-out property <bool> offline-prompt-explicit;
-    // "Set Up Offline" was chosen when leaving the network page. Only this skips the online steps,
+    // "Set Up Offline" was chosen when leaving the network page. only this skips the online steps,
     // otherwise the install goes by the connection it has when it starts
     in-out property <bool> offline-chosen;
 
@@ -135,14 +135,14 @@ export global Network {
     in property <string> proxy-public;
     // whether the installed system keeps using the proxy, else it's only for setup
     in-out property <bool> proxy-persist: true;
-    // checking the proxy reaches the internet, cleared when the dialog is cancelled, as the check
+    // checking the proxy reaches the internet, cleared when the dialog is canceled, as the check
     // it was waiting for no longer counts
     in-out property <bool> proxy-busy;
     // translation id of why the proxy can't be used
     in-out property <string> proxy-error-id;
     // the active connection with the default route, as a D-Bus path, "/" if none
     in property <string> primary-connection;
-    // the `primary-connection` the proxy was last found to reach the internet on. Another network
+    // the `primary-connection` the proxy was last found to reach the internet on. another network
     // may not have it, so it only counts as online on this one, until it's checked again there
     in property <string> proxy-checked-on;
 
@@ -159,8 +159,8 @@ export global Network {
     // reaching the internet, directly or through the proxy, which NetworkManager can't check
     out property <bool> online: state == NetState.online || (proxy-url != "" && proxy-checked-on == primary-connection
         && state != NetState.offline && state != NetState.connecting);
-    // whether the install would use the internet if it started now, what the summary shows and
-    // `install::start` goes by
+    // whether the install would use the internet if it started now. the summary shows this and
+    // `install::start` goes by it
     out property <bool> install-online: online && !offline-chosen;
 
     // pretty name for this device, and the hostname derived from it, or from the username if the
@@ -215,7 +215,7 @@ export global Network {
     callback save-ip(ssid: string, ip: IpSettings);
     // writes the device name and proxy to the settings, when leaving the page
     callback save();
-    // any page change, so a connection that fails later doesn't pop a dialog over another page,
-    // with whether the network page is the one shown now
+    // called on every page change with whether the network page is shown, so a connection that
+    // fails later doesn't pop a dialog over another page
     callback page-changed(bool);
 }

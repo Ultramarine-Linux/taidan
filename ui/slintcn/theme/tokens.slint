@@ -1,12 +1,10 @@
-// slintcn default theme — dark + light, switchable at runtime
+// slintcn default theme, dark and light, switchable at runtime
 //
-// `Theme.mode` selects which palette slot each semantic role pulls from
-// components only read `Tokens.*` — they don't care which mode is active
-// mutate `Theme.mode = ThemeMode.light` from Rust or Slint anywhere and
-// every color binding updates reactively
+// `Theme.mode` picks the palette color each semantic role uses. components only read `Tokens.*`,
+// so they don't care which mode is active
 //
-// to retune a VALUE: edit palette.slint
-// to remap a SEMANTIC ROLE: change the per-mode picks below
+// to retune a value, edit palette.slint
+// to remap a semantic role, change the per-mode picks below
 
 import { Palette } from "palette.slint";
 import { Palette as StdPalette } from "std-widgets.slint";
@@ -14,17 +12,17 @@ import { Palette as StdPalette } from "std-widgets.slint";
 export enum ThemeMode { dark, light }
 
 export global Theme {
-    // follows the system color scheme, to override it set `Palette.color-scheme`
-    // (std-widgets) instead, so the std widgets switch along with the tokens
+    // follows the system color scheme. to override it, set `Palette.color-scheme` (std-widgets) so
+    // the std widgets switch along with the tokens
     out property <ThemeMode> mode:
         StdPalette.color-scheme == ColorScheme.dark ? ThemeMode.dark : ThemeMode.light;
 }
 
 export global Tokens {
-    // how much bigger than the 600×500 designs the UI is drawn, the window derives its size and
+    // how much bigger than the 600×500 designs the UI is drawn. the window derives its size and
     // `default-font-size` (and so every `rem`) from this
     in-out property <float> scale: 1.2;
-    // one design pixel, sizes below are in these instead of `px`, so they follow `scale`
+    // one design pixel. sizes below use it instead of `px` so they follow `scale`
     out property <length> unit: 1px * scale;
     // text and buttons are drawn this much smaller than the rest, so the layout keeps its room
     in-out property <float> text-scale: 0.875;
@@ -67,18 +65,18 @@ export global Tokens {
         Theme.mode == ThemeMode.light ? Palette.red-700 : Palette.red-600;
     out property <color> color-destructive-foreground: #ffffff;
     out property <color> color-affirm:             Palette.green-400;
-    // subtle hover surface for outline/ghost controls — shadcn's "accent"
+    // subtle hover surface for outline and ghost controls (shadcn's "accent")
     out property <color> color-accent:
         Theme.mode == ThemeMode.light ? Palette.alpha-b-08-on-light : Palette.alpha-w-08;
 
-    // focus / interaction
+    // focus
     out property <color> color-ring:
         Theme.mode == ThemeMode.light ? Palette.neutral-700 : Palette.neutral-500;
     out property <length> focus-ring-width:  3 * unit;
     out property <length> focus-ring-offset: 2 * unit;
 
-    // surface tint / hairline — overlays invert their tint per mode so the
-    // contrast stays comfortable on either background
+    // surface tint and hairlines. the overlays flip between black and white per mode so they stay
+    // subtle on either background
     out property <color> color-surface-1:
         Theme.mode == ThemeMode.light ? Palette.alpha-b-04-on-light : Palette.alpha-w-04;
     out property <color> color-border-hairline:
@@ -86,7 +84,7 @@ export global Tokens {
     out property <color> color-border-hairline-strong:
         Theme.mode == ThemeMode.light ? Palette.alpha-b-20-on-light : Palette.alpha-w-20;
 
-    // radius — shadcn --radius: 0.625rem (10px) with derived steps
+    // radius, shadcn's --radius of 0.625rem (10px) with derived steps
     out property <length> radius-sm: 6 * unit;   // radius - 4
     out property <length> radius-md: 8 * unit;   // radius - 2
     out property <length> radius-lg: 10 * unit;  // radius

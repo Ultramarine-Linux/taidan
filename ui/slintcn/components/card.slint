@@ -1,10 +1,10 @@
 import { Tokens } from "../theme/tokens.slint";
 
-// a bordered surface. Cards aren't focusable, put a button inside to make one do something.
-// Nothing on the root is animated and it has no drop shadow, or Slint would inline a copy of
-// the card at every use
 export enum CardRadius { md, lg, xl }
 
+// a bordered surface. cards aren't focusable, so put a button inside to make one do something.
+// nothing on the root is animated and there's no drop shadow, or Slint would inline a copy of
+// the card at every use
 export component Card inherits Rectangle {
     in property <CardRadius> card-radius: CardRadius.xl;
 

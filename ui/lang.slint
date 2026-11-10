@@ -54,17 +54,17 @@ export global Lang {
     in property <Keymap> current_keymap;
     // `id` is empty for the layout's default variant
     in property <KeymapVariant> current_variant;
-    // the current layout can't type ASCII, so US English was added and Super+Space switches
+    // the current layout can't type ASCII, so US English was added, switched to with Super+Space
     in property <bool> latin-fallback;
-    // the picked keymap couldn't be saved for the system, the login screen may still have the old
-    // one until the installation tries again
+    // the picked keymap couldn't be saved for the system, so the login screen may keep the old one
+    // until the installation tries again
     in property <bool> keymap-not-saved;
     // selecting also applies the keymap to the system
     callback select_keymap(keymap: Keymap);
     callback select_variant(variant: KeymapVariant);
 }
 
-// left and right as the language reads, so text and rows mirror for right-to-left languages.
+// start and end edges as the language reads, so text and rows mirror for right-to-left languages.
 // Slint 1.18 has no layout direction, and `horizontal-alignment: start` is always the left
 export global Dir {
     // where lines start and end, for `horizontal-alignment`
@@ -75,7 +75,7 @@ export global Dir {
     out property <LayoutAlignment> end: Lang.rtl ? LayoutAlignment.start : LayoutAlignment.end;
 
     // `layout-order` for the `i`th child of a `HorizontalLayout`, which reverses the row for
-    // right-to-left languages. The first child can leave it out, as it's 0 either way.
+    // right-to-left languages. the first child can leave it out, as it's 0 either way
     public pure function order(i: int) -> int {
         Lang.rtl ? -i : i
     }

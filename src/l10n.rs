@@ -26,8 +26,8 @@ static PO_ASSETS: LazyLock<Arc<B>> = LazyLock::new(|| {
 });
 
 /// the embedded languages that [`PO_ASSETS`] also has. `available_languages` can't list a
-/// [`FileSystemAssets`], it gets file names without their language directory and finds only the
-/// fallback
+/// [`FileSystemAssets`]. it gets file names without their language directory, so it only finds
+/// the fallback
 static PO_AVAILABLE_LANGS: LazyLock<Vec<LanguageIdentifier>> =
     LazyLock::new(|| po_langs(&***PO_ASSETS));
 
@@ -44,8 +44,8 @@ fn po_langs(assets: &dyn i18n_embed::I18nAssets) -> Vec<LanguageIdentifier> {
     langs
 }
 
-/// Create a new loader according to the list of languages, leaving out ones [`PO_ASSETS`] doesn't
-/// have. If the translations there can't be loaded, the embedded ones are used instead.
+/// creates a loader for `langs`, leaving out ones [`PO_ASSETS`] doesn't have. if the translations
+/// there can't be loaded, the embedded ones are used instead
 #[must_use]
 pub fn new_loader(langs: Vec<LanguageIdentifier>) -> FluentLanguageLoader {
     let loader = fluent_language_loader!();
@@ -61,7 +61,7 @@ pub fn new_loader(langs: Vec<LanguageIdentifier>) -> FluentLanguageLoader {
         ?present,
         "cannot load the translations in {PO_PATH}, using the embedded ones"
     );
-    // a fresh loader, the failed one may be half loaded
+    // a fresh loader, since the failed one may be half loaded
     let loader = fluent_language_loader!();
     let mut embedded =
         langs.into_iter().filter(|li| crate::AVAILABLE_LANGS.contains(li)).collect_vec();
@@ -94,20 +94,20 @@ taidan_proc_macros::comptime_localedef_langrows!(LANGS);
 
 impl LanguageRow {
     /// `localedef` also lists legacy glibc aliases (`bokmal`, `deutsch`, …) that aren't locales.
-    /// Real ones have a territory (`en-US`) or are a bare 2–3 letter language code (`eo`).
+    /// real ones have a territory (`en-US`) or are a bare 2–3 letter language code (`eo`).
     fn is_alias(&self) -> bool {
         !self.locale.contains('-') && self.locale.len() > 3
     }
 
-    /// [`Self::locale`] as a BCP-47 tag (`en-US`), the proc macro already normalizes `localedef`'s
-    /// POSIX names (`en_US`) but this keeps any stragglers working.
+    /// [`Self::locale`] as a BCP-47 tag (`en-US`). the proc macro already normalizes `localedef`'s
+    /// POSIX names (`en_US`), this catches any it missed
     fn bcp47(&self) -> slint::SharedString {
         self.locale.replace('_', "-").into()
     }
 }
 
-/// the system locale for a language tag from [`LANGS`], `pt-BR` → `pt_BR.UTF-8`, `None` for ones
-/// that can't be one
+/// the system locale for a language tag from [`LANGS`], `pt-BR` → `pt_BR.UTF-8`. [`None`] for
+/// empty and private-use tags
 fn posix_locale(lang: &str) -> Option<String> {
     let tag = lang.split_once('.').map_or(lang, |(left, _)| left);
     // the OwO translation is only for the UI, the system gets US English
@@ -120,11 +120,10 @@ fn posix_locale(lang: &str) -> Option<String> {
     Some(format!("{}.UTF-8", tag.replace('-', "_")))
 }
 
-/// translations in another language that are close enough to show for a language, by its base
-/// language, before English
+/// translations in another language close enough to show before English, by base language
 const EXTRA_FALLBACKS: &[(&str, &str)] = &[("yue", "zh-Hant")];
 
-/// the translations to show for `locale`, best first, out of `available`. Only ones in the same
+/// the translations to show for `locale`, best first, out of `available`. only ones in the same
 /// language and those in [`EXTRA_FALLBACKS`], then `en-US`, never an unrelated language the
 /// solver offers (`pt-BR` → `es`)
 fn ui_langs(
@@ -149,7 +148,7 @@ fn ui_langs(
         .collect_vec()
 }
 
-/// switches the UI to `lang`, a BCP 47 tag, and keeps it for the installed system. Returns the
+/// switches the UI to `lang`, a BCP 47 tag, and keeps it for the installed system. returns the
 /// tag of the translation it got, which may be a fallback
 pub fn set_lang(lang: &str) -> String {
     let mut shown = "en-US".to_owned();
@@ -209,7 +208,7 @@ fn display_hdl<T>(
                 .unwrap_or_else(|e| panic!("cannot parse locale {current_lang:?}: {e}"));
             assert_ne!(locale, icu::locale::Locale::UNKNOWN, "locale {current_lang:?} is unk");
 
-            // ICU's built-in data lacks names in many languages, those get English ones
+            // ICU's built-in data lacks names in many languages, so those get English ones
             let fmt = dn::multi::LocaleDisplayNamesFormatter::try_new((&locale).into(), opt)
                 .or_else(|e| {
                     tracing::debug!(?e, ?locale, "no display names, using English ones");
@@ -226,15 +225,15 @@ fn display_hdl<T>(
     })
 }
 
-/// applies keymap changes on a worker thread, and only the newest request is applied, so scrolling
-/// through the layout list doesn't queue up a `localectl` call per row
 /// a keymap for the worker below, and whether it goes to the system too, not only the session
 type KeymapReq = (String, Option<String>, bool);
 
-/// the window the keymap worker tells when the system keymap couldn't be saved
+/// the window the keymap worker notifies when the system keymap couldn't be saved
 static KEYMAP_UI: std::sync::OnceLock<slint::Weak<crate::ui::AppWindow>> =
     std::sync::OnceLock::new();
 
+/// applies keymap changes on a worker thread. only the newest request is applied, so scrolling
+/// through the layout list doesn't queue up a `localectl` call per row
 static KEYMAP_TX: LazyLock<std::sync::mpsc::Sender<KeymapReq>> = LazyLock::new(|| {
     let (tx, rx) = std::sync::mpsc::channel::<KeymapReq>();
     std::thread::spawn(move || {
@@ -255,11 +254,11 @@ static KEYMAP_TX: LazyLock<std::sync::mpsc::Sender<KeymapReq>> = LazyLock::new(|
                 Ok(saved) => saved,
                 Err(e) => {
                     tracing::error!(?e, layout, ?variant, "cannot set keymap");
-                    // the system's may have been saved, but there's no telling
+                    // the system keymap may have been saved, there's no telling
                     true
                 }
             };
-            // only a request for the system says anything about it
+            // only a system request says whether the system keymap was saved
             if system && let Some(ui) = KEYMAP_UI.get() {
                 let res = ui.upgrade_in_event_loop(move |ui| {
                     use slint::ComponentHandle as _;
@@ -286,8 +285,8 @@ fn has_latin_fallback(layout: &str, variant: Option<&str>) -> bool {
     libtaidan::i18n::XkbKeymap::new(layout, variant).has_latin_fallback()
 }
 
-/// keeps the keymap and applies it, to the system too if `system`, which is what picking one on
-/// the page does, else only to the session
+/// keeps the keymap and applies it to the session, and to the system too if `system`, which is
+/// what picking one on the page does
 fn set_keymap(layout: &str, variant: Option<&str>, system: bool) {
     save_keymap(layout, variant);
     if system {
@@ -319,8 +318,8 @@ fn parse_xorg_keymap(conf: &str) -> (Option<String>, Option<String>) {
 }
 
 /// the keymap the system already has, so the keyboard page starts there instead of changing it.
-/// Read from the files `systemd-localed` keeps it in, the same way it does, `vconsole.conf` first,
-/// so there's no blocking `localectl` call before the UI is up
+/// read from the files `systemd-localed` keeps it in, `vconsole.conf` first as localed does, so
+/// there's no blocking `localectl` call before the UI is up
 fn system_keymap() -> Option<(String, Option<String>)> {
     let read = |path: &str| {
         std::fs::read_to_string(path)
@@ -361,7 +360,7 @@ fn matches(query: &str, haystacks: &[&str]) -> bool {
 }
 
 /// # Panics
-/// If `en-US` is missing from [`LANGS`].
+/// if `en-US` is missing from [`LANGS`]
 pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
     use crate::ui::{FluentArg, Language};
     use slint::{ComponentHandle, Model, ToSharedString};
@@ -369,8 +368,6 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
         tracing::trace!(?id);
         let mut fargs = fluent::FluentArgs::new();
         args.iter().for_each(|FluentArg { key, value }| {
-            // for some reason k, v are owned values
-            // weird design of `Model::iter()`
             fargs.set(key.to_string(), value.to_string());
         });
         let s = PO_LOADER.read().get_args_fluent(&id, Some(&fargs));
@@ -378,7 +375,7 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
         // they're redone in Weblate, and Slint text has no markup
         s.replace("<tt>", "").replace("</tt>", "").into()
     });
-    // Start in the system language if we have it, otherwise English.
+    // the system language if it's listed, otherwise English
     let initial = poly_l10n::system_want_langids()
         .find_map(|li| {
             let tag = li.to_string();
@@ -386,7 +383,8 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
         })
         .or_else(|| LANGS.iter().find(|lang| lang.locale == "en-US"))
         .expect("no english");
-    // by the translation shown, a language without one would be English laid out right to left
+    // by the translation shown, since a language without one would be English laid out right to
+    // left
     lang.set_rtl(is_rtl(&set_lang(&initial.bcp47())));
     lang.set_current_language(Language {
         locale: initial.bcp47(),
@@ -405,8 +403,8 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
                 crate::ims::follow_locale(&ui);
             }
             ui.upgrade_in_event_loop(|ui| {
-                // runs after `current_language` changed. The time zone names are localized in
-                // Rust, so redo them even when the time zone page is skipped. Ones never shown
+                // runs after `current_language` changed. the time zone names are localized in
+                // Rust, so redo them even when the time zone page is skipped. ones never shown
                 // yet are filled when their page or the summary is entered.
                 let tz = ui.global::<crate::ui::Tz<'_>>();
                 if !tz.get_current().id.is_empty() {
@@ -436,7 +434,7 @@ fn init_language_list(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::
         })
         .collect::<VecModel<_>>();
     let query = Query::default();
-    // the UI language when the search was typed. The arrow keys switch the language while the
+    // the UI language when the search was typed. the arrow keys switch the language while the
     // search stays, and the matches mustn't change under them
     let query_lang = Rc::new(RefCell::new(None::<Language>));
     let model = Rc::new(FilterModel::new(all_langs, {
@@ -531,10 +529,10 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
         }
     });
 
-    // applied to the session, KWin doesn't follow the system's layout and would type as US
-    // English, e.g. a password typed here wouldn't work at the login screen. Not to the system,
-    // which has it already, and more completely than what's parsed here (all its layouts, its
-    // options). Not in a dev session, where it would change the developer's keyboard
+    // applied to the session, since KWin doesn't follow the system's layout and would type as US
+    // English, e.g. a password typed here wouldn't work at the login screen. not to the system,
+    // which already has it more completely than what's parsed here (all its layouts and options).
+    // not in a dev session, where it would change the developer's keyboard
     let initial_variant_id =
         (!initial_variant.id.is_empty()).then_some(initial_variant.id.as_str());
     if crate::install::is_dev_session() {
@@ -617,7 +615,8 @@ mod tests {
 
     #[test]
     fn languages_without_icu_names_are_listed() {
-        // only where the build machine has the locales, `localedef --list-archive` is the source
+        // only where the build machine has the locale, since `localedef --list-archive` is the
+        // source
         let has = |tag: &str| LANGS.iter().any(|row| row.bcp47() == tag);
         if std::process::Command::new("localedef")
             .arg("--list-archive")
@@ -666,7 +665,7 @@ mod tests {
                 .map(ToString::to_string)
                 .collect_vec()
         };
-        // no Portuguese translation, and Spanish isn't one
+        // there's no Portuguese translation, and Spanish doesn't stand in for one
         assert_eq!(langs("pt-BR"), ["en-US"]);
         assert_eq!(langs("es-MX").first().map(String::as_str), Some("es"));
         assert_eq!(langs("es-MX").last().map(String::as_str), Some("en-US"));

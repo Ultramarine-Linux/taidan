@@ -17,7 +17,7 @@ use crate::ui::{
 
 /// how often the state and network list are refreshed while nothing else happens
 const POLL: Duration = Duration::from_secs(3);
-/// how often it looks while the network page isn't shown, where little shows the state (the
+/// how often it polls while the network page isn't shown. little else shows the state there (the
 /// summary's updates switch), and the installation shouldn't compete with it
 const POLL_ELSEWHERE: Duration = Duration::from_secs(10);
 /// whether the network page is shown, see [`POLL_ELSEWHERE`]
@@ -26,7 +26,7 @@ static ON_PAGE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::n
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(45);
 /// how long scan results take to come in after asking for them
 const SCAN_TIME: Duration = Duration::from_secs(3);
-/// how often `NetworkManager` is asked to check connectivity while behind a captive portal, each
+/// how often `NetworkManager` is asked to check connectivity while behind a captive portal. each
 /// check is a request to the internet that can take a while
 const PORTAL_CHECK: Duration = Duration::from_secs(10);
 
@@ -244,7 +244,7 @@ impl KeyMgmt {
     }
 
     /// how a network with access points secured as `self` and `other` is connected to, as if
-    /// their flags were one AP's. Bands of one network can differ, like WPA3 only on 6 GHz, and
+    /// their flags were one AP's. bands of one network can differ, like WPA3 only on 6 GHz, and
     /// `NetworkManager` picks an AP that matches what's saved, so a password network is saved as
     /// WPA-PSK when any band offers it, which SAE transition APs take too
     const fn merge(self, other: Self) -> Self {
@@ -367,9 +367,9 @@ const PROXY_INVALID: Failure = "page-internet-proxy-invalid";
 const PROXY_FAILED: Failure = "page-internet-proxy-error";
 /// the browser for logging in to captive portals, a `WPE WebKit` shell
 const PORTAL_BROWSER: &str = "/usr/bin/cog";
-/// the user it runs as. Not taidan, which has the root helper while the OOBE runs, so a page
-/// the network serves that gets past `WebKit` can't. `taidan-initial-setup.service` makes the user
-/// and removes it once the OOBE is done
+/// the user it runs as. not taidan's, which can use the root helper while the OOBE runs, so a
+/// page served by the network that escapes `WebKit` can't. `taidan-initial-setup.service`
+/// makes the user and removes it once the OOBE is done
 const PORTAL_USER: &str = "taidan-portal";
 /// checked through the proxy if `NetworkManager` has no connectivity check URI of its own
 const CHECK_URI: &str = "http://fedoraproject.org/static/hotspot.txt";
@@ -407,10 +407,11 @@ struct Nm {
     ui: slint::Weak<AppWindow>,
     /// access points from the last refresh, strongest per network
     aps: Vec<Ap>,
-    /// how every network the list has shown is secured, by SSID, for one that's gone from it
-    /// since
+    /// the security of every network the list has shown, by SSID, for ones that have dropped out
+    /// of it since
     seen: HashMap<Vec<u8>, KeyMgmt>,
-    /// IP settings for wi-fi networks without a saved connection yet by SSID, used once connecting
+    /// IP settings by SSID for wi-fi networks without a saved connection yet, applied when
+    /// connecting
     pending_ip: HashMap<Vec<u8>, IpConfig>,
     /// the last snapshot shown
     last: Option<Snapshot>,
@@ -418,7 +419,7 @@ struct Nm {
     /// when `NetworkManager` last checked connectivity for the portal browser
     portal_checked: Option<Instant>,
     /// whether the internet wasn't fully working at some point since the portal browser opened.
-    /// It's only closed on its own once that changes, since it's also there for portals
+    /// it's only closed on its own once that changes, since it's also there for portals
     /// `NetworkManager` misses, where it already says the internet works
     portal_offline: bool,
     /// when the scan the user asked for should be done
@@ -494,7 +495,7 @@ impl Nm {
 
     /// runs the commands that came in while connecting that don't have to wait for it, like
     /// loading IP settings or a scan, and keeps the rest for later in the order they came.
-    /// Once one is kept, all after it are too, so none overtakes one sent before it
+    /// once one is kept, all after it are too, so none overtakes one sent before it
     fn service(&mut self) {
         let Some(rx) = self.rx.take() else { return };
         while let Ok(cmd) = rx.try_recv() {
@@ -840,8 +841,8 @@ impl Nm {
     }
 
     /// connects with new `settings`, replacing any saved connection for `ssid` but keeping its IP
-    /// settings, and doesn't keep them if connecting fails, so a wrong password isn't saved. The
-    /// old connection is only deleted once the new one works, so a failed attempt keeps it.
+    /// settings. the old connection is only deleted once the new one works, and a failed attempt
+    /// deletes the new one, so a wrong password isn't saved
     fn add_and_connect(
         &mut self,
         ssid: &[u8],
@@ -1120,7 +1121,7 @@ fn eap_settings(login: &EnterpriseLogin) -> HashMap<&'static str, Value<'_>> {
             if login.private_key.is_empty() { &login.client_cert } else { &login.private_key };
         x.insert("private-key", cert_path(key));
         if login.private_key_password.is_empty() {
-            // an unencrypted key has no password, NM_SETTING_SECRET_FLAG_NOT_REQUIRED says so,
+            // an unencrypted key has no password. NM_SETTING_SECRET_FLAG_NOT_REQUIRED says so,
             // or NetworkManager fails with no secrets, which reads as a wrong password
             x.insert("private-key-password-flags", Value::from(4u32));
         } else {
@@ -1217,7 +1218,8 @@ fn install_certs(login: &mut EnterpriseLogin) -> Result<Certs, Failure> {
         let ext = std::path::Path::new(path.as_str())
             .extension()
             .and_then(|e| e.to_str())
-            // the helper only takes a short ASCII one, the rest is what the file's in it anyway
+            // the helper only accepts a short ASCII extension. others are dropped, since only the
+            // file's contents matter
             .filter(|e| !e.is_empty() && e.len() <= 8 && e.chars().all(|c| c.is_ascii_alphanumeric()))
             .map(|e| format!(".{}", e.to_ascii_lowercase()))
             .unwrap_or_default();
@@ -1336,7 +1338,7 @@ fn recheck_proxy(
 /// the bypass list a new proxy starts with, as `Network.proxy-bypass` has it
 const DEFAULT_BYPASS: &str = "localhost, 127.0.0.1, ::1";
 
-/// checks the internet is reachable through the proxy, then uses it. The check runs on its own
+/// checks the internet is reachable through the proxy, then uses it. the check runs on its own
 /// thread, so it doesn't wait for a connect or hold up the worker
 fn set_proxy(
     nm: &Nm,
@@ -1356,7 +1358,7 @@ fn set_proxy(
                 .and_then(|proxy| check_proxy(&proxy, &uri).map(|()| Some(proxy)))
         };
         push(&ui, move |net| {
-            // cancelled while it was checked, maybe opened again since, the user gave up on it
+            // canceled while it was being checked (maybe reopened since), so the user gave up on it
             if !net.get_proxy_open() || net.get_proxy_visit() != visit {
                 return;
             }
@@ -1383,7 +1385,7 @@ fn set_proxy(
     });
 }
 
-/// IPv4 address and DNS servers of a connection, IPv6 stays automatic apart from DNS
+/// IPv4 address and DNS servers of a connection. IPv6 stays automatic apart from DNS
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct IpConfig {
     /// address, prefix length, and gateway, or `None` for DHCP
@@ -1527,7 +1529,7 @@ impl IpConfig {
 
 impl Nm {
     /// opens a browser at the connectivity check page, which a captive portal redirects to its
-    /// login, returns whether it's open
+    /// login. returns whether it's open
     fn open_portal(&mut self, proxy: Option<(String, String)>) -> bool {
         if SHUT_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
             return false;
@@ -1571,7 +1573,7 @@ impl Nm {
         }
     }
 
-    /// whether the portal browser is still open, it's closed once the internet works. Connectivity
+    /// whether the portal browser is still open. it's closed once the internet works. connectivity
     /// keeps being rechecked while behind the portal, even with the browser closed, since it's
     /// often closed right after logging in
     fn check_portal(&mut self) -> bool {
@@ -1590,7 +1592,8 @@ impl Nm {
             self.portal_checked = None;
             return false;
         }
-        // right away once the browser closes, the login most likely just went through
+        // recheck right away once the browser closes, since the login most likely just went
+        // through
         if !closed && self.portal_checked.is_some_and(|at| at.elapsed() < PORTAL_CHECK) {
             return open;
         }
@@ -1780,7 +1783,7 @@ impl Nm {
         conn.update(settings)
     }
 
-    /// (re)connects `conn` on `dev`, so new IP settings take effect. They're saved by then, so a
+    /// (re)connects `conn` on `dev`, so new IP settings take effect. they're saved by then, so a
     /// failure says that rather than blaming the password, which the IP dialog can't change
     fn reactivate(&mut self, conn: &ObjectPath<'_>, dev: &ObjectPath<'_>) -> Result<(), Failure> {
         let root = ObjectPath::from_static_str_unchecked("/");
@@ -1834,7 +1837,7 @@ impl Nm {
                 zbus::blocking::proxy::Builder::new(&self.conn).build().map_err(failed)?;
             settings_proxy.add_connection(settings).map_err(failed)?
         };
-        // without a cable there's nothing to connect, it's used once one is plugged in
+        // without a cable there's nothing to connect. it's used once one is plugged in
         let plugged = self
             .at::<nm::Device<'_>>(&dev)
             .and_then(|d| d.state())
@@ -1852,7 +1855,7 @@ fn parse_mac(s: &str) -> Option<Vec<u8>> {
 }
 
 /// the helper starting the portal browser at `uri` as [`PORTAL_USER`] in `taidan-portal.service`, with
-/// what to write to its stdin. It waits for the browser to quit, so [`Nm::check_portal`] can tell.
+/// what to write to its stdin. it waits for the browser to quit, so [`Nm::check_portal`] can tell.
 /// [`None`] if the browser can't be given the session's display
 fn portal_command(
     proxy: Option<(String, String)>,
@@ -1867,7 +1870,7 @@ fn portal_command(
         return None;
     }
     // the session's own files are only taidan's, so the browser gets the display socket bound into
-    // its own runtime dir and nothing else. Connecting still needs write access to the socket
+    // its own runtime dir and nothing else. connecting still needs write access to the socket
     let acl = format!("u:{PORTAL_USER}:rw");
     match std::process::Command::new("setfacl").args(["-m", &acl, "--", &socket]).status() {
         Ok(status) if status.success() => {}
@@ -1876,7 +1879,8 @@ fn portal_command(
             return None;
         }
     }
-    // a crashed taidan's may still be there, it can't be started again while it is
+    // a crashed taidan's portal unit may still be running, and it can't be started again while
+    // it is
     if let Err(e) = stop_portal_unit() {
         tracing::debug!(?e, "no earlier portal browser to stop");
     }
@@ -1901,8 +1905,8 @@ fn stop_portal_unit() -> libtaidan::prelude::Res<()> {
         .unwrap_or_else(|_| Err(libtaidan::prelude::Err::Msg("stopping the portal panicked")))
 }
 
-/// stops the portal browser, which would outlive taidan otherwise. Through systemd, it's another
-/// user's and only root could signal it
+/// stops the portal browser, which would outlive taidan otherwise. goes through systemd since the
+/// browser runs as another user and only root could signal it
 fn close_portal() {
     let Some(mut child) = portal().take() else { return };
     if let Err(e) = stop_portal_unit() {
@@ -1919,8 +1923,8 @@ fn close_portal() {
     tracing::warn!("systemd-run didn't end with the captive portal browser");
 }
 
-/// the hostname for the device name `name`, see [`derive_hostname`]. If nothing in `name` is
-/// usable, e.g. it's all Japanese, it's `username-pc` so a name still changes the hostname. An
+/// the hostname for the device name `name`, see [`derive_hostname`]. if nothing in `name` is
+/// usable, e.g. it's all Japanese, it's `username-pc` so a name still changes the hostname. an
 /// empty `name` stays empty, which keeps the system's existing name
 fn device_hostname(name: &str, username: &str) -> String {
     if name.trim().is_empty() {
@@ -2013,7 +2017,7 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
         Cmd::Refresh => {
             push(ui, |net| net.set_scanning(true));
             nm.scan();
-            // results come in over the next few seconds, `Nm::publish` says when it's done
+            // results come in over the next few seconds. `Nm::publish` says when it's done
             nm.scanning_until = Some(Instant::now() + SCAN_TIME);
             return;
         }
@@ -2022,7 +2026,7 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
             let res = nm.connect(&ssid, &password);
             let security =
                 nm.aps.iter().find(|ap| ap.name == ssid).map(|ap| ap.key_mgmt.security());
-            // an open network has no password to get wrong, a supplicant disconnect there is
+            // an open network has no password to get wrong, so a supplicant disconnect there means
             // something else, like a MAC filter or a full AP
             let res = match res {
                 Err(FAILED_SECRETS) if security == Some(Security::Open) => Err(FAILED),
@@ -2071,7 +2075,7 @@ fn handle(nm: &mut Nm, ui: &slint::Weak<AppWindow>, cmd: Cmd) {
             let res = IpConfig::parse(&ip).and_then(|ip| nm.save_ip(&ssid, ip));
             push(ui, move |net| {
                 net.set_ip_busy(false);
-                // cancelled meanwhile, it mustn't close or show errors in another network's
+                // canceled meanwhile. it mustn't close or show errors in another network's dialog
                 if !net.get_ip_open() || net.get_ip_ssid().as_str() != ssid.as_str() {
                     return;
                 }
@@ -2248,8 +2252,8 @@ fn worker(ui: &slint::Weak<AppWindow>, rx: mpsc::Receiver<Cmd>) {
     let Some(mut nm) = connect_nm(ui, &rx) else { return };
     nm.rx = Some(rx);
     nm.scan();
-    // right away, whether it's online decides how the installation runs, even if the network
-    // page is skipped
+    // publish right away, since whether it's online decides how the installation runs, even if
+    // the network page is skipped
     nm.publish();
     loop {
         if SHUT_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
@@ -2272,7 +2276,7 @@ fn worker(ui: &slint::Weak<AppWindow>, rx: mpsc::Receiver<Cmd>) {
     }
 }
 
-/// shows `dir` in the file browser, or the first place if it's empty. Listed on another thread,
+/// shows `dir` in the file browser, or the first place if it's empty. listed on another thread,
 /// as a slow drive or network mount would freeze the UI
 fn browse(ui: &slint::Weak<AppWindow>, dir: &str, pac: bool, all: bool) {
     /// counts the folders asked for, so a slow listing doesn't replace a newer one
@@ -2381,7 +2385,7 @@ impl Drop for WorkerGone {
 }
 
 /// marks `ssid` as connecting right away, not once the worker gets to it after a scan, so a second
-/// click or Enter doesn't queue another connect that drops the first one. False if one is going
+/// click or Enter doesn't queue another connect that drops the first one. false if one is going
 /// already
 fn start_busy(ui: &slint::Weak<AppWindow>, ssid: &str) -> bool {
     let Some(ui) = ui.upgrade() else { return true };
@@ -2530,7 +2534,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
         let ui = ui.clone();
         move || {
             PAGE_VISIT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            // done with the network page, so done logging in to the portal too. Not through the
+            // done with the network page, so done logging in to the portal too. not through the
             // worker, which may be busy connecting for a while yet
             std::thread::spawn(close_portal);
             if let Some(ui) = ui.upgrade() {
@@ -2543,7 +2547,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
     });
 }
 
-/// keeps what the network page set for the installation, when leaving it. Whether it goes online
+/// keeps what the network page set for the installation, when leaving it. whether it goes online
 /// is up to `install::start`, from `Network.install-online`
 fn save(net: &Network<'_>) {
     // a connection's dialog mustn't follow onto the next page
@@ -2602,7 +2606,7 @@ mod tests {
     fn cert_names_are_unique() {
         assert_eq!(cert_name(true, "ignored"), "wired");
         assert_eq!(cert_name(false, "Home"), "home-486f6d65");
-        // the same as a hostname, but not as files
+        // these read the same as a hostname, but mustn't collide as files
         assert_ne!(cert_name(false, "Café"), cert_name(false, "Caf"));
         assert_ne!(cert_name(false, "東京"), cert_name(false, "大阪"));
         assert_eq!(cert_name(false, "東京"), "wifi-e69db1e4baac");

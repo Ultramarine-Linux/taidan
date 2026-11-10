@@ -4,7 +4,7 @@ use crate::prelude::*;
 /// installs them, whether that's the one the drivers ask for or one the user picks later
 ///
 /// Last, since dnf5 refuses a staged transaction once the rpmdb changed after it was downloaded,
-/// and every step before it may install something. Failing is never fatal, the system works fine
+/// and every step before it may install something. failing is never fatal, the system works fine
 /// without the updates and gets them the usual way later.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DownloadUpdates;
@@ -32,7 +32,7 @@ impl super::Step for DownloadUpdates {
             tracing::warn!(?e, "cannot download updates, leaving them for later");
             return Ok(());
         }
-        // what `dnf5 offline reboot` does but the reboot, which is up to the user. It fails when
+        // what `dnf5 offline reboot` does, minus the reboot, which is up to the user. it fails when
         // nothing was staged because the system is up to date already
         let armed = crate::root(crate::Verb::DnfOfflineArm).await;
         match armed {

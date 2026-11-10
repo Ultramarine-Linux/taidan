@@ -16,8 +16,7 @@ Requires=taidan-initial-setup.service
 
 [Service]
 Type=oneshot
-# This unit will run taidan-initial-setup,
-# so we can just stub it out
+# a stub, taidan-initial-setup.service (pulled in by Requires=) does the work
 ExecStart=true
 TimeoutSec=0
 RemainAfterExit=no

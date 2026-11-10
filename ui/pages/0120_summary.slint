@@ -57,19 +57,19 @@ export component SummaryPage inherits TdnPage {
     step_i: 3;
     name: Lang.t("page-summary", [{ key: "name", value: Account.first-name(Account.fullname, Account.username) }]);
     next-text: Lang.t("page-summary-confirm", []);
-    // Enter on the review doesn't start it, only on the button itself
+    // Enter on the review doesn't start the install, only on the button itself
     next-enter-hint: false;
 
     // the wi-fi network in use, if any
     property <string> connected-ssid: Network.connected-ssid;
 
     // focus the review itself instead of Confirm, so an Enter meant for the page before or a
-    // dialog doesn't start the install. Screen readers read the summary from here.
+    // dialog doesn't start the install. screen readers read the summary from here
     forward-focus: review;
 
     review := FocusScope {
         enabled: !Modal.open;
-        // takes what the buttons leave, the review scrolls when it doesn't fit, e.g. on 1024x600
+        // takes the space the buttons leave. the review scrolls when it doesn't fit, e.g. on 1024×600
         vertical-stretch: 1;
         // a named group, or screen readers skip the FocusScope and say nothing when it's focused
         accessible-role: groupbox;
@@ -175,7 +175,7 @@ export component SummaryPage inherits TdnPage {
                     }
                 }
 
-                // packed at the top like the account column, the card only as tall as what's in it
+                // packed at the top like the account column, with the card only as tall as its content
                 VerticalLayout {
                     layout-order: Dir.order(1);
                     alignment: start;
@@ -215,7 +215,7 @@ export component SummaryPage inherits TdnPage {
                         }
                     }
 
-                    // installed on the next restart, so only when there's internet to download them with
+                    // installed on the next restart, and only enabled with internet to download them
                     if Install.can-download-updates: TdnToggleRow {
                         vertical-stretch: 0;
                         enabled: Network.install-online;

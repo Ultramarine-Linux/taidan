@@ -12,14 +12,14 @@ const fn username_error(problem: Option<UsernameProblem>) -> &'static str {
     }
 }
 
-/// whether the full name has none of the characters that would cut it short in the GECOS field.
-/// The install would replace them, but then the login screen wouldn't show what the user typed
+/// whether the full name has none of the characters that separate GECOS fields.
+/// the install would replace them, but then the login screen wouldn't show what the user typed
 fn valid_fullname(s: &str) -> bool {
     !s.chars().any(libtaidan::passwd::gecos_separator)
 }
 
 /// starts the thread that looks up whether usernames are taken, which goes through NSS and maybe
-/// `lastlog2`, too slow for the UI thread. It only checks the latest username sent and drops a
+/// `lastlog2`, too slow for the UI thread. it only checks the latest username sent and drops a
 /// result once the username has changed again
 fn spawn_username_checker(
     ui: slint::Weak<crate::ui::AppWindow>,
@@ -60,8 +60,8 @@ fn derive_username(fullname: &str) -> String {
         .then(|| part.to_ascii_lowercase())
     }
 
-    // Chinese characters are read differently in Chinese and Japanese, a guess would likely be
-    // wrong for one of them. A `?` makes their word unusable
+    // Han characters read differently in Chinese and Japanese, so a guess would likely be wrong
+    // for one of them. mapping them to `?` makes their word unusable
     let script = icu::properties::CodePointMapData::<icu::properties::props::Script>::new();
     let fullname = fullname
         .chars()
@@ -108,7 +108,7 @@ pub fn initialize_ui(ui: slint::Weak<crate::ui::AppWindow>, account: &crate::ui:
         settings.username = account.get_username().into();
         // `:`, `,` and newlines would break the passwd entry
         let fullname = libtaidan::passwd::sanitize_fullname(&account.get_fullname());
-        // so the summary shows it as it's saved, not e.g. a blank line for one that's only spaces
+        // so the summary shows it as saved, not e.g. a blank line for one that's only spaces
         if fullname != account.get_fullname().as_str() {
             account.set_fullname(fullname.as_str().into());
         }

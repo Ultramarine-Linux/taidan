@@ -6,7 +6,7 @@ export global Camera {
     in property <bool> open;
     // latest preview frame, empty until the camera starts
     in property <image> frame;
-    // why the camera can't be used, if it can't
+    // why the camera can't be used, empty if it can
     in property <string> error;
 
     callback start();

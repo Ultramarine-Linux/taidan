@@ -1,8 +1,8 @@
-//! accessibility options, as the KDE config entries that turn them on in KWin and Plasma, and the
-//! `gsettings` or `xfconf-query` commands for the new user on GNOME, Budgie and Xfce
+//! accessibility options, as the KDE config entries that turn them on in KWin and Plasma, and as
+//! the `gsettings` or `xfconf-query` commands for the new user on GNOME, Budgie and Xfce
 //!
-//! the OOBE writes the KDE ones for its own KWin session as they change, and the new user gets
-//! whichever their desktop reads during setup, see [`apply_to_user`]
+//! the OOBE writes the KDE entries for its own KWin session as options change. the new user gets
+//! whichever form their desktop reads during setup, see [`apply_to_user`].
 use crate::prelude::*;
 
 /// what the user turned on in the OOBE
@@ -28,7 +28,7 @@ pub struct A11y {
     pub color_filter: u8,
 }
 
-/// how far zoom is turned on, about what four presses of Meta+= give
+/// the zoom level when zoom is on, about what four presses of Meta+= give
 pub const ZOOM: f64 = 2.0;
 
 /// Plasma's built-in fonts, for when the system's kdeglobals doesn't set them
@@ -39,8 +39,8 @@ const MONO: &str = "Hack";
 /// how many points larger text makes the fonts
 const LARGER_TEXT_STEP: u8 = 2;
 
-/// the system's kdeglobals, most important first, as Plasma's session on Fedora sets
-/// `XDG_CONFIG_DIRS`
+/// the system's kdeglobals, most important first, matching the `XDG_CONFIG_DIRS` that Plasma's
+/// session sets on Fedora
 const SYSTEM_KDEGLOBALS: [&str; 2] =
     ["/etc/xdg/kdeglobals", "/usr/share/kde-settings/kde-profile/default/xdg/kdeglobals"];
 
@@ -51,7 +51,7 @@ const LEGIBLE_MONO: &str = "Atkinson Hyperlegible Mono";
 const GNOME_FONT_SIZE: u8 = 11;
 const GNOME_LARGER_TEXT: &str = "1.25";
 
-/// Xfce's default font size, and the DPI that makes text about as much larger as on GNOME
+/// Xfce's default font size, and the DPI that enlarges text about as much as GNOME's Large Text
 const XFCE_FONT_SIZE: u8 = 10;
 const XFCE_LARGER_DPI: &str = "120";
 
@@ -109,7 +109,7 @@ fn font(family: &str, size: u8) -> String {
     format!("{family},{size},-1,5,400,0,0,0,0,0,0,0,0,0,0,1")
 }
 
-/// the fonts a new Plasma user starts with, which larger text only makes bigger
+/// the fonts a new Plasma user starts with, which larger text only scales up
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct SystemFonts {
     sans: String,
@@ -131,8 +131,8 @@ impl SystemFonts {
         Self::from_kdeglobals(&files.collect_vec())
     }
 
-    /// from the contents of kdeglobals files, most important first. Like KConfig, each key comes
-    /// from the first file that has it
+    /// from the contents of kdeglobals files, most important first. like KConfig, each key comes
+    /// from the first file that has it.
     fn from_kdeglobals(files: &[String]) -> Self {
         let get = |key: &str| {
             files.iter().find_map(|f| kconfig_value(f, "General", key)).and_then(parse_font)
@@ -153,7 +153,7 @@ fn kconfig_value<'a>(file: &'a str, group: &str, key: &str) -> Option<&'a str> {
     let mut in_group = false;
     for line in file.lines().map(str::trim) {
         if let Some(name) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
-            // `[$i]` alone on a line marks the whole file immutable, it's not a group
+            // `[$i]` alone on a line marks the whole file immutable and isn't a group
             if !name.starts_with('$') {
                 in_group = name == group;
             }
@@ -179,7 +179,7 @@ fn parse_font(font: &str) -> Option<(String, Option<u8>)> {
     if family.is_empty() {
         return None;
     }
-    // -1 when the font has a pixel size instead, and it may have a fraction, which is dropped
+    // -1 when the font has a pixel size instead. it may have a fraction, which is dropped.
     let size = fields.next().map(str::trim).and_then(|s| {
         s.split_once('.').map_or(s, |(whole, _)| whole).parse::<u8>().ok().filter(|&s| s > 0)
     });
@@ -216,8 +216,8 @@ impl A11y {
         ]
     }
 
-    /// every entry [`Self::user_entries`] can write, deleted so the defaults apply, for undoing
-    /// options that were carried over before they were turned off
+    /// deletes every entry [`Self::user_entries`] can write so the defaults apply, to undo options
+    /// that were carried over before they were turned off
     fn reset_entries() -> Vec<Entry> {
         let all = Self {
             screen_reader: true,
@@ -234,14 +234,14 @@ impl A11y {
         all.user_entries().into_iter().map(|e| Entry { value: None, bool: false, ..e }).collect()
     }
 
-    /// everything to write for the new user, nothing when no option is on so their config stays
-    /// untouched
+    /// everything to write for the new user. nothing when no option is on, so their config stays
+    /// untouched.
     #[must_use]
     pub fn user_entries(&self) -> Vec<Entry> {
         self.user_entries_with(&SystemFonts::read())
     }
 
-    /// [`Self::user_entries`], with larger text and the legible font based on `system`
+    /// [`Self::user_entries`] with larger text and the legible font based on `system`
     fn user_entries_with(&self, system: &SystemFonts) -> Vec<Entry> {
         if *self == Self::default() {
             return vec![];
@@ -301,7 +301,7 @@ pub(crate) fn gsettings(schema: &str, key: &str, value: Option<&str>) -> Vec<Str
 }
 
 /// `xfconf-query` setting a `ty` property, or resetting it for [`None`], through a D-Bus of its
-/// own like [`gsettings`]. `-n` creates the property in case the defaults don't have it
+/// own like [`gsettings`]. `-n` creates the property in case the defaults don't have it.
 pub(crate) fn xfconf(channel: &str, property: &str, ty: &str, value: Option<&str>) -> Vec<String> {
     let mut cmd = vec!["dbus-run-session", "--", "xfconf-query", "-c", channel, "-p", property];
     match value {
@@ -311,8 +311,9 @@ pub(crate) fn xfconf(channel: &str, property: &str, ty: &str, value: Option<&str
     cmd.into_iter().map(str::to_owned).collect()
 }
 
-/// runs the next `$1` arguments as a command, then the next after that, and so on, failing if any
-/// of them do. `eval` only ever sees `"${1}" "${2}"…`, never the arguments themselves
+/// reads a count from `$1` and runs that many of the following arguments as one command, then
+/// repeats, failing if any command fails. `eval` only ever sees `"${1}" "${2}"…`, never the
+/// arguments themselves.
 const RUN_ALL: &str = r#"
 status=0
 while [ $# -gt 0 ]; do
@@ -331,13 +332,13 @@ if [ -n "$TAIDAN_XFCONF_WAIT" ]; then sleep "$TAIDAN_XFCONF_WAIT"; fi
 exit "$status"
 "#;
 
-/// how long xfconfd waits before saving a change, it saves sooner when its D-Bus goes away, but
-/// `dbus-run-session` doesn't wait for that, and the next xfconfd could read the old file
+/// how long xfconfd waits before saving a change. it saves sooner when its D-Bus goes away, but
+/// `dbus-run-session` doesn't wait for that, so the next xfconfd could read the old file.
 const XFCONFD_SAVE_DELAY: &str = "6";
 
-/// [`gsettings`] and [`xfconf`] commands run one after the other through a single D-Bus, so one
-/// dconf or xfconf daemon has them all, rather than one for each that may not have saved before
-/// the next reads its files. Other commands run as they are. [`None`] if there are none
+/// [`gsettings`] and [`xfconf`] commands run one after another through a single D-Bus, so one
+/// dconf or xfconf daemon handles them all instead of one per command, which may not have saved
+/// before the next reads its files. other commands run unchanged. [`None`] if there are none.
 pub(crate) fn one_session(cmds: Vec<Vec<String>>) -> Option<Vec<String>> {
     if cmds.is_empty() {
         return None;
@@ -354,12 +355,12 @@ pub(crate) fn one_session(cmds: Vec<Vec<String>>) -> Option<Vec<String>> {
             _ => cmd,
         };
         xfconf |= cmd.first().is_some_and(|c| c == "xfconf-query");
-        // through `env`, for the variables some start with
+        // through `env`, since some commands start with variable assignments
         args.push((cmd.len() + 1).to_string());
         args.push("env".to_owned());
         args.extend(cmd);
     }
-    // a D-Bus only if one of them wanted it, it may not be installed otherwise
+    // start a D-Bus only if a command wanted one, since it may not be installed otherwise
     let mut out = if bus { vec!["dbus-run-session".to_owned(), "--".to_owned()] } else { vec![] };
     out.push("env".to_owned());
     out.push(format!("TAIDAN_XFCONF_WAIT={}", if xfconf { XFCONFD_SAVE_DELAY } else { "" }));
@@ -383,7 +384,7 @@ pub(crate) fn in_home(home: &std::path::Path, cmd: Vec<String>) -> Vec<String> {
 
 /// starts Orca at login on desktops other than GNOME, whose shell starts it from
 /// `screen-reader-enabled`. Orca's own autostart entry is only for GNOME and a few others, so this
-/// one in the user's config takes its place
+/// one in the user's config takes its place.
 const ORCA_AUTOSTART: &str = "[Desktop Entry]
 Type=Application
 Name=Orca Screen Reader
@@ -393,13 +394,13 @@ NotShowIn=GNOME;KDE;
 X-GNOME-AutoRestart=true
 ";
 
-/// where [`ORCA_AUTOSTART`] goes in the home, the name of Orca's own entry so it replaces it
+/// where [`ORCA_AUTOSTART`] goes in the home, named like Orca's own entry so it overrides it
 const ORCA_AUTOSTART_PATH: &str = ".config/autostart/orca-autostart.desktop";
 
 impl A11y {
     /// the commands that write the options into the config under `HOME` on a desktop other than
-    /// Plasma, `xfconf-query` on Xfce and `gsettings` elsewhere. Zoom, dwell click and the color
-    /// filter have nothing to go to on Xfce, and GNOME has no color filter
+    /// Plasma, `xfconf-query` on Xfce and `gsettings` elsewhere. zoom, dwell click and the color
+    /// filter have no Xfce setting, and GNOME has no color filter.
     #[must_use]
     pub fn desktop_commands(&self, edition: &str) -> Vec<Vec<String>> {
         if *self == Self::default() {
@@ -408,7 +409,7 @@ impl A11y {
         self.all_desktop_commands(edition)
     }
 
-    /// [`Self::desktop_commands`], even when no option is on, which resets them all
+    /// [`Self::desktop_commands`] even when no option is on, which resets them all
     fn all_desktop_commands(&self, edition: &str) -> Vec<Vec<String>> {
         if crate::theme::uses_xfconf(edition) {
             return self.xfconf_commands();
@@ -500,8 +501,8 @@ impl A11y {
     }
 }
 
-/// [`A11y::desktop_commands`] if there's a tool on this system to run them, all of them with
-/// `reset` to undo options that were turned off
+/// [`A11y::desktop_commands`] if this system has the tool to run them. with `reset`, every
+/// command, to undo options that were turned off.
 fn desktop_commands(
     settings: &crate::settings::Settings,
     edition: &str,
@@ -521,8 +522,8 @@ fn desktop_commands(
 
 /// writes the options into the new user's config, so their session starts with them
 ///
-/// on systemd-homed the home isn't mounted after it's created, so there they go in the skeleton
-/// it's created from instead, see [`write_to_skel`]
+/// on systemd-homed the home isn't mounted after it's created, so the options go into the
+/// skeleton it's created from instead, see [`write_to_skel`]
 ///
 /// # Errors
 /// - cannot find the user's home directory
@@ -530,7 +531,7 @@ pub async fn apply_to_user(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
 ) -> Res<()> {
-    // off too, for a retry after an attempt with it on
+    // even when off, in case an earlier attempt turned it on
     apply_to_greeter(settings.a11y.screen_reader).await;
     if cfg.taidan0.systemd_homed || settings.a11y == A11y::default() {
         return Ok(());
@@ -538,8 +539,8 @@ pub async fn apply_to_user(
     write_to_home(settings, cfg, None).await
 }
 
-/// [`apply_to_user`] again if the options changed since `applied` were, e.g. on the installing
-/// page, undoing the ones turned off since
+/// [`apply_to_user`] again if the options changed since `applied` was written (e.g. on the
+/// installing page), undoing the ones turned off since
 ///
 /// # Errors
 /// - cannot find the user's home directory
@@ -557,9 +558,8 @@ pub async fn reapply_to_user(
     write_to_home(settings, cfg, Some(applied)).await
 }
 
-/// starts the screen reader on the login screen too, or stops it again, on GDM only. Plasma Login
-/// Manager and SDDM have no setting for it, and slick-greeter keeps its own in the `lightdm`
-/// user's dconf
+/// starts or stops the screen reader on the login screen, on GDM only. Plasma Login Manager and
+/// SDDM have no setting for it, and slick-greeter keeps its own in the `lightdm` user's dconf.
 async fn apply_to_greeter(on: bool) {
     if !std::path::Path::new(crate::helper::GDM_DCONF_PROFILE).exists() {
         return;
@@ -572,9 +572,9 @@ async fn apply_to_greeter(on: bool) {
 /// a command to run as the user in their home, with what to feed its stdin
 pub(crate) type HomeCmd = (Vec<String>, Option<String>);
 
-/// runs `cmds` as the user, each failure logged. On systemd-homed, the home isn't mounted once
+/// runs `cmds` as the user, logging each failure. on systemd-homed the home isn't mounted once
 /// it's created, so they all run in one `homectl with`, which opens it with the user's password.
-/// That only works once the user is unlocked, see `steps::unlock_user`
+/// that only works once the user is unlocked, see `steps::unlock_user`.
 pub(crate) async fn run_in_home(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
@@ -608,7 +608,7 @@ pub(crate) async fn run_in_home(
     }
 }
 
-/// `cmds` as one `sh` script that runs them all and fails if any did
+/// `cmds` as one `sh` script that runs them all and fails if any fails
 fn homed_script(cmds: &[HomeCmd]) -> String {
     use crate::proxy::sh_quote;
     let mut script = "rc=0\n".to_owned();
@@ -652,7 +652,7 @@ async fn write_to_home(
         let dir = path.parent().unwrap_or(&home).to_string_lossy().into_owned();
         let path = path.to_string_lossy().into_owned();
         cmds.push((vec!["mkdir".to_owned(), "-p".to_owned(), dir], None));
-        // quiet, it would only echo the file into the log
+        // redirected so the file isn't echoed into the log
         cmds.push((
             vec![
                 "sh".to_owned(),
@@ -671,7 +671,7 @@ async fn write_to_home(
     Ok(())
 }
 
-/// writes the options into `skel`, a copy of `/etc/skel` the new user's home is made from,
+/// writes the options into `skel`, a copy of `/etc/skel` the new user's home is made from, and
 /// returns whether there was anything to write
 ///
 /// # Errors
@@ -860,7 +860,7 @@ mod tests {
         assert!(gnome.iter().all(|c| c[2] == "gsettings"));
         assert!(gnome.iter().any(|c| c.ends_with(&["stickykeys-enable".into(), "true".into()])));
         assert!(gnome.iter().any(|c| c.last().unwrap() == "'Atkinson Hyperlegible Next 11'"));
-        // off ones go back to the defaults, for a retry after an attempt with them on
+        // off ones go back to the defaults, in case an earlier attempt turned them on
         assert!(
             gnome.iter().any(|c| c[3] == "reset" && c.last().unwrap() == "text-scaling-factor")
         );

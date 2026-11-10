@@ -3,7 +3,7 @@ use slint::{Color, ModelRc, VecModel};
 
 use crate::ui::{AccentItem, Appearance};
 
-/// `#rrggbb` as a [`Color`], for the accents' colors, which are always valid
+/// `#rrggbb` as a [`Color`]. only for the accents' colors, which are always valid
 fn parse_hex(hex: &str) -> Color {
     crate::cfg::parse_color(hex).unwrap_or_default()
 }
@@ -22,7 +22,7 @@ fn white_contrast(c: Color) -> f32 {
     1.05 / (luminance(c) + 0.05)
 }
 
-/// `c` darkened just enough that white text on it reaches AA's 4.5:1. Most of libadwaita's accents
+/// `c` darkened just enough that white text on it reaches AA's 4.5:1. most of libadwaita's accents
 /// don't on their own (yellow is about 3:1), so buttons and other fills with text use this, and only
 /// the swatches show the color itself
 fn readable_fill(c: Color) -> Color {
@@ -38,8 +38,8 @@ fn readable_fill(c: Color) -> Color {
         .unwrap_or(Color::from_rgb_u8(0, 0, 0))
 }
 
-/// the swatch's check mark on `c`: white, as on the other swatches, unless it's under 3:1 there
-/// (non-text contrast, with some room), then near black
+/// the swatch's check mark on `c`: white, as on the other swatches, unless white is under 3.5:1
+/// there (3:1 non-text contrast plus some room), then near black
 fn check_color(c: Color) -> Color {
     if white_contrast(c) >= 3.5 {
         Color::from_rgb_u8(255, 255, 255)

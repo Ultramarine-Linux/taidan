@@ -1,5 +1,5 @@
-//! the keyboard page's input methods, see [`libtaidan::i18n::IMS`]. They follow the UI language
-//! until the user turns one on or off, from then on they're what the user picked
+//! the keyboard page's input methods, see [`libtaidan::i18n::IMS`]. they follow the UI language
+//! until the user turns one on or off, then stay as the user picked
 use std::rc::Rc;
 
 use slint::{ComponentHandle, Model, VecModel};
@@ -11,8 +11,8 @@ fn imf() -> libtaidan::i18n::I18nImf {
 }
 
 fn items() -> Vec<ImItem> {
-    // what `skip_pages = ["inputmethod"]` did before the page became part of the keyboard page,
-    // with no items the keyboard page and summary show none and none are set up
+    // keeps `skip_pages = ["inputmethod"]` working from before the input methods moved to the
+    // keyboard page. with no items, the keyboard page and summary show none and none are set up
     if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::InputMethod) {
         return vec![];
     }
@@ -30,7 +30,7 @@ fn items() -> Vec<ImItem> {
         .collect()
 }
 
-/// the ones turned on, for the keyboard page and the summary
+/// shows the ones turned on, for the keyboard page and the summary
 fn show_enabled(ims: &Ims<'_>, model: &VecModel<ImItem>) {
     let enabled = model.iter().filter(|im| im.on).map(|im| im.name).collect::<Vec<_>>();
     ims.set_enabled(enabled.join(", ").into());

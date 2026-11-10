@@ -8,8 +8,8 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 export component DriverRow inherits HorizontalLayout {
     in property <image> icon;
     in property <string> text;
-    // faded, for drivers that won't be installed. Not `opacity`, which renders the row to a layer
-    // and shifts the text by a pixel when it toggles.
+    // faded for drivers that won't be installed. this isn't `opacity`, which renders the row to a
+    // layer and shifts the text by a pixel when it toggles
     in property <bool> dimmed;
     property <color> color: root.dimmed ? Tokens.color-foreground.transparentize(0.5) : Tokens.color-foreground;
 
@@ -34,9 +34,9 @@ export component DriverRow inherits HorizontalLayout {
 
 // what gets installed for the detected hardware, also shown on the summary page
 export component DriverList inherits VerticalLayout {
-    // the install goes without internet, which the optional drivers and codecs are downloaded with
+    // the install goes without internet, which the optional drivers and codecs need to download
     in property <bool> offline;
-    // dims the optional drivers, the built-in ones are always installed
+    // dims the optional drivers, since the built-in ones are always installed
     property <bool> optional-dimmed: !Drivers.install || root.offline;
 
     spacing: 0.5rem;

@@ -15,7 +15,7 @@ Suggests:       %{name}-default-configs
 Requires:       kwin
 Requires:       dbus-daemon
 Requires:       swaybg
-# /run/polkit-1/rules.d, where taidan-initial-setup.service puts its rules, is read since 126
+# polkit reads /run/polkit-1/rules.d, where taidan-initial-setup.service puts its rules, since 126
 Requires:       polkit >= 126
 # installation steps
 Requires:       (glib2 or (/usr/bin/plasma-apply-colorscheme and kf6-kconfig))
@@ -36,14 +36,14 @@ Recommends:     systemd-homed
 Requires:       pciutils
 # dbus-send, to tell KWin to reload the keyboard layout
 Requires:       dbus-tools
-# network page, over its D-Bus API, and the browser for captive portals
+# the network page talks to NetworkManager over D-Bus, cog is the captive portal browser
 Requires:       NetworkManager
 Requires:       cog
 # setfacl, which lets the captive portal browser's user use the session's display
 Requires:       acl
 # time zone page: /usr/share/zoneinfo/zone1970.tab and the zones themselves
 Requires:       tzdata
-# keeps the clock right, `timedatectl set-ntp`
+# for `timedatectl set-ntp`, which keeps the clock right
 Recommends:     chrony
 # finds the kernel the NVIDIA driver is built for
 Recommends:     grubby
@@ -94,7 +94,7 @@ This package contains the default configuration files for Taidan.
 %{cargo_license_online} > LICENSE.dependencies
 %cargo_license_summary_online
 # the root helper is a binary of libtaidan, which %%cargo_install (the taidan package only) leaves
-# out. Its dependencies are a subset of taidan's, so the licenses above cover it
+# out. its dependencies are a subset of taidan's, so the licenses above cover it
 %{__cargo} build %{__cargo_common_opts} --profile rpm -p libtaidan --bin taidan-helper
 
 %install

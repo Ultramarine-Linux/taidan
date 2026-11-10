@@ -23,7 +23,7 @@ maps:
   curl -sSfL -o "$dir/zones.geojson" "$ne/ne_10m_time_zones.geojson"
   cargo run --release --example mkmaps -- "$dir/land.geojson" "$dir/zones.geojson" data/icons
 
-# bumps taidan and taidan_ui to a version, or by `major`, `minor`, or `patch`. Doesn't commit or tag.
+# bumps taidan and taidan_ui to a version, or by `major`, `minor`, or `patch`. doesn't commit or tag.
 # needs cargo-edit (`cargo install cargo-edit`)
 bump to="patch":
   #!/usr/bin/env bash

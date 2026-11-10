@@ -1,7 +1,7 @@
 pub use taidan_ui::*;
 
 /// # Panics
-/// If the UI cannot be created or the event loop fails.
+/// if the UI can't be created or the event loop fails
 pub fn run() {
     tracing::debug!("Starting Taidan");
     let screen = crate::screen::init();
@@ -10,8 +10,8 @@ pub fn run() {
     if screen.set(ui.as_weak()).is_err() {
         tracing::warn!("window already given to the screen scaling");
     }
-    // Wayland ignores the window `icon`; compositors look up `<app_id>.desktop` instead.
-    // Must be set after the platform exists (AppWindow::new) and before the window is shown.
+    // Wayland ignores the window `icon`, compositors look up `<app_id>.desktop` instead. this
+    // must be set after the platform exists (`AppWindow::new`) and before the window is shown.
     slint::set_xdg_app_id(crate::APPID).expect("cannot set xdg app id");
     crate::l10n::initialize_ui(&ui.as_weak(), &ui.global::<Lang<'_>>());
     let cfg: Cfg<'_> = ui.global();
@@ -30,7 +30,7 @@ pub fn run() {
     init_actions(ui.as_weak(), &ui.global());
     ui.set_pagenum(first_page);
     ui.set_framed(crate::install::is_dev_session());
-    // the OOBE has to be completed, Alt+F4 shouldn't drop to an unconfigured system. Finishing
+    // the OOBE has to be completed, Alt+F4 shouldn't drop to an unconfigured system. finishing
     // quits the event loop directly instead of closing the window.
     ui.window().on_close_requested(|| {
         if crate::install::is_dev_session() {
@@ -41,14 +41,14 @@ pub fn run() {
         }
     });
     ui.run().expect("cannot run ui");
-    // closing the window in a dev session skips finish(), so stop the helpers here too
+    // closing the window in a dev session skips `finish()`, so stop the helpers here too
     crate::network::shutdown();
     crate::a11y::shutdown();
 }
 
 /// whether `taidan.debug_shell` is on the kernel command line, either bare or set to a true value
-/// like systemd's `systemd.debug_shell`. A root terminal has to be opt-in. The helper checks it
-/// too, this only saves asking it
+/// like systemd's `systemd.debug_shell`. A root terminal has to be opt-in. the helper checks it
+/// too, this only saves asking it when it's off
 fn debug_shell_enabled() -> bool {
     match std::fs::read_to_string("/proc/cmdline") {
         Ok(cmdline) => libtaidan::helper::cmdline_has_debug_shell(&cmdline),

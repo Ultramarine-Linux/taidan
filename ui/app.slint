@@ -33,24 +33,24 @@ import { Ims } from "ims.slint";
 export { Lang, Cfg, Account, Step, StepHdl, Pages, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y, Appearance, Ims }
 
 export component AppWindow inherits Window {
-    // set from Rust to the first page not in `skip_pages`, Next and Back skip those too
+    // set from Rust to the first page not in `skip_pages`. next and Back skip those too
     // (`Cfg.next-page` and `Cfg.prev-page`)
     in-out property <int> pagenum: 0;
     title: Lang.t("window-title", [{ key: "distro", value: Cfg.distro }]);
-    // set from Rust, dev runs keep the title bar to move and close the window
+    // set from Rust so dev runs keep a title bar for moving and closing the window
     in property <bool> framed: false;
     no-frame: !self.framed;
     icon: Cfg.distro_icon();
     background: Tokens.color-background;
-    // from the `vercel-geist-fonts` package unless `font` in /etc/taidan.toml names the distro's,
-    // scripts the font lacks (CJK, …) fall back to system fonts. Atkinson Hyperlegible Next is from
-    // `atkinson-hyperlegible-next-fonts` and wins over both, since someone asked for it
+    // Geist is from the `vercel-geist-fonts` package unless `font` in /etc/taidan.toml names the
+    // distro's own. scripts it lacks (CJK, …) fall back to system fonts. Atkinson Hyperlegible Next,
+    // from `atkinson-hyperlegible-next-fonts`, wins over both when the legible font option is on
     default-font-family: A11y.legible-font ? "Atkinson Hyperlegible Next" : Cfg.get_string("font", "Geist");
-    // shown as a standalone window in the middle of the kiosk session, the designs are 600×500 and
-    // `Tokens.scale` fits that to the screen (`src/screen.rs`), the size is locked to keep it 6:5
+    // a standalone window in the middle of the kiosk session. the designs are 600×500,
+    // `Tokens.scale` fits that to the screen (`src/screen.rs`), and the size is locked to keep it 6:5
     preferred-width: 600 * Tokens.unit;
     preferred-height: 500 * Tokens.unit;
-    // set from Rust, `Tokens` itself isn't exported as its easings can't be
+    // set from Rust. `Tokens` itself isn't exported since its easings can't be
     in-out property <float> ui-scale <=> Tokens.scale;
     min-width: self.preferred-width;
     max-width: self.preferred-width;
@@ -92,7 +92,7 @@ export component AppWindow inherits Window {
         focus-page();
     }
 
-    // apply the text options here, `Tokens` can't be set from the global
+    // applied here because `Tokens` can't be set from the `A11y` global
     property <bool> larger-text: A11y.larger-text;
     changed larger-text => { Tokens.text-scale = larger-text ? 1.0 : 0.875; }
     property <bool> reduce-motion: A11y.reduce-motion;

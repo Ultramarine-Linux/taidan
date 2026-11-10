@@ -8,36 +8,36 @@ export global Install {
     // 1-based
     in property <int> stage-num;
     in property <int> stage-count: 11;
-    // progress within the stage, 0–1, or negative when unknown. A bar on the installing page
+    // progress within the stage for the installing page's bar, 0–1, or negative when unknown
     in property <float> stage-progress: -1;
     // details of why the installation failed
     in property <string> error;
-    // the NVIDIA driver was installed and built, otherwise finishing just drops to the login screen
+    // an NVIDIA or Broadcom Wi-Fi driver was installed and loads on reboot, otherwise finishing
+    // drops to the login screen
     in property <bool> needs-reboot;
     // whether to download updates to install on the next restart, a switch on the summary page
     in-out property <bool> download-updates: true;
     // false when dnf can't install updates, i.e. `taidan0.skip_dnf` or rpm-ostree
     in property <bool> can-download-updates: true;
-    // some drivers couldn't be installed, the rest of the installation still worked
+    // some drivers couldn't be installed, but the rest of the installation worked
     in property <bool> drivers-failed;
-    // the system language couldn't be set, usually since its language pack isn't installed
+    // the system language couldn't be set, usually because its language pack isn't installed
     in property <bool> locale-failed;
-    // updates were downloaded and install on the next restart
+    // updates were downloaded and will install on the next restart
     in property <bool> updates-ready;
     // the failed installation had online steps, so it can be retried without them
     in property <bool> used-internet;
-    // restarting from the done page failed, it can be tried again
+    // restarting from the done page failed and can be tried again
     in property <bool> reboot-failed;
-    // `finish()` is running, so the done page's buttons wait. Cleared if restarting fails
+    // `finish()` is running, so the done page's buttons wait. cleared if restarting fails
     in property <bool> finishing;
-    // set by the error page to retry offline, e.g. when a mirror is broken. Cleared by `reset()`
+    // set by the error page to retry offline, e.g. when a mirror is broken. cleared by `reset()`
     in-out property <bool> force-offline;
 
     callback start();
     // back to `idle` after a failed installation, so it can be started again
     callback reset();
-    // leave the OOBE after a successful installation: mark the system as configured, then reboot
-    // or just exit
+    // after a successful installation, marks the system as configured, then reboots or exits
     callback finish(reboot: bool);
 }
 

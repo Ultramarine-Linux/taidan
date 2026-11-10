@@ -87,8 +87,8 @@ export component InstallingPage inherits TdnBasePg {
                         overflow: elide;
                     }
 
-                    // how far the stage is, when it says (dnf's `[n/m]` lines). Hidden rather
-                    // than left out, so the text doesn't move when it shows
+                    // how far the stage is, when it reports that (dnf's `[n/m]` lines). hidden
+                    // rather than removed so the text doesn't move when it shows
                     Rectangle {
                         visible: Install.stage-progress >= 0;
                         height: 0.25rem;

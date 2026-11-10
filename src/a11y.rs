@@ -9,11 +9,12 @@ use zbus::blocking::Connection;
 
 use crate::ui::{A11y, AppWindow};
 
-/// about [`libtaidan::a11y::ZOOM`]: zoom in multiplies by KWin's default zoom factor, 1.2
+/// zoom-in presses to reach about [`libtaidan::a11y::ZOOM`], each multiplying by KWin's default
+/// zoom factor of 1.2
 const ZOOM_STEPS: usize = 4;
 
-/// the screen reader, here rather than in the worker so [`shutdown`] can stop it, with a number
-/// for each start so a watcher only watches the one it was started for
+/// the screen reader, kept here rather than in the worker so [`shutdown`] can stop it. each start
+/// gets a number so a watcher only watches the Orca it was started for.
 static ORCA: std::sync::Mutex<Option<(u64, std::process::Child)>> = std::sync::Mutex::new(None);
 
 /// counts Orca starts, see [`ORCA`]
@@ -35,7 +36,7 @@ static ORCA_LOCALE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(Non
 static WORKER: std::sync::OnceLock<mpsc::Sender<Msg>> = std::sync::OnceLock::new();
 
 /// where the options are kept while the OOBE runs, so they survive taidan (and KWin) restarting.
-/// In the unit's runtime directory, which is gone on the next boot
+/// it lives in the unit's runtime directory, which is gone on the next boot.
 const SAVED: &str = "a11y.json";
 
 /// how long the language has to stay the same before Orca restarts to speak it
@@ -43,12 +44,12 @@ const ORCA_RESTART_DELAY: Duration = Duration::from_millis(1500);
 
 enum Msg {
     Opts(Opts),
-    /// Orca is started again, if it runs, to speak the new language
+    /// restarts Orca, if it runs, to speak the new language
     RestartOrca,
 }
 
-/// called when the UI's language changes, `locale` being its POSIX locale (`pt_BR.UTF-8`).
-/// Doesn't block, a running Orca is restarted by the worker
+/// called when the UI's language changes, with `locale` as its POSIX locale (`pt_BR.UTF-8`).
+/// doesn't block. the worker restarts a running Orca.
 pub fn language_changed(locale: &str) {
     let mut current = ORCA_LOCALE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if current.as_deref() == Some(locale) {
@@ -56,7 +57,7 @@ pub fn language_changed(locale: &str) {
     }
     *current = Some(locale.to_owned());
     drop(current);
-    // before the worker exists Orca can't be running yet
+    // Orca can't be running before the worker exists
     if let Some(tx) = WORKER.get()
         && let Err(e) = tx.send(Msg::RestartOrca)
     {
@@ -124,13 +125,13 @@ pub fn shutdown() {
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, a11y: &A11y<'_>) {
     let (tx, rx) = mpsc::channel();
-    // one thread, so changes are applied in order
+    // a single thread, so changes apply in order
     std::thread::spawn({
         let ui = ui.clone();
         move || worker(&rx, &ui)
     });
-    // what was on before taidan restarted, if it did in this boot, otherwise all off. Either way
-    // the worker writes all of it, resetting anything else an earlier run left in the config
+    // the options from before taidan restarted in this boot, otherwise all off. either way the
+    // worker writes all of them, resetting anything else an earlier run left in the config.
     let opts = load();
     set(a11y, &opts);
     crate::SETTINGS.write().a11y = opts;
@@ -170,10 +171,10 @@ fn read(a11y: &A11y<'_>) -> Opts {
 
 fn worker(rx: &mpsc::Receiver<Msg>, ui: &slint::Weak<AppWindow>) {
     let bus = Connection::session().inspect_err(|e| tracing::error!(?e, "no session bus")).ok();
-    // the session's config may be left over from an earlier run, so the first one writes it all
+    // the session's config may be left over from an earlier run, so the first pass writes it all
     let mut applied: Option<Opts> = None;
-    // when Orca restarts for a new language. Not right away, the arrow keys on the language page
-    // switch the language with every press, and each restart would cut Orca off
+    // when Orca restarts for a new language. it waits because the arrow keys on the language page
+    // switch the language with every press, and each restart would cut Orca off.
     let mut restart_at: Option<Instant> = None;
     loop {
         let msg = match restart_at {
@@ -239,7 +240,7 @@ fn write_config(prev: Option<&Opts>, next: &Opts) {
         if old.contains(&entry) {
             continue;
         }
-        // in the OOBE user's own config, the one this KWin session reads
+        // a bare file name means the OOBE user's own config, which this KWin session reads
         let mut args = entry.kwriteconfig_args(entry.file);
         args.push("--notify".to_owned());
         match std::process::Command::new("kwriteconfig6").args(&args).status() {
@@ -255,7 +256,7 @@ fn apply_effects(bus: &Connection, first: bool, prev: &Opts, next: &Opts) {
     if first || prev.color_filter != next.color_filter {
         let method = match (prev.color_filter, next.color_filter) {
             (_, 0) => "unloadEffect",
-            // the mode was written with the config, a loaded effect has to read it again
+            // the new mode is already in the config, but a loaded effect has to reread it
             (1.., _) if !first => "reconfigureEffect",
             _ => "loadEffect",
         };
@@ -264,8 +265,8 @@ fn apply_effects(bus: &Connection, first: bool, prev: &Opts, next: &Opts) {
     if first || prev.dwell_click != next.dwell_click {
         effect(bus, if next.dwell_click { "loadEffect" } else { "unloadEffect" }, "dwellclicker");
     }
-    // on the first change too, a KWin that was zoomed in before taidan (re)started would stay
-    // that way while the tile says zoom is off
+    // on the first pass too, or a KWin that was zoomed in before taidan restarted would stay
+    // zoomed while the tile says zoom is off
     if first || prev.zoom != next.zoom {
         if next.zoom {
             for _ in 0..ZOOM_STEPS {
@@ -339,7 +340,7 @@ fn stop_orca() {
 fn start_orca(ui: &slint::Weak<AppWindow>) {
     let mut cmd = std::process::Command::new("orca");
     cmd.arg("--replace");
-    // in the UI's language, Orca's own messages through gettext and its voice
+    // in the UI's language, for both Orca's gettext messages and its voice
     let locale = ORCA_LOCALE.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
     if let Some(locale) = locale {
         cmd.envs(locale_env(&locale)).env_remove("LC_ALL").env_remove("LC_MESSAGES");
@@ -383,7 +384,7 @@ fn watch_orca(n: u64, ui: &slint::Weak<AppWindow>) {
     loop {
         std::thread::sleep(ORCA_WATCH_INTERVAL);
         let mut orca = lock_orca();
-        // stopped or replaced, by the worker or `shutdown`
+        // stopped or replaced by the worker or `shutdown`
         let Some((started, child)) = orca.as_mut().filter(|(started, _)| *started == n) else {
             return;
         };
@@ -413,14 +414,14 @@ fn screen_reader_off(ui: &slint::Weak<AppWindow>) {
     }
 }
 
-/// Orca runs as taidan, which polkit lets run anything as root while the OOBE is on. Its help
+/// Orca runs as taidan, which polkit lets run anything as root while the OOBE is on. its help
 /// (`help:orca`) and links go through GIO to whatever handles them: Yelp or `KHelpCenter`, then a
-/// browser, a file manager, and a terminal. So Orca gets XDG directories where GIO finds no
+/// browser, a file manager, and a terminal. so Orca gets XDG directories where GIO finds no
 /// `.desktop` files and no default apps, and `g_app_info_launch_default_for_uri` fails.
 ///
 /// GIO falls back to the `OpenURI` portal only with `GIO_USE_PORTALS=1` or in Flatpak and Snap, and
 /// GTK 3 only with `GTK_USE_PORTAL=1`, so those are unset. Orca itself never runs `xdg-open`,
-/// `kioclient` or Python's `webbrowser`, which reads `BROWSER`
+/// `kioclient` or Python's `webbrowser`, which reads `BROWSER`.
 mod sandbox {
     use std::ffi::{OsStr, OsString};
     use std::io;
@@ -485,8 +486,8 @@ mod sandbox {
     }
 
     /// makes `root` from scratch, with symlinks to everything in the real XDG directories except
-    /// `applications` and `mimeapps.list`, and returns the variables that point at it. Each data
-    /// directory gets one of its own so they still stack in the same order
+    /// `applications` and `mimeapps.list`, and returns the variables that point at it. each data
+    /// directory gets one of its own so they still stack in the same order.
     pub(super) fn build(root: &Path, real: &Real) -> io::Result<Vec<(&'static str, OsString)>> {
         match std::fs::remove_dir_all(root) {
             Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(e),
@@ -497,8 +498,9 @@ mod sandbox {
 
         let config = root.join("config");
         if let Some(real) = &real.config_home {
-            // dconf reads its database from here but writes it through its service, which uses
-            // the real one, so the link has to be there before Orca saves any settings
+            // dconf reads its database from here but writes through its service, which uses the
+            // real config. so the real `dconf` directory has to exist, and get linked, before Orca
+            // saves any settings.
             std::fs::create_dir_all(real.join("dconf"))?;
         }
         link_all(real.config_home.as_deref(), &config, |name| {
@@ -584,7 +586,7 @@ mod sandbox {
                 data_dirs: vec![share, fake.join("missing")],
             };
             let root = tmp.path().join("sandbox");
-            // twice, the second one replaces the first
+            // built twice, the second build replaces the first
             build(&root, &real).unwrap();
             let env = build(&root, &real).unwrap();
 
@@ -608,7 +610,7 @@ mod sandbox {
             );
         }
 
-        /// against this machine's real apps, if it has GIO's tool
+        /// runs against this machine's real apps, if it has GIO's tool
         #[test]
         fn gio_finds_no_handler() {
             if !Path::new("/usr/bin/gio").exists() {
@@ -616,7 +618,7 @@ mod sandbox {
             }
             let tmp = tempfile::tempdir().unwrap();
             let (_, mut real) = Real::from_env();
-            // the real config would get a `dconf` directory
+            // otherwise the real config would get a `dconf` directory
             real.config_home = None;
             let env = build(tmp.path(), &real).unwrap();
             for ty in MIME_TYPES {

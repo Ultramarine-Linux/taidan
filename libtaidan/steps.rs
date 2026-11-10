@@ -32,17 +32,17 @@ pub(crate) async fn is_ostree() -> bool {
     tokio::fs::try_exists("/ostree").await.unwrap_or_default()
 }
 
-/// whether dnf can install packages here, it can't with `skip_dnf` or on rpm-ostree
+/// whether dnf can install packages here, false with `skip_dnf` or on rpm-ostree
 pub(crate) async fn can_use_dnf(cfg: &crate::cfg::Config) -> bool {
     !cfg.taidan0.skip_dnf && !is_ostree().await
 }
 
-/// runs `a` and `b` together and waits for both, the first error if either fails. Unlike
-/// `try_join` it doesn't drop the other one when one fails, that would leave its root process
-/// running with nobody reading its output
+/// runs `a` and `b` concurrently and waits for both, returning `a`'s error, else `b`'s. unlike
+/// `try_join` it doesn't drop one when the other fails, which would leave its root process running
+/// with nobody reading its output.
 pub(crate) async fn join_both(
-    a: impl std::future::Future<Output = Res<()>>,
-    b: impl std::future::Future<Output = Res<()>>,
+    a: impl Future<Output = Res<()>>,
+    b: impl Future<Output = Res<()>>,
 ) -> Res<()> {
     let (a, b) = futures::future::join(a, b).await;
     a.and(b)

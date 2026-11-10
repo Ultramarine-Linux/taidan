@@ -12,15 +12,15 @@ import { Card } from "slintcn/components/card.slint";
 import { ScrollView } from "std-widgets.slint";
 
 export global TdnStyle {
-    // the accent picked on the theme page, so it shows right away like dark mode does, otherwise
-    // the distro's, lightened in dark mode so it still reads on a dark background
+    // the accent picked on the theme page, so it applies right away like dark mode does. otherwise
+    // the distro's, lightened in dark mode so it reads on a dark background
     out property <brush> accent: Appearance.accent >= 0 && Appearance.accent < Appearance.accents.length
         ? Appearance.accents[Appearance.accent].fill
         : Theme.mode == ThemeMode.dark
         ? Cfg.get_brush("accent_color_dark", #4a56e2)
         : Cfg.get_brush("accent_color", #00078f);
-    // text and icons on the accent, for distros with a light one. The picked accents all take
-    // white, as in libadwaita, which their fills are darkened for
+    // text and icons on the accent, for distros with a light one. the picked accents all take
+    // white, as in libadwaita, and their fills are darkened for it
     out property <color> accent-foreground: Appearance.accent >= 0 ? white
         : Theme.mode == ThemeMode.dark
         ? Cfg.get_color("accent_foreground_color_dark", Cfg.get_color("accent_foreground_color", white))
@@ -45,7 +45,6 @@ export component TdnBtn inherits Rectangle {
     in property <color> foreground-color: root.outline ? Tokens.color-foreground : Tokens.color-primary-foreground;
     in property <length> font-size: Tokens.typography-body-size;
     in property <bool> enabled: true;
-    // horizontal space between the edge and the content
     in property <length> padding-x: 1rem;
     in property <length> icon-size: 1.25rem;
     in property <length> min-size: 2.25rem;
@@ -81,9 +80,8 @@ export component TdnBtn inherits Rectangle {
     min-width: root.min-size * Tokens.text-scale;
     border-radius: Tokens.radius-md;
 
-    // the fill, border and dimming are on this inner rectangle, not the root. Slint inlines
-    // every instance of a component with `opacity` or an animated `background` on its root,
-    // a copy of the whole button per use
+    // the fill, border and dimming live on this inner rectangle because Slint inlines a full copy
+    // of any component with `opacity` or an animated `background` on its root at every use
     frame := Rectangle {
         border-radius: root.border-radius;
         border-width: root.outline ? 1px : 0;
@@ -98,14 +96,14 @@ export component TdnBtn inherits Rectangle {
 
         focus := FocusScope {
             enabled: root.enabled && Modal.open == root.in-dialog;
-            // a click set it, so it can be stale when Tab comes back here from elsewhere
+            // `pointer-focus` from an earlier click is stale once Tab brings the focus back
             focus-gained(reason) => {
                 if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
             }
             key-pressed(event) => {
                 root.pointer-focus = false;
                 // a held key repeats, which would go on to press whatever gets the focus next, like
-                // Confirm on the summary
+                // the summary's confirm button
                 if event.text == Key.Return || event.text == " " {
                     if !event.repeat { root.press(); }
                     return accept;
@@ -180,9 +178,7 @@ export component TdnBtn inherits Rectangle {
 
 // from slintcn Input
 export component TdnInput inherits Rectangle {
-    // two-way bound to the field contents
     in-out property <string> text;
-    // hint shown when the field is empty
     in property <string> placeholder;
     // accessible name, usually the visible label of the `TdnField` around it, falls back to
     // the placeholder
@@ -191,11 +187,11 @@ export component TdnInput inherits Rectangle {
     in property <string> description;
     // when false, the input dims and stops accepting keystrokes
     in property <bool> enabled: true;
-    // when true, the user can focus but not edit
+    // focusable but not editable
     in property <bool> read-only: false;
     // when true, characters render as bullets
     in property <bool> password: false;
-    // when true, the input grabs focus on mount
+    // focuses the input when it's created
     in property <bool> auto-focus: false;
     // leading icon, e.g. a magnifier for search fields
     in property <image> icon;
@@ -216,7 +212,7 @@ export component TdnInput inherits Rectangle {
 
     property <bool> revealed: false;
     property <bool> reveal-pointer-focus: false;
-    // the page it's on is shown, leaving it hides a revealed password again
+    // whether its page is shown. leaving the page hides a revealed password again
     in property <bool> page-active: true;
     changed page-active => { if !self.page-active { root.revealed = false; } }
     property <bool> has-icon: root.icon.width > 0;
@@ -241,9 +237,8 @@ export component TdnInput inherits Rectangle {
     height: Tokens.density-input;
     border-radius: Tokens.radius-md;
 
-    // the fill, border and dimming are on this inner rectangle, not the root. Slint inlines
-    // every instance of a component with `opacity` on its root, a copy of the whole input
-    // per use
+    // the fill, border and dimming live on this inner rectangle because Slint inlines a full copy
+    // of any component with `opacity` on its root at every use
     frame := Rectangle {
         background: Theme.mode == ThemeMode.light ? #ffffff : Tokens.color-surface-1;
         border-color: root.invalid ? Tokens.color-destructive
@@ -270,7 +265,7 @@ export component TdnInput inherits Rectangle {
         }
 
         input := TextInput {
-            // from the start edge, the right one for right-to-left languages
+            // from the start edge, which is the right one in right-to-left languages
             property <length> offset: root.has-icon ? 10 * Tokens.unit + icon.width + 8 * Tokens.unit : 12 * Tokens.unit;
             x: Dir.x(self.offset, self.width, parent.width);
             y: 0;
@@ -332,7 +327,7 @@ export component TdnInput inherits Rectangle {
 
             reveal-focus := FocusScope {
                 enabled: root.password && root.enabled && Modal.open == root.in-dialog;
-                // a click set it, so it can be stale when Tab comes back here from elsewhere
+                // `pointer-focus` from an earlier click is stale once Tab brings the focus back
                 focus-gained(reason) => {
                     if reason == FocusReason.tab-navigation { root.reveal-pointer-focus = false; }
                 }
@@ -373,9 +368,8 @@ export component TdnInput inherits Rectangle {
             }
         }
 
-        // outer focus ring, drawn last so it isn't clipped. Unlike the buttons' it shows after a
-        // click too, as browsers' `:focus-visible` does on text fields, which keep the focus
-        // to type into
+        // outer focus ring, drawn last so it isn't clipped. unlike the buttons' ring it also shows
+        // after a click, like browsers' `:focus-visible` on text fields
         if input.has-focus: FocusRing {
             host-width: parent.width;
             host-height: parent.height;
@@ -415,7 +409,7 @@ export component TdnListRow inherits Rectangle {
 
     focus := FocusScope {
         enabled: root.focusable && Modal.open == root.in-dialog;
-        // a click set it, so it can be stale when Tab comes back here from elsewhere
+        // `pointer-focus` from an earlier click is stale once Tab brings the focus back
         focus-gained(reason) => {
             if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
         }
@@ -462,7 +456,7 @@ export component TdnListRow inherits Rectangle {
         clicked => { root.clicked(); }
     }
 
-    // inset, the rows sit flush against each other and the edge of their list
+    // inset, since the rows sit flush against each other and the edge of their list
     if focus.has-focus && !root.pointer-focus: FocusRing {
         host-width: parent.width;
         host-height: parent.height;
@@ -472,7 +466,7 @@ export component TdnListRow inherits Rectangle {
     }
 }
 
-// picks one of `options`, the list opens below it and Up and Down change the choice while focused
+// picks one of `options`. the list opens below it, and Up and Down change the choice while focused
 export component TdnSelect inherits Rectangle {
     in property <[string]> options;
     in-out property <int> index;
@@ -482,7 +476,8 @@ export component TdnSelect inherits Rectangle {
     // accessible name, as the visible label is usually a `TdnField`'s
     in property <string> label;
     callback changed(int);
-    // when it gets focus or opens, with where it is in the window, so a scrolling list can show it
+    // fired when it gets focus or opens, with its position in the window, so a scrolling list can
+    // show it
     callback focus-in(/* y */ length, /* height */ length);
 
     property <bool> open;
@@ -530,7 +525,7 @@ export component TdnSelect inherits Rectangle {
 
             focus := FocusScope {
                 enabled: root.enabled && Modal.open == root.in-dialog;
-                // a click set it, so it can be stale when Tab comes back here from elsewhere
+                // `pointer-focus` from an earlier click is stale once Tab brings the focus back
                 focus-gained(reason) => {
                     if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
                 }
@@ -550,8 +545,8 @@ export component TdnSelect inherits Rectangle {
                     }
                     reject
                 }
-                // tabbing or clicking away leaves the list open otherwise. A click on an option
-                // doesn't move the focus, as the rows aren't focusable here, so it still reaches it
+                // otherwise tabbing or clicking away leaves the list open. the rows aren't focusable here,
+                // so clicking an option doesn't move the focus and the click still reaches it
                 focus-lost(reason) => {
                     if reason == FocusReason.tab-navigation || reason == FocusReason.pointer-click {
                         root.open = false;
@@ -674,7 +669,7 @@ export component TdnToggleRow inherits Rectangle {
     callback accepted();
     // whether this is part of a dialog, see `Modal`
     in property <bool> in-dialog;
-    // when it gets focus, with where it is in the window, so a scrolling list can show it
+    // fired when it gets focus, with its position in the window, so a scrolling list can show it
     callback focus-in(/* y */ length, /* height */ length);
 
     property <bool> pointer-focus;
@@ -688,8 +683,8 @@ export component TdnToggleRow inherits Rectangle {
         if root.enabled { root.toggled(!root.checked); }
     }
 
-    // faded when disabled. Not `opacity` on the root, which Slint inlines a copy of the whole
-    // row per use for
+    // faded when disabled. this isn't `opacity` on the root, since Slint would then inline a copy of
+    // the whole row at every use
     property <float> fade: root.enabled ? 0 : 0.5;
 
     forward-focus: focus;
@@ -709,7 +704,7 @@ export component TdnToggleRow inherits Rectangle {
 
     focus := FocusScope {
         enabled: Modal.open == root.in-dialog;
-        // a click set it, so it can be stale when Tab comes back here from elsewhere
+        // `pointer-focus` from an earlier click is stale once Tab brings the focus back
         focus-gained(reason) => {
             if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
         }
@@ -750,8 +745,8 @@ export component TdnToggleRow inherits Rectangle {
             layout-order: Dir.order(1);
             alignment: center;
 
-            // off is an outlined track with a darker knob, both above the 3:1 WCAG asks of
-            // controls against the card in either mode
+            // off is an outlined track with a darker knob, both above WCAG's 3:1 contrast for controls
+            // against the card in either mode
             Rectangle {
                 width: 2.4rem;
                 height: 1.3rem;
@@ -765,7 +760,7 @@ export component TdnToggleRow inherits Rectangle {
                     width: parent.height - 0.3rem;
                     height: self.width;
                     y: 0.15rem;
-                    // on is toward the end, the left for right-to-left languages
+                    // on is toward the end edge, which is the left in right-to-left languages
                     x: Dir.x(root.checked ? parent.width - self.width - 0.15rem : 0.15rem, self.width, parent.width);
                     border-radius: self.width / 2;
                     background: root.checked ? Tokens.color-primary-foreground : Tokens.color-muted-foreground.transparentize(root.fade);
@@ -922,7 +917,7 @@ export component TdnIconButton inherits Rectangle {
     // stays enabled while busy, since disabling the focused item drops focus
     focus := FocusScope {
         enabled: (root.enabled || root.busy) && Modal.open == root.in-dialog;
-        // a click set it, so it can be stale when Tab comes back here from elsewhere
+        // `pointer-focus` from an earlier click is stale once Tab brings the focus back
         focus-gained(reason) => {
             if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
         }
@@ -968,7 +963,7 @@ export component TdnIconButton inherits Rectangle {
 // a small square status icon: a green check when `ok`, a grey cross when not
 export component TdnStatusIcon inherits Rectangle {
     in property <bool> ok: true;
-    // the status, for screen readers, and anything more about it
+    // for screen readers, the status and anything more about it
     in property <string> label;
     in property <string> description;
 
@@ -1001,8 +996,8 @@ export component TdnDialog inherits Rectangle {
     TouchArea { }
 
     FocusScope {
-        // keys bubble up to it, it needn't be a Tab stop, and a click on the dialog's
-        // background mustn't take the focus from the field that has it
+        // keys bubble up to it, so it needn't be a Tab stop. A click on the dialog's background
+        // mustn't take the focus from the field that has it
         focus-on-tab-navigation: false;
         focus-on-click: false;
         key-pressed(event) => {
@@ -1044,9 +1039,9 @@ export component TdnDialog inherits Rectangle {
     }
 }
 
-// a list in a dialog that scrolls once the dialog shrinks it to fit the window, otherwise as tall
-// as what's in it. Slint scrolls a focused item into view on its own, items also call `reveal`
-// from their `focus-in` so their focus ring isn't cut off at the edge
+// a list in a dialog, as tall as its content until the dialog shrinks it to fit the window, then
+// it scrolls. Slint scrolls a focused item into view on its own, but items also call `reveal` from
+// their `focus-in` so their focus ring isn't cut off at the edge
 export component TdnScrollList inherits ScrollView {
     in property <length> spacing: 1rem;
 
@@ -1066,11 +1061,11 @@ export component TdnScrollList inherits ScrollView {
     }
 
     // `list.preferred-height` measures wrapped text as a single line, so it comes out too short
-    // and the end can't be scrolled to. Where the end marker lands is the real height
+    // and the end can't be scrolled to. where the end marker lands is the real height
     preferred-height: list-end.y;
     content-width: self.visible-width;
     content-height: list-end.y;
-    // it only scrolls up and down, a horizontal bar would sit on top of the last item
+    // vertical only, since a horizontal bar would sit on top of the last item
     horizontal-scrollbar-policy: always-off;
 
     list := VerticalLayout {
@@ -1079,7 +1074,7 @@ export component TdnScrollList inherits ScrollView {
         height: self.preferred-height;
         alignment: start;
         spacing: root.spacing;
-        // focus rings are drawn outside their item, keep them clear of the edges and the scrollbar
+        // focus rings are drawn outside their item, so keep them clear of the edges and the scrollbar
         padding-left: Tokens.focus-ring-offset + Tokens.focus-ring-width;
         padding-top: self.padding-left;
         padding-right: 0.9rem;

@@ -10,7 +10,7 @@ enum NvidiaBranch {
     Latest,
 }
 
-/// every driver package Taidan may install, which are all the helper takes for drivers
+/// every driver package Taidan may install, the only ones the helper takes for drivers
 pub(crate) fn driver_packages() -> Vec<&'static str> {
     let mut pkgs = vec!["nvidia-gpu-firmware", "libva-nvidia-driver", "broadcom-wl", "akmod-wl"];
     pkgs.extend(NvidiaBranch::R580.packages());
@@ -190,7 +190,7 @@ pub struct Hardware {
     pub secure_boot_blocks: bool,
 }
 
-/// detect hardware that [`DriversCodecs`] would install drivers for
+/// detects hardware that [`DriversCodecs`] would install drivers for
 pub async fn detect_hardware() -> Hardware {
     let pci = pci_devices().await;
     let nvidia = has_nvidia_gpu(&pci)
@@ -208,10 +208,10 @@ const PCI_VENDOR_BROADCOM: u16 = 0x14e4;
 
 /// Broadcom Wi-Fi chips that only `wl` (`broadcom-wl`) can drive on Fedora.
 ///
-/// This is `wl`'s device list minus the chips `brcmsmac` handles (4727, 0576, 4353, 4357),
-/// which work out of the box with linux-firmware. The b43 chips stay in, since Fedora doesn't
-/// ship the proprietary b43 firmware they need. Newer chips are `brcmfmac`'s and aren't
-/// supported by `wl` at all. See <https://wiki.debian.org/wl>.
+/// this is `wl`'s device list minus the chips `brcmsmac` handles (4727, 0576, 4353, 4357),
+/// which work out of the box with linux-firmware. the b43 chips stay in, since Fedora doesn't
+/// ship the proprietary b43 firmware they need. newer chips are `brcmfmac`'s and aren't
+/// supported by `wl` at all. see <https://wiki.debian.org/wl>.
 const WL_ONLY_DEVICES: &[u16] = &[
     0x4311, 0x4312, // BCM4311
     0x4315, // BCM4312
@@ -234,7 +234,7 @@ struct PciDevice {
 }
 
 impl PciDevice {
-    /// read a device from its directory in `/sys/bus/pci/devices`
+    /// reads a device from its directory in `/sys/bus/pci/devices`
     async fn read(dir: &std::path::Path) -> Option<Self> {
         let read = async |name| {
             let s = tokio::fs::read_to_string(dir.join(name)).await.ok()?;
@@ -299,7 +299,7 @@ enum Installed {
     Skipped,
 }
 
-/// install packages with rpm-ostree on atomic systems, or dnf unless the config skips it
+/// installs packages with rpm-ostree on atomic systems, or dnf unless the config skips it
 async fn install_pkgs(cfg: &crate::cfg::Config, pkgs: &[&str]) -> Res<Installed> {
     if super::is_ostree().await {
         let owned = pkgs.iter().map(|&p| p.to_owned()).collect();
@@ -341,7 +341,7 @@ impl Drivers {
     }
 
     /// the kernel that boots next, which may be newer than the running one if an earlier attempt
-    /// or the image installed one. Updates from [`super::DownloadUpdates`] only install on the
+    /// or the image installed one. updates from [`super::DownloadUpdates`] only install on the
     /// restart, then akmods builds the module for their kernel while booting
     async fn next_kernel() -> Res<String> {
         // grubby reads the boot loader entries, which only root may
@@ -358,9 +358,9 @@ impl Drivers {
         Ok(kver.trim().to_owned())
     }
 
-    /// Waits for akmods to build the given kernel module, then checks that it's there.
+    /// waits for akmods to build the given kernel module, then checks that it's there.
     ///
-    /// The akmod's `%posttrans` starts a build in the background, a second `akmods` waits on its
+    /// the akmod's `%posttrans` starts a build in the background, a second `akmods` waits on its
     /// lock and skips kmods that are already up to date, so this also builds it if that didn't.
     async fn kmod_built(module: &str) -> Res<bool> {
         let kver = Self::next_kernel().await?;
@@ -378,8 +378,8 @@ impl Drivers {
     }
 
     /// whether a module akmods builds would load: Secure Boot is off, or the key akmods signs with
-    /// is enrolled. Otherwise the kernel refuses it, and as the driver packages turn off nouveau,
-    /// the next boot would be stuck on the firmware framebuffer. On atomic systems rpm-ostree
+    /// is enrolled. otherwise the kernel refuses it, and with nouveau blacklisted by the driver,
+    /// the next boot would be stuck on the firmware framebuffer. on atomic systems rpm-ostree
     /// builds the kmods in its transaction without that key, so Secure Boot always blocks them
     async fn kmods_would_load() -> bool {
         const AKMODS_KEY: &str = "/etc/pki/akmods/certs/public_key.der";
@@ -401,7 +401,7 @@ impl Drivers {
         out.is_ok_and(|out| String::from_utf8_lossy(&out.stdout).contains("already enrolled"))
     }
 
-    /// Returns whether the kernel module is ready, so a reboot would load it.
+    /// returns whether the kernel module is ready, so a reboot would load it
     async fn setup_nvidia(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<Setup> {
         tracing::info!("Setting up Nvidia drivers");
         let primary_gpu = std::env::var("STELLAR_OPTION").is_ok_and(|x| x == "1");
@@ -439,7 +439,7 @@ impl Drivers {
         if installed == Installed::Skipped {
             return Ok(Setup::default());
         }
-        // the driver works without it, so the done page mentions it but it's not worth more
+        // the driver works without the primary GPU option, so a failure only shows on the done page
         let mut primary_failed = false;
         if primary_gpu {
             // a snippet of its own, the packaged `nvidia.conf` stays as it is. Xorg applies every
@@ -462,8 +462,8 @@ impl Drivers {
         Ok(Setup { reboot: built, failed: !built || primary_failed })
     }
 
-    /// Returns whether a reboot would load the drivers, i.e. the `wl` kernel module is ready or
-    /// rpm-ostree layered the packages.
+    /// returns whether a reboot would load the drivers, i.e. the `wl` kernel module is ready or
+    /// rpm-ostree layered the packages
     async fn setup_broadcom(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<Setup> {
         let mut done = Setup::default();
         if has_wl_only_wifi(pci) && !Self::kmods_would_load().await {

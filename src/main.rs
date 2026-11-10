@@ -77,7 +77,7 @@ fn main() {
     ui::run();
 }
 
-/// log fields that can say who the user is, left out of what goes to Sentry
+/// log fields that can identify the user, dropped from what goes to Sentry
 #[cfg_attr(debug_assertions, allow(dead_code))]
 const PRIVATE_FIELDS: &[&str] = &[
     "user", "username", "prev", "ssid", "hostname", "name", "fullname", "path", "home", "dest",
@@ -85,17 +85,17 @@ const PRIVATE_FIELDS: &[&str] = &[
     "args", "e",
 ];
 
-/// what the user typed that says who they are, each with its placeholder, replaced wherever it
-/// shows up in what goes to Sentry. Filled in by `install::start`
+/// identifying values the user typed, each with its placeholder, replaced wherever they show up
+/// in what goes to Sentry. filled in by `install::start`
 static PRIVATE_VALUES: RwLock<Vec<(regex::Regex, &'static str)>> = RwLock::new(Vec::new());
 
-/// makes [`scrub_event`] replace these wherever they show up
+/// sets the values [`scrub_event`] replaces
 pub fn set_private_values(settings: &libtaidan::settings::Settings) {
     let values = [
         (settings.fullname.as_str(), "<fullname>"),
         (settings.device_name.as_str(), "<hostname>"),
         (settings.hostname.as_str(), "<hostname>"),
-        // also takes the home with it, whatever directory it's in
+        // also covers the home directory, wherever it is
         (settings.username.as_str(), "<user>"),
     ];
     let values = values
@@ -105,13 +105,14 @@ pub fn set_private_values(settings: &libtaidan::settings::Settings) {
     *PRIVATE_VALUES.write() = values;
 }
 
-/// matches `value` wherever it's a word of its own, so a short one doesn't take parts of longer
-/// words with it. [`None`] if it's empty
+/// matches `value` only as a whole word, so a short one doesn't match inside longer words.
+/// [`None`] if it's empty
 fn value_regex(value: &str) -> Option<regex::Regex> {
     let word = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
     let first = value.chars().next()?;
     let last = value.chars().next_back()?;
-    // only where the value itself starts or ends a word, `/home/alice` needs nothing before it
+    // boundaries only where the value itself starts or ends with a word character, so
+    // `/home/alice` needs none before it
     let before = if word(first) { r"(^|[^\w-])" } else { "()" };
     let after = if word(last) { r"($|[^\w-])" } else { "()" };
     regex::RegexBuilder::new(&format!("{before}{}{after}", regex::escape(value)))
@@ -122,16 +123,16 @@ fn value_regex(value: &str) -> Option<regex::Regex> {
 }
 
 #[cfg_attr(debug_assertions, allow(dead_code))]
-/// `text` with the [`PRIVATE_VALUES`] replaced
+/// replaces the [`PRIVATE_VALUES`] in `text`
 fn scrub_str(text: &mut String) {
     replace_values(text, &PRIVATE_VALUES.read());
 }
 
 #[cfg_attr(debug_assertions, allow(dead_code))]
-/// `text` with each of `values` replaced by its placeholder
+/// replaces each of `values` in `text` with its placeholder
 fn replace_values(text: &mut String, values: &[(regex::Regex, &str)]) {
     for (re, placeholder) in values {
-        // twice, a match takes the character after it, which may be where the next one starts
+        // twice, since a match consumes the character after it, which may start the next one
         for _ in 0..2 {
             if let std::borrow::Cow::Owned(new) =
                 re.replace_all(text, format!("${{1}}{placeholder}${{2}}"))
@@ -182,7 +183,7 @@ fn scrub_event(event: &mut sentry::protocol::Event<'_>) {
             scrub_str(value);
         }
     }
-    // the machine's hostname, which is the one the user picked on a retry after it was set
+    // the machine's hostname, which is the user's pick on a retry after the first attempt set it
     if let Some(server) = &mut event.server_name {
         let mut name = server.to_string();
         scrub_str(&mut name);
@@ -218,7 +219,7 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 /// - cannot create taidan tempdir
 #[allow(clippy::cognitive_complexity)]
 fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
-    // first, it replaces the panic hook rather than chaining it, and Sentry's chains to it
+    // first, since it replaces the panic hook rather than chaining it, and Sentry's chains to it
     color_eyre::install().expect("install color_eyre");
     #[cfg(not(debug_assertions))]
     let sentry_guard = sentry::init((SENTRY_LINK, {
@@ -338,7 +339,7 @@ mod tests {
 
     #[test]
     fn replace_values_takes_every_match() {
-        // not through `set_private_values`, the other test sets those at the same time
+        // not through `set_private_values`, since the other test sets those concurrently
         let values = [(value_regex("al").expect("regex"), "<user>")];
         let mut msg = "user `al` already exists: al al, /home/al".to_owned();
         replace_values(&mut msg, &values);

@@ -1,12 +1,13 @@
 pub use libtaidan::cfg::{Config, SkipPage};
 use libtaidan::passwd::user_already_exists;
 
-/// where `skip_pages` and Next and Back go, from the `Pages` global in `ui/page.slint`
+/// Next and Back navigation that skips `skip_pages`, with indices from the `Pages` global in
+/// `ui/page.slint`
 #[derive(Clone, Debug)]
 pub struct PageNav {
     /// indices of the pages `skip_pages` hides
     skipped: Vec<i32>,
-    /// the last page Next and Back go through, the summary
+    /// the last page Next goes to, the summary
     last: i32,
 }
 
@@ -52,7 +53,7 @@ impl PageNav {
     }
 }
 
-/// fills in what `/etc/taidan.toml` doesn't say, and whether the OOBE should run at all
+/// fills in what `/etc/taidan.toml` leaves out, and whether the OOBE should run at all
 #[tracing::instrument(skip_all)]
 pub fn populate(cfg: &mut Config) {
     cfg.should_exit = !should_run(&cfg.taidan0);
@@ -66,14 +67,14 @@ fn should_run(taidan0: &libtaidan::cfg::Taidan0Config) -> bool {
         tracing::info!("taidan0.continue_if_user_exists detected");
     } else if user_already_exists() {
         // an install that died between removing its user record and the markers would
-        // otherwise start the OOBE on every boot. On a thread, since this may run on `RT`
+        // otherwise start the OOBE on every boot. on a thread, since this may run on `RT`
         if libtaidan::marked_unconfigured() {
             tracing::warn!("the system has a user but is still marked unconfigured, fixing");
             let marked = std::thread::spawn(|| crate::RT.block_on(libtaidan::mark_configured()));
             if marked.join().is_err() {
                 tracing::error!("marking the system configured panicked");
             }
-            // nor should a later rerun undo the tweaks that install turned on
+            // so a later rerun doesn't undo the tweaks that install turned on
             let cleared =
                 std::thread::spawn(|| crate::RT.block_on(libtaidan::tweaks::clear_on_record()));
             if !matches!(cleared.join(), Ok(Ok(()))) {
@@ -154,9 +155,9 @@ fn decode_hero(dark: bool) -> image::DynamicImage {
     }
 }
 
-/// a copy of the hero `width` pixels wide for the theme page. The renderers sample without
+/// a copy of the hero `width` pixels wide for the theme page. the renderers sample without
 /// mipmaps, so drawing the full image into a small card skips most of its pixels and aliases.
-/// Filter it down here instead.
+/// filter it down here instead
 fn hero_thumb(img: &image::DynamicImage, width: u32) -> HeroBuffer {
     if img.width() > width {
         to_buffer(&img.resize(width, u32::MAX, image::imageops::FilterType::Lanczos3))
@@ -165,8 +166,8 @@ fn hero_thumb(img: &image::DynamicImage, width: u32) -> HeroBuffer {
     }
 }
 
-/// decodes the welcome images on a separate thread, since decoding a 4K wallpaper on the UI thread
-/// when the page first shows would stall its slide-in animation. The theme page's thumbnails come
+/// decodes the welcome images on a separate thread, since a 4K wallpaper decoded on the UI thread
+/// when the page first shows would stall its slide-in animation. the theme page's thumbnails come
 /// after, once the event loop runs and the UI's scale is known
 fn load_hero_images(ui: slint::Weak<crate::ui::AppWindow>) {
     std::thread::spawn(move || {

@@ -13,12 +13,12 @@ static PROGRESS_REGEX: LazyLock<regex::Regex> =
 const TAIL_LINES: usize = 10;
 /// how long [`run_logged`] waits for another line once the program exited
 const DRAIN_LINE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
-/// how long [`run_logged`] reads output in all once the program exited, so something it started
+/// how long [`run_logged`] keeps reading in total once the program exited, so a leftover process
 /// that keeps printing can't hold it up forever
 const DRAIN_TOTAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// runs `verb` through the helper, and passes each line what it runs prints to `on_line`. The
-/// output also goes to stdout and is appended to `<name>.stdout.log` in [`crate::TEMP_DIR`]
+/// runs `verb` through the helper and passes each line of its output to `on_line`. the output also
+/// goes to stdout and is appended to `<name>.stdout.log` in [`crate::TEMP_DIR`].
 ///
 /// # Errors
 /// - the program cannot be run
@@ -32,14 +32,14 @@ pub(super) async fn run_logged(
     let (writer, reader) = tokio::net::unix::pipe::pipe().map_err(Err::_fail_to_run(name))?;
     let writer = writer.into_blocking_fd().map_err(Err::_fail_to_run(name))?;
     let mut child = cmd
-        // only the request, the helper doesn't pass stdin on to what it runs, and nobody types
-        // into the OOBE's tty, a question would wait forever
+        // stdin carries only the request. the helper doesn't forward it to the program, and
+        // nobody types into the OOBE's tty, so a prompt would wait forever.
         .stdin(std::process::Stdio::piped())
         .stdout(writer.try_clone().map_err(Err::_fail_to_run(name))?)
         .stderr(writer)
         .spawn()
         .map_err(Err::_fail_to_run(name))?;
-    // it holds the write end too, the pipe would never reach EOF otherwise
+    // `cmd` holds a copy of the write end, so the pipe never reaches EOF while it's alive
     drop(cmd);
     if let Some(mut stdin) = child.stdin.take() {
         // a failed write shows up as the helper refusing, so wait for it anyway
@@ -61,7 +61,7 @@ pub(super) async fn run_logged(
     let mut lines = tokio::io::BufReader::new(reader).split(b'\n');
     let mut tail = std::collections::VecDeque::with_capacity(TAIL_LINES);
     let mut status = None;
-    // set once it exits
+    // set once the child exits
     let mut drain_until: Option<tokio::time::Instant> = None;
     loop {
         let line = if let Some(drain_until) = drain_until {
@@ -141,7 +141,7 @@ pub(super) async fn handle_dnf(callback: &impl crate::Callback, verb: crate::Ver
 }
 
 /// enables `repo`, either the URL of a `.repo` file or the id of a repo that's already defined
-/// but disabled. The helper only takes this from a caller that's root already, see
+/// but disabled. the helper only takes this from a caller that's root already, see
 /// [`crate::helper::Verb::EnableRepo`]
 ///
 /// # Errors

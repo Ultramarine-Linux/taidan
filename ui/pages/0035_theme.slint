@@ -17,9 +17,9 @@ component ThemeTile inherits Rectangle {
     in property <bool> dark;
     in property <bool> checked;
     callback picked();
-    // Enter, to go on with this one
+    // fired on Enter, to go on with this one
     callback accepted();
-    // Left or Right, to the other tile
+    // fired on Left or Right, to switch to the other tile
     callback switched();
     // whether this is part of a dialog, see `Modal`
     in property <bool> in-dialog;
@@ -168,11 +168,11 @@ component ThemeTile inherits Rectangle {
     }
 }
 
-// the accent colors as a row of swatches, a radio group with one Tab stop, where Left and Right
-// pick the next one as they read. The focus moves along with the pick, so screen readers say
+// the accent colors as a row of swatches. it's a radio group with one Tab stop, and Left and Right
+// pick the next one in reading direction. the focus moves with the pick, so screen readers say
 // which color it is
 component AccentRow inherits Rectangle {
-    // Enter, to go on with the picked one
+    // fired on Enter, to go on with the picked one
     callback accepted();
 
     property <length> size: 1.75rem;
@@ -216,7 +216,7 @@ component AccentRow inherits Rectangle {
                 }
             }
 
-            // on the picked one, or the first while none is
+            // a Tab stop on the picked swatch, or on the first while none is picked
             focus := FocusScope {
                 enabled: !Modal.open;
                 focus-on-tab-navigation: swatch.checked || (Appearance.accent < 0 && i == 0);
@@ -283,12 +283,12 @@ export component ThemePage inherits TdnPage {
         StdPalette.color-scheme = dark ? ColorScheme.dark : ColorScheme.light;
     }
 
-    // for when the page is shown, the picked tile rather than always the first
+    // focuses the picked tile when the page is shown, rather than always the first
     public function focus-picked() {
         if root.dark { dark-tile.focus(); } else { light-tile.focus(); }
     }
 
-    // the tiles at their own height, in the middle of the page, the accents under them
+    // the tiles at their own height in the middle of the page, with the accents under them
     VerticalLayout {
         vertical-stretch: 1;
         alignment: center;

@@ -30,10 +30,10 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 pub enum InstallMsg {
     UpdStage(steps::Stage),
     NeedsReboot,
-    /// some drivers couldn't be installed, the installation still finishes without them
+    /// some drivers couldn't be installed. the installation still finishes without them.
     DriversFailed,
-    /// the system language couldn't be set, usually since its language pack isn't installed
-    /// (offline, or on an atomic edition), the installation still finishes in the old one
+    /// the system language couldn't be set, usually because its language pack isn't installed
+    /// (offline, or on an atomic edition). the installation still finishes in the old one.
     LocaleFailed,
     /// updates were downloaded and install on the next restart
     UpdatesReady,
@@ -70,7 +70,7 @@ pub async fn start_install(
     proxy::set(settings.proxy.clone());
     let saved = match &settings.proxy {
         Some(proxy) if settings.proxy_persist => proxy.persist().await,
-        // one saved by an earlier attempt would otherwise stay
+        // clear one saved by an earlier attempt
         _ => proxy::clear().await,
     };
     if let Err(e) = saved {
@@ -84,23 +84,23 @@ pub async fn start_install(
         tracing::info!(?stage, "Running stage");
         stage.run(settings, cfg, callback).await?;
     }
-    // the repos the install added, like the drivers' or a tweak's, may need overrides too
+    // repos the install added (drivers, tweaks) may need overrides too
     if settings.proxy_persist
         && let Some(proxy) = &settings.proxy
         && let Err(e) = proxy.write_repo_overrides().await
     {
         tracing::warn!(?e, "cannot keep dnf from using the proxy for the bypassed hosts");
     }
-    // the user may log in now, it was locked so a half-installed system couldn't be logged in to.
+    // the user was locked so nobody could log in to a half-installed system
     steps::unlock_user(settings, cfg).await?;
     steps::fix_homed_ims(settings, cfg).await;
-    // the user is theirs now, so no later run of Taidan should remove it. Not marked configured
-    // if the record stays, since a machine that leaves the OOBE with it could later have the
-    // account and its home removed by a rerun
+    // the account is the user's now, so no later Taidan run should remove it. if the record
+    // can't be cleared, the system isn't marked configured, since a rerun on a machine that left
+    // the OOBE with the record still there could remove the account and its home.
     passwd::clear_record().await?;
-    // the tweaks are the user's now too, a later rerun shouldn't undo them. After the user record,
-    // which a retry needs, while this is only needed if the install doesn't finish. If it dies
-    // before this, the repair in Taidan's startup clears it
+    // the tweaks are the user's now too, so a later rerun shouldn't undo them. this goes after the
+    // user record, which a retry needs, while this record only matters if the install doesn't
+    // finish. if the install dies before this, the repair in Taidan's startup clears it.
     for attempt in 1..=3 {
         match tweaks::clear_on_record().await {
             Ok(()) => break,
@@ -108,8 +108,8 @@ pub async fn start_install(
         }
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     }
-    // right away rather than when the user leaves the last page, or a machine that dies on it
-    // would boot into the OOBE again with the record gone and the user still there
+    // now rather than when the user leaves the last page. otherwise a machine that dies on that
+    // page would boot into the OOBE again with the record gone and the user still there.
     mark_configured().await;
     callback.send(InstallMsg::Finish);
     Ok(())
@@ -137,10 +137,10 @@ async fn run_cmd(
 ) -> Res<Vec<u8>> {
     use tokio::io::AsyncWriteExt;
     cmd.stdout(std::process::Stdio::piped());
-    // for the error, which would say nothing about why otherwise
+    // captured so the error can say why it failed
     cmd.stderr(std::process::Stdio::piped());
-    // not the OOBE's, a tty nobody types into, where a command asking something would wait
-    // forever. Without stdin, it fails
+    // never the OOBE's stdin, a tty nobody types into where a prompt would wait forever. with
+    // null stdin the prompt fails instead.
     cmd.stdin(if input.is_some() {
         std::process::Stdio::piped()
     } else {
@@ -159,8 +159,8 @@ async fn run_cmd(
     let p = p.wait_with_output().await.map_err(|e| Err::FailToRunProgram(name, e))?;
     if !p.status.success() {
         let e = Err::program_fail(name, &p);
-        // not an error, the output can name the user and the caller reports the failure itself.
-        // The message ends with the program's last output line
+        // debug rather than error, since the output can name the user and the caller reports the
+        // failure itself. the message ends with the program's last output line.
         tracing::debug!(name, %e, "command failed");
         return Err(e);
     }
@@ -191,8 +191,8 @@ pub async fn root_output(verb: Verb) -> Res<String> {
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
-/// like [`root`], but passes `input` on to the verb, for secrets that shouldn't be in arguments,
-/// which anyone can read, and files
+/// like [`root`], but passes `input` to the verb, for files and for secrets that shouldn't be in
+/// arguments (anyone can read those)
 ///
 /// # Errors
 /// - the helper failed to run
@@ -201,12 +201,12 @@ pub async fn root_with_stdin(verb: Verb, input: &[u8]) -> Res<()> {
     run_helper(&verb, input).await.map(drop)
 }
 
-/// how long [`run_helper`] waits before each try again when `pkexec` itself fails
+/// how long [`run_helper`] waits before each retry when `pkexec` itself fails
 const PKEXEC_BACKOFF: [std::time::Duration; 2] =
     [std::time::Duration::from_secs(2), std::time::Duration::from_secs(4)];
 
-/// runs the helper for `verb` with `input`, and returns its stdout. Tried again a few times when
-/// `pkexec` refuses, which it can for a moment after a VT switch makes the session inactive
+/// runs the helper for `verb` with `input` and returns its stdout. retries a few times when
+/// `pkexec` refuses, which it can do briefly after a VT switch makes the session inactive.
 async fn run_helper(verb: &Verb, input: &[u8]) -> Res<Vec<u8>> {
     tracing::debug!(?verb, "running taidan-helper");
     let stdin = helper::stdin(verb, input);
@@ -223,16 +223,16 @@ async fn run_helper(verb: &Verb, input: &[u8]) -> Res<Vec<u8>> {
     run().await
 }
 
-/// whether `pkexec` refused to run the helper at all, i.e. it wasn't authorized or there was no
-/// agent, not the helper refusing the request (exit 2) or what it ran failing
+/// whether `pkexec` refused to run the helper at all (not authorized, or no agent), as opposed to
+/// the helper refusing the request (exit 2) or what it ran failing
 fn pkexec_refused(e: &Err) -> bool {
     // pkexec's messages aren't translated
     matches!(e, Err::ProgramFail { rc: Some(126 | 127), output, .. }
         if output.contains("Error executing command as another user"))
 }
 
-/// runs `argv` as `user`, with `input` on its stdin, directly if that's who this runs as already,
-/// otherwise through the helper, which only runs things as the user the installation made
+/// runs `argv` as `user` with `input` on its stdin. runs it directly if this process already is
+/// `user`, otherwise through the helper, which only runs things as the user the installation made.
 ///
 /// # Errors
 /// - the command failed to run
@@ -248,8 +248,8 @@ pub async fn as_user(user: &str, argv: Vec<String>, input: Option<&[u8]>) -> Res
     root_with_stdin(Verb::AsUser { user: user.to_owned(), argv }, input.unwrap_or_default()).await
 }
 
-/// marks the system as configured so the OOBE doesn't run on the next boot, failures are logged.
-/// Safe to run more than once
+/// marks the system configured so the OOBE doesn't run on the next boot, logging failures. safe to
+/// run more than once.
 pub async fn mark_configured() {
     if let Err(e) = root(Verb::MarkConfigured).await {
         tracing::error!(?e, "cannot mark the system configured");

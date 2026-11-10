@@ -4,10 +4,10 @@ use crate::prelude::*;
 pub struct DnfInstallApps;
 
 /// swaps Fedora's `ffmpeg-free` for RPM Fusion's `ffmpeg`, as RPM Fusion says to before
-/// installing `@multimedia` (<https://rpmfusion.org/Howto/Multimedia>). Otherwise their conflicts
+/// installing `@multimedia` (<https://rpmfusion.org/Howto/Multimedia>). otherwise their conflicts
 /// make `--skip-broken` silently drop the codecs. `--allowerasing` on the extras transaction
 /// wouldn't do: dnf5 makes `--skip-broken` installs weak solver jobs, and libsolv drops a weak job
-/// before it tries erasing anything. Not fatal, e.g. without RPM Fusion there's no `ffmpeg`
+/// before it tries erasing anything. not fatal, e.g. without RPM Fusion there's no `ffmpeg`
 async fn swap_ffmpeg(callback: &impl crate::Callback) {
     let installed = tokio::process::Command::new("rpm")
         .args(["-q", "--quiet", "ffmpeg-free"])
@@ -60,7 +60,7 @@ impl super::Step for DnfInstallApps {
             }
         }
 
-        // the helper only takes these from a caller that's root already, see `helper::Verb`
+        // the helper refuses these unless taidan itself runs as root, see `helper::Verb`
         for script in settings.actions[3].iter().filter(|_| dnf) {
             super::root(crate::Verb::RunScript { script: script.clone() })
                 .await

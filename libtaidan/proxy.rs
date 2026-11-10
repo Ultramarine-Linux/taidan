@@ -1,7 +1,7 @@
 //! a manual HTTP proxy, for networks that only reach the internet through one
 //!
 //! `pkexec` clears the environment, so what runs as root gets the proxy from the request the
-//! helper reads on stdin (see [`crate::helper`]) instead of inheriting `http_proxy` and friends.
+//! helper reads on stdin (see [`crate::helper`]) instead of inheriting `http_proxy` and the like
 use crate::prelude::*;
 
 #[derive(Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -12,7 +12,7 @@ pub struct Proxy {
     pub no_proxy: String,
 }
 
-/// without the password, since the settings with the proxy in them are logged
+/// redacts the password, since settings with the proxy in them get logged
 impl std::fmt::Debug for Proxy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Proxy")
@@ -49,8 +49,9 @@ pub fn get() -> Option<Proxy> {
 }
 
 impl Proxy {
-    /// parses what the user typed, `host:port` gets an `http://` in front, `None` if the URL is
-    /// invalid, has no host, isn't an HTTP(S) or SOCKS proxy, or either has control characters
+    /// parses what the user typed, adding `http://` to a bare `host:port`. `None` if the URL is
+    /// invalid, has no host or isn't an HTTP(S) or SOCKS proxy, or if either field has control
+    /// characters
     #[must_use]
     pub fn new(url: &str, no_proxy: &str) -> Option<Self> {
         let url = url.trim();
@@ -82,9 +83,8 @@ impl Proxy {
         if has_control(&no_proxy) {
             return None;
         }
-        // as typed, apart from the scheme's case, which some tools are picky about. Not as the
-        // parser writes it out, which drops a default port, and a proxy without one is on 1080
-        // for curl
+        // keep it as typed, only lowercasing the scheme, which some tools are picky about. the
+        // parser's output drops a default port, and curl assumes 1080 for a proxy without one
         let url = match url.split_once("://") {
             Some((scheme, rest)) => format!("{}://{rest}", scheme.to_ascii_lowercase()),
             None => url,
@@ -92,14 +92,14 @@ impl Proxy {
         Some(Self { url: url.trim_end_matches('/').to_owned(), no_proxy })
     }
 
-    /// whether it's safe to write a line of, which settings that didn't come through [`Self::new`]
-    /// may not be
+    /// whether it's safe to write into a line of a config file. settings that didn't come through
+    /// [`Self::new`] may not be
     fn is_safe(&self) -> bool {
         !has_control(&self.url) && !has_control(&self.no_proxy)
     }
 
-    /// the environment variables for the proxy, both cases since tools disagree on which one
-    /// they read
+    /// the environment variables for the proxy, in lower and upper case since tools disagree on
+    /// which one they read
     #[must_use]
     pub fn vars(&self) -> Vec<(&'static str, &str)> {
         let mut vars = vec![];
@@ -118,7 +118,8 @@ impl Proxy {
     fn systemd_dropin(&self) -> String {
         let mut dropin = "[Service]\n".to_owned();
         for (key, value) in self.vars() {
-            // quoted, and `%` is a specifier in unit files, e.g. a password's `%40`
+            // escape for the quotes, and `%` because it's a specifier in unit files (e.g. a
+            // password's `%40`)
             let value = value.replace('\\', "\\\\").replace('"', "\\\"").replace('%', "%%");
             dropin.push_str(&format!("Environment=\"{key}={value}\"\n"));
         }
@@ -145,7 +146,7 @@ impl Proxy {
         let (authority, path) = rest.split_at(end);
         let host = authority.rsplit_once('@').map_or(authority, |(_, host)| host);
         let public = format!("{scheme}://{host}{path}");
-        // whatever the parser sees in it, it mustn't see credentials anymore
+        // re-parse to make sure no credentials are left, however the parser reads it
         let check = reqwest::Url::parse(&public).ok()?;
         (check.username().is_empty() && check.password().is_none())
             .then(|| Self { url: public, no_proxy: self.no_proxy.clone() })
@@ -159,7 +160,7 @@ impl Proxy {
     }
 
     /// # Errors
-    /// The URL isn't a valid proxy for reqwest.
+    /// the URL isn't a valid proxy for reqwest
     pub fn client(&self) -> reqwest::Result<reqwest::Client> {
         let proxy =
             reqwest::Proxy::all(&self.url)?.no_proxy(reqwest::NoProxy::from_string(&self.no_proxy));
@@ -170,13 +171,13 @@ impl Proxy {
     /// [`Self::write_repo_overrides`] for the hosts it's not used for
     ///
     /// # Errors
-    /// Cannot write the files.
+    /// cannot write the files
     pub async fn persist(&self) -> Res<()> {
         // a newline would add lines of its own to the files
         if !self.is_safe() {
             return Err(Err::Msg("the proxy has control characters in it"));
         }
-        // the helper saves the proxy the request has, which is the installation's
+        // the helper saves the proxy from its request, which is always the installation's
         if get().as_ref() != Some(self) {
             return Err(Err::Msg("only the installation's proxy can be saved"));
         }
@@ -186,16 +187,16 @@ impl Proxy {
     /// what [`Self::persist`] does, run by the helper as root
     ///
     /// # Errors
-    /// Cannot write the files.
+    /// cannot write the files
     pub(crate) fn persist_as_root(&self) -> Result<(), String> {
         if !self.is_safe() {
             return Err("the proxy has control characters in it".to_owned());
         }
         // every user can read `/etc/environment` and gets it in their session, so the password
-        // only goes into the dnf config. Apps ask for it themselves when the proxy wants one
+        // only goes into the dnf config. apps ask for it themselves when the proxy wants one
         let public = self.without_credentials().ok_or("the proxy URL is invalid")?;
-        // the dnf config first, `clear` goes by it, so it must be there if anything is. Only root
-        // may read it. `/etc/environment` has to stay readable for login sessions to pick the
+        // write the dnf config first, since `clear` only cleans up `/etc/environment` when it
+        // exists. only root may read it. `/etc/environment` has to stay readable for login sessions to pick the
         // proxy up
         let dropin = format!("[main]\nproxy={}\n", self.url);
         crate::helper::write_atomic(std::path::Path::new(DNF_DROPIN), dropin.as_bytes(), 0o600)
@@ -213,8 +214,8 @@ impl Proxy {
         }
         crate::helper::write_atomic(std::path::Path::new(ETC_ENVIRONMENT), env.as_bytes(), 0o644)
             .map_err(|e| format!("cannot write the proxy to {ETC_ENVIRONMENT}: {e}"))?;
-        // rpm-ostree has its daemon download, which reads neither of the above. Only root may
-        // read it, it has the password
+        // rpm-ostree downloads through its daemon, which reads neither of the above. only root
+        // may read the drop-in since it has the password
         if std::path::Path::new("/ostree").exists() {
             let dropin = self.systemd_dropin();
             crate::helper::write_atomic(
@@ -233,12 +234,12 @@ const RPM_OSTREED_ETC: &str = "/etc/systemd/system/rpm-ostreed.service.d/50-taid
 /// the proxy for `rpm-ostreed` until the reboot, see [`rpm_ostreed_as_root`]
 const RPM_OSTREED_RUN: &str = "/run/systemd/system/rpm-ostreed.service.d/50-taidan-proxy.conf";
 
-/// points `rpm-ostreed` at `proxy`, or at none, until the reboot. The `rpm-ostree` command only
-/// asks the daemon, which downloads with its own environment rather than the command's. It's
-/// restarted when that changes, so the next transaction has it
+/// points `rpm-ostreed` at `proxy`, or at none, until reboot. the `rpm-ostree` command only
+/// talks to the daemon, which downloads with its own environment. the daemon is restarted when
+/// the drop-in changes so the next transaction picks it up
 ///
 /// # Errors
-/// Cannot write the drop-in, or systemd doesn't take it.
+/// cannot write the drop-in, or systemd doesn't take it
 pub(crate) fn rpm_ostreed_as_root(proxy: Option<&Proxy>) -> Result<(), String> {
     let path = std::path::Path::new(RPM_OSTREED_RUN);
     let old = std::fs::read_to_string(path).ok();
@@ -272,8 +273,8 @@ pub(crate) fn rpm_ostreed_as_root(proxy: Option<&Proxy>) -> Result<(), String> {
 /// login sessions' environment, see pam_env(8)
 const ETC_ENVIRONMENT: &str = "/etc/environment";
 
-/// `/etc/environment` without its `http_proxy`, `https_proxy` and `no_proxy` lines, in any case,
-/// each line ending in a newline
+/// `/etc/environment` without its `http_proxy`, `https_proxy` and `no_proxy` lines (in either
+/// case), each line ending in a newline
 fn without_proxy_vars(env: &str) -> String {
     env.lines()
         .filter(|line| {
@@ -286,15 +287,15 @@ fn without_proxy_vars(env: &str) -> String {
 
 impl Proxy {
     /// turns the proxy off in dnf for the repos on hosts in [`Self::no_proxy`], since libdnf5 has
-    /// no `no_proxy` of its own. Removes the overrides if no repo needs one. Run again once the
+    /// no `no_proxy` of its own. removes the overrides if no repo needs one. run again once the
     /// install has added its repos
     ///
-    /// A best effort: only the hosts in a repo's `baseurl`, `metalink` and `mirrorlist` are
+    /// best effort: only the hosts in a repo's `baseurl`, `metalink` and `mirrorlist` are
     /// known, not the mirrors a metalink or mirrorlist hands out at runtime, which keep going
     /// through the proxy
     ///
     /// # Errors
-    /// Cannot write or remove the file.
+    /// cannot write or remove the file
     pub async fn write_repo_overrides(&self) -> Res<()> {
         if get().as_ref() != Some(self) {
             return Err(Err::Msg("only the installation's proxy has overrides written"));
@@ -336,10 +337,10 @@ const REPO_DIRS: [&str; 3] = ["/etc/yum.repos.d", "/etc/distro.repos.d", "/usr/s
 const REPO_OVERRIDE: &str = "/etc/dnf/repos.override.d/50-taidan-proxy-bypass.repo";
 
 /// the repos in a `.repo` file, each with the hosts in its `baseurl`, `metalink` and
-/// `mirrorlist`. One with `$` in a host is left out, which is a variable only dnf knows
+/// `mirrorlist`. A host with `$` in it is left out, since that's a variable only dnf expands
 fn repo_hosts(text: &str) -> Vec<(String, Vec<String>)> {
     let mut repos: Vec<(String, Vec<String>)> = vec![];
-    // whether the lines are for a URL key, which go on in indented lines
+    // whether the current key is a URL key, whose values can continue on indented lines
     let mut in_urls = false;
     for line in text.lines() {
         let continued = line.starts_with([' ', '\t']);
@@ -369,7 +370,7 @@ fn repo_hosts(text: &str) -> Vec<(String, Vec<String>)> {
             if let Ok(url) = reqwest::Url::parse(url)
                 && let Some(host) = url.host_str()
                 && !host.is_empty()
-                // the parser takes it as part of the name
+                // a dnf variable, which the parser keeps as part of the name
                 && !host.contains('$')
             {
                 hosts.push(host.trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase());
@@ -382,7 +383,7 @@ fn repo_hosts(text: &str) -> Vec<(String, Vec<String>)> {
 /// a repos.override.d file that turns the proxy off for the `repos` on a host in `no_proxy`,
 /// empty if there are none
 ///
-/// An empty `proxy=` in a repo section overrides the one in `[main]`, and libdnf5 then doesn't
+/// an empty `proxy=` in a repo section overrides the one in `[main]`, and libdnf5 then doesn't
 /// give librepo a proxy at all, see dnf5.conf(5). curl still goes by `http_proxy` and
 /// `no_proxy` from the environment then, which `/etc/environment` sets together
 fn repo_overrides(repos: &[(String, Vec<String>)], no_proxy: &str) -> String {
@@ -415,7 +416,7 @@ fn bypassed(host: &str, no_proxy: &str) -> bool {
             let Ok(net) = net.parse::<std::net::IpAddr>() else { return false };
             return in_cidr(host_ip, net, bits.parse().ok());
         }
-        // a port doesn't narrow it down, `::1`-like entries never match a name anyway
+        // ignore a port. `::1`-like entries never match a name anyway
         let name = entry.split(':').next().unwrap_or_default();
         let name = name.trim_start_matches('*').trim_start_matches('.');
         !name.is_empty()
@@ -449,11 +450,11 @@ fn has_control(s: &str) -> bool {
 /// where [`Proxy::persist`] saves the proxy for dnf
 const DNF_DROPIN: &str = "/etc/dnf/libdnf5.conf.d/50-taidan-proxy.conf";
 
-/// removes a proxy saved by [`Proxy::persist`] in an earlier attempt, nothing is touched if there
+/// removes a proxy saved by [`Proxy::persist`] in an earlier attempt. touches nothing if there
 /// isn't one, so proxies set up by other means stay
 ///
 /// # Errors
-/// Cannot change the files.
+/// cannot change the files
 pub async fn clear() -> Res<()> {
     let exists = |path| async move { tokio::fs::try_exists(path).await.unwrap_or(true) };
     if !exists(DNF_DROPIN).await && !exists(REPO_OVERRIDE).await {
@@ -565,7 +566,7 @@ mod tests {
         assert_eq!(p.without_credentials().unwrap().url, "http://proxy.example.com:3128");
         let p = Proxy::new("proxy.example.com:3128", "").unwrap();
         assert_eq!(p.without_credentials().unwrap(), p);
-        // the parser would drop it, curl would then go to 1080
+        // the parser would drop the default port, and curl would then go to 1080
         let p = Proxy::new("HTTP://bob:pw@proxy.example.com:80", "").unwrap();
         assert_eq!(p.url, "http://bob:pw@proxy.example.com:80");
         assert_eq!(p.without_credentials().unwrap().url, "http://proxy.example.com:80");

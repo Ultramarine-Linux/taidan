@@ -72,8 +72,8 @@ fn regular_user_in(reader: impl BufRead, recorded: Option<&str>) -> bool {
 }
 
 /// the user an unfinished install created, so the next attempt (a retry, or after a reboot) can
-/// remove it and start over instead of failing on it or leaving it behind. Removed when the
-/// install finishes, so a later run of Taidan never touches the user
+/// remove it and start over instead of failing on it or leaving it behind. removed when the
+/// install finishes, so a later Taidan run never touches the user.
 pub const CREATED_RECORD: &str = "/var/lib/taidan/created-user";
 
 /// what [`CREATED_RECORD`] says about the user an unfinished install made
@@ -107,17 +107,17 @@ pub fn recorded_user() -> Option<String> {
     record().map(|r| r.user)
 }
 
-/// the user named in [`CREATED_RECORD`], if there's one and nobody has logged in as it. One that
-/// has been is someone's account now, whatever the record says. One whose logins can't be told
-/// about counts as unused, as the record says it's from an install that never finished. Taking it
-/// for a real user would mark the system configured with an account that was never set up, and
-/// [`login_state`] says to keep its home when it's removed
+/// the user named in [`CREATED_RECORD`], if there's one and nobody has logged in as it. A user
+/// someone has logged in as is their account now, whatever the record says. A user whose logins
+/// can't be checked counts as unused, since the record says it's from an install that never
+/// finished. treating it as a real user would mark the system configured with an account that was
+/// never set up, and [`login_state`] already says to keep its home when it's removed.
 #[must_use]
 pub fn unused_recorded_user() -> Option<String> {
     recorded_user().filter(|u| match login_state(u) {
         Some(logged_in) => !logged_in,
-        // except a homed one, which can't be removed while keeping its home, so it stays put,
-        // see `remove_previous`
+        // except a homed user, which can't be removed without its home, so it stays (see
+        // `remove_previous`)
         None => uzers::get_user_by_name(u).is_none_or(|user| !HOMED_UIDS.contains(&user.uid())),
     })
 }
@@ -129,9 +129,9 @@ pub fn created_by_us(username: &str) -> bool {
     unused_recorded_user().is_some_and(|u| u == username)
 }
 
-/// whether `username` has ever logged in, going by lastlog2, which PAM updates for display
-/// manager, console and ssh logins but not `runuser` or `pkexec`, or [`None`] if it can't be
-/// told. Then removing the user mustn't take its home along, in case it was used after all
+/// whether `username` has ever logged in, going by lastlog2 (PAM updates it for display manager,
+/// console and ssh logins, but not `runuser` or `pkexec`). [`None`] if that can't be checked, and
+/// then removing the user mustn't take its home along, in case it was used after all.
 #[must_use]
 pub fn login_state(username: &str) -> Option<bool> {
     // `-a` leaves out users who never logged in. A missing database prints nothing
@@ -154,18 +154,19 @@ fn logged_in_from(output: &[u8], username: &str) -> bool {
 }
 
 /// writes `username` to [`CREATED_RECORD`], world-readable since the OOBE checks it as its own
-/// user. `keep_home` if its home is already there, see [`Record::keep_home`]
+/// user. pass `keep_home` if its home already exists (see [`Record::keep_home`]).
 ///
 /// # Errors
-/// Cannot write the file.
+/// cannot write the file
 pub async fn record_created(username: &str, keep_home: bool) -> Res<()> {
     crate::root(crate::Verb::RecordCreated { user: username.to_owned(), keep_home })
         .await
         .wrap_msg("cannot record the created user")
 }
 
-/// what [`record_created`] does, run by the helper as root. Replaced whole, so a full disk can't
-/// leave it empty, and on disk before what it records is done, a power cut mustn't lose it
+/// what [`record_created`] does, run by the helper as root. the file is replaced whole so a full
+/// disk can't leave it empty, and is on disk before the user it records is created so a power cut
+/// can't lose it.
 pub(crate) fn write_record(username: &str, keep_home: bool) -> std::io::Result<()> {
     let mut content = format!("{username}\n");
     if keep_home {
@@ -178,7 +179,7 @@ pub(crate) fn write_record(username: &str, keep_home: bool) -> std::io::Result<(
 /// removes [`CREATED_RECORD`], if it's there
 ///
 /// # Errors
-/// Cannot remove the file.
+/// cannot remove the file
 pub async fn clear_record() -> Res<()> {
     if !tokio::fs::try_exists(CREATED_RECORD).await.unwrap_or(true) {
         return Ok(());
@@ -193,19 +194,18 @@ pub fn removable(username: &str, uid: u32) -> bool {
     regular_uid(uid) && username_syntax_problem(username).is_none()
 }
 
-/// the most `homectl create` takes (it must fit utmp's `ut_user`), one less than `useradd`
+/// the longest name `homectl create` takes (it must fit utmp's `ut_user`), one less than `useradd`
 pub const USERNAME_MAX_LEN: usize = 31;
 
 /// the longest password libxcrypt hashes, in bytes. `crypt` refuses `CRYPT_MAX_PASSPHRASE_SIZE`
-/// (512) and up
+/// (512) and up.
 pub const PASSWORD_MAX_LEN: usize = 511;
 
 /// names that are taken even if the system doesn't have them right now
 const RESERVED_USERNAMES: &[&str] = &["root", "taidan", "nobody"];
 
-static USERNAME_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-    regex::Regex::new("^[a-z][-a-z0-9_]*$").expect("invalid username regex")
-});
+static USERNAME_RE: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new("^[a-z][-a-z0-9_]*$").expect("invalid username regex"));
 
 /// why a username can't be used
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -219,14 +219,14 @@ pub enum UsernameProblem {
 }
 
 /// [`username_problem`] without looking up users and groups, so it's cheap enough to run on
-/// every keystroke. Only reserved names come out as [`UsernameProblem::Taken`]
+/// every keystroke. only reserved names come out as [`UsernameProblem::Taken`].
 #[must_use]
 pub fn username_syntax_problem(username: &str) -> Option<UsernameProblem> {
     username_problem_with(username, |_| false, None)
 }
 
-/// what's wrong with `username` for the new user, if anything. This looks up NSS and may run
-/// `lastlog2`, so keep it off the UI thread
+/// what's wrong with `username` for the new user, if anything. this looks up NSS and may run
+/// `lastlog2`, so keep it off the UI thread.
 #[must_use]
 pub fn username_problem(username: &str) -> Option<UsernameProblem> {
     username_problem_with(
@@ -236,7 +236,7 @@ pub fn username_problem(username: &str) -> Option<UsernameProblem> {
     )
 }
 
-/// [`username_problem`], with `exists` telling whether a user or group has the name, and
+/// [`username_problem`] with `exists` checking whether a user or group has the name, and
 /// `recorded` the user from [`CREATED_RECORD`]
 fn username_problem_with(
     username: &str,

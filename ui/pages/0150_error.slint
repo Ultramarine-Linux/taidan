@@ -10,8 +10,8 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 export component ErrorPage inherits TdnBasePg {
     forward-focus: retry;
 
-    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is, and
-    // what went wrong, when the focus lands on Retry
+    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is and
+    // what went wrong when the focus lands on Retry
     VerticalLayout {
         accessible-role: groupbox;
         accessible-label: Lang.t("page-error", []);
@@ -86,7 +86,7 @@ export component ErrorPage inherits TdnBasePg {
         HorizontalLayout {
             alignment: space-between;
 
-            // no way to leave the OOBE from here, the system isn't set up. Powering off keeps the
+            // no way to leave the OOBE from here, since the system isn't set up. powering off keeps the
             // recovery record, so the next boot starts over
             HorizontalLayout {
                 spacing: 0.5rem;

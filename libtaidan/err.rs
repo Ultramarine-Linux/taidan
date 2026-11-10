@@ -22,7 +22,7 @@ pub enum Err {
     Serde(#[from] serde_json::Error),
 }
 
-/// the exit code and the last line the program printed, which is usually why it failed, for the
+/// the exit code and the last line the program printed (usually the reason it failed) for the
 /// error page
 fn fail_detail(rc: Option<i32>, output: &str) -> String {
     let mut detail = rc.map(|rc| format!(" with exit code {rc}")).unwrap_or_default();
