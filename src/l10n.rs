@@ -25,12 +25,24 @@ static PO_ASSETS: LazyLock<Arc<B>> = LazyLock::new(|| {
     )
 });
 
-static PO_AVAILABLE_LANGS: LazyLock<Vec<LanguageIdentifier>> = LazyLock::new(|| {
-    fluent_language_loader!().available_languages(&***PO_ASSETS).unwrap_or_else(|e| {
-        tracing::error!(?e, "cannot list the translations in {PO_PATH}");
-        vec![]
-    })
-});
+/// the embedded languages that [`PO_ASSETS`] also has. `available_languages` can't list a
+/// [`FileSystemAssets`], it gets file names without their language directory and finds only the
+/// fallback
+static PO_AVAILABLE_LANGS: LazyLock<Vec<LanguageIdentifier>> =
+    LazyLock::new(|| po_langs(&***PO_ASSETS));
+
+fn po_langs(assets: &dyn i18n_embed::I18nAssets) -> Vec<LanguageIdentifier> {
+    let loader = fluent_language_loader!();
+    let langs = crate::AVAILABLE_LANGS
+        .iter()
+        .filter(|li| !assets.get_files(&format!("{li}/{}.ftl", loader.domain())).is_empty())
+        .cloned()
+        .collect_vec();
+    if langs.len() < crate::AVAILABLE_LANGS.len() {
+        tracing::warn!(?langs, "some translations are missing in {PO_PATH}");
+    }
+    langs
+}
 
 /// Create a new loader according to the list of languages, leaving out ones [`PO_ASSETS`] doesn't
 /// have. If the translations there can't be loaded, the embedded ones are used instead.
@@ -630,6 +642,21 @@ mod tests {
         assert_eq!(parse_vconsole_keymap("KEYMAP=us\n#XKBLAYOUT=de\n"), None);
         assert_eq!(parse_vconsole_keymap("XKBLAYOUT=\n"), None);
         assert_eq!(parse_vconsole_keymap("XKBOPTIONS=ctrl:nocaps\n"), Some((None, None)));
+    }
+
+    #[test]
+    fn translations_load_from_disk() {
+        let assets = FileSystemAssets::try_new("po/").unwrap();
+        let langs = po_langs(&assets);
+        let fr: LanguageIdentifier = "fr".parse().unwrap();
+        assert!(langs.contains(&fr), "{langs:?}");
+        assert_eq!(langs.len(), crate::AVAILABLE_LANGS.len(), "{langs:?}");
+        let loader = fluent_language_loader!();
+        loader.load_languages(&assets, std::slice::from_ref(&fr)).unwrap();
+        assert_eq!(loader.current_language(), fr);
+        let en = fluent_language_loader!();
+        en.load_languages(&assets, &[en.fallback_language().clone()]).unwrap();
+        assert_ne!(loader.get("page-welcome-go"), en.get("page-welcome-go"));
     }
 
     #[test]
