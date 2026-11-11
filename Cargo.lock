@@ -6204,7 +6204,6 @@ dependencies = [
 name = "taidan"
 version = "1.0.0"
 dependencies = [
- "basic-toml",
  "color-eyre",
  "deunicode",
  "fluent",
@@ -6222,7 +6221,6 @@ dependencies = [
  "regex",
  "rust-embed",
  "sentry",
- "serde",
  "serde_json",
  "slint",
  "strip-ansi-escapes",
