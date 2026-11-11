@@ -7,7 +7,7 @@ import { Cfg } from "cfg.slint";
 import { Account } from "account.slint";
 import { Step, StepHdl, Pages } from "page.slint";
 import { LanguagePage } from "pages/0010_language.slint";
-import { Theme, Tokens } from "slintcn/theme/tokens.slint";
+import { Theme, ThemeMode, Tokens } from "slintcn/theme/tokens.slint";
 import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
 import { Camera } from "camera.slint";
 import { KeyboardPage } from "pages/0020_keyboard.slint";
@@ -40,16 +40,18 @@ export component AppWindow inherits Window {
     // set from Rust so dev runs keep a title bar for moving and closing the window
     in property <bool> framed: false;
     no-frame: !self.framed;
+    in property <bool> rounded: false;
     icon: Cfg.distro_icon();
-    background: Tokens.color-background;
+    background: self.rounded ? transparent : Tokens.color-background;
     // Geist is from the `vercel-geist-fonts` package unless `font` in /etc/taidan.toml names the
     // distro's own. scripts it lacks (CJK, …) fall back to system fonts. Atkinson Hyperlegible Next,
     // from `atkinson-hyperlegible-next-fonts`, wins over both when the legible font option is on
     default-font-family: A11y.legible-font ? "Atkinson Hyperlegible Next" : Cfg.get_string("font", "Geist");
     // a standalone window in the middle of the kiosk session. the designs are 600×500,
     // `Tokens.scale` fits that to the screen (`src/screen.rs`), and the size is locked to keep it 6:5
-    preferred-width: 600 * Tokens.unit;
-    preferred-height: 500 * Tokens.unit;
+    preferred-width: 600 * Tokens.unit + 2 * self.shadow-margin;
+    preferred-height: 500 * Tokens.unit + 2 * self.shadow-margin;
+    out property <length> shadow-margin: self.rounded ? 32px : 0;
     // set from Rust. `Tokens` itself isn't exported since its easings can't be
     in-out property <float> ui-scale <=> Tokens.scale;
     min-width: self.preferred-width;
@@ -98,6 +100,10 @@ export component AppWindow inherits Window {
     property <bool> reduce-motion: A11y.reduce-motion;
     changed reduce-motion => { Tokens.reduce-motion = reduce-motion; }
 
+    out property <bool> dark-mode: Theme.mode == ThemeMode.dark;
+    callback dark-mode-changed(bool);
+    changed dark-mode => { root.dark-mode-changed(self.dark-mode); }
+
     // back to whatever opened a dialog when it closes (`DialogOpener`), or else to the page
     property <bool> dialog-open: Modal.open;
     changed dialog-open => {
@@ -138,190 +144,212 @@ export component AppWindow inherits Window {
         }
     }
 
-    accessibility := AccessibilityPage {
-        index: Pages.accessibility;
-        current: pagenum;
-        next_page => { pagenum = Cfg.next-page(pagenum); }
+    if root.rounded: Rectangle {
+        x: root.shadow-margin;
+        y: root.shadow-margin;
+        width: root.width - 2 * root.shadow-margin;
+        height: root.height - 2 * root.shadow-margin;
+        border-radius: Tokens.radius-xl;
+        background: Tokens.color-background;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 6px;
+        drop-shadow-color: #0000004d;
     }
 
-    language := LanguagePage {
-        index: Pages.language;
-        current: pagenum;
-        next_page => { pagenum = Cfg.next-page(pagenum); }
-    }
+    Rectangle {
+        x: root.shadow-margin;
+        y: root.shadow-margin;
+        width: root.width - 2 * root.shadow-margin;
+        height: root.height - 2 * root.shadow-margin;
+        background: Tokens.color-background;
+        border-radius: root.rounded ? Tokens.radius-xl : 0;
+        clip: true;
 
-    keyboard := KeyboardPage {
-        index: Pages.keyboard;
-        current: pagenum;
-        prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => { pagenum = Cfg.next-page(pagenum); }
-    }
-
-    welcome := WelcomePage {
-        index: Pages.welcome;
-        current: pagenum;
-        prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => { pagenum = Cfg.next-page(pagenum); }
-    }
-
-    theme := ThemePage {
-        index: Pages.theme;
-        current: pagenum;
-        prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => { pagenum = Cfg.next-page(pagenum); }
-    }
-
-    whoareyou := WhoAreYouPage {
-        index: Pages.whoareyou;
-        current: pagenum;
-        prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => {
-            Account.save();
-            pagenum = Cfg.next-page(pagenum);
+        accessibility := AccessibilityPage {
+            index: Pages.accessibility;
+            current: pagenum;
+            next_page => { pagenum = Cfg.next-page(pagenum); }
         }
-    }
 
-    password := PasswordPage {
-        index: Pages.password;
-        current: pagenum;
-        prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => {
-            Account.save();
-            pagenum = Cfg.next-page(pagenum);
+        language := LanguagePage {
+            index: Pages.language;
+            current: pagenum;
+            next_page => { pagenum = Cfg.next-page(pagenum); }
         }
-    }
 
-    timezone := TimezonePage {
-        index: Pages.timezone;
-        current: pagenum;
-        prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => {
-            Tz.save();
-            pagenum = Cfg.next-page(pagenum);
+        keyboard := KeyboardPage {
+            index: Pages.keyboard;
+            current: pagenum;
+            prev_page => { pagenum = Cfg.prev-page(pagenum); }
+            next_page => { pagenum = Cfg.next-page(pagenum); }
         }
-    }
 
-    network := NetworkPage {
-        index: Pages.network;
-        current: pagenum;
-        prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => {
-            // online, or offline without choosing "Set Up Offline", so the install goes by the
-            // connection it has when it starts
-            Network.offline-chosen = false;
-            Network.save();
-            pagenum = Cfg.next-page(pagenum);
+        welcome := WelcomePage {
+            index: Pages.welcome;
+            current: pagenum;
+            prev_page => { pagenum = Cfg.prev-page(pagenum); }
+            next_page => { pagenum = Cfg.next-page(pagenum); }
         }
-    }
 
-    location := LocationPage {
-        index: Pages.location;
-        current: pagenum;
-        prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => { pagenum = Cfg.next-page(pagenum); }
-    }
-
-    drivers := DriversPage {
-        index: Pages.drivers;
-        current: pagenum;
-        prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => { pagenum = Cfg.next-page(pagenum); }
-    }
-
-    summary := SummaryPage {
-        index: Pages.summary;
-        current: pagenum;
-        prev_page => { pagenum = Cfg.prev-page(pagenum); }
-        next_page => {
-            Install.start();
-            pagenum = Pages.installing;
+        theme := ThemePage {
+            index: Pages.theme;
+            current: pagenum;
+            prev_page => { pagenum = Cfg.prev-page(pagenum); }
+            next_page => { pagenum = Cfg.next-page(pagenum); }
         }
-    }
 
-    installing := InstallingPage {
-        index: Pages.installing;
-        current: pagenum;
-    }
-
-    done := DonePage {
-        index: Pages.done;
-        current: pagenum;
-    }
-
-    error := ErrorPage {
-        index: Pages.error;
-        current: pagenum;
-        // back to the summary, to change what made it fail before trying again
-        prev_page => {
-            Install.reset();
-            pagenum = Pages.summary;
+        whoareyou := WhoAreYouPage {
+            index: Pages.whoareyou;
+            current: pagenum;
+            prev_page => { pagenum = Cfg.prev-page(pagenum); }
+            next_page => {
+                Account.save();
+                pagenum = Cfg.next-page(pagenum);
+            }
         }
-        // the retry button
-        next_page => {
-            Install.start();
-            pagenum = Pages.installing;
+
+        password := PasswordPage {
+            index: Pages.password;
+            current: pagenum;
+            prev_page => { pagenum = Cfg.prev-page(pagenum); }
+            next_page => {
+                Account.save();
+                pagenum = Cfg.next-page(pagenum);
+            }
         }
-    }
 
-    if Camera.open: CameraDialog {
-        width: 100%;
-        height: 100%;
-    }
-
-    if Network.password-ssid != "": PasswordDialog {
-        width: 100%;
-        height: 100%;
-    }
-
-    if Network.hidden-open: HiddenDialog {
-        width: 100%;
-        height: 100%;
-    }
-
-    if Network.enterprise-open: EnterpriseDialog {
-        width: 100%;
-        height: 100%;
-    }
-
-    if Network.proxy-open: ProxyDialog {
-        width: 100%;
-        height: 100%;
-    }
-
-    if Network.ip-open: IpDialog {
-        width: 100%;
-        height: 100%;
-    }
-
-    if Tweaks.open: TweaksDialog {
-        width: 100%;
-        height: 100%;
-    }
-
-    if Ims.open: ImsDialog {
-        width: 100%;
-        height: 100%;
-    }
-
-    if Network.offline-prompt: OfflineDialog {
-        width: 100%;
-        height: 100%;
-        explicit: Network.offline-prompt-explicit;
-        skipped => {
-            Network.offline-prompt = false;
-            Network.offline-chosen = Network.offline-prompt-explicit;
-            Network.save();
-            pagenum = Cfg.next-page(pagenum);
+        timezone := TimezonePage {
+            index: Pages.timezone;
+            current: pagenum;
+            prev_page => { pagenum = Cfg.prev-page(pagenum); }
+            next_page => {
+                Tz.save();
+                pagenum = Cfg.next-page(pagenum);
+            }
         }
-    }
 
-    if A11y.open: AccessibilityDialog {
-        width: 100%;
-        height: 100%;
-    }
+        network := NetworkPage {
+            index: Pages.network;
+            current: pagenum;
+            prev_page => { pagenum = Cfg.prev-page(pagenum); }
+            next_page => {
+                // online, or offline without choosing "Set Up Offline", so the install goes by the
+                // connection it has when it starts
+                Network.offline-chosen = false;
+                Network.save();
+                pagenum = Cfg.next-page(pagenum);
+            }
+        }
 
-    if A11y.more-open: A11yMoreDialog {
-        width: 100%;
-        height: 100%;
+        location := LocationPage {
+            index: Pages.location;
+            current: pagenum;
+            prev_page => { pagenum = Cfg.prev-page(pagenum); }
+            next_page => { pagenum = Cfg.next-page(pagenum); }
+        }
+
+        drivers := DriversPage {
+            index: Pages.drivers;
+            current: pagenum;
+            prev_page => { pagenum = Cfg.prev-page(pagenum); }
+            next_page => { pagenum = Cfg.next-page(pagenum); }
+        }
+
+        summary := SummaryPage {
+            index: Pages.summary;
+            current: pagenum;
+            prev_page => { pagenum = Cfg.prev-page(pagenum); }
+            next_page => {
+                Install.start();
+                pagenum = Pages.installing;
+            }
+        }
+
+        installing := InstallingPage {
+            index: Pages.installing;
+            current: pagenum;
+        }
+
+        done := DonePage {
+            index: Pages.done;
+            current: pagenum;
+        }
+
+        error := ErrorPage {
+            index: Pages.error;
+            current: pagenum;
+            // back to the summary, to change what made it fail before trying again
+            prev_page => {
+                Install.reset();
+                pagenum = Pages.summary;
+            }
+            // the retry button
+            next_page => {
+                Install.start();
+                pagenum = Pages.installing;
+            }
+        }
+
+        if Camera.open: CameraDialog {
+            width: 100%;
+            height: 100%;
+        }
+
+        if Network.password-ssid != "": PasswordDialog {
+            width: 100%;
+            height: 100%;
+        }
+
+        if Network.hidden-open: HiddenDialog {
+            width: 100%;
+            height: 100%;
+        }
+
+        if Network.enterprise-open: EnterpriseDialog {
+            width: 100%;
+            height: 100%;
+        }
+
+        if Network.proxy-open: ProxyDialog {
+            width: 100%;
+            height: 100%;
+        }
+
+        if Network.ip-open: IpDialog {
+            width: 100%;
+            height: 100%;
+        }
+
+        if Tweaks.open: TweaksDialog {
+            width: 100%;
+            height: 100%;
+        }
+
+        if Ims.open: ImsDialog {
+            width: 100%;
+            height: 100%;
+        }
+
+        if Network.offline-prompt: OfflineDialog {
+            width: 100%;
+            height: 100%;
+            explicit: Network.offline-prompt-explicit;
+            skipped => {
+                Network.offline-prompt = false;
+                Network.offline-chosen = Network.offline-prompt-explicit;
+                Network.save();
+                pagenum = Cfg.next-page(pagenum);
+            }
+        }
+
+        if A11y.open: AccessibilityDialog {
+            width: 100%;
+            height: 100%;
+        }
+
+        if A11y.more-open: A11yMoreDialog {
+            width: 100%;
+            height: 100%;
+        }
     }
 }

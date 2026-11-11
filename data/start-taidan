@@ -16,7 +16,6 @@ status_file() {
 
 # the part inside the KWin session, which KWin ends when this exits (--exit-with-session)
 if [ "$1" = session ]; then
-	swaybg -i /usr/share/backgrounds/default.png -m fill -c '#113344' >/dev/null 2>&1 &
 	TAIDAN_LOG=trace /usr/bin/taidan
 	echo $? >"$(status_file "$TAIDAN_ATTEMPT")"
 	exit 0

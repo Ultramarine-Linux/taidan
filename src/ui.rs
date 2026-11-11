@@ -27,9 +27,12 @@ pub fn run() {
     crate::theme::initialize_ui(&ui.global());
     crate::ims::initialize_ui(&ui.as_weak(), &ui.global());
     crate::a11y::initialize_ui(&ui.as_weak(), &ui.global());
+    crate::wallpaper::initialize_ui(&ui);
     init_actions(ui.as_weak(), &ui.global());
     ui.set_pagenum(first_page);
     ui.set_framed(crate::install::is_dev_session());
+    let software = std::env::var("SLINT_BACKEND").is_ok_and(|b| b.contains("software"));
+    ui.set_rounded(!crate::install::is_dev_session() && !software);
     // the OOBE has to be completed, Alt+F4 shouldn't drop to an unconfigured system. finishing
     // quits the event loop directly instead of closing the window.
     ui.window().on_close_requested(|| {
@@ -44,6 +47,7 @@ pub fn run() {
     // closing the window in a dev session skips `finish()`, so stop the helpers here too
     crate::network::shutdown();
     crate::a11y::shutdown();
+    crate::wallpaper::shutdown();
 }
 
 /// whether `taidan.debug_shell` is on the kernel command line, either bare or set to a true value

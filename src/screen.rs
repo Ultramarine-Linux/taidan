@@ -79,7 +79,8 @@ struct ScaleToScreen(Rc<OnceCell<slint::Weak<AppWindow>>>);
 impl ScaleToScreen {
     fn apply(&self, screen: (f64, f64)) {
         let Some(ui) = self.0.get().and_then(slint::Weak::upgrade) else { return };
-        let scale = scale_for(screen);
+        let margin = 2. * f64::from(ui.get_shadow_margin());
+        let scale = scale_for(((screen.0 - margin).max(1.), (screen.1 - margin).max(1.)));
         tracing::info!(?screen, scale, "Scaling the window to the screen");
         #[expect(clippy::cast_possible_truncation, reason = "a scale around 1–3")]
         ui.set_ui_scale(scale as f32);

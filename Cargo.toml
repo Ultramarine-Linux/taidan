@@ -61,7 +61,7 @@ i18n-embed = { version = "0.16.0", features = [
     "filesystem-assets",
     "fluent-system",
 ] }
-icu = { version = "2.4.0", features = ["unstable"] }
+icu = { version = "2.4.0", features = ["unstable", "logging"] }
 # time zone offsets and local times, from the system tzdata
 jiff = { version = "0.2.38", features = ["tzdb-zoneinfo"] }
 # decodes the welcome image off the UI thread, and gives Slint's `@image-url` the `webp` decoder

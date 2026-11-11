@@ -12,6 +12,7 @@ pub mod theme;
 pub mod timezone;
 pub mod tweaks;
 pub mod ui;
+pub mod wallpaper;
 
 use std::sync::LazyLock;
 

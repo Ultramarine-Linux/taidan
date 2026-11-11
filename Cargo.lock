@@ -861,6 +861,7 @@ checksum = "5abbd6eeda6885048d357edc66748eea6e0268e3dd11f326fff5bd248d779c26"
 dependencies = [
  "core_maths",
  "displaydoc",
+ "log",
 ]
 
 [[package]]
@@ -3141,6 +3142,7 @@ checksum = "413099315636c588ee8f011190b329b971a09a8fae9d157e01dcae8379468514"
 dependencies = [
  "displaydoc",
  "icu_locale_core",
+ "log",
  "serde",
  "stable_deref_trait",
  "writeable",
