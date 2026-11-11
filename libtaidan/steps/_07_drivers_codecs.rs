@@ -7,12 +7,14 @@ enum NvidiaBranch {
     Latest,
 }
 
+const TERRA_NVIDIA_RELEASE: &str = "terra-release-nvidia";
 const NVIDIA_COMMON_PACKAGES: [&str; 2] = ["nvidia-gpu-firmware", "libva-nvidia-driver"];
 const BROADCOM_PACKAGES: [&str; 2] = ["broadcom-wl", "akmod-wl"];
 
 pub(crate) fn driver_packages() -> Vec<&'static str> {
     [
-        &NVIDIA_COMMON_PACKAGES[..],
+        &[TERRA_NVIDIA_RELEASE][..],
+        &NVIDIA_COMMON_PACKAGES,
         &NvidiaBranch::R580.packages(),
         &NvidiaBranch::Latest.packages(),
         &BROADCOM_PACKAGES,
@@ -23,12 +25,8 @@ pub(crate) fn driver_packages() -> Vec<&'static str> {
 impl NvidiaBranch {
     fn packages(self) -> [&'static str; 3] {
         match self {
-            Self::R580 => [
-                "akmod-nvidia-580xx",
-                "xorg-x11-drv-nvidia-580xx",
-                "xorg-x11-drv-nvidia-580xx-cuda",
-            ],
-            Self::Latest => ["akmod-nvidia", "xorg-x11-drv-nvidia", "xorg-x11-drv-nvidia-cuda"],
+            Self::R580 => ["akmod-nvidia-580xx", "nvidia-driver-580xx", "nvidia-driver-580xx-cuda"],
+            Self::Latest => ["akmod-nvidia", "nvidia-driver", "nvidia-driver-cuda"],
         }
     }
 }
@@ -166,6 +164,7 @@ pub struct Hardware {
 pub async fn detect_hardware() -> Hardware {
     let pci = pci_devices().await;
     let nvidia = has_nvidia_gpu(&pci)
+        && !super::is_ostree().await
         && matches!(Drivers::get_nvidia_driver().await, Ok(NvidiaDriver::Branch(_)));
     let broadcom_wifi = has_wl_only_wifi(&pci);
     Hardware {
@@ -348,6 +347,10 @@ impl Drivers {
             tracing::info!("No Nvidia GPU detected");
             return Ok(Setup::default());
         }
+        if super::is_ostree().await {
+            tracing::info!("ostree images get the Nvidia driver from their nvidia layer");
+            return Ok(Setup::default());
+        }
         if !Self::kmods_would_load().await {
             tracing::warn!(
                 "Secure Boot is on and the module wouldn't be signed with an enrolled key, so \
@@ -370,22 +373,17 @@ impl Drivers {
                 return Ok(Setup::default());
             }
         };
-        let pkgs = [&NVIDIA_COMMON_PACKAGES[..], &branch.packages()].concat();
-        let installed = install_pkgs(cfg, &pkgs).await?;
-        if installed == Installed::Skipped {
+        if install_pkgs(cfg, &[TERRA_NVIDIA_RELEASE]).await? == Installed::Skipped {
             return Ok(Setup::default());
         }
+        let pkgs = [&NVIDIA_COMMON_PACKAGES[..], &branch.packages()].concat();
+        install_pkgs(cfg, &pkgs).await?;
         let primary_gpu = std::env::var("STELLAR_OPTION").is_ok_and(|x| x == "1");
         let mut primary_failed = false;
         if primary_gpu && let Err(e) = root(Verb::NvidiaPrimaryGpu).await {
             tracing::warn!(?e, "cannot set nvidia as primary gpu");
             primary_failed = true;
         }
-        if installed == Installed::Ostree {
-            root(Verb::NvidiaKargs).await?;
-            return Ok(Setup { needs_reboot: true, failed: primary_failed });
-        }
-
         let built = Self::build_kmod("nvidia").await?;
         if !built {
             tracing::warn!("Nvidia kernel module isn't built, not asking for a reboot");
@@ -531,6 +529,8 @@ mod tests {
     fn nvidia_branch_packages() {
         assert_eq!(NvidiaBranch::Latest.packages()[0], "akmod-nvidia");
         assert!(NvidiaBranch::R580.packages().iter().all(|p| p.contains("-580xx")));
+        assert!(driver_packages().contains(&TERRA_NVIDIA_RELEASE));
+        assert!(!driver_packages().iter().any(|p| p.starts_with("xorg-x11-drv-nvidia")));
     }
 
     const fn dev(vendor: u16, device: u16, class_code: u32) -> PciDevice {

@@ -91,7 +91,6 @@ pub enum Verb {
     DnfUpgradeOffline,
     DnfOfflineClean,
     DnfOfflineArm,
-    NvidiaKargs,
     NvidiaPrimaryGpu,
     DefaultKernel,
     Akmods { kernel: String },
@@ -158,7 +157,6 @@ impl Verb {
             Self::DnfUpgradeOffline => "dnf-upgrade-offline",
             Self::DnfOfflineClean => "dnf-offline-clean",
             Self::DnfOfflineArm => "dnf-offline-arm",
-            Self::NvidiaKargs => "nvidia-kargs",
             Self::NvidiaPrimaryGpu => "nvidia-primary-gpu",
             Self::DefaultKernel => "default-kernel",
             Self::Akmods { .. } => "akmods",
@@ -230,7 +228,6 @@ impl Verb {
             | Self::DnfUpgradeOffline
             | Self::DnfOfflineClean
             | Self::DnfOfflineArm
-            | Self::NvidiaKargs
             | Self::NvidiaPrimaryGpu
             | Self::DefaultKernel => Ok(()),
             Self::DebugShell { wayland_display } => {
@@ -817,16 +814,6 @@ impl Ctx {
                     .args(["offline", "reboot", "-y"]),
                 None,
             ),
-            // RPM Fusion's `%posttrans` kargs, except simpledrm stays since the LUKS prompt and a
-            // failed driver need it
-            Verb::NvidiaKargs => self.exec(
-                "rpm-ostree",
-                &[
-                    "kargs",
-                    "--append-if-missing=rd.driver.blacklist=nouveau,nova_core",
-                    "--append-if-missing=modprobe.blacklist=nouveau,nova_core",
-                ],
-            ),
             Verb::NvidiaPrimaryGpu => {
                 const DEST: &str = "/etc/X11/xorg.conf.d/10-nvidia-primary.conf";
                 write_atomic(
@@ -1297,7 +1284,6 @@ mod tests {
             Verb::DnfUpgradeOffline,
             Verb::DnfOfflineClean,
             Verb::DnfOfflineArm,
-            Verb::NvidiaKargs,
             Verb::NvidiaPrimaryGpu,
             Verb::DefaultKernel,
             Verb::Akmods { kernel: s("6.17.1-300.fc43.x86_64") },
@@ -1420,7 +1406,7 @@ mod tests {
             Verb::DnfDrivers { pkgs: pkgs.iter().map(|p| s(p)).collect() }.validate(root)
         };
         assert!(
-            drivers(&["nvidia-gpu-firmware", "akmod-nvidia-580xx", "broadcom-wl"], false).is_ok()
+            drivers(&["terra-release-nvidia", "nvidia-driver-580xx", "broadcom-wl"], false).is_ok()
         );
         assert!(drivers(&["@multimedia"], false).is_err());
         let ostree = Verb::RpmOstreeInstall { pkgs: vec![s("akmod-wl"), s("broadcom-wl")] };
