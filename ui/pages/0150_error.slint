@@ -10,13 +10,10 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 export component ErrorPage inherits TdnBasePg {
     forward-focus: retry;
 
-    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is and
-    // what went wrong when the focus lands on Retry
     VerticalLayout {
         accessible-role: groupbox;
         accessible-label: Lang.t("page-error", []);
-        accessible-description: Install.error == "" ? Lang.t("page-error-desc", [])
-            : Lang.t("page-error-desc", []) + "\n\n" + Install.error;
+        accessible-description: Lang.t("page-error-desc", []) + (Install.error == "" ? "" : "\n\n" + Install.error);
         padding-left: 2rem;
         padding-right: 2rem;
         padding-top: 1rem;
@@ -65,7 +62,6 @@ export component ErrorPage inherits TdnBasePg {
             background: Tokens.color-card;
 
             ScrollView {
-                // selectable so details can be copied into a bug report
                 TextInput {
                     x: 0.75rem;
                     y: 0.75rem;
@@ -86,8 +82,6 @@ export component ErrorPage inherits TdnBasePg {
         HorizontalLayout {
             alignment: space-between;
 
-            // no way to leave the OOBE from here, since the system isn't set up. powering off keeps the
-            // recovery record, so the next boot starts over
             HorizontalLayout {
                 spacing: 0.5rem;
 
@@ -107,8 +101,6 @@ export component ErrorPage inherits TdnBasePg {
                 layout-order: Dir.order(1);
                 spacing: 0.5rem;
 
-                // the way out when an online step keeps failing, e.g. a broken mirror, without
-                // having to unplug the network
                 if Install.used-internet: TdnBtn {
                     text: Lang.t("page-error-offline", []);
                     clicked => {

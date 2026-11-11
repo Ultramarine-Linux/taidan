@@ -1,63 +1,38 @@
 export enum InstallState { idle, running, done, failed }
 
-// driven from Rust (`src/install.rs`)
 export global Install {
     in property <InstallState> state;
-    // translation id describing the running stage, e.g. "steps-useradd"
     in property <string> stage-id;
-    // 1-based
     in property <int> stage-num;
     in property <int> stage-count: 11;
-    // progress within the stage for the installing page's bar, 0–1, or negative when unknown
     in property <float> stage-progress: -1;
-    // details of why the installation failed
     in property <string> error;
-    // an NVIDIA or Broadcom Wi-Fi driver was installed and loads on reboot, otherwise finishing
-    // drops to the login screen
     in property <bool> needs-reboot;
-    // whether to download updates to install on the next restart, a switch on the summary page
     in-out property <bool> download-updates: true;
-    // false when dnf can't install updates, i.e. `taidan0.skip_dnf` or rpm-ostree
     in property <bool> can-download-updates: true;
-    // some drivers couldn't be installed, but the rest of the installation worked
     in property <bool> drivers-failed;
-    // the system language couldn't be set, usually because its language pack isn't installed
     in property <bool> locale-failed;
-    // updates were downloaded and will install on the next restart
     in property <bool> updates-ready;
-    // the failed installation had online steps, so it can be retried without them
     in property <bool> used-internet;
-    // restarting from the done page failed and can be tried again
     in property <bool> reboot-failed;
-    // `finish()` is running, so the done page's buttons wait. cleared if restarting fails
     in property <bool> finishing;
-    // set by the error page to retry offline, e.g. when a mirror is broken. cleared by `reset()`
     in-out property <bool> force-offline;
 
     callback start();
-    // back to `idle` after a failed installation, so it can be started again
     callback reset();
-    // after a successful installation, marks the system as configured, then reboots or exits
     callback finish(reboot: bool);
 }
 
 export global Location {
-    // whether apps may ask GeoClue for the device's location
     in-out property <bool> enabled: true;
 }
 
 export global Drivers {
-    // detected hardware that needs extra drivers
     in property <bool> nvidia;
     in property <bool> broadcom-wifi;
-    // Secure Boot keeps the NVIDIA or Broadcom Wi-Fi driver from loading, so they aren't
-    // installed, and the drivers page shows how to set them up instead
     in property <bool> secure-boot;
-    // a QR code to `secure-boot-url`
     in property <image> secure-boot-qr;
     in property <string> secure-boot-url;
-    // false when the distro skips dnf (`taidan0.skip_dnf`), which is how codecs get installed
     in property <bool> codecs: true;
-    // whether to install drivers and codecs
     in-out property <bool> install: true;
 }

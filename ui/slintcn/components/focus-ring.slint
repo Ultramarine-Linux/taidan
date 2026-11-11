@@ -1,42 +1,18 @@
-// slintcn FocusRing, the shared keyboard focus ring (you own this file after `slintcn add`)
-//
-// a component root can't read `parent` in Slint, so the host passes its own size in. make it the
-// last child of the element that gets the ring, behind a keyboard-only guard so a mouse click
-// doesn't show it:
-//
-//     if scope.has-focus && !root.pointer-focus : FocusRing {
-//         host-width: parent.width;
-//         host-height: parent.height;
-//     }
-//
-// it draws an outline `offset` outside that box, so set `radius` per call site to match the
-// host's corner radius
-//
-// consumers hide it after a click with a `pointer-focus` flag, which the shared widgets in
-// `components.slint` clear in their FocusScope's `focus-gained` when Tab brings the focus back
-
 import { Tokens } from "../theme/tokens.slint";
 
 export component FocusRing inherits Rectangle {
-    // the host element's size
+    // a component root can't read `parent` in Slint
     in property <length> host-width;
     in property <length> host-height;
     in property <length> offset:     Tokens.focus-ring-offset;
-    in property <length> ring-width: Tokens.focus-ring-width;
     in property <length> radius:     Tokens.radius-md + root.offset;
-    // solid, since a translucent ring falls under the 3:1 contrast WCAG asks of focus indicators
-    // in both modes
-    in property <color>  ring-color: Tokens.color-ring;
-    // draws the ring `offset` inside the box instead, for hosts with no room around them,
-    // like rows packed in a list
     in property <bool>   inset;
 
     x: root.inset ? root.offset : -root.offset;
     y: self.x;
     width:  root.host-width  - 2 * self.x;
     height: root.host-height - 2 * self.x;
-    border-width:  root.ring-width;
-    border-color:  root.ring-color;
+    border-width:  Tokens.focus-ring-width;
+    border-color:  Tokens.color-ring;
     border-radius: root.radius;
-    background:    transparent;
 }

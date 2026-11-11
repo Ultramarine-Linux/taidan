@@ -27,25 +27,37 @@ use crate::steps::{
     _10_settimezone::SetTimezone, _11_setlocale::SetLocale, _12_downloadupdates::DownloadUpdates,
 };
 
-/// whether this is an rpm-ostree system, which dnf can't install to
 pub(crate) async fn is_ostree() -> bool {
     tokio::fs::try_exists("/ostree").await.unwrap_or_default()
 }
 
-/// whether dnf can install packages here, false with `skip_dnf` or on rpm-ostree
 pub(crate) async fn can_use_dnf(cfg: &crate::cfg::Config) -> bool {
     !cfg.taidan0.skip_dnf && !is_ostree().await
 }
 
-/// runs `a` and `b` concurrently and waits for both, returning `a`'s error, else `b`'s. unlike
-/// `try_join` it doesn't drop one when the other fails, which would leave its root process running
-/// with nobody reading its output.
-pub(crate) async fn join_both(
-    a: impl Future<Output = Res<()>>,
-    b: impl Future<Output = Res<()>>,
+async fn flatpaks_and_packages<C: crate::Callback>(
+    callback: &C,
+    refs: &[String],
+    pkgs: &[String],
+    download_only: bool,
 ) -> Res<()> {
-    let (a, b) = futures::future::join(a, b).await;
-    a.and(b)
+    let flatpaks = async {
+        if refs.is_empty() {
+            return Ok(());
+        }
+        let verb = crate::Verb::FlatpakInstall { refs: refs.to_vec(), download_only };
+        crate::flatpak::handle_flatpak(callback, verb).await
+    };
+    let packages = async {
+        if pkgs.is_empty() {
+            return Ok(());
+        }
+        let verb = crate::Verb::DnfExtras { pkgs: pkgs.to_vec(), download_only };
+        crate::dnf::handle_dnf(callback, verb).await
+    };
+    // flatpak and dnf don't affect each other, and neither is cancelled when the other fails
+    let (flatpaks, packages) = futures::future::join(flatpaks, packages).await;
+    flatpaks.and(packages)
 }
 
 #[allow(async_fn_in_trait, clippy::unused_async)]

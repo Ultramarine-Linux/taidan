@@ -1,37 +1,20 @@
-// slintcn default theme, dark and light, switchable at runtime
-//
-// `Theme.mode` picks the palette color each semantic role uses. components only read `Tokens.*`,
-// so they don't care which mode is active
-//
-// to retune a value, edit palette.slint
-// to remap a semantic role, change the per-mode picks below
-
 import { Palette } from "palette.slint";
 import { Palette as StdPalette } from "std-widgets.slint";
 
 export enum ThemeMode { dark, light }
 
 export global Theme {
-    // follows the system color scheme. to override it, set `Palette.color-scheme` (std-widgets) so
-    // the std widgets switch along with the tokens
     out property <ThemeMode> mode:
         StdPalette.color-scheme == ColorScheme.dark ? ThemeMode.dark : ThemeMode.light;
 }
 
 export global Tokens {
-    // how much bigger than the 600×500 designs the UI is drawn. the window derives its size and
-    // `default-font-size` (and so every `rem`) from this
     in-out property <float> scale: 1.2;
-    // one design pixel. sizes below use it instead of `px` so they follow `scale`
     out property <length> unit: 1px * scale;
-    // text and buttons are drawn this much smaller than the rest, so the layout keeps its room
     in-out property <float> text-scale: 0.875;
-    // one design pixel of text
     out property <length> text-unit: unit * text-scale;
-    // a `rem` for font sizes, use `1.5 * Tokens.text-rem` instead of `1.5rem`
     out property <length> text-rem: 14 * text-unit;
 
-    // surfaces
     out property <color> color-background:
         Theme.mode == ThemeMode.light ? Palette.neutral-50 : Palette.neutral-950;
     out property <color> color-foreground:
@@ -39,7 +22,6 @@ export global Tokens {
     out property <color> color-card:
         Theme.mode == ThemeMode.light ? Palette.neutral-100 : Palette.neutral-900;
 
-    // intent
     out property <color> color-primary:
         Theme.mode == ThemeMode.light ? Palette.neutral-900 : Palette.neutral-200;
     out property <color> color-primary-foreground:
@@ -48,35 +30,26 @@ export global Tokens {
         Theme.mode == ThemeMode.light ? Palette.neutral-100 : Palette.neutral-800;
     out property <color> color-muted:
         Theme.mode == ThemeMode.light ? Palette.neutral-100 : Palette.neutral-800;
-    // darker than neutral-500 in light mode so muted text stays above 4.5:1 on cards and their
-    // hover tint
     out property <color> color-muted-foreground:
         Theme.mode == ThemeMode.light ? #616161 : Palette.neutral-400;
-    // darker in light mode so red text stays above 4.5:1 on the background and on its tint
     out property <color> color-destructive:
         Theme.mode == ThemeMode.light ? Palette.red-700 : Palette.red-400;
-    // behind red text, for the softer destructive buttons
     out property <color> color-destructive-tint:
         Theme.mode == ThemeMode.light
         ? Palette.red-700.with-alpha(0.1)
         : Palette.red-400.with-alpha(0.2);
-    // filled destructive buttons, dark enough for white text in either mode
     out property <color> color-destructive-solid:
         Theme.mode == ThemeMode.light ? Palette.red-700 : Palette.red-600;
     out property <color> color-destructive-foreground: #ffffff;
     out property <color> color-affirm:             Palette.green-400;
-    // subtle hover surface for outline and ghost controls (shadcn's "accent")
     out property <color> color-accent:
         Theme.mode == ThemeMode.light ? Palette.alpha-b-08-on-light : Palette.alpha-w-08;
 
-    // focus
     out property <color> color-ring:
         Theme.mode == ThemeMode.light ? Palette.neutral-700 : Palette.neutral-500;
     out property <length> focus-ring-width:  3 * unit;
     out property <length> focus-ring-offset: 2 * unit;
 
-    // surface tint and hairlines. the overlays flip between black and white per mode so they stay
-    // subtle on either background
     out property <color> color-surface-1:
         Theme.mode == ThemeMode.light ? Palette.alpha-b-04-on-light : Palette.alpha-w-04;
     out property <color> color-border-hairline:
@@ -84,26 +57,21 @@ export global Tokens {
     out property <color> color-border-hairline-strong:
         Theme.mode == ThemeMode.light ? Palette.alpha-b-20-on-light : Palette.alpha-w-20;
 
-    // radius, shadcn's --radius of 0.625rem (10px) with derived steps
-    out property <length> radius-sm: 6 * unit;   // radius - 4
-    out property <length> radius-md: 8 * unit;   // radius - 2
-    out property <length> radius-lg: 10 * unit;  // radius
-    out property <length> radius-xl: 16 * unit;  // radius + 6
+    out property <length> radius-sm: 6 * unit;
+    out property <length> radius-md: 8 * unit;
+    out property <length> radius-lg: 10 * unit;
+    out property <length> radius-xl: 16 * unit;
 
-    // motion
-    // turns animations off, for people who get motion sick or distracted by them
     in-out property <bool> reduce-motion;
     out property <duration> motion-fast: reduce-motion ? 0ms : 150ms;
     out property <duration> motion-base: reduce-motion ? 0ms : 200ms;
     out property <easing> motion-easing-standard:    cubic-bezier(0.4, 0.0, 0.2, 1.0);
 
-    // typography
     out property <int> typography-weight-medium:     500;
-    out property <length> typography-body-sm-size:      13 * text-unit;  // text-sm-ish
-    out property <length> typography-body-size:         14 * text-unit;  // text-sm
-    out property <length> typography-label-size:        12 * text-unit;  // text-xs
-    out property <length> typography-title-size:        18 * text-unit;  // text-lg
+    out property <length> typography-body-sm-size:      13 * text-unit;
+    out property <length> typography-body-size:         14 * text-unit;
+    out property <length> typography-label-size:        12 * text-unit;
+    out property <length> typography-title-size:        18 * text-unit;
 
-    // control height, shadcn's h-9
     out property <length> density-input: 36 * unit;
 }

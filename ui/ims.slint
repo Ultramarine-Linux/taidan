@@ -1,22 +1,14 @@
 export struct ImItem {
     name: string,
-    // what the IM calls itself, e.g. 拼音
     native: string,
-    // the language it's for, in that language, e.g. 中文
     lang: string,
     on: bool,
 }
 
-// input methods for languages a keyboard layout alone can't type, driven from Rust (`src/ims.rs`).
-// they default to the ones for the UI language until the user picks some
 export global Ims {
-    // only the ones the distro's input method framework has, grouped by `lang`
     in property <[ImItem]> items;
-    // names of the ones turned on, comma separated, empty for none
     in property <string> enabled;
-    // whether the dialog is open, from the keyboard page
     in-out property <bool> open;
 
-    // turns one on or off, which goes straight to the settings
     callback set(index: int, on: bool);
 }

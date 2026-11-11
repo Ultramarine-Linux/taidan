@@ -16,12 +16,8 @@ fn lock_swaybg() -> MutexGuard<'static, Option<Child>> {
     SWAYBG.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-fn image_for(dark: bool) -> &'static str {
-    if dark && Path::new(DARK).exists() { DARK } else { LIGHT }
-}
-
 fn spawn_swaybg(dark: bool) -> Option<Child> {
-    let image = image_for(dark);
+    let image = if dark && Path::new(DARK).exists() { DARK } else { LIGHT };
     tracing::debug!(image, "Showing the wallpaper");
     Command::new("swaybg")
         .args(["-i", image, "-m", "fill", "-c", FALLBACK_COLOR])

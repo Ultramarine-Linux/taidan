@@ -2,9 +2,6 @@ import { Tokens } from "../theme/tokens.slint";
 
 export enum CardRadius { md, lg, xl }
 
-// a bordered surface. cards aren't focusable, so put a button inside to make one do something.
-// nothing on the root is animated and there's no drop shadow, or Slint would inline a copy of
-// the card at every use
 export component Card inherits Rectangle {
     in property <CardRadius> card-radius: CardRadius.xl;
 
@@ -14,7 +11,7 @@ export component Card inherits Rectangle {
     border-radius:
         card-radius == CardRadius.md ? Tokens.radius-md :
         card-radius == CardRadius.lg ? Tokens.radius-lg :
-        /* xl */                       Tokens.radius-xl;
+        Tokens.radius-xl;
 
     @children
 }

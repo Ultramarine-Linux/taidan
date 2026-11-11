@@ -1,8 +1,3 @@
-# seeded into the OOBE session's own config by taidan-initial-setup.service
-#
-# turns off KWin's window menu on right-clicking a title bar (Alt+F3 is already unbound in
-# kglobalshortcutsrc). its "Configure Special Window Settings" opens the window rules KCM, which
-# leads on to other apps running as the taidan user, which can run the root helper. KWin checks
-# this with KAuthorized::authorizeAction("kwin_rmb") in src/useractions.cpp.
+# kwin_rmb is KWin's title bar right-click menu, which can open other apps as the taidan user
 [KDE Action Restrictions][$i]
 action/kwin_rmb=false

@@ -1,5 +1,3 @@
-// accessibility options, applied to the OOBE session as they change and carried over to the new
-// user, driven from Rust (`src/a11y.rs`)
 export global A11y {
     in-out property <bool> screen-reader;
     in-out property <bool> zoom;
@@ -8,18 +6,12 @@ export global A11y {
     in-out property <bool> bounce-keys;
     in-out property <bool> dwell-click;
     in-out property <bool> larger-text;
-    // Atkinson Hyperlegible Next instead of Geist
     in-out property <bool> legible-font;
     in-out property <bool> reduce-motion;
-    // 0 for none, then KWin's colorblindness correction modes + 1: protanopia, deuteranopia,
-    // tritanopia and monochrome
     in-out property <int> color-filter;
 
-    // the page opened from the header button, over whichever page is shown
     in-out property <bool> open;
-    // the dialog with the options beyond the three on the page
     in-out property <bool> more-open;
 
-    // fired after any option changes
     callback changed();
 }

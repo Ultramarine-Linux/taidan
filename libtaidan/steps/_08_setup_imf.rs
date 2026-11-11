@@ -11,18 +11,11 @@ impl super::Step for SetupImf {
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        // homed homes get it from the skeleton they're created from, see `write_to_skel`
         if cfg.taidan0.systemd_homed {
             return Ok(());
         }
-        let installed = if settings.ims.is_empty() {
-            None
-        } else {
-            with_installed_ims(settings, cfg, true).await
-        };
-        let Some(settings) = &installed else {
-            // not worth failing the setup over
-            if let Err(e) = remove_fcitx5_config(settings).await {
+        let Some(settings) = &with_installed_ims(settings, cfg, InstallPhase::After).await else {
+            if let Err(e) = remove_stale_fcitx5_config(settings).await {
                 tracing::warn!(?e, "cannot remove the Fcitx5 config of an earlier attempt");
             }
             return Ok(());
@@ -37,16 +30,18 @@ impl super::Step for SetupImf {
     }
 }
 
-/// `settings` with only the input methods that are installed, [`None`] if that leaves none. ones
-/// installed here may still be missing, as dnf skips broken packages, and offline or without dnf
-/// only the image's are there. before the installation (`installed` false, e.g. for homed's
-/// skeleton), the ones dnf is about to install count too
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum InstallPhase {
+    Before,
+    After,
+}
+
 async fn with_installed_ims(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
-    installed: bool,
+    phase: InstallPhase,
 ) -> Option<crate::settings::Settings> {
-    if !installed && !settings.nointernet && super::can_use_dnf(cfg).await {
+    if phase == InstallPhase::Before && !settings.nointernet && super::can_use_dnf(cfg).await {
         return (!settings.ims.is_empty()).then(|| settings.clone());
     }
     let mut ims = vec![];
@@ -66,32 +61,19 @@ async fn with_installed_ims(
     (!ims.is_empty()).then(|| crate::settings::Settings { ims, ..settings.clone() })
 }
 
-/// `kwriteconfig6` arguments, after `--file`, that select Fcitx5 as KWin's input method
-/// <https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg>
-const KWINRC_FCITX5: [[&str; 6]; 2] = [
-    [
-        "--group",
-        "Wayland",
-        "--key",
-        "InputMethod",
-        "--",
-        "/usr/share/applications/fcitx5-wayland-launcher.desktop",
-    ],
+const FCITX5_LAUNCHER: &str = "/usr/share/applications/fcitx5-wayland-launcher.desktop";
+
+// https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg
+const KWINRC_SELECT_FCITX5_ARGS: [[&str; 6]; 2] = [
+    ["--group", "Wayland", "--key", "InputMethod", "--", FCITX5_LAUNCHER],
     ["--group", "Wayland", "--key", "VirtualKeyboardEnabled", "--type=bool", "true"],
 ];
 
-/// first line of the Fcitx5 profiles written here, so a retry knows which one it may remove.
-/// Fcitx5 drops it once it saves the profile itself, and then it's the user's
 const FCITX5_PROFILE_MARKER: &str = "# written by Taidan";
 
-/// removes the Fcitx5 profile and the kwinrc keys an earlier attempt wrote (see
-/// [`write_fcitx5_profile`]), for a retry without input methods. only a home kept from before
-/// the install can have them. nothing is removed unless the profile is still the one written
-/// here
-async fn remove_fcitx5_config(settings: &crate::settings::Settings) -> Res<()> {
+async fn remove_stale_fcitx5_config(settings: &crate::settings::Settings) -> Res<()> {
     const SCRIPT: &str = r#"
         profile="$1/fcitx5/profile"
-        # without the marker nothing here is from an earlier attempt
         [ "$(head -n 1 -- "$profile" 2>/dev/null)" = "$2" ] || exit 0
         rm -f -- "$profile"
         if [ "$3" = plasma ] && [ -e "$1/kwinrc" ] \
@@ -103,7 +85,6 @@ async fn remove_fcitx5_config(settings: &crate::settings::Settings) -> Res<()> {
     let username = &settings.username;
     let config = crate::a11y::home_of(username).await?.join(".config");
     let plasma = if crate::a11y::is_plasma() { "plasma" } else { "" };
-    let [_, _, _, _, _, launcher] = KWINRC_FCITX5[0];
     let argv = [
         "sh",
         "-c",
@@ -112,13 +93,11 @@ async fn remove_fcitx5_config(settings: &crate::settings::Settings) -> Res<()> {
         &config.to_string_lossy(),
         FCITX5_PROFILE_MARKER,
         plasma,
-        launcher,
+        FCITX5_LAUNCHER,
     ];
-    // as the user, whose home it is
     crate::as_user(username, argv.map(str::to_owned).to_vec(), None).await
 }
 
-/// `~/.config/fcitx5/profile` with the keyboard layout and the chosen input methods
 fn fcitx5_profile(
     crate::settings::Settings { ims, kb_layout, kb_variant, .. }: &crate::settings::Settings,
 ) -> String {
@@ -142,13 +121,11 @@ fn fcitx5_profile(
         ",
     );
 
-    // a layout that can't type ASCII gets US English next to it, see `XkbKeymap::new`
-    let latin = i18n::XkbKeymap::new(kb_layout, kb_variant.as_deref())
+    let latin_fallback = i18n::XkbKeymap::new(kb_layout, kb_variant.as_deref())
         .has_latin_fallback()
         .then_some("keyboard-us");
-    // after the input methods, fcitx5's Ctrl+Space toggles between the layout and the first of
-    // them
-    let refs = ims.iter().filter_map(|im| i18n::find_im(im)?.fcitx5_ref).chain(latin);
+    // after the input methods, since fcitx5's Ctrl+Space toggles between the layout and the first
+    let refs = ims.iter().filter_map(|im| i18n::find_im(im)?.fcitx5_ref).chain(latin_fallback);
     for (i, im) in refs.enumerate() {
         buf.push_str(&format!(
             "\
@@ -166,33 +143,25 @@ fn fcitx5_profile(
     buf
 }
 
-/// writes `content` to `path` as `user`, replacing what was there, so the file is theirs
-async fn write_as(user: &str, path: &str, content: &[u8]) -> Res<()> {
-    let argv = ["sh", "-c", r#"exec cat > "$1""#, "sh", path].map(str::to_owned).to_vec();
-    crate::as_user(user, argv, Some(content))
-        .await
-        .wrap_message(|_| format!("failed to write to {path}"))
+fn write_file_argv(path: String) -> Vec<String> {
+    let script = r#"mkdir -p "${1%/*}" && exec cat > "$1""#;
+    ["sh", "-c", script, "sh"].map(str::to_owned).into_iter().chain([path]).collect()
 }
 
 async fn write_fcitx5_profile(settings: &crate::settings::Settings) -> Res<()> {
     let username = &settings.username;
     let config = crate::a11y::home_of(username).await?.join(".config");
-    let fcitx5 = config.join("fcitx5");
-    let argv = vec!["mkdir".to_owned(), "-p".to_owned(), fcitx5.to_string_lossy().into_owned()];
-    crate::as_user(username, argv, None).await.wrap_msg("cannot create ~/.config/fcitx5/")?;
+    let profile = config.join("fcitx5/profile").to_string_lossy().into_owned();
+    crate::as_user(username, write_file_argv(profile), Some(fcitx5_profile(settings).as_bytes()))
+        .await
+        .wrap_msg("cannot write ~/.config/fcitx5/profile")?;
 
-    let profile_path = fcitx5.join("profile");
-    write_as(username, &profile_path.to_string_lossy(), fcitx5_profile(settings).as_bytes())
-        .await?;
-
-    // KWin is only the user's compositor on Plasma
     if !crate::a11y::is_plasma() {
         return Ok(());
     }
     let kwinrc = config.join("kwinrc");
     let kwinrc = kwinrc.to_string_lossy();
-    for entry in KWINRC_FCITX5 {
-        // as the user, so the file they get is theirs
+    for entry in KWINRC_SELECT_FCITX5_ARGS {
         let mut argv = vec!["kwriteconfig6", "--file", &kwinrc];
         argv.extend(entry);
         let argv = argv.into_iter().map(str::to_owned).collect();
@@ -201,20 +170,14 @@ async fn write_fcitx5_profile(settings: &crate::settings::Settings) -> Res<()> {
     Ok(())
 }
 
-/// writes the input method config into `skel`, a copy of `/etc/skel` the new user's home is made
-/// from, for systemd-homed, where the home isn't mounted when [`SetupImf`] runs
-///
-/// # Errors
-/// - cannot write the files
 pub async fn write_to_skel(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
     skel: &std::path::Path,
 ) -> Res<bool> {
-    if settings.ims.is_empty() {
+    let Some(settings) = &with_installed_ims(settings, cfg, InstallPhase::Before).await else {
         return Ok(false);
-    }
-    let Some(settings) = &with_installed_ims(settings, cfg, false).await else { return Ok(false) };
+    };
     if settings.imf.is_ibus() {
         return write_ibus_to_skel(settings, skel).await;
     }
@@ -226,7 +189,7 @@ pub async fn write_to_skel(
     if crate::a11y::is_plasma() {
         let kwinrc = config.join("kwinrc");
         let kwinrc = kwinrc.to_string_lossy();
-        for entry in KWINRC_FCITX5 {
+        for entry in KWINRC_SELECT_FCITX5_ARGS {
             let mut args = vec!["--file", &*kwinrc];
             args.extend(entry);
             super::acmd("kwriteconfig6", &args).await?;
@@ -235,29 +198,23 @@ pub async fn write_to_skel(
     Ok(true)
 }
 
-/// the `dconf write`s that hand IBus the chosen engines, for [`crate::a11y::one_session`] to run
-/// through one D-Bus, [`None`] if none of them have an IBus engine. IBus reads
-/// `preload-engines`, but GNOME (and Budgie) drive IBus from their own `input-sources` and
-/// ignore it, so the engines go in there too, after the layout. arguments rather than a shell
-/// script, since the layout comes from the settings
-fn ibus_dconf_writes(settings: &crate::settings::Settings) -> Option<Vec<Vec<String>>> {
+const EMPTY_STRING_ARRAY_GVARIANT: &str = "@as []";
+
+fn ibus_session_if_any_engine(settings: &crate::settings::Settings) -> Option<Vec<String>> {
     let any = settings.ims.iter().any(|s| i18n::find_im(s).is_some_and(|im| im.ibus_ref.is_some()));
-    any.then(|| ibus_dconf_writes_all(settings))
+    any.then(|| ibus_dconf_writes(settings)).and_then(crate::a11y::one_session)
 }
 
-/// [`ibus_dconf_writes`] even without engines, which sets IBus and GNOME back to the layout alone
-fn ibus_dconf_writes_all(
+fn ibus_dconf_writes(
     crate::settings::Settings { ims, kb_layout, kb_variant, .. }: &crate::settings::Settings,
 ) -> Vec<Vec<String>> {
     let engines: Vec<_> = ims.iter().filter_map(|s| i18n::find_im(s)?.ibus_ref).collect();
-    // dconf can't infer the type of an empty array
     let order = if engines.is_empty() {
-        "@as []".to_owned()
+        EMPTY_STRING_ARRAY_GVARIANT.to_owned()
     } else {
         format!("[{}]", engines.iter().map(|r| format!("'{r}'")).collect::<Vec<_>>().join(", "))
     };
 
-    // without an xkb source first GNOME would type through an IBus engine all the time
     let layout = if kb_layout.is_empty() { "us" } else { kb_layout };
     let sources = i18n::XkbKeymap::new(layout, kb_variant.as_deref())
         .gnome_sources()
@@ -277,32 +234,29 @@ fn ibus_dconf_writes_all(
         write("/desktop/ibus/general/use-system-keyboard-layout", "true".to_owned()),
         write("/desktop/ibus/general/engines-order", order.clone()),
         write("/desktop/ibus/general/preload-engines", order),
+        // GNOME and Budgie ignore `preload-engines` and drive IBus from `input-sources`
         write("/org/gnome/desktop/input-sources/sources", format!("[{sources}]")),
     ]
 }
 
-/// on systemd-homed, the skeleton the home was made from counted the input methods dnf was about
-/// to install, see [`write_to_skel`]. once the installation is over and the user is unlocked, this
-/// drops the ones that didn't install from the home, failures are logged
 pub async fn fix_homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) {
     if !cfg.taidan0.systemd_homed || settings.ims.is_empty() {
         return;
     }
-    let in_skel = with_installed_ims(settings, cfg, false).await;
-    let installed = with_installed_ims(settings, cfg, true).await;
-    let ims = |s: &Option<crate::settings::Settings>| s.as_ref().map(|s| s.ims.clone());
-    if ims(&in_skel) == ims(&installed) {
+    let in_skel = with_installed_ims(settings, cfg, InstallPhase::Before).await;
+    let installed = with_installed_ims(settings, cfg, InstallPhase::After).await;
+    if in_skel.as_ref().map(|s| &s.ims) == installed.as_ref().map(|s| &s.ims) {
         return;
     }
     tracing::info!(?installed, "some input methods didn't install, fixing the home");
     let settings =
-        &crate::settings::Settings { ims: ims(&installed).unwrap_or_default(), ..settings.clone() };
+        &installed.unwrap_or_else(|| crate::settings::Settings { ims: vec![], ..settings.clone() });
     let home = match crate::a11y::home_of(&settings.username).await {
         Ok(home) => home,
         Err(e) => return tracing::warn!(?e, "cannot find the user's home"),
     };
     let cmds = if settings.imf.is_ibus() {
-        let Some(cmd) = crate::a11y::one_session(ibus_dconf_writes_all(settings)) else { return };
+        let Some(cmd) = crate::a11y::one_session(ibus_dconf_writes(settings)) else { return };
         let mut env = vec!["env".to_owned()];
         env.extend(crate::a11y::in_home(&home, cmd));
         vec![(env, None)]
@@ -311,27 +265,20 @@ pub async fn fix_homed(settings: &crate::settings::Settings, cfg: &crate::cfg::C
         if settings.ims.is_empty() {
             vec![(vec!["rm".to_owned(), "-f".to_owned(), profile], None)]
         } else {
-            let write = r#"mkdir -p "${1%/*}" && exec cat > "$1""#;
-            let cmd = ["sh", "-c", write, "sh"].map(str::to_owned).into_iter().chain([profile]);
-            vec![(cmd.collect(), Some(fcitx5_profile(settings)))]
+            vec![(write_file_argv(profile), Some(fcitx5_profile(settings)))]
         }
     };
     crate::a11y::run_in_home(settings, cfg, cmds).await;
 }
 
-/// [`ibus_dconf_writes`] into the dconf database in `skel`, through a D-Bus of its own like the
-/// theme's `gsettings`
 async fn write_ibus_to_skel(
     settings: &crate::settings::Settings,
     skel: &std::path::Path,
 ) -> Res<bool> {
-    let Some(cmd) = ibus_dconf_writes(settings).and_then(crate::a11y::one_session) else {
-        return Ok(false);
-    };
+    let Some(cmd) = ibus_session_if_any_engine(settings) else { return Ok(false) };
     tokio::fs::create_dir_all(skel.join(".config")).await.map_err(Err::Io)?;
     let env = crate::a11y::in_home(skel, cmd);
     let env = env.iter().map(String::as_str).collect::<Vec<_>>();
-    // not worth losing the rest of the skeleton over
     if let Err(e) = super::acmd("env", &env).await {
         tracing::warn!(?e, "cannot set the IBus engines");
         return Ok(false);
@@ -340,13 +287,8 @@ async fn write_ibus_to_skel(
 }
 
 async fn write_ibus_profile(settings: &crate::settings::Settings) -> Res<()> {
-    let username = &settings.username;
-    // dconf writes through its D-Bus service, which the bus `one_session` starts activates
-    let Some(cmd) = ibus_dconf_writes(settings).and_then(crate::a11y::one_session) else {
-        return Ok(());
-    };
-
-    crate::as_user(username, cmd, None).await.wrap_msg("failed to set the IBus engines")
+    let Some(cmd) = ibus_session_if_any_engine(settings) else { return Ok(()) };
+    crate::as_user(&settings.username, cmd, None).await.wrap_msg("failed to set the IBus engines")
 }
 
 #[cfg(test)]
@@ -376,7 +318,7 @@ mod tests {
             ims: vec!["Pinyin".into(), "bogus".into(), "Mozc".into()],
             ..Default::default()
         };
-        let script = ibus_dconf_writes(&settings).unwrap().concat().join(" ");
+        let script = ibus_dconf_writes(&settings).concat().join(" ");
         let refs: Vec<_> = ["Pinyin", "Mozc"]
             .iter()
             .map(|im| i18n::find_im(im).unwrap().ibus_ref.unwrap())
@@ -400,7 +342,7 @@ mod tests {
         let profile = fcitx5_profile(&settings);
         assert!(profile.contains("[Groups/0/Items/1]\n# Name\nName=mozc\n"));
         assert!(profile.contains("[Groups/0/Items/2]\n# Name\nName=keyboard-us\n"));
-        let script = ibus_dconf_writes(&settings).unwrap().concat().join(" ");
+        let script = ibus_dconf_writes(&settings).concat().join(" ");
         assert!(script.contains("[('xkb', 'ru'), ('xkb', 'us'), ('ibus', "), "{script}");
     }
 
@@ -408,6 +350,6 @@ mod tests {
     fn no_ibus_engines_writes_nothing() {
         let settings =
             crate::settings::Settings { ims: vec!["bogus".into()], ..Default::default() };
-        assert!(ibus_dconf_writes(&settings).is_none());
+        assert!(ibus_session_if_any_engine(&settings).is_none());
     }
 }

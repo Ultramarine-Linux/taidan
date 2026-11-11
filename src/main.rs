@@ -36,7 +36,6 @@ static AVAILABLE_LANGS: LazyLock<Vec<i18n_embed::unic_langid::LanguageIdentifier
 /// Configuration of the distro OOBE.
 pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     tracing::debug!("Initializing cfg::Config");
-    // a broken config mustn't keep the OOBE from coming up at all
     let mut cfg = cfg::Config::new().unwrap_or_else(|e| {
         tracing::error!(%e, "cannot parse /etc/taidan.toml, using the defaults");
         sentry::capture_message(
@@ -52,7 +51,6 @@ pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
 pub static SETTINGS: LazyLock<RwLock<libtaidan::settings::Settings>> =
     LazyLock::new(Default::default);
 
-/// runtime for `libtaidan`'s async system calls, so they never block the UI thread
 pub static RT: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -69,53 +67,44 @@ struct Localizations;
 #[allow(clippy::missing_panics_doc)]
 fn main() {
     let _guard = setup_logs_and_install_panic_hook();
-    // returning instead of exiting drops `_guard`, which flushes the log and Sentry
+    // return rather than exit so dropping `_guard` flushes the log and Sentry
     if CFG.should_exit {
         return;
     }
-    std::sync::LazyLock::force(&l10n::PO_LOADER);
+    LazyLock::force(&l10n::PO_LOADER);
 
     ui::run();
 }
 
-/// log fields that can identify the user, dropped from what goes to Sentry
 #[cfg_attr(debug_assertions, allow(dead_code))]
 const PRIVATE_FIELDS: &[&str] = &[
     "user", "username", "prev", "ssid", "hostname", "name", "fullname", "path", "home", "dest",
-    // command lines and errors, which often carry one of the above
     "args", "e",
 ];
 
-/// identifying values the user typed, each with its placeholder, replaced wherever they show up
-/// in what goes to Sentry. filled in by `install::start`
 static PRIVATE_VALUES: RwLock<Vec<(regex::Regex, &'static str)>> = RwLock::new(Vec::new());
 
-/// sets the values [`scrub_event`] replaces
 pub fn set_private_values(settings: &libtaidan::settings::Settings) {
     let values = [
         (settings.fullname.as_str(), "<fullname>"),
         (settings.device_name.as_str(), "<hostname>"),
         (settings.hostname.as_str(), "<hostname>"),
-        // also covers the home directory, wherever it is
         (settings.username.as_str(), "<user>"),
     ];
     let values = values
         .into_iter()
-        .filter_map(|(value, placeholder)| Some((value_regex(value.trim())?, placeholder)))
+        .filter_map(|(value, placeholder)| Some((whole_word_regex(value.trim())?, placeholder)))
         .collect();
     *PRIVATE_VALUES.write() = values;
 }
 
-/// matches `value` only as a whole word, so a short one doesn't match inside longer words.
-/// [`None`] if it's empty
-fn value_regex(value: &str) -> Option<regex::Regex> {
-    let word = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
+fn whole_word_regex(value: &str) -> Option<regex::Regex> {
+    let is_word_char = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
     let first = value.chars().next()?;
     let last = value.chars().next_back()?;
-    // boundaries only where the value itself starts or ends with a word character, so
-    // `/home/alice` needs none before it
-    let before = if word(first) { r"(^|[^\w-])" } else { "()" };
-    let after = if word(last) { r"($|[^\w-])" } else { "()" };
+    let no_boundary = "()";
+    let before = if is_word_char(first) { r"(^|[^\w-])" } else { no_boundary };
+    let after = if is_word_char(last) { r"($|[^\w-])" } else { no_boundary };
     regex::RegexBuilder::new(&format!("{before}{}{after}", regex::escape(value)))
         .case_insensitive(true)
         .build()
@@ -124,17 +113,17 @@ fn value_regex(value: &str) -> Option<regex::Regex> {
 }
 
 #[cfg_attr(debug_assertions, allow(dead_code))]
-/// replaces the [`PRIVATE_VALUES`] in `text`
 fn scrub_str(text: &mut String) {
     replace_values(text, &PRIVATE_VALUES.read());
 }
 
 #[cfg_attr(debug_assertions, allow(dead_code))]
-/// replaces each of `values` in `text` with its placeholder
+const PASSES_FOR_ADJACENT_MATCHES: usize = 2;
+
+#[cfg_attr(debug_assertions, allow(dead_code))]
 fn replace_values(text: &mut String, values: &[(regex::Regex, &str)]) {
     for (re, placeholder) in values {
-        // twice, since a match consumes the character after it, which may start the next one
-        for _ in 0..2 {
+        for _ in 0..PASSES_FOR_ADJACENT_MATCHES {
             if let std::borrow::Cow::Owned(new) =
                 re.replace_all(text, format!("${{1}}{placeholder}${{2}}"))
             {
@@ -156,7 +145,6 @@ fn scrub_value(value: &mut sentry::protocol::Value) {
 }
 
 #[cfg_attr(debug_assertions, allow(dead_code))]
-/// drops the [`PRIVATE_FIELDS`] and replaces the [`PRIVATE_VALUES`] in the rest
 fn scrub(fields: &mut sentry::protocol::Map<String, sentry::protocol::Value>) {
     fields.retain(|key, _| !PRIVATE_FIELDS.contains(&key.as_str()));
     fields.values_mut().for_each(scrub_value);
@@ -184,7 +172,6 @@ fn scrub_event(event: &mut sentry::protocol::Event<'_>) {
             scrub_str(value);
         }
     }
-    // the machine's hostname, which is the user's pick on a retry after the first attempt set it
     if let Some(server) = &mut event.server_name {
         let mut name = server.to_string();
         scrub_str(&mut name);
@@ -220,7 +207,7 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 /// - cannot create taidan tempdir
 #[allow(clippy::cognitive_complexity)]
 fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
-    // first, since it replaces the panic hook rather than chaining it, and Sentry's chains to it
+    // color_eyre replaces the panic hook and Sentry's chains to it, so it goes first
     color_eyre::install().expect("install color_eyre");
     #[cfg(not(debug_assertions))]
     let sentry_guard = sentry::init((SENTRY_LINK, {
@@ -256,7 +243,6 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
                 .with_env_var("TAIDAN_LOG")
                 .from_env_lossy(),
         )
-        // not there in a container, or while journald restarts, which mustn't keep the OOBE down
         .with(journald.map(|l| l.with_syslog_identifier("taidan".to_owned())))
         .with(fmt::layer().with_writer(non_blocking).with_ansi(false).compact())
         .init();
@@ -330,18 +316,17 @@ mod tests {
     }
 
     #[test]
-    fn value_regex_leaves_longer_words_alone() {
-        let re = value_regex("al").expect("regex");
+    fn whole_word_regex_leaves_longer_words_alone() {
+        let re = whole_word_regex("al").expect("regex");
         assert!(!re.is_match("also"));
         assert!(re.is_match("user al exists"));
         assert!(re.is_match("/home/al"));
-        assert!(value_regex("").is_none());
+        assert!(whole_word_regex("").is_none());
     }
 
     #[test]
     fn replace_values_takes_every_match() {
-        // not through `set_private_values`, since the other test sets those concurrently
-        let values = [(value_regex("al").expect("regex"), "<user>")];
+        let values = [(whole_word_regex("al").expect("regex"), "<user>")];
         let mut msg = "user `al` already exists: al al, /home/al".to_owned();
         replace_values(&mut msg, &values);
         assert_eq!(msg, "user `<user>` already exists: <user> <user>, /home/<user>");

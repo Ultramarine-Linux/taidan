@@ -13,11 +13,8 @@ export component InstallingPage inherits TdnBasePg {
         { key: "count", value: Install.stage-count },
     ]);
 
-    // nothing to press here, so the focus goes to the progress, which screen readers read out as
-    // the stage changes
     forward-focus: status;
 
-    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is
     VerticalLayout {
         accessible-role: groupbox;
         accessible-label: Lang.t("page-installing-configuring", []);
@@ -61,7 +58,6 @@ export component InstallingPage inherits TdnBasePg {
 
                     TdnSpinner {
                         width: 1.6rem;
-                        // the progress around it says what's going on
                         accessible-role: none;
                     }
                 }
@@ -87,8 +83,6 @@ export component InstallingPage inherits TdnBasePg {
                         overflow: elide;
                     }
 
-                    // how far the stage is, when it reports that (dnf's `[n/m]` lines). hidden
-                    // rather than removed so the text doesn't move when it shows
                     Rectangle {
                         visible: Install.stage-progress >= 0;
                         height: 0.25rem;
@@ -97,9 +91,8 @@ export component InstallingPage inherits TdnBasePg {
                         accessible-role: none;
 
                         Rectangle {
-                            property <length> filled: parent.width * clamp(Install.stage-progress, 0, 1);
                             x: Dir.x(0, self.width, parent.width);
-                            width: self.filled;
+                            width: parent.width * clamp(Install.stage-progress, 0, 1);
                             border-radius: parent.border-radius;
                             background: TdnStyle.accent;
                         }

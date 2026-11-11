@@ -36,8 +36,7 @@ export component LocationPage inherits TdnPage {
             }
         }
 
-        // pushes the privacy card to the end edge on wider windows
-        Rectangle {
+        privacy-card-spacer := Rectangle {
             layout-order: Dir.order(1);
             horizontal-stretch: 1;
         }

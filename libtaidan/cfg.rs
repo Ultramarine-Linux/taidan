@@ -1,19 +1,15 @@
 pub const ACTION_TYPES: usize = 5;
 
-/// `/etc/taidan.toml`, read by both the backend and the UI
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct Config {
     #[serde(skip)]
     pub distro: String,
-    /// set when the OOBE shouldn't run. taidan's `main` exits on it, so the log and Sentry guards
-    /// still flush.
     #[serde(skip)]
     pub should_exit: bool,
     #[serde(default)]
     pub edition: String,
 
-    /// pages the distro doesn't want shown, see [`SkipPage`]
     #[serde(default, deserialize_with = "de_skip_pages")]
     pub skip_pages: Vec<SkipPage>,
     #[serde(default = "_default_org")]
@@ -25,27 +21,22 @@ pub struct Config {
     #[serde(default)]
     pub taidan0: Taidan0Config,
 
-    /// keys only the UI reads (e.g. `accent_color`, `welcome.*`), looked up through `Cfg` in Slint.
-    /// it also takes keys older versions had (`internet_timeout`, …) so those configs still parse.
     #[serde(flatten)]
     pub ui: serde_json::Map<String, serde_json::Value>,
 }
 
-/// the same defaults as an empty `/etc/taidan.toml`
 impl Default for Config {
     fn default() -> Self {
         basic_toml::from_str("").expect("an empty config parses")
     }
 }
 
-/// keys from before the Slint rewrite that are now ignored. they set how the internet page pinged.
-pub const IGNORED_KEYS: [&str; 2] = ["internet_timeout", "internet_retry_interval"];
+const IGNORED_LEGACY_INTERNET_KEYS: [&str; 2] = ["internet_timeout", "internet_retry_interval"];
 
 fn _default_org() -> String {
     "Fyra Labs".into()
 }
 
-/// a page that `skip_pages` in `/etc/taidan.toml` can hide
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SkipPage {
@@ -57,16 +48,12 @@ pub enum SkipPage {
     Timezone,
     Network,
     Location,
-    /// the drivers and codecs page. skipping it still installs them.
     Drivers,
-    /// no longer a page, hides the tweaks button on the summary page
     Tweaks,
-    /// no longer a page either, hides the keyboard page's input methods so none are set up
     InputMethod,
 }
 
 impl SkipPage {
-    /// parses a page name, including the ones from before the Slint rewrite (`internet`, `codecs`)
     fn parse(name: &str) -> Result<Self, &'static str> {
         Ok(match name {
             "accessibility" => Self::Accessibility,
@@ -83,7 +70,6 @@ impl SkipPage {
             "devicename" | "analytics" | "crashreport" => {
                 return Err("this page no longer exists");
             }
-            // the account and the install itself depend on these
             "whoareyou" | "password" | "summary" | "installing" | "finish" | "done" | "error" => {
                 return Err("this page can't be skipped");
             }
@@ -92,8 +78,6 @@ impl SkipPage {
     }
 }
 
-/// reads `skip_pages`, ignoring (with a warning) names it doesn't know instead of refusing the
-/// whole config
 fn de_skip_pages<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Vec<SkipPage>, D::Error> {
     let names = <Vec<String> as serde::Deserialize>::deserialize(de)?;
     Ok(names
@@ -109,8 +93,6 @@ fn de_skip_pages<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Vec<SkipPage
 impl Config {
     /// Create a new [`Config`] by reading from `/etc/taidan.toml`, else [`Self::default()`].
     ///
-    /// remember to fill in [`Self::read_os_release`] afterwards.
-    ///
     /// # Errors
     /// Failure to parse `/etc/taidan.toml`.
     pub fn new() -> Result<Self, basic_toml::Error> {
@@ -122,9 +104,9 @@ impl Config {
         basic_toml::from_str(&s).inspect(Self::warn_ignored_keys)
     }
 
-    /// warns about keys older versions read that do nothing now. they still parse, see [`Self::ui`]
     fn warn_ignored_keys(&self) {
-        for key in IGNORED_KEYS.into_iter().filter(|key| self.ui.contains_key(*key)) {
+        for key in IGNORED_LEGACY_INTERNET_KEYS.into_iter().filter(|key| self.ui.contains_key(*key))
+        {
             tracing::warn!(
                 key,
                 "ignoring /etc/taidan.toml key, online detection uses NetworkManager's connectivity \
@@ -133,7 +115,6 @@ impl Config {
         }
     }
 
-    /// the distro name, and the edition unless the config sets it, from os-release
     pub fn read_os_release(&mut self) {
         let (name, variant_id) = os_release();
         self.distro = name;
@@ -143,9 +124,7 @@ impl Config {
     }
 }
 
-/// `NAME=` and `VARIANT_ID=` from `/etc/os-release`, or `/usr/lib/os-release` as os-release(5) says
-#[must_use]
-pub fn os_release() -> (String, String) {
+fn os_release() -> (String, String) {
     let file = ["/etc/os-release", "/usr/lib/os-release"]
         .into_iter()
         .find_map(|path| std::fs::read_to_string(path).ok())
@@ -156,11 +135,7 @@ pub fn os_release() -> (String, String) {
     parse_os_release(&file)
 }
 
-/// `NAME=` and `VARIANT_ID=` from the contents of os-release(5)
-///
-/// missing keys get the defaults from os-release(5): `Linux` for `NAME=` and `""` for `VARIANT_ID=`
-#[must_use]
-pub fn parse_os_release(file: &str) -> (String, String) {
+fn parse_os_release(file: &str) -> (String, String) {
     let get = |key: &str| {
         let value =
             file.lines().find_map(|line| line.trim().strip_prefix(key)?.strip_prefix('='))?;
@@ -182,8 +157,6 @@ pub fn parse_os_release(file: &str) -> (String, String) {
     (name, variant_id)
 }
 
-/// the lowercase desktop an edition (`VARIANT_ID`) runs, the same for its atomic image
-/// (`atomic-gnome` is `gnome`)
 #[must_use]
 pub fn desktop(edition: &str) -> String {
     let edition = edition.to_ascii_lowercase();
@@ -192,7 +165,7 @@ pub fn desktop(edition: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Config, IGNORED_KEYS, SkipPage, desktop, parse_os_release};
+    use super::{Config, IGNORED_LEGACY_INTERNET_KEYS, SkipPage, desktop, parse_os_release};
 
     #[test]
     fn defaults_are_the_serde_ones() {
@@ -209,7 +182,6 @@ mod tests {
             cfg.skip_pages,
             [SkipPage::Drivers, SkipPage::Network, SkipPage::Theme, SkipPage::InputMethod]
         );
-        // not swallowed by the flattened `ui` map
         assert!(!cfg.ui.contains_key("skip_pages"));
         assert!(!cfg.ui.contains_key("org"));
     }
@@ -219,7 +191,7 @@ mod tests {
         let cfg: Config =
             basic_toml::from_str("internet_timeout = 20\ninternet_retry_interval = 5").unwrap();
         assert_eq!(cfg.skip_pages, []);
-        assert!(IGNORED_KEYS.iter().all(|key| cfg.ui.contains_key(*key)));
+        assert!(IGNORED_LEGACY_INTERNET_KEYS.iter().all(|key| cfg.ui.contains_key(*key)));
     }
 
     #[test]
@@ -239,7 +211,6 @@ mod tests {
     #[test]
     fn os_release_defaults() {
         assert_eq!(parse_os_release(""), ("Linux".into(), String::new()));
-        // PRETTY_NAME= and VARIANT= must not match NAME= or VARIANT_ID=
         assert_eq!(parse_os_release("PRETTY_NAME=x\nVARIANT=y\n"), ("Linux".into(), String::new()));
     }
 }

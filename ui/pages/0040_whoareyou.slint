@@ -1,13 +1,11 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
-import { Account } from "../account.slint";
+import { Account, Avatar } from "../account.slint";
 import { Camera } from "../camera.slint";
 import { TdnInput, TdnField, TdnText, TdnStyle, TdnBtn, TdnSpinner, TdnDialog, Modal, DialogOpener } from "../components.slint";
-import { Card } from "../slintcn/components/card.slint";
 import { FocusRing } from "../slintcn/components/focus-ring.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
-// the chosen user icon, or a placeholder
 export component UserIcon inherits Rectangle {
     width: 3rem;
     height: self.width;
@@ -31,24 +29,19 @@ export component UserIcon inherits Rectangle {
     }
 }
 
-// a round button in the icon picker
 component IconButton inherits Rectangle {
     in property <image> image;
     in property <string> label;
     in property <bool> selected;
     in property <bool> enabled: true;
-    // draws `image` as a small icon on a dark circle, instead of filling the circle
     in property <bool> symbolic;
-    // whether this is part of a dialog, see `Modal`
-    in property <bool> in-dialog;
     callback clicked;
 
     property <bool> pointer-focus;
 
-    // presses it, and if that opened a dialog, the focus comes back here once it closes
     function press() {
         root.clicked();
-        if !root.in-dialog { opener.opened(); }
+        opener.opened();
     }
 
     forward-focus: focus;
@@ -58,7 +51,7 @@ component IconButton inherits Rectangle {
     accessible-checkable: !root.symbolic;
     accessible-checked: root.selected;
     accessible-action-default => {
-        if root.enabled && Modal.open == root.in-dialog { root.press(); }
+        if root.enabled && !Modal.open { root.press(); }
     }
 
     width: 3.1rem;
@@ -95,7 +88,7 @@ component IconButton inherits Rectangle {
     }
 
     focus := FocusScope {
-        enabled: root.enabled && Modal.open == root.in-dialog;
+        enabled: root.enabled && !Modal.open;
         key-pressed(event) => {
             root.pointer-focus = false;
             if event.text == " " || event.text == Key.Return {
@@ -126,21 +119,21 @@ component IconButton inherits Rectangle {
     }
 }
 
-// the camera when `index` is -1, otherwise a preset icon
 component Slot inherits IconButton {
     in property <int> index;
     property <bool> camera: root.index < 0;
+    property <Avatar> avatar: Account.avatars[root.index];
     symbolic: root.camera;
-    image: root.camera ? @image-url("../../data/icons/camera-photo-symbolic.svg") : Account.avatars[root.index].image;
-    selected: !root.camera && Account.avatar-id == Account.avatars[root.index].id;
+    image: root.camera ? @image-url("../../data/icons/camera-photo-symbolic.svg") : root.avatar.image;
+    selected: !root.camera && Account.avatar-id == root.avatar.id;
     label: root.camera ? Lang.t("page-whoareyou-camera", []) : Lang.t("page-whoareyou-icon-n", [{ key: "n", value: root.index + 1 }]);
     enabled: !root.camera || Camera.available;
     clicked => {
         if root.camera {
             Camera.start();
         } else {
-            Account.avatar-id = Account.avatars[root.index].id;
-            Account.avatar = Account.avatars[root.index].image;
+            Account.avatar-id = root.avatar.id;
+            Account.avatar = root.avatar.image;
         }
     }
 }
@@ -149,15 +142,14 @@ component IconPicker inherits VerticalLayout {
     spacing: 1.25rem;
     alignment: start;
 
+    property <bool> account-preview-ready: Account.avatar-id != "" && Account.username != "" && Account.username-error == "";
+
     HorizontalLayout {
         spacing: 0.75rem;
 
         UserIcon { }
 
-        // once an icon and a username are chosen, preview the account instead of the hint. this
-        // checks `username-error` rather than `username-valid` so it doesn't flicker while the
-        // background check runs
-        if Account.avatar-id != "" && Account.username != "" && Account.username-error == "": VerticalLayout {
+        if root.account-preview-ready: VerticalLayout {
             layout-order: Dir.order(1);
             alignment: center;
 
@@ -177,7 +169,7 @@ component IconPicker inherits VerticalLayout {
             }
         }
 
-        if Account.avatar-id == "" || Account.username == "" || Account.username-error != "": VerticalLayout {
+        if !root.account-preview-ready: VerticalLayout {
             layout-order: Dir.order(1);
             alignment: center;
 
@@ -197,8 +189,6 @@ component IconPicker inherits VerticalLayout {
         }
     }
 
-    // the camera in the middle, with the presets around it in staggered rows, see
-    // `avatar::picker_rows`
     VerticalLayout {
         spacing: 0.15rem;
 
@@ -211,12 +201,9 @@ component IconPicker inherits VerticalLayout {
     }
 }
 
-// live camera preview for taking the user icon, shown over the whole window
 export component CameraDialog inherits TdnDialog {
     title: Lang.t("page-whoareyou-camera", []);
     dismissed => { Camera.stop(); }
-    // Take is disabled until the first frame arrives, so Cancel holds the focus until then and
-    // Escape works right away
     init => { cancel.focus(); }
 
     property <bool> can-take: Camera.error == "" && Camera.frame.width > 0;
@@ -281,23 +268,19 @@ export component WhoAreYouPage inherits TdnPage {
     can-next: Account.username-valid && Account.fullname-valid;
     forward-focus: nameinput;
 
-    // Enter was pressed while the username was still being checked, so the page goes on once
-    // that's done
-    property <bool> next-pending;
+    property <bool> next-after-username-check;
     property <string> checked-for: Account.checked-username;
     changed checked-for => {
-        if self.next-pending && self.active {
-            self.next-pending = false;
-            // does nothing if it turned out to be taken or while a dialog is over the page
+        if self.next-after-username-check && self.active {
+            self.next-after-username-check = false;
             if !Modal.open { self.try-next(); }
         }
     }
     changed active => {
         if self.active {
-            // a camera may have been plugged in since the OOBE started
             Camera.refresh();
         } else {
-            self.next-pending = false;
+            self.next-after-username-check = false;
         }
     }
 
@@ -306,7 +289,6 @@ export component WhoAreYouPage inherits TdnPage {
 
         VerticalLayout {
             alignment: start;
-            // grows to its max width before the spacer takes the rest
             horizontal-stretch: 100;
             max-width: 23rem;
             padding-top: 1rem;
@@ -324,15 +306,13 @@ export component WhoAreYouPage inherits TdnPage {
                     text <=> Account.fullname;
                     invalid: !Account.fullname-valid;
                     edited(text) => {
-                        // it may change the username a pending Next was for
-                        root.next-pending = false;
+                        root.next-after-username-check = false;
                         if !Account.username-touched {
                             Account.username = Account.suggest-username(text, Account.username);
                         }
                     }
                     accepted => {
                         userinput.focus();
-                        // typing replaces the suggestion, Enter accepts it
                         userinput.select-all();
                     }
                 }
@@ -350,13 +330,12 @@ export component WhoAreYouPage inherits TdnPage {
                     description: username-field.description;
                     text <=> Account.username;
                     invalid: username-field.invalid;
-                    // clearing the field hands it back to the suggestion from the full name
                     edited(text) => {
                         Account.username-touched = text != "";
-                        root.next-pending = false;
+                        root.next-after-username-check = false;
                     }
                     accepted => {
-                        root.next-pending = !root.can-next && Account.username-error == ""
+                        root.next-after-username-check = !root.can-next && Account.username-error == ""
                             && Account.checked-username != Account.username;
                         root.try-next();
                     }

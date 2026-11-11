@@ -12,18 +12,14 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 global A11yIcons {
     out property <string> ear: "M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0 M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4";
     out property <string> zoom-in: "M3 11a8 8 0 1 0 16 0a8 8 0 1 0-16 0 M21 21l-4.35-4.35 M11 8v6 M8 11h6";
-    // the keys are short dashes instead of Lucide's dots, since `Icon` has no round line caps
+    // dashes for keys instead of Lucide's dots, since `Icon` has no round line caps
     out property <string> keyboard: "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M5.5 8h1.5 M9.5 8h1.5 M13.5 8h1.5 M17.5 8h1.5 M7.5 12h1.5 M11.5 12h1.5 M15.5 12h1.5 M7 16h10";
 }
 
-// a big square button that turns a feature on or off
 component A11yTile inherits Rectangle {
     in property <string> icon;
     in property <string> text;
-    // set it from what `toggled` changes, so it keeps following the setting when something else
-    // (Meta+Alt+S for the screen reader) changes it
     in property <bool> checked;
-    // whether this is part of a dialog, see `Modal`
     in property <bool> in-dialog;
     callback toggled(bool);
 
@@ -33,6 +29,8 @@ component A11yTile inherits Rectangle {
         root.toggled(!root.checked);
     }
 
+    width: 10rem;
+    height: self.width;
     forward-focus: focus;
     accessible-role: button;
     accessible-label: root.text;
@@ -46,8 +44,7 @@ component A11yTile inherits Rectangle {
     background: Tokens.color-card;
     animate border-color { duration: Tokens.motion-fast; }
 
-    // the tints are layers that fade in. animating from the opaque card color to a translucent one
-    // would dip through the page color on the way
+    // animating the opaque background to a translucent tint would dip through the page color
     Rectangle {
         border-radius: root.border-radius;
         background: TdnStyle.accent;
@@ -99,7 +96,6 @@ component A11yTile inherits Rectangle {
         }
     }
 
-    // a check in the corner, so it isn't only the color that says it's on
     if root.checked: Rectangle {
         x: Dir.x(parent.width - self.width - 0.5rem, self.width, parent.width);
         y: 0.5rem;
@@ -130,27 +126,21 @@ component A11yTile inherits Rectangle {
     }
 }
 
-// the page's content, shared by the first page and the one the header button opens
 component A11yContent inherits VerticalLayout {
     in property <bool> in-dialog;
-    // text of the button at the bottom right, Next or Done
     in property <string> next-text;
     callback next;
 
-    // whether "More Options" was opened from here, so its button gets the focus back when it
-    // closes. the page clears it once it's left
-    in-out property <bool> opened-more;
+    in-out property <bool> more-opened-from-here;
 
     public function focus-first() {
-        if root.opened-more { more.focus(); } else { screen-reader.focus(); }
+        if root.more-opened-from-here { more.focus(); } else { screen-reader.focus(); }
     }
 
-    // "More Options" opens a dialog over this one, which takes the keyboard until it closes, so
-    // Tab can't reach this content behind it
-    property <bool> interactive-dialog: root.in-dialog && !A11y.more-open;
+    property <bool> in-active-dialog: root.in-dialog && !A11y.more-open;
     property <bool> more-open: A11y.more-open;
     changed more-open => {
-        if !self.more-open && root.opened-more { more.focus(); }
+        if !self.more-open && root.more-opened-from-here { more.focus(); }
     }
 
     padding-left: 2rem;
@@ -179,9 +169,7 @@ component A11yContent inherits VerticalLayout {
         alignment: center;
 
         screen-reader := A11yTile {
-            width: 10rem;
-            height: self.width;
-            in-dialog: root.interactive-dialog;
+            in-dialog: root.in-active-dialog;
             icon: A11yIcons.ear;
             text: Lang.t("page-accessibility-screen-reader", []);
             checked: A11y.screen-reader;
@@ -193,9 +181,7 @@ component A11yContent inherits VerticalLayout {
 
         A11yTile {
             layout-order: Dir.order(1);
-            width: 10rem;
-            height: self.width;
-            in-dialog: root.interactive-dialog;
+            in-dialog: root.in-active-dialog;
             icon: A11yIcons.zoom-in;
             text: Lang.t("page-accessibility-zoom", []);
             checked: A11y.zoom;
@@ -207,9 +193,7 @@ component A11yContent inherits VerticalLayout {
 
         A11yTile {
             layout-order: Dir.order(2);
-            width: 10rem;
-            height: self.width;
-            in-dialog: root.interactive-dialog;
+            in-dialog: root.in-active-dialog;
             icon: A11yIcons.keyboard;
             text: Lang.t("page-accessibility-sticky-keys", []);
             checked: A11y.sticky-keys;
@@ -220,8 +204,6 @@ component A11yContent inherits VerticalLayout {
         }
     }
 
-    // a picture of the header button next to the hint. the hint names it in words for screen
-    // readers, and so a translation doesn't need to fit around a picture
     HorizontalLayout {
         spacing: 0.6rem;
         alignment: center;
@@ -262,19 +244,19 @@ component A11yContent inherits VerticalLayout {
         alignment: space-between;
 
         more := TdnBtn {
-            in-dialog: root.interactive-dialog;
+            in-dialog: root.in-active-dialog;
             outline: true;
             text: Lang.t("page-accessibility-more", []);
             foreground-color: Tokens.color-foreground;
             clicked => {
-                root.opened-more = true;
+                root.more-opened-from-here = true;
                 A11y.more-open = true;
             }
         }
 
         TdnBtn {
             layout-order: Dir.order(1);
-            in-dialog: root.interactive-dialog;
+            in-dialog: root.in-active-dialog;
             text: root.next-text;
             enter-hint: true;
             background-color: TdnStyle.accent;
@@ -284,22 +266,17 @@ component A11yContent inherits VerticalLayout {
     }
 }
 
-// the first page, before the language, so the rest of the setup can be done with these on
 export component AccessibilityPage inherits TdnBasePg {
     pageid: "accessibility";
     forward-focus: focus;
 
     changed active => {
-        if !self.active { content.opened-more = false; }
+        if !self.active { content.more-opened-from-here = false; }
     }
 
-    // Enter goes on, unless a tile or button has focus and takes it first
     focus := FocusScope {
         enabled: !Modal.open;
-        // not a Tab stop of its own, since it has nothing to show focus on
         focus-on-tab-navigation: false;
-        // focused when the page is shown or the window refocuses it after a dialog closes. the
-        // content takes the focus from here
         focus-gained(reason) => {
             if reason == FocusReason.programmatic { content.focus-first(); }
         }
@@ -322,15 +299,12 @@ export component AccessibilityPage inherits TdnBasePg {
     }
 }
 
-// the same page over everything else, opened with the header button
 export component AccessibilityDialog inherits Rectangle {
     background: Tokens.color-background;
 
-    // keeps clicks from reaching the page underneath
-    TouchArea { }
+    click-blocker := TouchArea { }
 
     FocusScope {
-        // keys bubble up to it, so it needn't be a Tab stop
         focus-on-tab-navigation: false;
         key-pressed(event) => {
             if event.text == Key.Escape && !A11y.more-open {
@@ -345,7 +319,6 @@ export component AccessibilityDialog inherits Rectangle {
             height: parent.height;
             in-dialog: true;
             next-text: Lang.t("page-accessibility-done", []);
-            // read when the focus moves into it, as on the page
             accessible-role: groupbox;
             accessible-label: Lang.t("page-accessibility", []);
             next => { A11y.open = false; }
@@ -355,13 +328,11 @@ export component AccessibilityDialog inherits Rectangle {
     init => { content.focus-first(); }
 }
 
-// a switch with a description underneath, in the dialog
 component OptionRow inherits VerticalLayout {
     in property <string> text;
     in property <string> desc;
     in property <bool> checked;
     callback toggled(bool);
-    // fired on Enter, which closes the dialog like Done
     callback accepted();
     callback focus-in(length, length);
 
@@ -385,7 +356,6 @@ component OptionRow inherits VerticalLayout {
     }
 }
 
-// the options beyond the three on the page
 export component A11yMoreDialog inherits TdnDialog {
     title: Lang.t("page-accessibility-more", []);
     dialog-width: 26rem;
@@ -480,10 +450,7 @@ export component A11yMoreDialog inherits TdnDialog {
                     Lang.t("page-accessibility-color-filter-monochrome", []),
                 ];
                 index <=> A11y.color-filter;
-                changed(i) => {
-                    A11y.color-filter = i;
-                    A11y.changed();
-                }
+                changed => { A11y.changed(); }
             }
         }
     }

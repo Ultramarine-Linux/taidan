@@ -1,10 +1,5 @@
-# the CachyOS kernel is only built for x86-64-v3 and up
 x86_64_level = 3
-
-# `up` runs `um tweaks enable`, which installs the kernel
 needs_internet = true
-
-# `um tweaks enable` installs it with dnf, which can't on atomic editions
 needs_dnf = true
 
 # the CachyOS kernel won't boot with Secure Boot on

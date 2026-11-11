@@ -6,18 +6,16 @@ import { Card } from "../slintcn/components/card.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 import { ListView } from "std-widgets.slint";
 
-// the world map, clicking it picks the nearest zone
 component WorldMap inherits Rectangle {
-    // aspect ratio of `world-map.svg`, 360° of longitude by 142° of latitude
-    property <float> aspect: 360 / 142;
+    property <float> map-aspect-ratio: 360 / 142;
 
     accessible-role: none;
 
     map := Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
-        width: min(parent.width, parent.height * root.aspect);
-        height: self.width / root.aspect;
+        width: min(parent.width, parent.height * root.map-aspect-ratio);
+        height: self.width / root.map-aspect-ratio;
 
         Image {
             width: 100%;
@@ -26,7 +24,6 @@ component WorldMap inherits Rectangle {
             colorize: Tokens.color-border-hairline-strong;
         }
 
-        // time zone boundaries, drawn faintly over the land
         Image {
             width: 100%;
             height: 100%;
@@ -44,7 +41,6 @@ component WorldMap inherits Rectangle {
             background: Tokens.color-muted-foreground.transparentize(0.4);
         }
 
-        // the chosen zone, if it's on the map (UTC isn't)
         if Tz.current.x >= 0: Rectangle {
             x: Tz.current.x * map.width - self.width / 2;
             y: Tz.current.y * map.height - self.height / 2;
@@ -70,28 +66,27 @@ export component TimezonePage inherits TdnPage {
 
     property <bool> searching: search.text != "";
     property <length> row-height: 2.25rem;
-    // result moved to with the arrow keys, -1 until the user does so
-    property <int> cursor: -1;
-    // row of the current zone in the results, -1 if it isn't there, see the finder below
+    property <int> arrow-key-row: -1;
     property <int> current-row: -1;
-    // the result Enter picks and that's highlighted: the one moved to, else the current zone,
-    // else the first
-    property <int> active-row: cursor >= 0 && cursor < Tz.results.length ? cursor
+    property <int> active-row: arrow-key-row >= 0 && arrow-key-row < Tz.results.length ? arrow-key-row
         : current-row >= 0 && current-row < Tz.results.length && Tz.results[current-row].id == Tz.current.id ? current-row
         : 0;
 
     function pick(zone: TimeZone) {
         Tz.pick(zone.id);
         search.text = "";
-        cursor = -1;
+        arrow-key-row = -1;
         Tz.search("");
     }
 
-    function move-cursor(delta: int) {
+    function move-arrow-key-row(delta: int) {
         if !searching || Tz.results.length == 0 { return; }
-        cursor = max(0, min(Tz.results.length - 1, active-row + delta));
-        // keep the row in view
-        let top = cursor * row-height;
+        arrow-key-row = max(0, min(Tz.results.length - 1, active-row + delta));
+        scroll-to-arrow-key-row();
+    }
+
+    function scroll-to-arrow-key-row() {
+        let top = arrow-key-row * row-height;
         if top < -list.content-y {
             list.content-y = -top;
         } else if top + row-height > -list.content-y + list.visible-height {
@@ -105,27 +100,25 @@ export component TimezonePage inherits TdnPage {
         search := TdnInput {
             icon: @image-url("../../data/icons/system-search-symbolic.svg");
             placeholder: Lang.t("page-timezone-search", []);
-            // the arrow keys move through the results while the focus stays here, so screen
-            // readers hear the one Enter would pick from the description changing
+            // screen readers hear the row Enter would pick as the description changes
             description: !root.searching ? ""
                 : Tz.results.length == 0 ? Lang.t("page-timezone-none", [])
                 : Lang.place(Tz.results[root.active-row].city, Tz.results[root.active-row].region);
             edited(text) => {
-                cursor = -1;
+                arrow-key-row = -1;
                 list.content-y = 0;
                 Tz.search(text);
             }
-            // Enter takes the highlighted match, see `active-row`
             accepted => {
                 if root.searching && Tz.results.length > 0 { root.pick(Tz.results[root.active-row]); }
                 else if !root.searching { root.try-next(); }
             }
             key-pressed(event) => {
                 if !root.searching { return reject; }
-                if event.text == Key.DownArrow { move-cursor(1); return accept; }
-                if event.text == Key.UpArrow { move-cursor(-1); return accept; }
-                if event.text == Key.PageDown { move-cursor(10); return accept; }
-                if event.text == Key.PageUp { move-cursor(-10); return accept; }
+                if event.text == Key.DownArrow { move-arrow-key-row(1); return accept; }
+                if event.text == Key.UpArrow { move-arrow-key-row(-1); return accept; }
+                if event.text == Key.PageDown { move-arrow-key-row(10); return accept; }
+                if event.text == Key.PageUp { move-arrow-key-row(-10); return accept; }
                 reject
             }
         }
@@ -134,7 +127,7 @@ export component TimezonePage inherits TdnPage {
             vertical-stretch: 1;
             card-radius: md;
 
-            // finds the current zone's row. `ListView` can't, since it only creates the rows in view
+            // `ListView` only creates the rows in view, so this finds the current zone's row
             for zone[i] in Tz.results: Rectangle {
                 property <bool> current: zone.id == Tz.current.id;
                 width: 0;
@@ -158,7 +151,7 @@ export component TimezonePage inherits TdnPage {
                 color: Tokens.color-muted-foreground;
             }
 
-            // not behind an `if`, so the arrow keys can scroll it. hidden when there's nothing to list
+            // not behind an `if`, so the arrow keys can scroll it
             list := ListView {
                 visible: root.searching && Tz.results.length > 0;
                 x: 0.25rem;
@@ -178,13 +171,11 @@ export component TimezonePage inherits TdnPage {
             }
         }
 
-        // the chosen zone and its time right now
         HorizontalLayout {
             spacing: 0.5rem;
-            property <string> zone-name: Lang.place(Tz.current.city, Tz.current.region);
 
             TdnText {
-                text: parent.zone-name;
+                text: Lang.place(Tz.current.city, Tz.current.region);
                 font-weight: Tokens.typography-weight-medium;
                 horizontal-alignment: Dir.text-start;
                 horizontal-stretch: 1;

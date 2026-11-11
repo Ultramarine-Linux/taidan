@@ -1,32 +1,13 @@
-// slintcn Icon, strokes an SVG path in a 24×24 viewBox (Lucide-compatible)
-//
-// usage:
-//   import { Icon } from "slintcn/components/icon.slint";
-//   import { LucidePaths } from "slintcn/components/lucide-paths.slint";
-//
-//   Icon {
-//       commands: LucidePaths.chevron-down;
-//       tint: Tokens.color-foreground;
-//   }
-//
-// to use a Lucide icon not bundled in LucidePaths, copy its `<path d="…">` (or polyline) string
-// from https://lucide.dev into `commands`
-
 import { Tokens } from "../theme/tokens.slint";
 
 export component Icon inherits Rectangle {
-    // path commands in SVG syntax (24-unit viewBox), pass a `LucidePaths.*` value
     in property <string> commands;
-    // pixel side length of the square icon
     in property <length> size: 16px;
     in property <color>  tint: Tokens.color-foreground;
-    // stroke thickness in SVG coordinates, not screen px
     in property <length> stroke-width: 2px;
 
-    // fixed rather than preferred, so a layout can't stretch it into space meant for its neighbors
     width:  size;
     height: size;
-    background: transparent;
 
     Path {
         width:  root.width;

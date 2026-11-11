@@ -10,7 +10,6 @@ readme = "../README.md"
 [lib]
 path = "./lib.rs"
 
-# installed to /usr/libexec, the only program the OOBE's polkit rule lets it run as root
 [[bin]]
 name = "taidan-helper"
 path = "./bin/taidan-helper.rs"

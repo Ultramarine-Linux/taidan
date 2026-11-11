@@ -3,7 +3,6 @@ use crate::prelude::*;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SetLocale;
 impl super::Step for SetLocale {
-    /// runs after the apps, so the language pack (and with it the locale) is installed
     #[tracing::instrument(skip(settings, sender))]
     async fn run<C: crate::Callback>(
         &self,
@@ -11,14 +10,10 @@ impl super::Step for SetLocale {
         _: &crate::cfg::Config,
         sender: &C,
     ) -> Res<()> {
-        set_keymap(settings).await;
-        // an empty locale keeps whatever the system already has
+        apply_keymap_to_login_screen(settings).await;
         if settings.locale.is_empty() {
             return Ok(());
         }
-        // systemd refuses locales that aren't installed, which can happen offline or on atomic
-        // editions, the system's language is a better place to end up than a failed setup. the
-        // done page says so
         if let Err(e) =
             crate::root(crate::Verb::SetLocale { locale: settings.locale.clone() }).await
         {
@@ -29,10 +24,7 @@ impl super::Step for SetLocale {
     }
 }
 
-/// the keyboard page already set the picked keymap for the system, but that's done in the
-/// background and only logged when it fails, so the login screen could be left on the old one.
-/// one that wasn't picked is the system's already
-async fn set_keymap(settings: &crate::settings::Settings) {
+async fn apply_keymap_to_login_screen(settings: &crate::settings::Settings) {
     if !settings.kb_picked || settings.kb_layout.is_empty() {
         return;
     }

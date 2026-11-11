@@ -1,10 +1,3 @@
-//! light or dark mode and the accent color for the new user, through `plasma-apply-colorscheme` on
-//! Plasma and `gsettings` or `xfconf-query` elsewhere, plus the GTK theme that goes with the mode,
-//! see [`crate::theme`]
-//!
-//! they all write into the home given in `HOME` and `XDG_CONFIG_HOME`, so this goes into the user's
-//! home during setup, or on systemd-homed into the skeleton it's created from, see
-//! [`write_to_skel`]
 use crate::prelude::*;
 use crate::theme::Accent;
 
@@ -18,7 +11,6 @@ impl super::Step for SetTheme {
         cfg: &crate::cfg::Config,
         _: &C,
     ) -> Res<()> {
-        // a desktop in the wrong mode isn't worth failing setup over
         if let Err(e) = apply_to_user(settings, cfg).await {
             tracing::warn!(?e, "cannot set the theme");
         }
@@ -28,6 +20,7 @@ impl super::Step for SetTheme {
 
 const GSETTINGS: &str = "/usr/bin/gsettings";
 const XFCONF: &str = "/usr/bin/xfconf-query";
+const HEADLESS_QT_PLATFORM: &str = "QT_QPA_PLATFORM=offscreen";
 
 fn gsettings(key: &str, value: &str) -> Vec<String> {
     crate::a11y::gsettings("org.gnome.desktop.interface", key, Some(value))
@@ -37,13 +30,10 @@ fn xfconf(channel: &str, property: &str, value: &str) -> Vec<String> {
     crate::a11y::xfconf(channel, property, "string", Some(value))
 }
 
-/// the commands that switch the config under `HOME` to `dark` or light, with the accent if the
-/// edition follows one, empty if there is no tool for it on this system
-fn commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String>> {
+fn theme_commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String>> {
     let accent = accent.filter(|_| crate::theme::accent_supported(edition));
     let themes = crate::theme::themes(edition, dark);
     let mut cmds = vec![];
-    // plasma-apply-colorscheme comes with plasmashell, in plasma-workspace
     if crate::a11y::is_plasma() {
         let scheme = if dark { "BreezeDark" } else { "BreezeLight" };
         let owned = |cmd: &[&str]| cmd.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
@@ -59,17 +49,14 @@ fn commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String
                 value,
             ])
         };
-        // plasma-apply-colorscheme is a `QGuiApplication`, so it needs a platform even though it
-        // shows nothing
-        cmds.push(owned(&["QT_QPA_PLATFORM=offscreen", "plasma-apply-colorscheme", scheme]));
-        // it does nothing when the scheme is already the default, which the look and feel's
-        // defaults may still override, so write it to kdeglobals either way
+        cmds.push(owned(&[HEADLESS_QT_PLATFORM, "plasma-apply-colorscheme", scheme]));
+        // plasma-apply-colorscheme skips a scheme that's already the default, which the look and
+        // feel may still override
         cmds.push(kdeglobals("ColorScheme", scheme));
         if let Some(accent) = accent {
-            // with `--accent-color`, it ignores a scheme given with it and reapplies the saved
-            // one, and it doesn't save the accent itself
+            // with `--accent-color` it reapplies the saved scheme and doesn't save the accent
             cmds.push(owned(&[
-                "QT_QPA_PLATFORM=offscreen",
+                HEADLESS_QT_PLATFORM,
                 "plasma-apply-colorscheme",
                 "--accent-color",
                 accent.hex(),
@@ -102,65 +89,42 @@ fn commands(dark: bool, accent: Option<Accent>, edition: &str) -> Vec<Vec<String
     cmds
 }
 
-/// `env` arguments running [`commands`] in one go with `home` as the home directory, none if
-/// there's nothing to run
 fn env_args(
     home: &std::path::Path,
     settings: &crate::settings::Settings,
     edition: &str,
-) -> Vec<Vec<String>> {
-    let Some(dark) = settings.dark_mode else { return vec![] };
-    crate::a11y::one_session(commands(dark, settings.accent, edition))
-        .map(|cmd| crate::a11y::in_home(home, cmd))
-        .into_iter()
-        .collect()
+) -> Option<Vec<String>> {
+    let cmds = theme_commands(settings.dark_mode?, settings.accent, edition);
+    crate::a11y::one_session(cmds).map(|cmd| crate::a11y::in_home(home, cmd))
 }
 
-/// sets the new user's theme, if they picked one, unless they're on systemd-homed, where it went
-/// into the skeleton
-///
-/// # Errors
-/// - cannot find the user's home directory
 async fn apply_to_user(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
     if settings.dark_mode.is_none() || cfg.taidan0.systemd_homed {
         return Ok(());
     }
     let home = crate::a11y::home_of(&settings.username).await?;
-    let cmds = env_args(&home, settings, &cfg.edition);
-    if cmds.is_empty() {
+    let Some(env) = env_args(&home, settings, &cfg.edition) else {
         tracing::info!("neither plasma-apply-colorscheme nor gsettings found; skipping the theme");
-    }
-    for env in cmds {
-        // as the user, so the files they get are theirs
-        let mut argv = vec!["env".to_owned()];
-        argv.extend(env);
-        if let Err(e) = crate::as_user(&settings.username, argv, None).await {
-            tracing::warn!(?e, "cannot set the theme");
-        }
+        return Ok(());
+    };
+    let mut argv = vec!["env".to_owned()];
+    argv.extend(env);
+    if let Err(e) = crate::as_user(&settings.username, argv, None).await {
+        tracing::warn!(?e, "cannot set the theme");
     }
     Ok(())
 }
 
-/// sets the theme in `skel`, a copy of `/etc/skel` the new user's home is made from, returns
-/// whether there was anything to write
-///
-/// # Errors
-/// - cannot create `skel/.config`
 pub async fn write_to_skel(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
     skel: &std::path::Path,
 ) -> Res<bool> {
-    let cmds = env_args(skel, settings, &cfg.edition);
-    if cmds.is_empty() {
-        return Ok(false);
-    }
+    let Some(env) = env_args(skel, settings, &cfg.edition) else { return Ok(false) };
     tokio::fs::create_dir_all(skel.join(".config")).await.map_err(Err::Io)?;
-    for env in cmds {
-        let env = env.iter().map(String::as_str).collect_vec();
-        if let Err(e) = crate::steps::acmd("env", &env).await {
-            tracing::warn!(?e, "cannot set the theme");
-        }
+    let env = env.iter().map(String::as_str).collect_vec();
+    if let Err(e) = crate::steps::acmd("env", &env).await {
+        tracing::warn!(?e, "cannot set the theme");
     }
     Ok(true)
 }

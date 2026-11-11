@@ -8,9 +8,7 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
 import { ScrollView } from "std-widgets.slint";
 
-// opens the IP address and DNS settings of a network
 component IpSettingsButton inherits TdnBtn {
-    // the network's name, for screen readers
     in property <string> name;
     outline: true;
     icon: @image-url("../../data/icons/systemsettings-symbolic.svg");
@@ -21,21 +19,43 @@ component IpSettingsButton inherits TdnBtn {
     padding-x: 0.3rem;
 }
 
-// the column for the lock of secured networks, a fixed width so the columns after it line up
+component SubmitButton inherits HorizontalLayout {
+    in property <string> text;
+    in property <bool> busy;
+    in property <bool> enabled;
+    callback clicked();
+
+    spacing: 0.75rem;
+
+    if root.busy: VerticalLayout {
+        alignment: center;
+        TdnSpinner { width: 1.1rem; }
+    }
+
+    TdnBtn {
+        layout-order: Dir.order(1);
+        in-dialog: true;
+        text: root.text;
+        enter-hint: true;
+        enabled: root.enabled;
+        background-color: TdnStyle.accent;
+        foreground-color: TdnStyle.accent-foreground;
+        clicked => { root.clicked(); }
+    }
+}
+
 component LockCell inherits VerticalLayout {
     width: 0.9rem * Tokens.text-scale;
     horizontal-stretch: 0;
     alignment: center;
 }
 
-// the trailing column of a network row, a fixed width so it lines up between rows
 component StatusCell inherits VerticalLayout {
     width: 1.6rem * Tokens.text-scale;
     horizontal-stretch: 0;
     alignment: center;
 }
 
-// a network's name, cut off with "…" so the buttons after it stay in place
 component NameCell inherits TdnText {
     horizontal-stretch: 1;
     min-width: 0;
@@ -47,46 +67,34 @@ component NameCell inherits TdnText {
 component NetworkRow inherits VerticalLayout {
     in property <WifiNetwork> net;
 
-    // why connecting to it from the list failed, which has no dialog of its own to show it in
     property <string> error: Network.error-ssid == root.net.ssid && Network.error-id != ""
         && Network.password-ssid == "" && !Network.enterprise-open && !Network.hidden-open
         ? Lang.t(Network.error-id, []) : "";
-    // shown under the row, why it failed or why it can't be connected to
     property <string> note: root.error != "" ? root.error
         : root.net.security == Security.unsupported ? Lang.t("page-internet-security-unsupported", []) : "";
-    // the security and signal strength the icons show, for screen readers
     property <string> info: Lang.t("page-internet-network-info", [
         { key: "security", value: Lang.t(
             root.net.security == Security.open ? "page-internet-security-open"
             : root.net.security == Security.password ? "page-internet-security-password"
-            : root.net.security == Security.enterprise || root.net.security == Security.enterprise-tls
-                ? "page-internet-security-enterprise"
+            : root.enterprise ? "page-internet-security-enterprise"
             : "page-internet-security-unsupported", []) },
         { key: "bars", value: root.net.strength },
     ]);
-    // whether this row's button had focus before it was rebuilt, see `Network.focus-ssid`
     property <bool> wants-focus: Network.focus-ssid == root.net.ssid;
+    property <bool> enterprise: root.net.security == Security.enterprise || root.net.security == Security.enterprise-tls;
 
-    // starts connecting, asking for a password or login first if one is needed
     function connect() {
         if root.net.known || root.net.security == Security.open {
             Network.connect(root.net.ssid, "");
-        } else if root.net.security == Security.enterprise || root.net.security == Security.enterprise-tls {
-            Network.enterprise-ssid = root.net.ssid;
-            Network.enterprise-wired = false;
-            Network.enterprise-tls-only = root.net.security == Security.enterprise-tls;
-            Network.enterprise-error-id = "";
-            Network.enterprise-open = true;
+        } else if root.enterprise {
+            Network.open-enterprise(root.net.ssid, false, root.net.security == Security.enterprise-tls);
         } else {
             Network.password-ssid = root.net.ssid;
         }
     }
 
-    // gives focus back after the connect button was swapped for the status icon, or the row was
-    // rebuilt when the list reordered
     function refocus() {
         if !root.wants-focus { return; }
-        // connected rows have no connect button to come back to
         if Network.focus-ip || root.net.connected {
             ip-btn.focus();
         } else {
@@ -98,7 +106,6 @@ component NetworkRow inherits VerticalLayout {
     changed wants-focus => { root.refocus(); }
     changed connected => { root.refocus(); }
 
-    // only for `changed` above, since a struct field can't be watched directly
     property <bool> connected: root.net.connected;
 
     HorizontalLayout {
@@ -129,7 +136,6 @@ component NetworkRow inherits VerticalLayout {
                 width: parent.width;
                 height: self.width;
                 colorize: Tokens.color-muted-foreground;
-                // the connect button or the connected status says it, see `info`
                 accessible-role: none;
             }
         }
@@ -141,7 +147,6 @@ component NetworkRow inherits VerticalLayout {
 
             ip-btn := IpSettingsButton {
                 name: root.net.ssid;
-                // where the focus goes on the connected row, which has no connect button to say it
                 accessible-description: root.net.connected
                     ? Lang.t("page-internet-connected", []) + "\n" + root.info : "";
                 clicked => { Network.open-ip(root.net.ssid); }
@@ -159,21 +164,16 @@ component NetworkRow inherits VerticalLayout {
         StatusCell {
             layout-order: Dir.order(4);
 
-            // stacked, so the hidden button takes no room
-            Rectangle {
+            overlay := Rectangle {
                 height: 1.6rem * Tokens.text-scale;
 
-                // the connected row has no connect button to say it, so this does
                 if root.net.connected: TdnStatusIcon {
                     label: Lang.t("page-internet-connected", []);
                     description: root.info;
                 }
 
-                // the same button stays for the whole attempt and turns into a spinner, so keyboard
-                // and screen reader focus stay on it
                 connect-btn := TdnIconButton {
                     visible: !root.net.connected;
-                    // forward, which points left for right-to-left languages
                     icon: Lang.rtl ? LucidePaths.arrow-left : LucidePaths.arrow-right;
                     label: Lang.t("page-internet-connect-to", [{ key: "ssid", value: root.net.ssid }]);
                     description: root.error != "" ? root.error + "\n" + root.info : root.info;
@@ -213,10 +213,9 @@ export component NetworkPage inherits TdnPage {
     }
     forward-focus: device-name;
 
-    // the wi-fi adapter is there, but its radio is off, so there's nothing to list
     property <bool> radio-off: Network.wifi-available && (!Network.wifi-enabled || !Network.wifi-hardware-enabled);
-    // the networks can be listed
     property <bool> wifi: Network.wifi-available && !root.radio-off;
+    property <length> scrollbar-gutter: 0.9rem;
 
     HorizontalLayout {
         spacing: 1.5rem;
@@ -238,7 +237,7 @@ export component NetworkPage inherits TdnPage {
                 alignment: start;
                 spacing: 0.75rem;
 
-                // NetworkManager doesn't catch every portal, so this stays available once connected
+                // NetworkManager doesn't detect every captive portal
                 HorizontalLayout {
                     alignment: Dir.start;
                     min-height: 2.25rem;
@@ -265,7 +264,6 @@ export component NetworkPage inherits TdnPage {
                         outline: true;
                         foreground-color: Tokens.color-foreground;
                         clicked => {
-                            // a check that failed before the dialog was last closed isn't this one's
                             Network.proxy-error-id = "";
                             Network.proxy-open = true;
                         }
@@ -288,7 +286,6 @@ export component NetworkPage inherits TdnPage {
             }
         }
 
-        // the network list takes the rest of the width
         VerticalLayout {
             layout-order: Dir.order(1);
             horizontal-stretch: 1;
@@ -306,11 +303,9 @@ export component NetworkPage inherits TdnPage {
                         height: 2.6rem;
                         spacing: 0.6rem;
                         padding-left: 0.25rem;
-                        // the wi-fi rows also leave room for the list's scrollbar
-                        padding-right: 0.25rem + 0.9rem;
+                        padding-right: 0.25rem + root.scrollbar-gutter;
 
-                        // where the wi-fi rows have their signal icon
-                        Rectangle {
+                        signal-icon-placeholder := Rectangle {
                             width: 1.25rem;
                             horizontal-stretch: 0;
                         }
@@ -320,8 +315,7 @@ export component NetworkPage inherits TdnPage {
                             text: Lang.t("page-internet-wired", []);
                         }
 
-                        // where the wi-fi rows have their lock
-                        LockCell {
+                        lock-placeholder := LockCell {
                             layout-order: Dir.order(2);
                         }
 
@@ -360,7 +354,6 @@ export component NetworkPage inherits TdnPage {
                         spacing: 0.75rem;
 
                         TdnText {
-                            // only the switch or key can turn it back on
                             text: Lang.t(Network.wifi-hardware-enabled ? "page-internet-wifi-off" : "page-internet-wifi-off-hardware", []);
                             color: Tokens.color-muted-foreground;
                             horizontal-alignment: Dir.text-start;
@@ -390,7 +383,7 @@ export component NetworkPage inherits TdnPage {
 
                         VerticalLayout {
                             alignment: start;
-                            padding-right: 0.9rem;
+                            padding-right: root.scrollbar-gutter;
 
                             for net in Network.networks: NetworkRow {
                                 net: net;
@@ -409,13 +402,10 @@ export component NetworkPage inherits TdnPage {
                             clicked => { Network.refresh(); }
                         }
 
-                        // networks that don't announce their name aren't in the list
                         TdnBtn {
                             layout-order: Dir.order(1);
                             text: Lang.t("page-internet-hidden", []);
                             min-size: 1.9rem;
-                            // its dialog can't connect until the connect going on is done, and
-                            // would open with nothing to focus
                             enabled: Network.connecting-ssid == "";
                             clicked => {
                                 Network.error-id = "";
@@ -447,12 +437,10 @@ export component NetworkPage inherits TdnPage {
     }
 }
 
-// asks for the password of a network
 export component PasswordDialog inherits TdnDialog {
     property <bool> busy: Network.connecting-ssid == Network.password-ssid;
 
     title: Lang.t("page-internet-connect-to", [{ key: "ssid", value: Network.password-ssid }]);
-    // the error was this dialog's, so it shouldn't be left under the network's row
     dismissed => {
         Network.dismissed-ssid = Network.password-ssid;
         Network.password-ssid = "";
@@ -490,48 +478,30 @@ export component PasswordDialog inherits TdnDialog {
             clicked => { root.dismissed(); }
         }
 
-        HorizontalLayout {
+        SubmitButton {
             layout-order: Dir.order(1);
-            spacing: 0.75rem;
-
-            if root.busy: VerticalLayout {
-                alignment: center;
-                TdnSpinner { width: 1.1rem; }
-            }
-
-            TdnBtn {
-                layout-order: Dir.order(1);
-                in-dialog: true;
-                text: Lang.t("page-internet-connect", []);
-                enter-hint: true;
-                enabled: !root.busy && pw.text != "";
-                background-color: TdnStyle.accent;
-                foreground-color: TdnStyle.accent-foreground;
-                clicked => { root.submit(); }
-            }
+            busy: root.busy;
+            text: Lang.t("page-internet-connect", []);
+            enabled: !root.busy && pw.text != "";
+            clicked => { root.submit(); }
         }
     }
 }
 
-// connects to a wi-fi network that doesn't announce its name, by typing it
 export component HiddenDialog inherits TdnDialog {
     property <[HiddenSecurity]> securities: [HiddenSecurity.wpa, HiddenSecurity.wpa3, HiddenSecurity.open, HiddenSecurity.enterprise];
     property <int> security-index: 0;
     property <HiddenSecurity> security: root.securities[root.security-index];
     property <bool> needs-password: root.security == HiddenSecurity.wpa || root.security == HiddenSecurity.wpa3;
-    // spaces around it are trimmed in Rust, as for 802.1X
     property <string> ssid;
     property <string> password;
-    // nothing else can connect while the dialog is open
     property <bool> busy: Network.connecting-ssid != "";
-    // NetworkManager wants 8 to 63 characters for WPA, or 64 hex digits. WPA3 has no minimum
+    property <int> wpa-psk-min-length: 8;
     property <bool> complete: Network.trim(root.ssid) != "" && (!root.needs-password
-        || (root.security == HiddenSecurity.wpa3 ? root.password != "" : root.password.character-count >= 8));
+        || (root.security == HiddenSecurity.wpa3 ? root.password != "" : root.password.character-count >= root.wpa-psk-min-length));
 
-    // why the last connect failed, only for the network this dialog tried, see `Network.hidden-ssid`
     property <string> error: Network.hidden-ssid != "" && Network.error-ssid == Network.hidden-ssid && Network.error-id != ""
         ? Lang.t(Network.error-id, []) : "";
-    // a wrong or too short password goes under the password, the rest under the name
     property <bool> error-on-password: root.needs-password
         && (Network.error-id == "page-internet-error-password" || Network.error-id == "page-internet-error-password-length");
 
@@ -546,13 +516,8 @@ export component HiddenDialog inherits TdnDialog {
     function submit() {
         if root.busy || !root.complete { return; }
         if root.security == HiddenSecurity.enterprise {
-            // the 802.1X dialog, which looks for the network when it isn't in the list
             Network.hidden-open = false;
-            Network.enterprise-ssid = root.ssid;
-            Network.enterprise-wired = false;
-            Network.enterprise-tls-only = false;
-            Network.enterprise-error-id = "";
-            Network.enterprise-open = true;
+            Network.open-enterprise(root.ssid, false, false);
         } else {
             Network.connect-hidden(root.ssid, root.security, root.needs-password ? root.password : "");
         }
@@ -611,41 +576,24 @@ export component HiddenDialog inherits TdnDialog {
             clicked => { root.dismissed(); }
         }
 
-        HorizontalLayout {
+        SubmitButton {
             layout-order: Dir.order(1);
-            spacing: 0.75rem;
-
-            if root.busy: VerticalLayout {
-                alignment: center;
-                TdnSpinner { width: 1.1rem; }
-            }
-
-            TdnBtn {
-                layout-order: Dir.order(1);
-                in-dialog: true;
-                text: Lang.t(root.security == HiddenSecurity.enterprise ? "next" : "page-internet-connect", []);
-                enter-hint: true;
-                enabled: !root.busy && root.complete;
-                background-color: TdnStyle.accent;
-                foreground-color: TdnStyle.accent-foreground;
-                clicked => { root.submit(); }
-            }
+            busy: root.busy;
+            text: Lang.t(root.security == HiddenSecurity.enterprise ? "next" : "page-internet-connect", []);
+            enabled: !root.busy && root.complete;
+            clicked => { root.submit(); }
         }
     }
 }
 
-// a certificate or other file for the 802.1X dialog, and buttons to pick or forget it
 component FileRow inherits TdnField {
     in property <string> path;
     in property <bool> enabled: true;
-    // whether the file browser was opened from here, so Choose takes the focus back when the
-    // browser closes and this row is recreated
     in property <bool> refocus;
     callback pick();
     callback clear();
     callback refocused();
 
-    // the chosen file's name, also what the buttons describe to screen readers
     property <string> file: root.path == "" ? Lang.t("page-internet-8021x-nofile", []) : Network.file-name(root.path);
 
     init => {
@@ -695,9 +643,7 @@ component FileRow inherits TdnField {
     }
 }
 
-// picks a file in-app, since the session may have no file chooser of its own
 component FileBrowser inherits VerticalLayout {
-    // lists PAC files instead of certificates
     in property <bool> pac;
     in-out property <bool> show-all;
     in property <length> list-height: 12rem;
@@ -707,7 +653,6 @@ component FileBrowser inherits VerticalLayout {
     spacing: 0.75rem;
     init => {
         Network.browse(Network.browse-dir, root.pac, root.show-all);
-        // the Choose button it was opened from is gone, so Escape and Tab need the focus in here
         cancel.focus();
     }
 
@@ -808,16 +753,12 @@ component FileBrowser inherits VerticalLayout {
     }
 }
 
-// logs in to an 802.1X network: WPA-Enterprise wi-fi like eduroam, or wired, with the same methods
-// and options as NetworkManager's connection editor
 export component EnterpriseDialog inherits TdnDialog {
     property <bool> busy: Network.enterprise-busy;
     property <bool> wired: Network.enterprise-wired;
 
-    // WPA3-Enterprise 192-bit networks only take TLS, see `Network.enterprise-tls-only`
     property <bool> tls-only: Network.enterprise-tls-only && !root.wired;
     property <EapMethod> method: root.tls-only ? EapMethod.tls : EapMethod.peap;
-    // MD5 is only offered for wired, LEAP only for wi-fi, the same as NetworkManager
     property <[EapMethod]> methods: root.tls-only ? [EapMethod.tls]
         : root.wired
         ? [EapMethod.peap, EapMethod.ttls, EapMethod.tls, EapMethod.fast, EapMethod.pwd, EapMethod.md5]
@@ -851,7 +792,6 @@ export component EnterpriseDialog inherits TdnDialog {
 
     property <string> username;
     property <string> password;
-    // follow the username's realm until edited
     property <string> anonymous-identity;
     property <bool> anonymous-touched;
     property <string> domain;
@@ -868,9 +808,7 @@ export component EnterpriseDialog inherits TdnDialog {
     property <string> pac-file;
     property <bool> advanced;
 
-    // the file being picked: "ca", "client", "key" or "pac", empty when not picking
     property <string> picking;
-    // the file the browser just closed for, whose row takes the focus back, see `FileRow.refocus`
     property <string> picked-from;
 
     function stop-picking() {
@@ -878,7 +816,6 @@ export component EnterpriseDialog inherits TdnDialog {
         root.picking = "";
     }
     property <bool> show-all-files;
-    // why the login failed, also the identity's and password's description for screen readers
     property <string> error: Network.enterprise-error-id == "" ? ""
         : Lang.t(Network.enterprise-error-id != "page-internet-error-password" ? Network.enterprise-error-id
             : root.method == EapMethod.tls ? "page-internet-8021x-error-tls"
@@ -894,7 +831,6 @@ export component EnterpriseDialog inherits TdnDialog {
         : root.wired ? Lang.t("page-internet-8021x-wired", [])
         : Lang.t("page-internet-connect-to", [{ key: "ssid", value: Network.enterprise-ssid }]);
     dialog-width: 26rem;
-    // made each time it opens, see `Network.enterprise-visit`
     init => { Network.enterprise-visit += 1; }
     dismissed => {
         if root.picking != "" {
@@ -973,7 +909,6 @@ export component EnterpriseDialog inherits TdnDialog {
                 description: root.error;
                 text <=> root.username;
                 placeholder: Lang.t("page-internet-username-placeholder", []);
-                // unless a file row takes it back from the file browser
                 auto-focus: root.picked-from == "";
                 enabled: !root.busy;
                 edited(text) => {
@@ -1010,7 +945,6 @@ export component EnterpriseDialog inherits TdnDialog {
             clear => { root.client-cert = ""; }
         }
 
-        // a PKCS#12 file has the key in it already
         if root.method == EapMethod.tls && !Network.is-pkcs12(root.client-cert): FileRow {
             label: Lang.t("page-internet-8021x-private-key", []);
             path: root.private-key;
@@ -1169,7 +1103,6 @@ export component EnterpriseDialog inherits TdnDialog {
         }
     }
 
-    // by the buttons rather than at the end of the list, where it'd be scrolled out of sight
     if root.picking == "" && root.error != "": TdnText {
         text: root.error;
         color: Tokens.color-destructive;
@@ -1188,31 +1121,16 @@ export component EnterpriseDialog inherits TdnDialog {
             clicked => { root.dismissed(); }
         }
 
-        HorizontalLayout {
+        SubmitButton {
             layout-order: Dir.order(1);
-            spacing: 0.75rem;
-
-            if root.busy: VerticalLayout {
-                alignment: center;
-                TdnSpinner { width: 1.1rem; }
-            }
-
-            TdnBtn {
-                layout-order: Dir.order(1);
-                in-dialog: true;
-                text: Lang.t("page-internet-connect", []);
-                enter-hint: true;
-                enabled: !root.busy && root.complete;
-                background-color: TdnStyle.accent;
-                foreground-color: TdnStyle.accent-foreground;
-                clicked => { root.submit(); }
-            }
+            busy: root.busy;
+            text: Lang.t("page-internet-connect", []);
+            enabled: !root.busy && root.complete;
+            clicked => { root.submit(); }
         }
     }
 }
 
-// confirms going on without internet, from Next while offline, or as the explicit choice from
-// "Set Up Offline", which skips the online steps even if the device gets online later
 export component OfflineDialog inherits TdnDialog {
     in property <bool> explicit;
     callback skipped;
@@ -1250,12 +1168,9 @@ export component OfflineDialog inherits TdnDialog {
     }
 }
 
-// a manual proxy server, for networks that only reach the internet through one
 export component ProxyDialog inherits TdnDialog {
     title: Lang.t("page-internet-proxy", []);
     dialog-width: 24rem;
-    // made each time it opens, see `Network.proxy-visit`. A check from before may still be running
-    // if it was canceled. it no longer counts, so it mustn't keep this one busy
     init => {
         Network.proxy-visit += 1;
         Network.proxy-busy = false;
@@ -1265,22 +1180,20 @@ export component ProxyDialog inherits TdnDialog {
         Network.proxy-busy = false;
     }
 
-    // whether to keep the proxy after setup, only saved along with the rest
     property <bool> persist: Network.proxy-persist;
-    // the server field shows the proxy without its username and password, so they aren't on screen
-    // or read out. left unedited, it still stands for the proxy in use, credentials included
-    property <string> url: server.text == Network.proxy-public ? Network.proxy-url : server.text;
+    property <string> full-url: server.text == Network.proxy-public ? Network.proxy-url : server.text;
+    property <bool> already-checked: root.full-url == Network.proxy-url && bypass.text == Network.proxy-bypass
+        && Network.proxy-checked-on == Network.primary-connection;
 
     function submit() {
         if Network.proxy-busy || server.text == "" {
-            // nothing to save
-        } else if root.url == Network.proxy-url && bypass.text == Network.proxy-bypass
-            && Network.proxy-checked-on == Network.primary-connection {
-            // no need to check the same proxy again, unless that was on another network
+            return;
+        }
+        if root.already-checked {
             Network.proxy-persist = root.persist;
             root.dismissed();
         } else {
-            Network.set-proxy(root.url, bypass.text, root.persist);
+            Network.set-proxy(root.full-url, bypass.text, root.persist);
         }
     }
 
@@ -1355,37 +1268,22 @@ export component ProxyDialog inherits TdnDialog {
             }
         }
 
-        HorizontalLayout {
+        SubmitButton {
             layout-order: Dir.order(1);
-            spacing: 0.75rem;
-
-            if Network.proxy-busy: VerticalLayout {
-                alignment: center;
-                TdnSpinner { width: 1.1rem; }
-            }
-
-            TdnBtn {
-                layout-order: Dir.order(1);
-                in-dialog: true;
-                text: Lang.t("page-internet-save", []);
-                enter-hint: true;
-                enabled: !Network.proxy-busy && server.text != "";
-                background-color: TdnStyle.accent;
-                foreground-color: TdnStyle.accent-foreground;
-                clicked => { root.submit(); }
-            }
+            busy: Network.proxy-busy;
+            text: Lang.t("page-internet-save", []);
+            enabled: !Network.proxy-busy && server.text != "";
+            clicked => { root.submit(); }
         }
     }
 }
 
-// the IP address and DNS servers of a wi-fi network, or of the wired connection
 export component IpDialog inherits TdnDialog {
     property <bool> busy: Network.ip-busy || Network.ip-loading;
 
     title: Lang.t("page-internet-ip", [{ key: "name", value: Network.ip-ssid != "" ? Network.ip-ssid : Lang.t("page-internet-wired", []) }]);
     dialog-width: 24rem;
     dismissed => { Network.ip-open = false; }
-    // Cancel holds the focus until the settings load, then the switch takes it (see its `init`)
     init => { if Network.ip-loading { cancel.focus(); } }
 
     function submit() {
@@ -1406,7 +1304,6 @@ export component IpDialog inherits TdnDialog {
         checked: Network.ip.manual;
         toggled(on) => { Network.ip.manual = on; }
         accepted => { root.submit(); }
-        // the first control, focused once the settings have loaded
         init => { self.focus(); }
     }
 
@@ -1414,7 +1311,6 @@ export component IpDialog inherits TdnDialog {
         spacing: 0.75rem;
 
         address-field := TdnField {
-            // equal halves, so a long translated label can't push the other field out
             min-width: 0;
             horizontal-stretch: 1;
             label: Lang.t("page-internet-ip-address", []);
@@ -1455,7 +1351,6 @@ export component IpDialog inherits TdnDialog {
     if !Network.ip-loading: dns-field := TdnField {
         label: Lang.t("page-internet-ip-dns", []);
         help: Lang.t(Network.ip.manual ? "page-internet-ip-dns-desc-manual" : "page-internet-ip-dns-desc", []);
-        // the DNS errors, and those that aren't about one field
         error: Network.ip-error-id != "" && Network.ip-error-id != "page-internet-ip-error-address"
             && Network.ip-error-id != "page-internet-ip-error-gateway" ? Lang.t(Network.ip-error-id, []) : "";
 
@@ -1471,7 +1366,6 @@ export component IpDialog inherits TdnDialog {
         }
     }
 
-    // wired networks at work or school may require a login before they let anything through
     if Network.ip-ssid == "" && !Network.ip-loading: HorizontalLayout {
         alignment: Dir.start;
 
@@ -1483,11 +1377,7 @@ export component IpDialog inherits TdnDialog {
             min-size: 1.8rem;
             clicked => {
                 Network.ip-open = false;
-                Network.enterprise-ssid = "";
-                Network.enterprise-wired = true;
-                Network.enterprise-tls-only = false;
-                Network.enterprise-error-id = "";
-                Network.enterprise-open = true;
+                Network.open-enterprise("", true, false);
             }
         }
     }
@@ -1501,25 +1391,12 @@ export component IpDialog inherits TdnDialog {
             clicked => { root.dismissed(); }
         }
 
-        HorizontalLayout {
+        SubmitButton {
             layout-order: Dir.order(1);
-            spacing: 0.75rem;
-
-            if Network.ip-busy: VerticalLayout {
-                alignment: center;
-                TdnSpinner { width: 1.1rem; }
-            }
-
-            TdnBtn {
-                layout-order: Dir.order(1);
-                in-dialog: true;
-                text: Lang.t("page-internet-save", []);
-                enter-hint: true;
-                enabled: !root.busy;
-                background-color: TdnStyle.accent;
-                foreground-color: TdnStyle.accent-foreground;
-                clicked => { root.submit(); }
-            }
+            busy: Network.ip-busy;
+            text: Lang.t("page-internet-save", []);
+            enabled: !root.busy;
+            clicked => { root.submit(); }
         }
     }
 }

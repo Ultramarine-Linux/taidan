@@ -1,27 +1,19 @@
-// installed to /run/polkit-1/rules.d by taidan-initial-setup.service only while the OOBE runs,
-// and removed again when it stops, so none of this outlives the setup
-//
-// the OOBE runs as the taidan user before any admin account exists to authenticate as. it runs
-// the installation steps as root through pkexec and taidan-helper, which only takes a fixed set
-// of requests, and adds system-wide network connections (so the new user stays online).
-//
-// pkexec puts the canonical path (realpath) of what it runs in `program`, so a symlink to the
-// helper still matches and nothing else does
 polkit.addRule(function(action, subject) {
+    var networkManagerActions = [
+        "org.freedesktop.NetworkManager.settings.modify.system",
+        "org.freedesktop.NetworkManager.network-control",
+        "org.freedesktop.NetworkManager.wifi.scan",
+        "org.freedesktop.NetworkManager.enable-disable-wifi",
+    ];
+
     if (!subject.isInGroup("taidan") || !subject.local || !subject.active) {
         return;
     }
     if (action.id == "org.freedesktop.policykit.exec") {
-        if (action.lookup("program") == "/usr/libexec/taidan-helper") {
-            return polkit.Result.YES;
-        }
-        // anything else is refused, even with an admin's password
-        return polkit.Result.NO;
+        // pkexec passes `program` as a realpath, so a symlink can't stand in for the helper
+        return action.lookup("program") == "/usr/libexec/taidan-helper" ? polkit.Result.YES : polkit.Result.NO;
     }
-    if (action.id == "org.freedesktop.NetworkManager.settings.modify.system" ||
-        action.id == "org.freedesktop.NetworkManager.network-control" ||
-        action.id == "org.freedesktop.NetworkManager.wifi.scan" ||
-        action.id == "org.freedesktop.NetworkManager.enable-disable-wifi") {
+    if (networkManagerActions.indexOf(action.id) != -1) {
         return polkit.Result.YES;
     }
 });

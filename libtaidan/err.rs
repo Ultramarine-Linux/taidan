@@ -22,8 +22,6 @@ pub enum Err {
     Serde(#[from] serde_json::Error),
 }
 
-/// the exit code and the last line the program printed (usually the reason it failed) for the
-/// error page
 fn fail_detail(rc: Option<i32>, output: &str) -> String {
     let mut detail = rc.map(|rc| format!(" with exit code {rc}")).unwrap_or_default();
     if let Some(line) = output.lines().map(str::trim).rfind(|l| !l.is_empty()) {
@@ -34,7 +32,6 @@ fn fail_detail(rc: Option<i32>, output: &str) -> String {
 }
 
 impl Err {
-    /// a [`Err::ProgramFail`] from what `name` printed, stdout then stderr
     #[must_use]
     pub fn program_fail(name: &'static str, out: &std::process::Output) -> Self {
         let mut output = String::from_utf8_lossy(&out.stdout).into_owned();

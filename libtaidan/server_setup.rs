@@ -55,11 +55,8 @@ impl std::fmt::Display for ValidationError {
 
 impl std::error::Error for ValidationError {}
 
-/// operations any step may run, since they only touch the OOBE's own state
-const ANY_STEP: &[&str] = &["state.patch", "state.reset"];
+const ANY_STEP_OPERATIONS: &[&str] = &["state.patch", "state.reset"];
 
-/// the operations `step` may run besides [`ANY_STEP`], matching what `server-oobe` calls from each
-/// step. [`None`] for an unknown step.
 fn step_operations(step: &str) -> Option<&'static [&'static str]> {
     Some(match step {
         "welcome" => &[],
@@ -88,12 +85,10 @@ fn step_operations(step: &str) -> Option<&'static [&'static str]> {
 }
 
 /// Validate the narrow operation vocabulary exposed by the local OOBE API.
-/// arbitrary commands, executable paths, and argument vectors are rejected, and so is an operation
-/// sent from a step other than its own, e.g. `user.create` from `internet`.
 pub fn validate_operation(operation: &SetupOperation) -> Result<(), ValidationError> {
     let allowed = step_operations(&operation.step).ok_or(ValidationError::InvalidStep)?;
     let op = operation.operation.as_str();
-    if !ANY_STEP.contains(&op) && !allowed.contains(&op) {
+    if !ANY_STEP_OPERATIONS.contains(&op) && !allowed.contains(&op) {
         return Err(ValidationError::InvalidOperation);
     }
     Ok(())
@@ -180,6 +175,14 @@ mod tests {
         }
     }
 
+    fn op(step: &str, operation: &str) -> SetupOperation {
+        SetupOperation {
+            step: step.into(),
+            operation: operation.into(),
+            payload: serde_json::Value::Null,
+        }
+    }
+
     #[test]
     fn rejects_operations_from_other_steps() {
         for (step, operation) in [
@@ -189,15 +192,10 @@ mod tests {
             ("updates", "setup.complete"),
             ("complete", "network.configure"),
         ] {
-            let operation = SetupOperation {
-                step: step.into(),
-                operation: operation.into(),
-                payload: serde_json::Value::Null,
-            };
             assert_eq!(
-                validate_operation(&operation),
+                validate_operation(&op(step, operation)),
                 Err(ValidationError::InvalidOperation),
-                "{operation:?}"
+                "{step} {operation}"
             );
         }
     }
@@ -205,19 +203,12 @@ mod tests {
     #[test]
     fn state_operations_work_from_any_step() {
         for step in ["welcome", "internet", "complete"] {
-            let operation = SetupOperation {
-                step: step.into(),
-                operation: "state.patch".into(),
-                payload: serde_json::Value::Null,
-            };
-            assert_eq!(validate_operation(&operation), Ok(()), "{step}");
+            assert_eq!(validate_operation(&op(step, "state.patch")), Ok(()), "{step}");
         }
-        let operation = SetupOperation {
-            step: "nope".into(),
-            operation: "state.patch".into(),
-            payload: serde_json::Value::Null,
-        };
-        assert_eq!(validate_operation(&operation), Err(ValidationError::InvalidStep));
+        assert_eq!(
+            validate_operation(&op("nope", "state.patch")),
+            Err(ValidationError::InvalidStep)
+        );
     }
 
     #[test]

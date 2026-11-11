@@ -1,6 +1,5 @@
-//! the accessibility page: applies the options to the OOBE's own KWin session as they change, and
-//! keeps them in the settings so they're carried over to the new user
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError, mpsc};
 use std::time::{Duration, Instant};
 
 use libtaidan::a11y::A11y as Opts;
@@ -9,71 +8,46 @@ use zbus::blocking::Connection;
 
 use crate::ui::{A11y, AppWindow};
 
-/// zoom-in presses to reach about [`libtaidan::a11y::ZOOM`], each multiplying by KWin's default
-/// zoom factor of 1.2
-const ZOOM_STEPS: usize = 4;
+const KWIN_ZOOM_IN_PRESSES: usize = 4;
 
-/// the screen reader, kept here rather than in the worker so [`shutdown`] can stop it. each start
-/// gets a number so a watcher only watches the Orca it was started for.
-static ORCA: std::sync::Mutex<Option<(u64, std::process::Child)>> = std::sync::Mutex::new(None);
+type OrcaStartNumber = u64;
 
-/// counts Orca starts, see [`ORCA`]
-static ORCA_STARTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static ORCA: Mutex<Option<(OrcaStartNumber, std::process::Child)>> = Mutex::new(None);
 
-/// how long Orca gets to exit after SIGTERM before it's killed
-const ORCA_STOP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+static ORCA_STARTS: AtomicU64 = AtomicU64::new(0);
 
-/// how often the watcher checks whether Orca exited by itself
-const ORCA_WATCH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+static SHUT_DOWN: AtomicBool = AtomicBool::new(false);
 
-/// set by [`shutdown`], so a change still queued doesn't start Orca again as taidan exits
-static SHUT_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static ORCA_POSIX_LOCALE: Mutex<Option<String>> = Mutex::new(None);
 
-/// the UI's language as a POSIX locale, which Orca is started in, see [`language_changed`]
-static ORCA_LOCALE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
-
-/// the worker, once [`initialize_ui`] started it
-static WORKER: std::sync::OnceLock<mpsc::Sender<Msg>> = std::sync::OnceLock::new();
-
-/// where the options are kept while the OOBE runs, so they survive taidan (and KWin) restarting.
-/// it lives in the unit's runtime directory, which is gone on the next boot.
-const SAVED: &str = "a11y.json";
-
-/// how long the language has to stay the same before Orca restarts to speak it
-const ORCA_RESTART_DELAY: Duration = Duration::from_millis(1500);
+static WORKER: OnceLock<mpsc::Sender<Msg>> = OnceLock::new();
 
 enum Msg {
     Opts(Opts),
-    /// restarts Orca, if it runs, to speak the new language
-    RestartOrca,
+    RestartOrcaInNewLanguage,
 }
 
-/// called when the UI's language changes, with `locale` as its POSIX locale (`pt_BR.UTF-8`).
-/// doesn't block. the worker restarts a running Orca.
-pub fn language_changed(locale: &str) {
-    let mut current = ORCA_LOCALE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    if current.as_deref() == Some(locale) {
+pub fn language_changed(posix_locale: &str) {
+    let mut current = ORCA_POSIX_LOCALE.lock().unwrap_or_else(PoisonError::into_inner);
+    if current.as_deref() == Some(posix_locale) {
         return;
     }
-    *current = Some(locale.to_owned());
+    *current = Some(posix_locale.to_owned());
     drop(current);
-    // Orca can't be running before the worker exists
     if let Some(tx) = WORKER.get()
-        && let Err(e) = tx.send(Msg::RestartOrca)
+        && let Err(e) = tx.send(Msg::RestartOrcaInNewLanguage)
     {
         tracing::error!(?e, "accessibility worker is gone");
     }
 }
 
 fn saved_path() -> Option<std::path::PathBuf> {
-    // set by systemd for `RuntimeDirectory=`, and passed on through KWin to the session
     std::env::var_os("RUNTIME_DIRECTORY")
         .filter(|v| !v.is_empty())
-        .map(|dir| std::path::PathBuf::from(dir).join(SAVED))
+        .map(|dir| std::path::PathBuf::from(dir).join("a11y.json"))
 }
 
-/// the options saved by an earlier taidan in this boot, or the defaults
-fn load() -> Opts {
+fn load_saved_this_boot() -> Opts {
     let Some(path) = saved_path() else { return Opts::default() };
     match std::fs::read(&path) {
         Ok(json) => parse(&json),
@@ -91,14 +65,17 @@ fn parse(json: &[u8]) -> Opts {
         .unwrap_or_default()
 }
 
-/// saves the options for [`load`], replacing the file so a crash never leaves half of it
+fn write_atomically(path: &std::path::Path, contents: &[u8]) -> std::io::Result<()> {
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, contents)?;
+    std::fs::rename(&tmp, path)
+}
+
 fn save(opts: &Opts) {
     let Some(path) = saved_path() else { return };
-    let saved = serde_json::to_vec(opts).map_err(std::io::Error::other).and_then(|json| {
-        let tmp = path.with_extension("json.tmp");
-        std::fs::write(&tmp, json)?;
-        std::fs::rename(&tmp, &path)
-    });
+    let saved = serde_json::to_vec(opts)
+        .map_err(std::io::Error::other)
+        .and_then(|json| write_atomically(&path, &json));
     if let Err(e) = saved {
         tracing::warn!(?e, ?path, "cannot save the accessibility options");
     }
@@ -117,22 +94,18 @@ fn set(a11y: &A11y<'_>, opts: &Opts) {
     a11y.set_color_filter(i32::from(opts.color_filter));
 }
 
-/// stops Orca, which would outlive taidan otherwise
 pub fn shutdown() {
-    SHUT_DOWN.store(true, std::sync::atomic::Ordering::SeqCst);
+    SHUT_DOWN.store(true, Ordering::SeqCst);
     stop_orca();
 }
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, a11y: &A11y<'_>) {
     let (tx, rx) = mpsc::channel();
-    // a single thread, so changes apply in order
     std::thread::spawn({
         let ui = ui.clone();
         move || worker(&rx, &ui)
     });
-    // the options from before taidan restarted in this boot, otherwise all off. either way the
-    // worker writes all of them, resetting anything else an earlier run left in the config.
-    let opts = load();
+    let opts = load_saved_this_boot();
     set(a11y, &opts);
     crate::SETTINGS.write().a11y = opts;
     if let Err(e) = tx.send(Msg::Opts(opts)) {
@@ -171,13 +144,10 @@ fn read(a11y: &A11y<'_>) -> Opts {
 
 fn worker(rx: &mpsc::Receiver<Msg>, ui: &slint::Weak<AppWindow>) {
     let bus = Connection::session().inspect_err(|e| tracing::error!(?e, "no session bus")).ok();
-    // the session's config may be left over from an earlier run, so the first pass writes it all
     let mut applied: Option<Opts> = None;
-    // when Orca restarts for a new language. it waits because the arrow keys on the language page
-    // switch the language with every press, and each restart would cut Orca off.
-    let mut restart_at: Option<Instant> = None;
+    let mut orca_restart_at: Option<Instant> = None;
     loop {
-        let msg = match restart_at {
+        let msg = match orca_restart_at {
             Some(at) => match rx.recv_timeout(at.saturating_duration_since(Instant::now())) {
                 Ok(msg) => Some(msg),
                 Err(mpsc::RecvTimeoutError::Timeout) => None,
@@ -188,30 +158,30 @@ fn worker(rx: &mpsc::Receiver<Msg>, ui: &slint::Weak<AppWindow>) {
                 Err(_) => break,
             },
         };
-        let mut next = None;
-        // only the latest options matter if several came in at once
+        let mut latest_opts = None;
         for msg in msg.into_iter().chain(rx.try_iter()) {
             match msg {
-                Msg::Opts(opts) => next = Some(opts),
-                Msg::RestartOrca => restart_at = Some(Instant::now() + ORCA_RESTART_DELAY),
+                Msg::Opts(opts) => latest_opts = Some(opts),
+                Msg::RestartOrcaInNewLanguage => {
+                    orca_restart_at = Some(Instant::now() + Duration::from_millis(1500));
+                }
             }
         }
-        let restart_orca = restart_at.is_some_and(|at| at <= Instant::now());
+        let restart_orca = orca_restart_at.is_some_and(|at| at <= Instant::now());
         if restart_orca {
-            restart_at = None;
+            orca_restart_at = None;
         }
         let prev = applied.unwrap_or_default();
-        let Some(next) = next.or(applied) else { continue };
+        let Some(next) = latest_opts.or(applied) else { continue };
         if applied != Some(next) {
             save(&next);
-            write_config(applied.as_ref(), &next);
+            write_kwin_config(applied.as_ref(), &next);
             if let Some(bus) = &bus {
-                apply_effects(bus, applied.is_none(), &prev, &next);
+                apply_kwin_effects(bus, applied.is_none(), &prev, &next);
             }
         }
         if next.screen_reader != prev.screen_reader || (restart_orca && next.screen_reader) {
-            // starting it picks up the latest language anyway
-            restart_at = None;
+            orca_restart_at = None;
             stop_orca();
             if next.screen_reader {
                 start_orca(ui);
@@ -222,25 +192,26 @@ fn worker(rx: &mpsc::Receiver<Msg>, ui: &slint::Weak<AppWindow>) {
     stop_orca();
 }
 
-/// writes what KWin watches for (keyboard filters, animation speed, plugins), notifying it
-fn write_config(prev: Option<&Opts>, next: &Opts) {
+const fn forget_kwin_saved_zoom() -> libtaidan::a11y::Entry {
+    libtaidan::a11y::Entry {
+        file: "kwinrc",
+        group: "Effect-zoom",
+        key: "InitialZoom",
+        value: None,
+        write_as_bool: false,
+    }
+}
+
+fn write_kwin_config(prev: Option<&Opts>, next: &Opts) {
     let old = prev.map(Opts::session_entries).unwrap_or_default();
     let mut entries = next.session_entries();
     if prev.is_none() {
-        // KWin saves its zoom here and zooms back in when it starts, e.g. after a crash
-        entries.push(libtaidan::a11y::Entry {
-            file: "kwinrc",
-            group: "Effect-zoom",
-            key: "InitialZoom",
-            value: None,
-            bool: false,
-        });
+        entries.push(forget_kwin_saved_zoom());
     }
     for entry in entries {
         if old.contains(&entry) {
             continue;
         }
-        // a bare file name means the OOBE user's own config, which this KWin session reads
         let mut args = entry.kwriteconfig_args(entry.file);
         args.push("--notify".to_owned());
         match std::process::Command::new("kwriteconfig6").args(&args).status() {
@@ -251,12 +222,10 @@ fn write_config(prev: Option<&Opts>, next: &Opts) {
     }
 }
 
-/// zoom, the color filter and dwell click are KWin effects, loaded and set over D-Bus
-fn apply_effects(bus: &Connection, first: bool, prev: &Opts, next: &Opts) {
+fn apply_kwin_effects(bus: &Connection, first: bool, prev: &Opts, next: &Opts) {
     if first || prev.color_filter != next.color_filter {
         let method = match (prev.color_filter, next.color_filter) {
             (_, 0) => "unloadEffect",
-            // the new mode is already in the config, but a loaded effect has to reread it
             (1.., _) if !first => "reconfigureEffect",
             _ => "loadEffect",
         };
@@ -265,15 +234,13 @@ fn apply_effects(bus: &Connection, first: bool, prev: &Opts, next: &Opts) {
     if first || prev.dwell_click != next.dwell_click {
         effect(bus, if next.dwell_click { "loadEffect" } else { "unloadEffect" }, "dwellclicker");
     }
-    // on the first pass too, or a KWin that was zoomed in before taidan restarted would stay
-    // zoomed while the tile says zoom is off
     if first || prev.zoom != next.zoom {
         if next.zoom {
-            for _ in 0..ZOOM_STEPS {
-                shortcut(bus, "view_zoom_in");
+            for _ in 0..KWIN_ZOOM_IN_PRESSES {
+                run_kwin_shortcut(bus, "view_zoom_in");
             }
         } else {
-            shortcut(bus, "view_actual_size");
+            run_kwin_shortcut(bus, "view_actual_size");
         }
     }
 }
@@ -290,8 +257,7 @@ fn effect(bus: &Connection, method: &str, name: &str) {
     }
 }
 
-/// runs one of KWin's global shortcuts, which KWin handles itself on Wayland
-fn shortcut(bus: &Connection, name: &str) {
+fn run_kwin_shortcut(bus: &Connection, name: &str) {
     if let Err(e) = bus.call_method(
         Some("org.kde.kglobalaccel"),
         "/component/kwin",
@@ -303,12 +269,10 @@ fn shortcut(bus: &Connection, name: &str) {
     }
 }
 
-fn lock_orca() -> std::sync::MutexGuard<'static, Option<(u64, std::process::Child)>> {
-    ORCA.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+fn lock_orca() -> MutexGuard<'static, Option<(OrcaStartNumber, std::process::Child)>> {
+    ORCA.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// stops Orca with SIGTERM, so it can put the keyboard back and leave AT-SPI, and kills it if it
-/// doesn't exit in time
 fn stop_orca() {
     let Some((_, mut child)) = lock_orca().take() else { return };
     if let Ok(pid) = libc::pid_t::try_from(child.id()) {
@@ -317,11 +281,11 @@ fn stop_orca() {
             tracing::warn!(e = ?std::io::Error::last_os_error(), "cannot stop Orca");
         }
     }
-    let deadline = std::time::Instant::now() + ORCA_STOP_TIMEOUT;
-    while std::time::Instant::now() < deadline {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while Instant::now() < deadline {
         match child.try_wait() {
             Ok(Some(_)) => return,
-            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
+            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
             Err(e) => {
                 tracing::warn!(?e, "cannot wait for Orca");
                 break;
@@ -340,29 +304,25 @@ fn stop_orca() {
 fn start_orca(ui: &slint::Weak<AppWindow>) {
     let mut cmd = std::process::Command::new("orca");
     cmd.arg("--replace");
-    // in the UI's language, for both Orca's gettext messages and its voice
-    let locale = ORCA_LOCALE.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+    let locale = ORCA_POSIX_LOCALE.lock().unwrap_or_else(PoisonError::into_inner).clone();
     if let Some(locale) = locale {
         cmd.envs(locale_env(&locale)).env_remove("LC_ALL").env_remove("LC_MESSAGES");
     }
-    // without it, Orca's help and links open apps that lead to a terminal, see `sandbox`
     if let Err(e) = sandbox::apply(&mut cmd) {
         tracing::error!(?e, "cannot set up Orca's sandbox, not starting it");
         screen_reader_off(ui);
         return;
     }
     let mut orca = lock_orca();
-    // under the lock, so `shutdown` either sees this Orca or stops it from starting
-    if SHUT_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
+    if SHUT_DOWN.load(Ordering::SeqCst) {
         return;
     }
-    // Orca turns on AT-SPI's screen reader flag, which makes Slint expose the UI to it
     match cmd.spawn() {
         Ok(child) => {
-            let n = ORCA_STARTS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let n = ORCA_STARTS.fetch_add(1, Ordering::SeqCst);
             *orca = Some((n, child));
             let ui = ui.clone();
-            std::thread::spawn(move || watch_orca(n, &ui));
+            std::thread::spawn(move || turn_tile_off_when_orca_exits(n, &ui));
         }
         Err(e) => {
             tracing::error!(?e, "cannot start Orca");
@@ -372,19 +332,15 @@ fn start_orca(ui: &slint::Weak<AppWindow>) {
     }
 }
 
-/// `LANG` and `LANGUAGE` for a POSIX locale, `LANGUAGE` being gettext's list of languages, which
-/// takes the name without the codeset
-fn locale_env(locale: &str) -> [(&'static str, String); 2] {
-    let language = locale.split_once('.').map_or(locale, |(name, _)| name);
-    [("LANG", locale.to_owned()), ("LANGUAGE", language.to_owned())]
+fn locale_env(posix_locale: &str) -> [(&'static str, String); 2] {
+    let without_codeset = posix_locale.split_once('.').map_or(posix_locale, |(name, _)| name);
+    [("LANG", posix_locale.to_owned()), ("LANGUAGE", without_codeset.to_owned())]
 }
 
-/// turns the tile off when Orca `n` exits by itself, e.g. when it crashes
-fn watch_orca(n: u64, ui: &slint::Weak<AppWindow>) {
+fn turn_tile_off_when_orca_exits(n: OrcaStartNumber, ui: &slint::Weak<AppWindow>) {
     loop {
-        std::thread::sleep(ORCA_WATCH_INTERVAL);
+        std::thread::sleep(Duration::from_secs(1));
         let mut orca = lock_orca();
-        // stopped or replaced by the worker or `shutdown`
         let Some((started, child)) = orca.as_mut().filter(|(started, _)| *started == n) else {
             return;
         };
@@ -400,7 +356,6 @@ fn watch_orca(n: u64, ui: &slint::Weak<AppWindow>) {
     }
 }
 
-/// shows the screen reader as off, going through `changed` so the settings and the worker agree
 fn screen_reader_off(ui: &slint::Weak<AppWindow>) {
     let sent = ui.upgrade_in_event_loop(|ui| {
         let a11y = ui.global::<A11y<'_>>();
@@ -414,21 +369,14 @@ fn screen_reader_off(ui: &slint::Weak<AppWindow>) {
     }
 }
 
-/// Orca runs as taidan, which polkit lets run anything as root while the OOBE is on. its help
-/// (`help:orca`) and links go through GIO to whatever handles them: Yelp or `KHelpCenter`, then a
-/// browser, a file manager, and a terminal. so Orca gets XDG directories where GIO finds no
-/// `.desktop` files and no default apps, and `g_app_info_launch_default_for_uri` fails.
-///
-/// GIO falls back to the `OpenURI` portal only with `GIO_USE_PORTALS=1` or in Flatpak and Snap, and
-/// GTK 3 only with `GTK_USE_PORTAL=1`, so those are unset. Orca itself never runs `xdg-open`,
-/// `kioclient` or Python's `webbrowser`, which reads `BROWSER`.
+// polkit lets taidan run anything as root, and Orca's help and links could open apps that reach a
+// terminal
 mod sandbox {
     use std::ffi::{OsStr, OsString};
     use std::io;
     use std::path::{Path, PathBuf};
 
-    /// what Orca's help, links and "show in folder" would open, mapped to nothing
-    const MIME_TYPES: &[&str] = &[
+    const MIME_TYPES_WITHOUT_HANDLER: &[&str] = &[
         "x-scheme-handler/help",
         "x-scheme-handler/ghelp",
         "x-scheme-handler/man",
@@ -445,16 +393,15 @@ mod sandbox {
         "application/x-desktop",
     ];
 
-    const UNSET: &[&str] = &["BROWSER", "GIO_USE_PORTALS", "GTK_USE_PORTAL"];
+    const BROWSER_AND_PORTAL_VARS: &[&str] = &["BROWSER", "GIO_USE_PORTALS", "GTK_USE_PORTAL"];
 
-    /// the XDG directories the sandbox is made from, see [`build`]
-    pub(super) struct Real {
-        pub config_home: Option<PathBuf>,
-        pub data_home: Option<PathBuf>,
-        pub data_dirs: Vec<PathBuf>,
+    struct RealXdgDirs {
+        config_home: Option<PathBuf>,
+        data_home: Option<PathBuf>,
+        data_dirs: Vec<PathBuf>,
     }
 
-    impl Real {
+    impl RealXdgDirs {
         fn from_env() -> (Option<PathBuf>, Self) {
             let var = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
             let home = var("HOME");
@@ -466,7 +413,6 @@ mod sandbox {
                     .or_else(|| home.as_ref().map(|h| h.join(".config"))),
                 data_home: var("XDG_DATA_HOME")
                     .or_else(|| home.as_ref().map(|h| h.join(".local/share"))),
-                // relative ones are invalid by the spec
                 data_dirs: std::env::split_paths(&data_dirs).filter(|p| p.is_absolute()).collect(),
             };
             let base = var("XDG_RUNTIME_DIR").or_else(|| home.map(|h| h.join(".cache")));
@@ -474,40 +420,35 @@ mod sandbox {
         }
     }
 
-    /// sets up the sandbox and points `cmd` at it
     pub(super) fn apply(cmd: &mut std::process::Command) -> io::Result<()> {
-        let (base, real) = Real::from_env();
+        let (base, real) = RealXdgDirs::from_env();
         let base = base.ok_or_else(|| io::Error::other("no XDG_RUNTIME_DIR or HOME"))?;
-        for var in UNSET {
+        for var in BROWSER_AND_PORTAL_VARS {
             cmd.env_remove(var);
         }
         cmd.envs(build(&base.join("taidan-orca"), &real)?);
         Ok(())
     }
 
-    /// makes `root` from scratch, with symlinks to everything in the real XDG directories except
-    /// `applications` and `mimeapps.list`, and returns the variables that point at it. each data
-    /// directory gets one of its own so they still stack in the same order.
-    pub(super) fn build(root: &Path, real: &Real) -> io::Result<Vec<(&'static str, OsString)>> {
-        match std::fs::remove_dir_all(root) {
-            Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(e),
-            _ => {}
+    fn build(root: &Path, real: &RealXdgDirs) -> io::Result<Vec<(&'static str, OsString)>> {
+        if let Err(e) = std::fs::remove_dir_all(root)
+            && e.kind() != io::ErrorKind::NotFound
+        {
+            return Err(e);
         }
         std::os::unix::fs::DirBuilderExt::mode(std::fs::DirBuilder::new().recursive(true), 0o700)
             .create(root)?;
 
         let config = root.join("config");
         if let Some(real) = &real.config_home {
-            // dconf reads its database from here but writes through its service, which uses the
-            // real config. so the real `dconf` directory has to exist, and get linked, before Orca
-            // saves any settings.
+            // dconf's service writes to the real config, so its directory has to be linked
             std::fs::create_dir_all(real.join("dconf"))?;
         }
         link_all(real.config_home.as_deref(), &config, |name| {
             name.to_str().is_some_and(|n| n == "mimeapps.list" || n.ends_with("-mimeapps.list"))
         })?;
         let mut list = "[Default Applications]\n".to_owned();
-        for ty in MIME_TYPES {
+        for ty in MIME_TYPES_WITHOUT_HANDLER {
             list += ty;
             list += "=\n";
         }
@@ -535,7 +476,6 @@ mod sandbox {
         name == "applications"
     }
 
-    /// makes `to` with a symlink to each entry in `from` that isn't `skip`ped
     fn link_all(from: Option<&Path>, to: &Path, skip: impl Fn(&OsStr) -> bool) -> io::Result<()> {
         std::fs::create_dir_all(to)?;
         let Some(from) = from else { return Ok(()) };
@@ -580,15 +520,14 @@ mod sandbox {
             }
             std::fs::write(config_home.join("mimeapps.list"), "").unwrap();
             std::fs::write(config_home.join("kde-mimeapps.list"), "").unwrap();
-            let real = Real {
+            let real = RealXdgDirs {
                 config_home: Some(config_home.clone()),
                 data_home: Some(fake.join("missing")),
                 data_dirs: vec![share, fake.join("missing")],
             };
             let root = tmp.path().join("sandbox");
-            // built twice, the second build replaces the first
             build(&root, &real).unwrap();
-            let env = build(&root, &real).unwrap();
+            let env_after_rebuild = build(&root, &real).unwrap();
 
             let config = root.join("config");
             assert_eq!(
@@ -603,25 +542,23 @@ mod sandbox {
                 root.join("share/0/icons").exists() && !root.join("share/0/applications").exists()
             );
             assert!(root.join("share/1").is_dir() && root.join("data").is_dir());
-            let dirs = env.iter().find(|(k, _)| *k == "XDG_DATA_DIRS").unwrap();
+            let dirs = env_after_rebuild.iter().find(|(k, _)| *k == "XDG_DATA_DIRS").unwrap();
             assert_eq!(
                 std::env::split_paths(&dirs.1).collect::<Vec<_>>(),
                 [root.join("share/0"), root.join("share/1")]
             );
         }
 
-        /// runs against this machine's real apps, if it has GIO's tool
         #[test]
-        fn gio_finds_no_handler() {
+        fn gio_finds_no_handler_among_this_machines_apps() {
             if !Path::new("/usr/bin/gio").exists() {
                 return;
             }
             let tmp = tempfile::tempdir().unwrap();
-            let (_, mut real) = Real::from_env();
-            // otherwise the real config would get a `dconf` directory
-            real.config_home = None;
-            let env = build(tmp.path(), &real).unwrap();
-            for ty in MIME_TYPES {
+            let (_, real) = RealXdgDirs::from_env();
+            let real_without_config_to_touch = RealXdgDirs { config_home: None, ..real };
+            let env = build(tmp.path(), &real_without_config_to_touch).unwrap();
+            for ty in MIME_TYPES_WITHOUT_HANDLER {
                 let out = gio_mime(&env, ty);
                 assert!(out.starts_with("No default applications"), "{ty}: {out}");
                 assert!(!out.contains("Registered applications"), "{ty}: {out}");
@@ -638,8 +575,15 @@ mod tests {
     fn parses_saved_options() {
         let opts = Opts { screen_reader: true, color_filter: 3, ..Opts::default() };
         assert_eq!(parse(&serde_json::to_vec(&opts).unwrap()), opts);
-        // missing fields are off, a broken file is all off
+    }
+
+    #[test]
+    fn missing_saved_fields_are_off() {
         assert_eq!(parse(br#"{"zoom":true}"#), Opts { zoom: true, ..Opts::default() });
+    }
+
+    #[test]
+    fn broken_saved_file_is_all_off() {
         assert_eq!(parse(b"{\"zoom\":"), Opts::default());
         assert_eq!(parse(b""), Opts::default());
     }

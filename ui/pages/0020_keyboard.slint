@@ -10,13 +10,10 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 import { Card } from "../slintcn/components/card.slint";
 import { Separator } from "../slintcn/components/separator.slint";
 
-// a row styled like the toggles elsewhere, showing which input methods are on and opening the
-// dialog to change them
 component ImsRow inherits Rectangle {
     property <bool> pointer-focus;
     property <string> value: Ims.enabled == "" ? Lang.t("page-keyboard-ims-none", []) : Ims.enabled;
 
-    // opens the dialog, and the focus comes back here once it closes
     function open() {
         Ims.open = true;
         opener.opened();
@@ -74,7 +71,6 @@ component ImsRow inherits Rectangle {
             accessible-role: none;
         }
 
-        // points in the reading direction
         VerticalLayout {
             layout-order: Dir.order(2);
             alignment: center;
@@ -109,23 +105,19 @@ export component KeyboardPage inherits TdnPage {
     forward-focus: search-layout;
 
     property <length> row-height: 2.25rem;
-    // rows moved to with the arrow keys, -1 until the user does so. they're only highlighted until
-    // Enter or a click applies them, since applying a layout changes what typing in the search does
-    // (e.g. Cyrillic after passing Russian)
     property <int> layout-cursor: -1;
-    // 0 is the "Default" row, `n` is `Lang.variants[n - 1]`
     property <int> variant-cursor: -1;
-    // rows of the current layout and variant, -1 if they're filtered out, see the finders below
+    property <int> default-variant-row: 0;
     property <int> current-layout-row: -1;
     property <int> current-variant-row: -1;
-    // what Enter picks when the search filtered out the current layout and the arrow keys weren't
-    // used: the first match
-    property <bool> first-layout-match: search-layout.text != "" && layout-cursor < 0
+    property <bool> enter-picks-first-layout: search-layout.text != "" && layout-cursor < 0
         && current-layout-row < 0 && Lang.keymaps.length > 0;
-    // the same for the variants. the pinned "Default" row isn't a match, so this also applies
-    // when the current variant is the default one
-    property <bool> first-variant-match: search-variant.text != "" && variant-cursor < 0
+    property <bool> enter-picks-first-variant: search-variant.text != "" && variant-cursor < 0
         && current-variant-row < 0 && Lang.variants.length > 0;
+
+    pure function variant-row(index: int) -> int {
+        index + 1
+    }
 
     function select-keymap(keymap: Keymap) {
         if keymap.id != Lang.current_keymap.id {
@@ -136,51 +128,56 @@ export component KeyboardPage inherits TdnPage {
         Lang.select_keymap(keymap);
     }
 
-    function select-variant(i: int) {
-        variant-cursor = i;
-        Lang.select_variant(i == 0 ? { id: "", name: "" } : Lang.variants[i - 1]);
+    function select-variant(row: int) {
+        variant-cursor = row;
+        Lang.select_variant(row == default-variant-row ? { id: "", name: "" } : Lang.variants[row - 1]);
     }
 
-    function move-layout-cursor(delta: int) {
-        if Lang.keymaps.length == 0 { return; }
-        // start from the current layout, so the first press moves away from it instead of
-        // jumping to the top of the list and applying that
+    function start-layout-cursor-at-current-layout() {
         if layout-cursor < 0 && current-layout-row >= 0 && current-layout-row < Lang.keymaps.length
             && Lang.keymaps[current-layout-row].id == Lang.current_keymap.id {
             layout-cursor = current-layout-row;
         }
+    }
+
+    pure function content-y-showing(row: int, content-y: length, visible-height: length) -> length {
+        let top = row * row-height;
+        if top < -content-y {
+            return -top;
+        }
+        if top + row-height > -content-y + visible-height {
+            return visible-height - top - row-height;
+        }
+        content-y
+    }
+
+    function move-layout-cursor(delta: int) {
+        if Lang.keymaps.length == 0 { return; }
+        start-layout-cursor-at-current-layout();
         layout-cursor = max(0, min(Lang.keymaps.length - 1, layout-cursor + delta));
-        let top = layout-cursor * row-height;
-        if top < -layouts.content-y {
-            layouts.content-y = -top;
-        } else if top + row-height > -layouts.content-y + layouts.visible-height {
-            layouts.content-y = layouts.visible-height - top - row-height;
+        layouts.content-y = content-y-showing(layout-cursor, layouts.content-y, layouts.visible-height);
+    }
+
+    function start-variant-cursor-at-current-variant() {
+        if variant-cursor >= 0 { return; }
+        if Lang.current_variant.id == "" {
+            variant-cursor = default-variant-row;
+        } else if current-variant-row >= 0 && current-variant-row < Lang.variants.length
+            && Lang.variants[current-variant-row].id == Lang.current_variant.id {
+            variant-cursor = variant-row(current-variant-row);
         }
     }
 
     function move-variant-cursor(delta: int) {
-        if variant-cursor < 0 {
-            if Lang.current_variant.id == "" {
-                variant-cursor = 0;
-            } else if current-variant-row >= 0 && current-variant-row < Lang.variants.length
-                && Lang.variants[current-variant-row].id == Lang.current_variant.id {
-                variant-cursor = current-variant-row + 1;
-            }
-        }
+        start-variant-cursor-at-current-variant();
         variant-cursor = max(0, min(Lang.variants.length, variant-cursor + delta));
-        let top = variant-cursor * row-height;
-        if top < -variants.content-y {
-            variants.content-y = -top;
-        } else if top + row-height > -variants.content-y + variants.visible-height {
-            variants.content-y = variants.visible-height - top - row-height;
-        }
+        variants.content-y = content-y-showing(variant-cursor, variants.content-y, variants.visible-height);
     }
 
     Card {
         vertical-stretch: 1;
 
-        // find the current layout's and variant's rows for the arrow keys to start from. the layouts'
-        // `ListView` only creates the rows in view, so its rows can't
+        // `ListView` only creates the rows in view, so these find the current ones
         for keymap[i] in Lang.keymaps: Rectangle {
             property <bool> current: keymap.id == Lang.current_keymap.id;
             width: 0;
@@ -214,15 +211,12 @@ export component KeyboardPage inherits TdnPage {
                 search-layout := TdnInput {
                     placeholder: Lang.t("page-keyboard-search-layout", []);
                     icon: @image-url("../../data/icons/system-search-symbolic.svg");
-                    // the arrow keys move through the layouts while the focus stays here, so screen
-                    // readers hear about it from the description changing
                     description: root.layout-cursor >= 0 && root.layout-cursor < Lang.keymaps.length
                         ? Lang.keymaps[root.layout-cursor].name
-                        : root.first-layout-match ? Lang.keymaps[0].name : Lang.current_keymap.name;
+                        : root.enter-picks-first-layout ? Lang.keymaps[0].name : Lang.current_keymap.name;
                     edited(text) => {
                         layout-cursor = -1;
-                        // filtering drops rows without notifying them, so the remaining ones set
-                        // it again
+                        // filtering drops rows without running their `changed current`
                         root.current-layout-row = -1;
                         layouts.content-y = 0;
                         Lang.filter_keymaps(text);
@@ -230,7 +224,7 @@ export component KeyboardPage inherits TdnPage {
                     accepted => {
                         if root.layout-cursor >= 0 && root.layout-cursor < Lang.keymaps.length {
                             select-keymap(Lang.keymaps[root.layout-cursor]);
-                        } else if root.first-layout-match {
+                        } else if root.enter-picks-first-layout {
                             select-keymap(Lang.keymaps[0]);
                         }
                         search-variant.focus();
@@ -250,7 +244,7 @@ export component KeyboardPage inherits TdnPage {
                         text: keymap.name;
                         secondary: keymap.id;
                         selected: keymap.id == Lang.current_keymap.id;
-                        highlighted: i == root.layout-cursor || (i == 0 && root.first-layout-match);
+                        highlighted: i == root.layout-cursor || (i == 0 && root.enter-picks-first-layout);
                         clicked => {
                             layout-cursor = i;
                             select-keymap(keymap);
@@ -259,7 +253,6 @@ export component KeyboardPage inherits TdnPage {
                 }
             }
 
-            // layouts first, at the start edge
             Separator {
                 layout-order: Dir.order(1);
                 orientation: vertical;
@@ -273,10 +266,10 @@ export component KeyboardPage inherits TdnPage {
                 search-variant := TdnInput {
                     placeholder: Lang.t("page-keyboard-search-variant", []);
                     icon: @image-url("../../data/icons/system-search-symbolic.svg");
-                    description: root.variant-cursor == 0 ? Lang.t("default", [])
+                    description: root.variant-cursor == root.default-variant-row ? Lang.t("default", [])
                         : root.variant-cursor > 0 && root.variant-cursor <= Lang.variants.length
                         ? Lang.variants[root.variant-cursor - 1].name
-                        : root.first-variant-match ? Lang.variants[0].name
+                        : root.enter-picks-first-variant ? Lang.variants[0].name
                         : Lang.current_variant.id == "" ? Lang.t("default", []) : Lang.current_variant.name;
                     edited(text) => {
                         variant-cursor = -1;
@@ -287,9 +280,8 @@ export component KeyboardPage inherits TdnPage {
                     accepted => {
                         if root.variant-cursor >= 0 && root.variant-cursor <= Lang.variants.length {
                             select-variant(root.variant-cursor);
-                        } else if root.first-variant-match {
-                            // `Lang.variants[0]`, after the "Default" row
-                            select-variant(1);
+                        } else if root.enter-picks-first-variant {
+                            select-variant(variant-row(0));
                         }
                         root.try-next();
                     }
@@ -310,16 +302,16 @@ export component KeyboardPage inherits TdnPage {
                             height: row-height;
                             text: Lang.t("default", []);
                             selected: Lang.current_variant.id == "";
-                            highlighted: root.variant-cursor == 0;
-                            clicked => { select-variant(0); }
+                            highlighted: root.variant-cursor == root.default-variant-row;
+                            clicked => { select-variant(root.default-variant-row); }
                         }
 
                         for variant[i] in Lang.variants: TdnListRow {
                             height: row-height;
                             text: variant.name;
                             selected: variant.id == Lang.current_variant.id;
-                            highlighted: root.variant-cursor == i + 1 || (i == 0 && root.first-variant-match);
-                            clicked => { select-variant(i + 1); }
+                            highlighted: root.variant-cursor == variant-row(i) || (i == 0 && root.enter-picks-first-variant);
+                            clicked => { select-variant(variant-row(i)); }
                         }
                     }
                 }
@@ -343,6 +335,5 @@ export component KeyboardPage inherits TdnPage {
         vertical-stretch: 0;
     }
 
-    // only where the distro's input method framework has any
     if Ims.items.length > 0: ImsRow { }
 }

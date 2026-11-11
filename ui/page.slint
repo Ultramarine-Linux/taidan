@@ -4,33 +4,6 @@ import { Lang, Dir } from "lang.slint";
 import { A11y } from "a11y.slint";
 import { Tokens, Theme, ThemeMode } from "slintcn/theme/tokens.slint";
 
-export enum Step {
-    account_creation,
-    region_and_connectivity,
-    additional_software,
-    finishing_up,
-}
-
-export global StepHdl {
-    out property <[Step]> steps: [
-        Step.account_creation,
-        Step.region-and-connectivity,
-        Step.additional-software,
-        Step.finishing-up
-    ];
-
-    public pure function label(step: Step) -> string {
-        Lang.t(
-            step == Step.account-creation ? "step-account-creation"
-            : step == Step.region-and-connectivity ? "step-region-and-connectivity"
-            : step == Step.additional-software ? "step-additional-software"
-            : "step-finishing-up",
-            [])
-    }
-}
-
-// position of each page in `AppWindow`, in the order Next goes through them. Rust reads these
-// too, for `skip_pages` and to move to the done and error pages
 export global Pages {
     out property <int> accessibility: 0;
     out property <int> language: 1;
@@ -43,9 +16,7 @@ export global Pages {
     out property <int> network: 8;
     out property <int> location: 9;
     out property <int> drivers: 10;
-    // the last page that Next and Back go through
     out property <int> summary: 11;
-    // the rest are jumped to
     out property <int> installing: 12;
     out property <int> done: 13;
     out property <int> error: 14;
@@ -53,7 +24,6 @@ export global Pages {
 
 export component TdnBasePg {
     in property <string> pageid;
-    // position of this page, and of the page currently shown
     in property <int> index;
     in property <int> current;
     out property <bool> active: index == current;
@@ -63,12 +33,9 @@ export component TdnBasePg {
     width: 100%;
     height: 100%;
     x: index < current ? -self.width : (index > current ? self.width : 0);
-    // off-screen pages are hidden so Tab can't reach their inputs. only the page that was shown
-    // slides out. pages a jump passes over stay hidden, so a failed install doesn't flash the done
-    // page on its way to the error page
-    visible: active || (leaving && self.x > -self.width && self.x < self.width);
+    visible: active || sliding-out;
 
-    // whether this was the page shown before the current one
+    property <bool> sliding-out: leaving && self.x > -self.width && self.x < self.width;
     property <bool> leaving;
     property <bool> was-active;
     init => { root.was-active = root.active; }
@@ -84,15 +51,12 @@ export component TdnBasePg {
 
     @children
 
-    // a page sliding out stays visible for a moment, so this keeps it from taking clicks, e.g. Back
-    // on the summary once the installation has started
-    if !root.active: TouchArea {
+    if !root.active: inactive-click-blocker := TouchArea {
         width: 100%;
         height: 100%;
     }
 }
 
-// the welcome image with the distro caption, for the first and last screens
 export component TdnHero inherits Rectangle {
     clip: true;
 
@@ -104,8 +68,6 @@ export component TdnHero inherits Rectangle {
         accessible-role: none;
     }
 
-    // marks a dev session in English, so it fits where the artwork expects it in every language.
-    // Distros can set their own caption, shown without the version outside dev sessions
     property <string> caption: Cfg.get_string("welcome.t0", Cfg.dev-session ? "Development Session" : "");
 
     if root.caption != "" || Cfg.dev-session: VerticalLayout {
@@ -130,11 +92,17 @@ export component TdnHero inherits Rectangle {
     }
 }
 
-// logo, step progress and the accessibility button, at the top of most pages
 export component TdnHeader inherits HorizontalLayout {
     in property <int> step_i;
-    // false for pages before the welcome screen, which aren't part of any step
     in property <bool> show-steps: true;
+
+    property <[string]> steps: [
+        "step-account-creation",
+        "step-region-and-connectivity",
+        "step-additional-software",
+        "step-finishing-up",
+    ];
+    property <string> step-label: Lang.t(root.steps[root.step_i], []);
 
     height: 2.25rem;
     spacing: 1rem;
@@ -154,11 +122,10 @@ export component TdnHeader inherits HorizontalLayout {
         HorizontalLayout {
             spacing: 4 * Tokens.unit;
             accessible-role: progress-indicator;
-            accessible-label: StepHdl.label(StepHdl.steps[root.step_i]);
-            accessible-value: (root.step_i + 1) + "/" + StepHdl.steps.length;
+            accessible-label: root.step-label;
+            accessible-value: (root.step_i + 1) + "/" + root.steps.length;
 
-            // filled from the start edge, which is the right one in right-to-left languages
-            for step[i] in StepHdl.steps: Rectangle {
+            for step[i] in root.steps: Rectangle {
                 layout-order: Dir.order(i);
                 height: 6 * Tokens.unit;
                 horizontal-stretch: 1;
@@ -172,7 +139,7 @@ export component TdnHeader inherits HorizontalLayout {
         TdnText {
             color: Tokens.color-muted-foreground;
             font-size: Tokens.typography-body-sm-size;
-            text: StepHdl.label(StepHdl.steps[root.step_i]);
+            text: root.step-label;
             horizontal-alignment: Dir.text-start;
         }
     }
@@ -197,17 +164,12 @@ export component TdnHeader inherits HorizontalLayout {
 export component TdnPage inherits TdnBasePg {
     in property <string> name: Lang.t("page-" + self.pageid, []);
     in property <int> step_i;
-    // whether the page's input is complete, which gates the Next button and Enter
     in property <bool> can-next: true;
-    // false on the first page, which depends on `skip_pages`
     in property <bool> can-prev: Cfg.prev-page(self.index) != self.index;
-    // false for pages before the welcome screen, which aren't part of any step
     in property <bool> show-steps: true;
     in property <string> next-text: Lang.t("next", []);
-    // whether Next shows the Enter keycap, off where Enter elsewhere on the page doesn't press it
     in property <bool> next-enter-hint: true;
 
-    // when set, Next and Enter call `next-intercepted` instead, e.g. to confirm first
     in property <bool> intercept-next;
     callback next-intercepted;
 
@@ -220,11 +182,8 @@ export component TdnPage inherits TdnBasePg {
         }
     }
 
-    // pages with inputs focus those instead
     forward-focus: next-btn;
 
-    // a named group around the page, so screen readers say which page it is when the focus moves
-    // into it, e.g. after Next
     VerticalLayout {
         padding-left: 2rem;
         padding-right: 2rem;
@@ -244,7 +203,6 @@ export component TdnPage inherits TdnBasePg {
             font-weight: 500;
             horizontal-alignment: Dir.text-start;
             wrap: word-wrap;
-            // the group above announces the name on focus. this keeps it readable when reviewing the screen
             text: root.name;
         }
 
@@ -263,7 +221,6 @@ export component TdnPage inherits TdnBasePg {
                 clicked => { root.prev_page(); }
             }
 
-            // keeps Next at the end when there is no Back button
             if !root.can-prev: Rectangle { }
 
             next-btn := TdnBtn {

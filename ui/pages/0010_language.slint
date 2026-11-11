@@ -11,27 +11,21 @@ export component LanguagePage inherits TdnPage {
     forward-focus: search;
 
     property <length> row-height: 2.25rem;
-    // row moved to with the arrow keys, -1 until the user does so
-    property <int> cursor: -1;
-    // row of the current language in the list, -1 if it's filtered out, see the finder below
-    property <int> current-row: -1;
-    // what Enter picks when the search filtered out the current language and the arrow keys
-    // weren't used: the first match
-    property <bool> first-match: search.text != "" && cursor < 0 && current-row < 0
-        && Lang.languages.length > 0;
+    property <int> arrow-key-row: -1;
+    property <int> current-language-row: -1;
+    property <bool> enter-picks-first-match: search.text != "" && arrow-key-row < 0
+        && current-language-row < 0 && Lang.languages.length > 0;
 
-    function move-cursor(delta: int) {
-        if Lang.languages.length == 0 { return; }
-        // start from the current language, so the first press moves away from it instead of
-        // jumping to the top of the list and switching to that
-        if cursor < 0 && current-row >= 0 && current-row < Lang.languages.length
-            && Lang.languages[current-row].locale == Lang.current_language.locale {
-            cursor = current-row;
+    function start-arrow-keys-at-current-language() {
+        if arrow-key-row < 0 && current-language-row >= 0
+            && current-language-row < Lang.languages.length
+            && Lang.languages[current-language-row].locale == Lang.current_language.locale {
+            arrow-key-row = current-language-row;
         }
-        cursor = max(0, min(Lang.languages.length - 1, cursor + delta));
-        Lang.select(Lang.languages[cursor]);
-        // keep the row in view
-        let top = cursor * row-height;
+    }
+
+    function scroll-to-arrow-key-row() {
+        let top = arrow-key-row * row-height;
         if top < -list.content-y {
             list.content-y = -top;
         } else if top + row-height > -list.content-y + list.visible-height {
@@ -39,18 +33,26 @@ export component LanguagePage inherits TdnPage {
         }
     }
 
+    function move-arrow-key-row(delta: int) {
+        if Lang.languages.length == 0 { return; }
+        start-arrow-keys-at-current-language();
+        arrow-key-row = max(0, min(Lang.languages.length - 1, arrow-key-row + delta));
+        Lang.select(Lang.languages[arrow-key-row]);
+        scroll-to-arrow-key-row();
+    }
+
     Card {
         vertical-stretch: 1;
 
-        // finds the current language's row. `ListView` can't, since it only creates the rows in view
+        // `ListView` only creates the rows in view, so this finds the current one
         for lang[i] in Lang.languages: Rectangle {
             property <bool> current: lang.locale == Lang.current_language.locale;
             width: 0;
             height: 0;
-            init => { if self.current { root.current-row = i; } }
+            init => { if self.current { root.current-language-row = i; } }
             changed current => {
-                if self.current { root.current-row = i; }
-                else if root.current-row == i { root.current-row = -1; }
+                if self.current { root.current-language-row = i; }
+                else if root.current-language-row == i { root.current-language-row = -1; }
             }
         }
 
@@ -61,25 +63,23 @@ export component LanguagePage inherits TdnPage {
             search := TdnInput {
                 placeholder: Lang.t("page-language-search-lang", []);
                 icon: @image-url("../../data/icons/system-search-symbolic.svg");
-                // the arrow keys pick a language while the focus stays here, so screen readers
-                // hear about it from the description changing
-                description: root.first-match ? Lang.name(Lang.languages[0]) : Lang.name(Lang.current_language);
+                description: root.enter-picks-first-match ? Lang.name(Lang.languages[0]) : Lang.name(Lang.current_language);
                 edited(text) => {
-                    cursor = -1;
-                    // filtering drops rows without notifying them, so the remaining ones set it again
-                    root.current-row = -1;
+                    arrow-key-row = -1;
+                    // filtering drops rows without running their `changed current`
+                    root.current-language-row = -1;
                     list.content-y = 0;
                     Lang.filter_languages(text);
                 }
                 accepted => {
-                    if root.first-match { Lang.select(Lang.languages[0]); }
+                    if root.enter-picks-first-match { Lang.select(Lang.languages[0]); }
                     root.try-next();
                 }
                 key-pressed(event) => {
-                    if event.text == Key.DownArrow { move-cursor(1); return accept; }
-                    if event.text == Key.UpArrow { move-cursor(-1); return accept; }
-                    if event.text == Key.PageDown { move-cursor(10); return accept; }
-                    if event.text == Key.PageUp { move-cursor(-10); return accept; }
+                    if event.text == Key.DownArrow { move-arrow-key-row(1); return accept; }
+                    if event.text == Key.UpArrow { move-arrow-key-row(-1); return accept; }
+                    if event.text == Key.PageDown { move-arrow-key-row(10); return accept; }
+                    if event.text == Key.PageUp { move-arrow-key-row(-10); return accept; }
                     reject
                 }
             }
@@ -90,9 +90,9 @@ export component LanguagePage inherits TdnPage {
                     text: Lang.name(lang);
                     secondary: lang.native-name;
                     selected: lang.locale == Lang.current_language.locale;
-                    highlighted: i == 0 && root.first-match;
+                    highlighted: i == 0 && root.enter-picks-first-match;
                     clicked => {
-                        cursor = i;
+                        arrow-key-row = i;
                         Lang.select(lang);
                     }
                 }

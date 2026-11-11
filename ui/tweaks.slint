@@ -2,26 +2,18 @@ import { Network } from "network.slint";
 
 export struct TweakItem {
     id: string,
-    // translation ids
     name: string,
     desc: string,
     on: bool,
-    // it downloads something, so it doesn't run when setting up offline
     needs-internet: bool,
 }
 
-// distro tweaks from /usr/share/taidan/tweaks, driven from Rust (`src/tweaks.rs`)
 export global Tweaks {
     in property <[TweakItem]> items;
-    // name translation ids of the enabled tweaks, all of them or only those that don't need the internet
     in property <[string]> enabled-names-online;
     in property <[string]> enabled-names-offline;
-    // the ones that will run, for the summary. those that need the internet are skipped when the
-    // install goes without it, see `Network.install-online`
     out property <[string]> enabled-names: Network.install-online ? enabled-names-online : enabled-names-offline;
-    // whether the dialog is open, from the summary page
     in-out property <bool> open;
 
-    // turns a tweak on or off, which goes straight to the settings
     callback set(index: int, on: bool);
 }

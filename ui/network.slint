@@ -3,25 +3,20 @@ import { Account } from "account.slint";
 // `enterprise-tls` is WPA3-Enterprise 192-bit (Suite B), which only works with EAP-TLS
 export enum Security { open, password, enterprise, enterprise-tls, unsupported }
 
-// what a hidden network is secured with, as picked in its dialog
 export enum HiddenSecurity { open, wpa, wpa3, enterprise }
 
 export struct WifiNetwork {
     ssid: string,
-    // signal strength as the number of lit arcs in the wi-fi icon, 0–3
     strength: int,
     security: Security,
-    // whether a connection for it is saved, so connecting needs no password
     known: bool,
     connected: bool,
 }
 
 export enum NetState { offline, connecting, limited, portal, online }
 
-// 802.1X methods, as in NetworkManager's connection editor
 export enum EapMethod { peap, ttls, tls, fast, pwd, leap, md5 }
 
-// how the authentication server's certificate is checked
 export enum CaSource { system, file, none }
 
 export struct FileEntry {
@@ -30,192 +25,125 @@ export struct FileEntry {
     dir: bool,
 }
 
-// IPv4 address and DNS servers of a connection, as typed
 export struct IpSettings {
-    // false to get the address from the network (DHCP)
     manual: bool,
-    // with the prefix length, e.g. 192.168.1.20/24
     address: string,
     gateway: string,
-    // comma-separated, IPv4 or IPv6, empty to use the network's
     dns: string,
 }
 
 export struct EnterpriseLogin {
-    // the wired connection instead of a wi-fi network
     wired: bool,
     ssid: string,
     method: EapMethod,
-    // inner method for PEAP, TTLS and FAST, as named by NetworkManager. `mschapv2-plain` is
-    // TTLS's "MSCHAPv2 (no EAP)"
+    // `mschapv2-plain` is TTLS's "MSCHAPv2 (no EAP)" in NetworkManager
     inner: string,
-    // the identity, for TLS too
     username: string,
     password: string,
     anonymous-identity: string,
     ca: CaSource,
-    // file paths, copied somewhere permanent before they're used
     ca-cert: string,
-    // suffix the server's certificate name has to match, empty for any
     domain: string,
-    // 0 automatic, 1 version 0, 2 version 1
     peap-version: int,
     client-cert: string,
     private-key: string,
     private-key-password: string,
-    // 0 off, 1 anonymous, 2 authenticated, 3 both
     fast-provisioning: int,
     pac-file: string,
 }
 
-// wi-fi and connectivity, driven from Rust (`src/network.rs`)
 export global Network {
     in property <NetState> state;
-    // whether there is a wi-fi adapter
     in property <bool> wifi-available: true;
-    // whether its radio is on, and whether a switch or key on the device turned it off, which
-    // only that switch can undo
     in property <bool> wifi-enabled: true;
     in property <bool> wifi-hardware-enabled: true;
-    // whether there is an ethernet adapter, and whether it's connected
     in property <bool> ethernet;
     in property <bool> wired;
     in property <[WifiNetwork]> networks;
-    // the wi-fi network in use, empty if none
     in property <string> connected-ssid;
     in property <bool> scanning;
-    // the network being connected to, if any
     in property <string> connecting-ssid;
-    // translation id of why the last connection failed, for `error-ssid`
     in property <string> error-id;
     in property <string> error-ssid;
-    // the network whose row button last had keyboard focus, so the row can take it back when it's
-    // rebuilt, for example when it moves to the top after connecting
     in-out property <string> focus-ssid;
-    // whether that was the row's IP settings button rather than its connect button
     in-out property <bool> focus-ip;
-    // shows "I Don't Have Internet" even when online, from `taidan0.persist_no_internet_btn`
     in property <bool> persist-offline-btn;
 
-    // network the password dialog is open for, empty if closed
     in-out property <string> password-ssid;
-    // the network whose password or 802.1X dialog was last closed without connecting, so a connect
-    // that fails afterwards doesn't open it again. cleared when a new connect starts
     in-out property <string> dismissed-ssid;
-    // whether the 802.1X login dialog is open, for the WPA-Enterprise network `enterprise-ssid`,
-    // or the wired connection when `enterprise-wired`
     in-out property <bool> enterprise-open;
     in-out property <string> enterprise-ssid;
     in-out property <bool> enterprise-wired;
-    // the network only takes EAP-TLS, so that's the only method the dialog offers
     in-out property <bool> enterprise-tls-only;
     in property <bool> enterprise-busy;
-    // counts the times the 802.1X dialog was opened, so a login sent from one that has closed
-    // since, wired ones included, doesn't close or show errors in the one open now
+    public function open-enterprise(ssid: string, wired: bool, tls-only: bool) {
+        enterprise-ssid = ssid;
+        enterprise-wired = wired;
+        enterprise-tls-only = tls-only;
+        enterprise-error-id = "";
+        enterprise-open = true;
+    }
     in-out property <int> enterprise-visit;
-    // translation id of why the login failed
     in-out property <string> enterprise-error-id;
-    // whether the "No Network Selected" dialog is open, and whether "Set Up Offline" opened it
-    // rather than Next, which makes it the explicit choice that `offline-chosen` keeps
     in-out property <bool> offline-prompt;
     in-out property <bool> offline-prompt-explicit;
-    // "Set Up Offline" was chosen when leaving the network page. only this skips the online steps,
-    // otherwise the install goes by the connection it has when it starts
     in-out property <bool> offline-chosen;
 
-    // whether the proxy dialog is open
     in-out property <bool> proxy-open;
-    // counts the times the proxy dialog was opened, so a check sent from one that has closed since
-    // doesn't close or show errors in the one open now
     in-out property <int> proxy-visit;
-    // the proxy in use, empty if none
     in property <string> proxy-url;
     in property <string> proxy-bypass: "localhost, 127.0.0.1, ::1";
-    // `proxy-url` without the username and password, to show
     in property <string> proxy-public;
-    // whether the installed system keeps using the proxy, else it's only for setup
     in-out property <bool> proxy-persist: true;
-    // checking the proxy reaches the internet, cleared when the dialog is canceled, as the check
-    // it was waiting for no longer counts
     in-out property <bool> proxy-busy;
-    // translation id of why the proxy can't be used
     in-out property <string> proxy-error-id;
-    // the active connection with the default route, as a D-Bus path, "/" if none
     in property <string> primary-connection;
-    // the `primary-connection` the proxy was last found to reach the internet on. another network
-    // may not have it, so it only counts as online on this one, until it's checked again there
     in property <string> proxy-checked-on;
 
-    // whether the IP settings dialog is open, for `ip-ssid`, or the wired connection if empty
     in-out property <bool> ip-open;
     in-out property <string> ip-ssid;
-    // the settings in the dialog, loaded by `load-ip()`
     in-out property <IpSettings> ip;
     in property <bool> ip-loading;
     in property <bool> ip-busy;
-    // translation id of why the settings can't be saved
     in property <string> ip-error-id;
 
-    // reaching the internet, directly or through the proxy, which NetworkManager can't check
+    // NetworkManager can't check connectivity through a proxy
     out property <bool> online: state == NetState.online || (proxy-url != "" && proxy-checked-on == primary-connection
         && state != NetState.offline && state != NetState.connecting);
-    // whether the install would use the internet if it started now. the summary shows this and
-    // `install::start` goes by it
     out property <bool> install-online: online && !offline-chosen;
 
-    // pretty name for this device, and the hostname derived from it, or from the username if the
-    // name has nothing a hostname can use (e.g. it's all Japanese)
     in-out property <string> device-name;
     out property <string> hostname: derive-hostname(device-name, Account.username);
     pure callback derive-hostname(name: string, username: string) -> string;
     derive-hostname(name, username) => name;
-    // the part of a username after the `@`
     pure callback realm(username: string) -> string;
     realm(username) => "";
-    // whether a certificate file holds its private key too (PKCS#12)
     pure callback is-pkcs12(path: string) -> bool;
     is-pkcs12(path) => false;
     pure callback file-name(path: string) -> string;
     file-name(path) => path;
-    // without the whitespace around it, which Slint has no function for
     pure callback trim(text: string) -> string;
     trim(text) => text;
 
-    // the file browser for picking certificates: the folder shown, its parent, and what's in it
     in property <string> browse-dir;
     in property <string> browse-parent;
     in property <[FileEntry]> browse-entries;
-    // places to start from, like removable drives
     in property <[FileEntry]> browse-places;
-    // lists `dir`, only certificates (or PAC files when `pac`) unless `all`
     callback browse(dir: string, pac: bool, all: bool);
 
     callback refresh();
-    // turns the wi-fi radio on, when it was turned off in software
     callback enable-wifi();
-    // `password` is empty for open or saved networks
     callback connect(ssid: string, password: string);
     callback connect-enterprise(login: EnterpriseLogin);
-    // the dialog for a network that doesn't announce its name, which closes once it's connected
     in-out property <bool> hidden-open;
-    // the network the hidden dialog last tried, trimmed as it's connected to, so the dialog only
-    // shows its own errors and not those of a connect from the list still running when it opened
     in-out property <string> hidden-ssid;
-    // `password` is empty for open networks, enterprise ones go through `connect-enterprise`
     callback connect-hidden(ssid: string, security: HiddenSecurity, password: string);
-    // whether the captive portal browser is open, opening it again closes it
     in property <bool> portal-open;
     callback open-portal();
     callback close-portal();
-    // checks the proxy works and uses it, an empty `url` stops using one. `persist` becomes
-    // `proxy-persist` once it's used
     callback set-proxy(url: string, bypass: string, persist: bool);
-    // opens the IP settings dialog for a wi-fi network, or the wired connection if `ssid` is empty
     callback open-ip(ssid: string);
     callback save-ip(ssid: string, ip: IpSettings);
-    // writes the device name and proxy to the settings, when leaving the page
     callback save();
-    // called on every page change with whether the network page is shown, so a connection that
-    // fails later doesn't pop a dialog over another page
     callback page-changed(bool);
 }

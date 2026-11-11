@@ -1,127 +1,86 @@
 #!/usr/bin/sh
-# started by taidan-initial-setup.service, as the taidan user. runs the OOBE in its own KWin
-# session, and starts that again (a few times, on Slint's software renderer in case the GPU is what
-# broke it) if taidan or KWin crashes before the setup is done. A clean exit, or one after the setup
-# removed the markers, ends it.
-#
-# if it still fails, it never returns. the unit is a oneshot ordered before display-manager.service
-# and getty-pre.target, so as long as this runs neither the greeter nor a getty starts on the
-# half-set-up system. it prints what happened on its own VT instead and waits there until the
-# machine is rebooted or powered off.
 
-# one per attempt, so a session left over from an earlier one can't answer for the next
-status_file() {
-	echo "${RUNTIME_DIRECTORY:-/run/taidan}/exit-status.$1"
-}
+status_dir=${RUNTIME_DIRECTORY:-/run/taidan}
 
-# the part inside the KWin session, which KWin ends when this exits (--exit-with-session)
 if [ "$1" = session ]; then
 	TAIDAN_LOG=trace /usr/bin/taidan
-	echo $? >"$(status_file "$TAIDAN_ATTEMPT")"
+	echo $? >"$status_dir/exit-status.$TAIDAN_ATTEMPT"
 	exit 0
 fi
 
+max_restarts=3
+oobe_vt=7
 uid=$(id -u)
+cgroup_procs=/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)/cgroup.procs
 
 unconfigured() {
 	[ -e /.unconfigured ] || [ -e /var/.unconfigured ]
 }
 
-# root processes in this session, which taidan started through pkexec and taidan-helper (dnf,
-# flatpak, tweaks…). they don't die with taidan and would race the next attempt. pkexec keeps
-# the cgroup, and nothing else here runs as root
-leftovers() {
-	cgroup=$(sed -n 's/^0:://p' /proc/self/cgroup)
-	while read -r pid; do
-		[ "$(stat -c %u "/proc/$pid" 2>/dev/null)" = 0 ] && echo "$pid"
-	done <"/sys/fs/cgroup$cgroup/cgroup.procs"
-	return 0
-}
-
-# the last attempt's own processes, the ones running as taidan (taidan, Orca, swaybg…). when KWin
-# crashes, the session it started keeps running. sets $own to their pids. not in a subshell, so
-# the only other ones it sees are its own short-lived helpers, the children of this script
-own_leftovers() {
-	own=
-	cgroup=$(sed -n 's/^0:://p' /proc/self/cgroup)
-	while read -r pid; do
-		# this script and systemd-inhibit, which runs it
-		{ [ "$pid" = $$ ] || [ "$pid" = "$PPID" ]; } && continue
-		stat=$(cat "/proc/$pid/stat" 2>/dev/null) || continue
-		# after the name in parentheses: the state, then the parent's pid
-		# shellcheck disable=SC2086
-		set -- ${stat##*) }
-		[ "$2" = $$ ] && continue
-		[ "$(stat -c %u "/proc/$pid" 2>/dev/null)" = "$uid" ] && own="$own $pid"
-	done <"/sys/fs/cgroup$cgroup/cgroup.procs"
-	return 0
-}
-
-# stops them before the next KWin starts, so the old taidan can't act alongside the new one
-stop_own_leftovers() {
-	own_leftovers
-	[ -n "$own" ] || return 0
-	echo "stopping what the last session left running:$own" >&2
-	# shellcheck disable=SC2086
-	kill $own 2>/dev/null
-	waited=0
-	while own_leftovers && [ -n "$own" ] && [ "$waited" -lt 5 ]; do
-		sleep 1
-		waited=$((waited + 1))
-	done
-	own_leftovers
-	if [ -n "$own" ]; then
-		echo "killing what didn't stop:$own" >&2
-		# shellcheck disable=SC2086
-		kill -KILL $own 2>/dev/null
-	fi
-}
-
-# runs taidan-helper's verb $1, which polkit lets through while the OOBE runs. verbs without
-# arguments need nothing on stdin
 helper() {
 	pkexec /usr/libexec/taidan-helper "$1" </dev/null
 }
 
-# asks the root leftovers to stop (rpm finishes its current transaction first) and kills what's
-# left after a few minutes. the helper finds them itself, the same way
-stop_leftovers() {
-	# polkit only lets the helper through while this session's VT is in front, see give_up
-	chvt 7 2>/dev/null
-	# the captive portal browser runs in a unit of its own
-	helper stop-portal 2>/dev/null
-	pids=$(leftovers)
-	[ -n "$pids" ] || return 0
-	echo "stopping what the last taidan left running: $(echo $pids)" >&2
-	helper kill-leftovers
-	waited=0
-	while [ -n "$(leftovers)" ] && [ "$waited" -lt 300 ]; do
+wait_while() {
+	seconds=$1
+	shift
+	while "$@" && [ "$seconds" -gt 0 ]; do
 		sleep 1
-		waited=$((waited + 1))
+		seconds=$((seconds - 1))
 	done
-	pids=$(leftovers)
-	if [ -n "$pids" ]; then
-		echo "killing what didn't stop: $(echo $pids)" >&2
+}
+
+find_own_leftovers() {
+	own_leftovers=
+	while read -r pid; do
+		case $pid in "$$" | "$PPID") continue ;; esac
+		stat=$(cat "/proc/$pid/stat" 2>/dev/null) || continue
+		# shellcheck disable=SC2086
+		set -- ${stat##*) }
+		[ "$2" = $$ ] && continue
+		[ "$(stat -c %u "/proc/$pid" 2>/dev/null)" = "$uid" ] && own_leftovers="$own_leftovers $pid"
+	done <"$cgroup_procs"
+	[ -n "$own_leftovers" ]
+}
+
+find_root_leftovers() {
+	root_leftovers=
+	while read -r pid; do
+		[ "$(stat -c %u "/proc/$pid" 2>/dev/null)" = 0 ] && root_leftovers="$root_leftovers $pid"
+	done <"$cgroup_procs"
+	[ -n "$root_leftovers" ]
+}
+
+stop_leftovers() {
+	if find_own_leftovers; then
+		echo "stopping what the last session left running:$own_leftovers" >&2
+		# shellcheck disable=SC2086
+		kill $own_leftovers 2>/dev/null
+		wait_while 5 find_own_leftovers
+		if [ -n "$own_leftovers" ]; then
+			echo "killing what didn't stop:$own_leftovers" >&2
+			# shellcheck disable=SC2086
+			kill -KILL $own_leftovers 2>/dev/null
+		fi
+	fi
+
+	chvt "$oobe_vt" 2>/dev/null
+	helper stop-portal 2>/dev/null
+	find_root_leftovers || return 0
+	echo "stopping what the last taidan left running:$root_leftovers" >&2
+	helper kill-leftovers
+	wait_while 300 find_root_leftovers
+	if [ -n "$root_leftovers" ]; then
+		echo "killing what didn't stop:$root_leftovers" >&2
 		helper kill-leftovers-now
 	fi
 }
 
-# shows why the setup stopped and blocks forever. it writes to /dev/tty, tty7, which the unit gives
-# this script as stdin and controlling terminal, and which systemd hands to the taidan user, so
-# none of it needs root. $1 is how many times it tried
-give_up() {
-	# back to this VT if someone switched away. the controlling terminal is enough for
-	# VT_ACTIVATE, and logind only counts the session as active (which the polkit rules want)
-	# while its VT is in front
-	chvt 7 2>/dev/null
-	# so whatever is still running as taidan can't use the polkit rules anymore. ExecStopPost
-	# removes them too, but this never stops on its own. polkitd picks the removal up by itself
+fail_forever() {
+	chvt "$oobe_vt" 2>/dev/null
 	helper drop-polkit-rule
-	# Ctrl+C/Ctrl+\ would kill this and its parent (systemd-inhibit), which ends the unit and lets
-	# the display manager start after all. also don't echo what's typed over the message
 	stty -isig -echo -icanon </dev/tty 2>/dev/null
 	trap '' INT QUIT TSTP HUP
-	# logind put the VT back into text mode when KWin let go of the session
 	{
 		printf '\033[H\033[2J'
 		cat <<-EOM
@@ -145,9 +104,8 @@ give_up() {
 
 restarts=0
 while :; do
-	status_file=$(status_file "$restarts")
+	status_file=$status_dir/exit-status.$restarts
 	rm -f "$status_file"
-	# KWin passes its environment on to the session
 	TAIDAN_ATTEMPT=$restarts dbus-run-session kwin_wayland --no-lockscreen \
 		--exit-with-session 'sh /usr/libexec/start-taidan session'
 	status=$(cat "$status_file" 2>/dev/null)
@@ -155,19 +113,15 @@ while :; do
 	if [ "$status" = 0 ] || ! unconfigured; then
 		exit 0
 	fi
-	# no status means KWin went down before taidan exited
-	if [ "$restarts" -ge 3 ]; then
+	if [ "$restarts" -ge "$max_restarts" ]; then
 		echo "taidan keeps failing (exit status ${status:-none}), giving up" >&2
-		stop_own_leftovers
 		stop_leftovers
-		give_up $((restarts + 1))
+		fail_forever $((restarts + 1))
 	fi
 	restarts=$((restarts + 1))
 	echo "taidan exited before the setup was done (exit status ${status:-none}), restarting with the software renderer" >&2
-	stop_own_leftovers
 	stop_leftovers
-	# Slint only falls back on its own when it can't create the renderer at all. femtovg failing
-	# later, in resume(), comes out of ui.run() and ends taidan. KWin passes this on to the session
+	# slint only falls back to software by itself when it can't create the renderer at all
 	export SLINT_BACKEND=winit-software
 	sleep 1
 done

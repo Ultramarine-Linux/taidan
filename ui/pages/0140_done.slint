@@ -1,21 +1,23 @@
 import { Tokens } from "../slintcn/theme/tokens.slint";
 import { TdnBasePg, TdnHero } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
-import { Cfg } from "../cfg.slint";
 import { Install } from "../install.slint";
 import { TdnText, TdnBtn, TdnStyle, TdnSpinner } from "../components.slint";
+
+component Note inherits TdnText {
+    color: Tokens.color-muted-foreground;
+    horizontal-alignment: Dir.text-start;
+    wrap: word-wrap;
+}
 
 export component DonePage inherits TdnBasePg {
     forward-focus: reboot;
 
-    // the buttons are off while finishing, which drops their focus, so it comes back if
-    // restarting fails
     property <bool> finishing: Install.finishing;
     changed finishing => {
         if !root.finishing && root.active { reboot.focus(); }
     }
 
-    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is
     VerticalLayout {
         accessible-role: groupbox;
         accessible-label: Lang.t("page-done", []);
@@ -44,44 +46,24 @@ export component DonePage inherits TdnBasePg {
                     wrap: word-wrap;
                 }
 
-                // so the next restart taking a while isn't a surprise
-                if Install.updates-ready: TdnText {
+                if Install.updates-ready: Note {
                     text: Lang.t(Install.needs-reboot ? "page-done-updates-drivers" : "page-done-updates", []);
-                    color: Tokens.color-muted-foreground;
-                    horizontal-alignment: Dir.text-start;
-                    wrap: word-wrap;
                 }
 
-                // not an error since the system works without them, but nobody should have to guess
-                // why their GPU or Wi-Fi isn't any better
-                if Install.drivers-failed: TdnText {
+                if Install.drivers-failed: Note {
                     text: Lang.t("page-done-drivers-failed", []);
-                    color: Tokens.color-muted-foreground;
-                    horizontal-alignment: Dir.text-start;
-                    wrap: word-wrap;
-                    accessible-role: text;
                 }
 
-                // the system stays in its old language, which would otherwise look like a bug
-                if Install.locale-failed: TdnText {
+                if Install.locale-failed: Note {
                     text: Lang.t("page-done-locale-failed", []);
-                    color: Tokens.color-muted-foreground;
-                    horizontal-alignment: Dir.text-start;
-                    wrap: word-wrap;
-                    accessible-role: text;
                 }
 
-                if Install.reboot-failed: TdnText {
+                if Install.reboot-failed: Note {
                     text: Lang.t("page-done-reboot-failed", []);
                     color: Tokens.color-destructive;
-                    horizontal-alignment: Dir.text-start;
-                    wrap: word-wrap;
-                    accessible-role: text;
                 }
             }
 
-            // centered vertically, since a HorizontalLayout alone would stretch the buttons to the
-            // row's height
             VerticalLayout {
                 layout-order: Dir.order(1);
                 alignment: center;
@@ -90,7 +72,6 @@ export component DonePage inherits TdnBasePg {
                 HorizontalLayout {
                     spacing: 0.75rem;
 
-                    // while the system is marked configured and restarts or logs out
                     if Install.finishing: VerticalLayout {
                         alignment: center;
                         TdnSpinner {
@@ -98,14 +79,12 @@ export component DonePage inherits TdnBasePg {
                         }
                     }
 
-                    // logging in comes first, updating can wait for whenever the user restarts
                     if !Install.needs-reboot && Install.updates-ready: TdnBtn {
                         text: Lang.t("page-done-restart-update", []);
                         enabled: !Install.finishing;
                         clicked => { Install.finish(true); }
                     }
 
-                    // a way out when restarting doesn't work
                     if Install.needs-reboot && Install.reboot-failed: TdnBtn {
                         text: Lang.t("page-done-login", []);
                         enabled: !Install.finishing;
