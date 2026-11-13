@@ -144,6 +144,11 @@ optional `tweak.toml` (fields in `Tweak`, `libtaidan/tweaks.rs`). `up 1` turns t
 only runs when an earlier, unfinished install turned it on and the user has since turned it off.
 Both run as root.
 
+An optional `condition` script determines whether a tweak applies to this system.
+The tweak is enabled if the exit code is 0; nonzero, failure to run, or a five-second timeout hides it.
+`TAIDAN_X86_64_LEVEL` (1–4 on x86-64, 0 elsewhere) and `TAIDAN_SECURE_BOOT`
+(`0` for disabled, `1` for enforced, `unknown` if detection failed) are available.
+
 `up` gets the user's choices as JSON on stdin (`Settings` in `libtaidan/settings.rs`):
 
 ```jsonc

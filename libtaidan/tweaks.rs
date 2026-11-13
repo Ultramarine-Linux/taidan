@@ -9,39 +9,25 @@ use crate::err::{Res, TaidanErrHelper};
 pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
     let tweaks = Tweak::list()
         .inspect_err(|err| tracing::error!(?err, "cannot list tweaks"))
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|t| {
-            let supported = t.is_supported();
-            if !supported {
-                tracing::info!(id=?t.id(), level=?t.x86_64_level, "hiding tweak unsupported on this CPU");
-            }
-            supported
-        })
-        .collect::<Box<[_]>>();
+        .unwrap_or_default();
     tracing::info!("found {} tweaks", tweaks.len());
     tweaks
 });
 
 pub async fn available(can_use_dnf: bool) -> Vec<&'static Tweak> {
-    let secure_boot = if TWEAKS.iter().any(|t| t.secure_boot.is_some()) {
-        crate::steps::secure_boot_enforced().await.unwrap_or_else(|| {
-            tracing::warn!("cannot tell whether Secure Boot is on, taking it to be");
-            true
-        })
-    } else {
-        false
-    };
-    TWEAKS
-        .iter()
-        .filter(|t| {
-            let allowed = t.is_allowed(can_use_dnf, secure_boot);
-            if !allowed {
-                tracing::info!(id=?t.id(), can_use_dnf, secure_boot, "hiding tweak this system can't take");
-            }
-            allowed
-        })
-        .collect()
+    let secure_boot = crate::steps::secure_boot_enforced().await;
+    futures::future::join_all(TWEAKS.iter().map(|t| async move {
+        if t.is_available(can_use_dnf, secure_boot).await {
+            Some(t)
+        } else {
+            tracing::info!(id=?t.id(), "hiding tweak this system can't take");
+            None
+        }
+    }))
+    .await
+    .into_iter()
+    .flatten()
+    .collect()
 }
 
 /// A distro-specified setting read by Taidan during runtime.
@@ -52,6 +38,7 @@ pub async fn available(can_use_dnf: bool) -> Vec<&'static Tweak> {
 /// /usr/share/taidan/tweaks/ (TWEAKS_DIR)
 /// ┣╸my_tweak/
 /// ┃ ├╴tweak.toml (optional)
+/// ┃ ├╴condition (optional, must be executable)
 /// ┃ └╴up (required, must be executable)
 /// ┗╸other_tweak/
 ///   ├╴tweak.toml
@@ -62,13 +49,16 @@ pub async fn available(can_use_dnf: bool) -> Vec<&'static Tweak> {
 ///
 /// `up 1` turns the tweak on. `up 0` turns it back off after an unfinished attempt turned it on.
 ///
+/// `condition` runs without root privileges in the tweak directory, with no stdin. Exit code 0
+/// offers the tweak; any other exit code, execution failure or a five-second timeout hides it.
+/// It must only inspect the system, not change it. It receives `TAIDAN_X86_64_LEVEL` (0 on other
+/// architectures) and `TAIDAN_SECURE_BOOT` (`0`, `1`, or `unknown`).
+///
 /// every field of `tweak.toml` is optional:
 /// - `ftl_name` (alias `name`): fluent ID of the name, defaults to `<id>-name`
 /// - `ftl_desc` (alias `desc`): fluent ID of the description, defaults to `<id>-desc`
-/// - `x86_64_level`: minimum x86-64 level (1 to 4), hidden below it and on other architectures
 /// - `needs_internet`: `up` downloads something, skipped offline
 /// - `needs_dnf`: `up` installs packages with dnf, hidden on atomic and with `taidan0.skip_dnf`
-/// - `secure_boot`: only offered when it matches whether Secure Boot is enforced
 #[derive(Clone, Debug, Default, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Tweak {
@@ -78,10 +68,8 @@ pub struct Tweak {
     pub ftl_name: String,
     #[serde(alias = "desc")]
     pub ftl_desc: String,
-    pub x86_64_level: Option<u8>,
     pub needs_internet: bool,
     pub needs_dnf: bool,
-    pub secure_boot: Option<bool>,
 }
 
 #[cfg(debug_assertions)]
@@ -131,13 +119,42 @@ impl Tweak {
         Ok(tweak)
     }
 
-    #[must_use]
-    pub fn is_supported(&self) -> bool {
-        self.x86_64_level.is_none_or(|level| x86_64_level() >= level)
+    async fn is_available(&self, can_use_dnf: bool, secure_boot: Option<bool>) -> bool {
+        (!self.needs_dnf || can_use_dnf) && self.condition_allows(secure_boot).await
     }
-    #[must_use]
-    pub fn is_allowed(&self, can_use_dnf: bool, secure_boot: bool) -> bool {
-        (can_use_dnf || !self.needs_dnf) && self.secure_boot.is_none_or(|sb| sb == secure_boot)
+
+    async fn condition_allows(&self, secure_boot: Option<bool>) -> bool {
+        match tokio::fs::metadata(self.path.join("condition")).await {
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return true,
+            Err(err) => {
+                tracing::warn!(?err, id=?self.id(), "cannot inspect tweak condition");
+                return false;
+            }
+            Ok(_) => {}
+        }
+        let secure_boot = match secure_boot {
+            Some(false) => "0",
+            Some(true) => "1",
+            None => "unknown",
+        };
+        let mut cmd = tokio::process::Command::new("./condition");
+        cmd.current_dir(&self.path)
+            .env("TAIDAN_X86_64_LEVEL", x86_64_level().to_string())
+            .env("TAIDAN_SECURE_BOOT", secure_boot)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .kill_on_drop(true);
+        match tokio::time::timeout(std::time::Duration::from_secs(5), cmd.status()).await {
+            Ok(Ok(status)) => status.success(),
+            Ok(Err(err)) => {
+                tracing::warn!(?err, id=?self.id(), "cannot run tweak condition");
+                false
+            }
+            Err(err) => {
+                tracing::warn!(?err, id=?self.id(), "tweak condition timed out");
+                false
+            }
+        }
     }
     /// Obtain [`Tweak`] from the path to the tweak directory.
     /// This is the "safe" version of [`Self::from_cfg_path()`].
@@ -165,6 +182,17 @@ impl Tweak {
             ));
         }
         let cfg_self = Self::from_cfg_path(&path)?;
+        match std::fs::metadata(path.join("condition")) {
+            Ok(metadata) if !metadata.is_file() || metadata.permissions().mode() & 0o111 == 0 => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    format!("expected executable file `condition` in `{}`", path.display()),
+                ));
+            }
+            Ok(_) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(err),
+        }
         Ok(Self { path, ..cfg_self })
     }
 
@@ -344,25 +372,19 @@ mod tests {
     fn missing_toml_uses_defaults() {
         let dir = tweak_dir(None);
         let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
-        assert_eq!(tweak.x86_64_level, None);
         assert!(tweak.ftl_name.ends_with("-name"));
         assert!(!tweak.needs_dnf);
-        assert_eq!(tweak.secure_boot, None);
     }
 
     #[test]
-    fn valid_toml_keeps_level() {
-        let dir = tweak_dir(Some("x86_64_level = 3\n"));
-        let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
-        assert_eq!(tweak.x86_64_level, Some(3));
-        assert!(!tweak.needs_internet);
+    fn valid_toml_keeps_internet_requirement() {
         let dir = tweak_dir(Some("needs_internet = true\n"));
         assert!(Tweak::from_dir(dir.path().to_path_buf()).unwrap().needs_internet);
     }
 
     #[test]
-    fn unparsable_toml_is_rejected_rather_than_dropping_the_cpu_requirement() {
-        for toml in ["x86_64_level = \"3\"\n", "x86_64_level = 3\nunknown = 1\n", "not toml ["] {
+    fn unparsable_toml_is_rejected() {
+        for toml in ["needs_dnf = \"true\"\n", "needs_dnf = true\nunknown = 1\n", "not toml ["] {
             let dir = tweak_dir(Some(toml));
             let err = Tweak::from_dir(dir.path().to_path_buf()).unwrap_err();
             assert_eq!(err.kind(), std::io::ErrorKind::InvalidData, "{toml:?}");
@@ -371,29 +393,97 @@ mod tests {
 
     #[test]
     fn constraints_parse() {
-        let dir = tweak_dir(Some("needs_dnf = true\nsecure_boot = false\n"));
+        let dir = tweak_dir(Some("needs_dnf = true\n"));
         let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
         assert!(tweak.needs_dnf);
-        assert_eq!(tweak.secure_boot, Some(false));
+    }
+
+    fn condition(dir: &Path, script: &str) {
+        let path = dir.join("condition");
+        std::fs::write(&path, script).unwrap();
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    #[tokio::test]
+    async fn absent_condition_allows_tweak() {
+        let dir = tweak_dir(None);
+        let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
+        assert!(tweak.condition_allows(None).await);
+    }
+
+    #[tokio::test]
+    async fn dnf_requirement_still_filters_tweaks() {
+        let dir = tweak_dir(Some("needs_dnf = true\n"));
+        let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
+        assert!(tweak.is_available(true, None).await);
+        assert!(!tweak.is_available(false, None).await);
+        let free = Tweak { needs_dnf: false, ..tweak };
+        assert!(free.is_available(false, None).await);
+    }
+
+    #[tokio::test]
+    async fn condition_exit_status_filters_tweak() {
+        let dir = tweak_dir(None);
+        for (script, allowed) in [
+            ("#!/bin/sh\nexit 0\n", true),
+            ("#!/bin/sh\nexit 1\n", false),
+            ("#!/bin/sh\nexit 42\n", false),
+            ("#!/missing-interpreter\n", false),
+        ] {
+            condition(dir.path(), script);
+            let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
+            assert_eq!(tweak.condition_allows(None).await, allowed, "{script}");
+        }
+    }
+
+    #[tokio::test]
+    async fn condition_receives_system_state_and_runs_in_tweak_directory() {
+        let dir = tweak_dir(None);
+        condition(
+            dir.path(),
+            "#!/bin/sh\n[ -f up ] && [ -n \"$TAIDAN_X86_64_LEVEL\" ] && \
+             [ \"$TAIDAN_SECURE_BOOT\" = 0 ] && [ -z \"$(cat)\" ]\n",
+        );
+        let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
+        assert!(tweak.condition_allows(Some(false)).await);
+        assert!(!tweak.condition_allows(Some(true)).await);
+        assert!(!tweak.condition_allows(None).await);
     }
 
     #[test]
-    fn constraints_filter() {
-        let constrained = Tweak { needs_dnf: true, secure_boot: Some(false), ..Tweak::default() };
-        let free = Tweak::default();
-        for (dnf, secure_boot, shown) in
-            [(true, false, true), (true, true, false), (false, false, false), (false, true, false)]
-        {
-            let case = format!("dnf={dnf} secure_boot={secure_boot}");
-            assert_eq!(constrained.is_allowed(dnf, secure_boot), shown, "{case}");
-            assert!(free.is_allowed(dnf, secure_boot), "{case}");
+    fn non_executable_condition_is_rejected() {
+        let dir = tweak_dir(None);
+        std::fs::write(dir.path().join("condition"), "#!/bin/sh\nexit 0\n").unwrap();
+        let err = Tweak::from_dir(dir.path().to_path_buf()).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+    }
+
+    #[tokio::test]
+    async fn condition_timeout_hides_tweak() {
+        let dir = tweak_dir(None);
+        condition(dir.path(), "#!/bin/sh\nexec sleep 30\n");
+        let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
+        assert!(!tweak.condition_allows(None).await);
+    }
+
+    #[test]
+    fn shipped_cachyos_condition_checks_cpu_and_secure_boot() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../data/tweaks/cachyos-kernel/condition");
+        for (level, secure_boot, allowed) in [
+            ("0", "0", false),
+            ("2", "0", false),
+            ("3", "0", true),
+            ("4", "0", true),
+            ("3", "1", false),
+            ("3", "unknown", false),
+        ] {
+            let status = std::process::Command::new(path)
+                .env("TAIDAN_X86_64_LEVEL", level)
+                .env("TAIDAN_SECURE_BOOT", secure_boot)
+                .status()
+                .unwrap();
+            assert_eq!(status.success(), allowed, "level={level} secure_boot={secure_boot}");
         }
-        let dnf_only = Tweak { needs_dnf: true, ..Tweak::default() };
-        assert!(dnf_only.is_allowed(true, true));
-        assert!(!dnf_only.is_allowed(false, false));
-        let sb_on_only = Tweak { secure_boot: Some(true), ..Tweak::default() };
-        assert!(sb_on_only.is_allowed(false, true));
-        assert!(!sb_on_only.is_allowed(true, false));
     }
 
     #[test]
@@ -401,7 +491,7 @@ mod tests {
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../data/tweaks/cachyos-kernel");
         let tweak = Tweak::from_dir(dir.into()).unwrap();
         assert!(tweak.needs_dnf);
-        assert_eq!(tweak.secure_boot, Some(false));
+        assert!(is_executable(&tweak.path.join("condition")));
     }
 
     #[test]

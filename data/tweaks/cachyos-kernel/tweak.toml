@@ -1,6 +1,2 @@
-x86_64_level = 3
 needs_internet = true
 needs_dnf = true
-
-# the CachyOS kernel won't boot with Secure Boot on
-secure_boot = false

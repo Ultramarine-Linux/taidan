@@ -17,6 +17,7 @@ Requires:       swaybg
 Requires:       polkit >= 126
 Requires:       (glib2 or (/usr/bin/plasma-apply-colorscheme and kf6-kconfig))
 Requires:       shadow-utils
+Requires:       glibc-common
 Requires:       util-linux
 Requires:       systemd
 Requires:       systemd-udev
@@ -27,6 +28,7 @@ Requires:       flatpak
 # required for running homectl
 Recommends:     systemd-homed
 Requires:       pciutils
+Requires:       mokutil
 Requires:       dbus-tools
 Requires:       NetworkManager
 Requires:       cog
