@@ -353,7 +353,7 @@ impl Snapshot {
         net.set_ethernet(self.ethernet);
         net.set_wired(self.wired);
         net.set_connected_ssid(
-            self.networks.iter().find(|n| n.connected).map(|n| n.ssid.clone()).unwrap_or_default(),
+            self.networks.iter().find(|n| n.connected).map_or_default(|n| n.ssid.clone()),
         );
         let model = net.get_networks();
         if let Some(model) = model.as_any().downcast_ref::<slint::VecModel<WifiNetwork>>() {
@@ -1635,8 +1635,7 @@ fn helper_accepted_extension(path: &str) -> String {
         .extension()
         .and_then(|e| e.to_str())
         .filter(|e| !e.is_empty() && e.len() <= 8 && e.chars().all(|c| c.is_ascii_alphanumeric()))
-        .map(|e| format!(".{}", e.to_ascii_lowercase()))
-        .unwrap_or_default()
+        .map_or_default(|e| format!(".{}", e.to_ascii_lowercase()))
 }
 
 const CERT_EXTS: [&str; 7] = ["der", "pem", "crt", "cer", "p12", "pfx", "key"];
@@ -1771,7 +1770,7 @@ impl IpConfig {
         IpSettings {
             manual: true,
             address: format!("{addr}/{prefix}").into(),
-            gateway: gateway.map(|gw| gw.to_string()).unwrap_or_default().into(),
+            gateway: gateway.map_or_default(|gw| gw.to_string()).into(),
             dns: dns.into(),
         }
     }
@@ -2028,7 +2027,7 @@ fn browse(ui: &slint::Weak<AppWindow>, dir: &str, pac: bool, all: bool) {
             dir
         };
         let path = std::path::Path::new(&dir);
-        let parent = path.parent().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+        let parent = path.parent().map_or_default(|p| p.to_string_lossy().into_owned());
         let entries = list_dir(path, pac, all);
         push(&ui, move |net| {
             if !LATEST.is_current(this) {

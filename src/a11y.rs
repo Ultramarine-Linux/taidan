@@ -267,7 +267,7 @@ const fn forget_kwin_saved_zoom() -> libtaidan::kconfig::KConfigEntry {
 }
 
 fn write_kwin_config(prev: Option<&Opts>, next: &Opts) {
-    let old = prev.map(Opts::session_entries).unwrap_or_default();
+    let old = prev.map_or_default(Opts::session_entries);
     let mut entries = next.session_entries();
     if prev.is_none() {
         entries.push(forget_kwin_saved_zoom());

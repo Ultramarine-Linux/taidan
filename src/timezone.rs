@@ -155,7 +155,7 @@ fn entry(zone: &Zone, regions: &Regions) -> TimeZone {
     TimeZone {
         id: zone.id.as_str().into(),
         city: city(&zone.id).into(),
-        region: zone.main_country().map(|c| regions.name(c)).unwrap_or_default().into(),
+        region: zone.main_country().map_or_default(|c| regions.name(c)).into(),
         offset: offset_text(&zone.id).into(),
         x,
         y,
