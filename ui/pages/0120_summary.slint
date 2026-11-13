@@ -2,13 +2,13 @@ import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Account } from "../account.slint";
 import { Drivers, Install } from "../install.slint";
-import { Network, NetState } from "../network.slint";
+import { Network } from "../network.slint";
 import { Tz } from "../timezone.slint";
 import { Tweaks } from "../tweaks.slint";
 import { Ims } from "../ims.slint";
 import { Cfg } from "../cfg.slint";
 import { Modal } from "../modal.slint";
-import { TdnText, TdnStyle, TdnBtn, TdnToggleRow, TdnScrollList } from "../components.slint";
+import { TdnText, TdnNote, TdnBtn, TdnToggleRow, TdnScrollList } from "../components.slint";
 import { DriverList, DriverRow } from "0100_drivers.slint";
 import { UserIcon } from "0040_whoareyou.slint";
 import { Card } from "../slintcn/components/card.slint";
@@ -57,25 +57,17 @@ export component SummaryPage inherits TdnPage {
     step_i: 3;
     name: Lang.t("page-summary", [{ key: "name", value: Account.first-name(Account.fullname, Account.username) }]);
     next-text: Lang.t("page-summary-confirm", []);
-    // Enter on the review doesn't start it, only on the button itself
     next-enter-hint: false;
 
-    // the wi-fi network in use, if any
-    property <string> connected-ssid: Network.connected-ssid;
-
-    // focus the review itself instead of Confirm, so an Enter meant for the page before or a
-    // dialog doesn't start the install. Screen readers read the summary from here.
     forward-focus: review;
 
     review := FocusScope {
         enabled: !Modal.open;
-        // takes what the buttons leave, the review scrolls when it doesn't fit, e.g. on 1024x600
         vertical-stretch: 1;
-        // a named group, or screen readers skip the FocusScope and say nothing when it's focused
+        // screen readers say nothing for a focused FocusScope without a named role
         accessible-role: groupbox;
         accessible-label: root.name;
 
-        // most of the review isn't focusable, so the arrow keys scroll it
         key-pressed(event) => {
             let step = event.text == Key.UpArrow ? 3rem
                 : event.text == Key.DownArrow ? -3rem
@@ -167,15 +159,13 @@ export component SummaryPage inherits TdnPage {
                     InfoRow {
                         icon: @image-url("../../data/icons/network-wireless-symbolic.svg");
                         label: Lang.t("page-summary-network", []);
-                        // what the install will go by, see `Network.install-online`
                         value: Network.offline-chosen ? Lang.t("page-summary-network-offline", [])
                             : !Network.online ? Lang.t("page-summary-network-none", [])
-                            : root.connected-ssid != "" ? root.connected-ssid
+                            : Network.connected-ssid != "" ? Network.connected-ssid
                             : Lang.t("page-internet-wired", []);
                     }
                 }
 
-                // packed at the top like the account column, the card only as tall as what's in it
                 VerticalLayout {
                     layout-order: Dir.order(1);
                     alignment: start;
@@ -206,16 +196,12 @@ export component SummaryPage inherits TdnPage {
                                 text: Lang.t(name, []);
                             }
 
-                            if !Drivers.install && Tweaks.enabled-names.length == 0: TdnText {
+                            if !Drivers.install && Tweaks.enabled-names.length == 0: TdnNote {
                                 text: Lang.t("page-summary-software-none", []);
-                                color: Tokens.color-muted-foreground;
-                                horizontal-alignment: Dir.text-start;
-                                wrap: word-wrap;
                             }
                         }
                     }
 
-                    // installed on the next restart, so only when there's internet to download them with
                     if Install.can-download-updates: TdnToggleRow {
                         vertical-stretch: 0;
                         enabled: Network.install-online;
@@ -224,7 +210,6 @@ export component SummaryPage inherits TdnPage {
                         toggled(on) => { Install.download-updates = on; }
                     }
 
-                    // the proxy without its credentials, and whether the installed system keeps it
                     if Network.proxy-url != "": TdnToggleRow {
                         vertical-stretch: 0;
                         text: Lang.t("page-summary-proxy", [{ key: "proxy", value: Network.proxy-public }]);
@@ -232,7 +217,6 @@ export component SummaryPage inherits TdnPage {
                         toggled(on) => { Network.proxy-persist = on; }
                     }
 
-                    // only when the distro ships tweaks
                     if Tweaks.items.length > 0 && !Cfg.skip-tweaks: HorizontalLayout {
                         vertical-stretch: 0;
                         alignment: Dir.start;

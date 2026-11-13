@@ -46,16 +46,15 @@ xkeyboard-config [for /usr/share/X11/xkb/rules/evdev.lst]
 ### Root helper
 
 Taidan runs as the unprivileged `taidan` user. Everything it does as root goes through
-`/usr/libexec/taidan-helper` (a binary in the `libtaidan` crate, `libtaidan/helper.rs`), and while
-the OOBE runs, the polkit rule only lets the `taidan` user `pkexec` that exact path. The helper
-takes a fixed set of requests with checked arguments, and refuses everything but a few cleanup ones
-once the system is marked configured.
+`/usr/libexec/taidan-helper` (`libtaidan/helper.rs`), the only path the polkit rule lets `taidan`
+`pkexec` while the OOBE runs. The helper takes a fixed set of requests with checked arguments, and
+once the system is marked configured it refuses everything but a few cleanup ones.
 
-The helper limits what a bug in Taidan can do as root, but it isn't a boundary against other code
-running as `taidan`: making an admin with a chosen password and running things as them is what the
-OOBE is for, so anything that can make those requests can get root. Nothing untrusted may run as
-`taidan`, which is why Orca's help and links open in an empty sandbox and the captive portal
-browser runs as its own user. Packaging has to install the helper there:
+This limits what a bug in Taidan can do as root, but it isn't a boundary against other code running
+as `taidan`: the OOBE exists to make an admin with a chosen password, so anything that can make
+those requests can get root. Nothing untrusted may run as `taidan`, which is why Orca's help and
+links open in an empty sandbox and the captive portal browser runs as its own user. Packaging has
+to install the helper:
 
 ```sh
 cargo build --release -p libtaidan --bin taidan-helper
@@ -73,9 +72,9 @@ package. `server-oobe` builds it from this repo:
 cargo build --release -p tdnx --no-default-features --features server-oobe
 ```
 
-The `desktop-install` backend runs the installation through `taidan-helper` like Taidan does, so the
-helper has to be installed. Custom repos, coprs and scripts in `actions`, and packages other than the
-ones Taidan installs itself, are only taken when `tdnx` runs as root.
+The `desktop-install` backend goes through `taidan-helper` like Taidan, so the helper has to be
+installed. Custom repos, coprs and scripts in `actions`, and packages Taidan doesn't install itself,
+are only taken when `tdnx` runs as root.
 
 ## Testing
 
@@ -83,18 +82,16 @@ ones Taidan installs itself, are only taken when `tdnx` runs as root.
 TAIDAN_LOG=trace cargo r
 ```
 
-- `TAIDAN_SIMULATE_HW=nvidia,broadcom-wifi` (or `all`) pretends that
-  hardware is present, to see the drivers list (with `nvidia`, the simulated install asks for a
-  reboot)
+- `TAIDAN_SIMULATE_HW=nvidia,broadcom-wifi` (or `all`) fakes that hardware for the drivers list
+  (with `nvidia`, the simulated install asks for a reboot)
 - `TAIDAN_SIMULATE_ERROR=1` makes the simulated install fail halfway
-- `TAIDAN_SIMULATE_UPDATES=1` pretends updates were downloaded, to see the done page's restart button
-- `TAIDAN_SIMULATE_DRIVER_ERROR=1` pretends a driver failed to install, to see the done page's note about it
+- `TAIDAN_SIMULATE_UPDATES=1` fakes downloaded updates, for the done page's restart button
+- `TAIDAN_SIMULATE_DRIVER_ERROR=1` fakes a failed driver install, for the done page's note about it
 
-To debug the OOBE on a real machine, boot with `taidan.debug_shell` on the kernel command line,
-then press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> to open a root terminal.
+On a real machine, boot with `taidan.debug_shell` on the kernel command line, then press
+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> for a root terminal.
 
-Debug builds run the root helper from `TAIDAN_HELPER` if it's set, instead of
-`/usr/libexec/taidan-helper`.
+Debug builds run the root helper from `TAIDAN_HELPER` if it's set.
 
 ## 📃 License
 
@@ -126,29 +123,28 @@ skip_pages = ["location", "drivers"] # hide pages you don't want, see `SkipPage`
 org = "Fyra Labs"
 ```
 
-A few things work differently from the GTK version of Taidan:
+Changes from the GTK version of Taidan:
 
-- `skip_pages = ["devicename"]` is ignored with a warning, since the device name moved onto the
-  network page. Skipping `network` keeps the system's hostname.
-- `skip_pages = ["keyboard"]` also hides the input method picker, which is part of the keyboard
-  page now. Input methods are then picked from the locale. To set up none at all, skip
-  `inputmethod`.
-- Codecs follow the drivers toggle, there's no separate codecs page. `skip_pages = ["codecs"]` is
-  the same as `drivers`. Skipping it hides the page, but drivers and codecs are still installed.
+- `skip_pages = ["devicename"]` is ignored with a warning, the device name is on the network page
+  now. Skipping `network` keeps the system's hostname.
+- `skip_pages = ["keyboard"]` also hides the input method picker, which moved onto the keyboard
+  page. Input methods are then picked from the locale. To set up none, skip `inputmethod`.
+- Codecs follow the drivers toggle. `skip_pages = ["codecs"]` is the same as `drivers`, which hides
+  the page but still installs drivers and codecs.
 - `internet_timeout` and `internet_retry_interval` are ignored with a warning, and
-  `/etc/com.fyralabs.Taidan/detect-internet` isn't run anymore. Whether the machine is online comes
-  from NetworkManager's connectivity check.
-- `/usr/share/taidan/oobe.sh` isn't run anymore. Use a tweak instead (see below).
+  `/etc/com.fyralabs.Taidan/detect-internet` isn't run anymore. Connectivity comes from
+  NetworkManager.
+- `/usr/share/taidan/oobe.sh` isn't run anymore. Use a tweak instead.
 
 ### Tweaks
 
-Tweaks are optional settings the user can turn on from the summary page. Each one is a directory in
-`/usr/share/taidan/tweaks/`, whose name is the tweak's id, with an executable `up` script and an
-optional `tweak.toml` (see `Tweak` in `libtaidan/tweaks.rs` for its fields). `up 1` turns the tweak
-on. `up 0` only runs for a tweak that an earlier, unfinished install turned on and the user has
-since turned off. Both run as root.
+Tweaks are optional settings the user can turn on from the summary page. Each is a directory in
+`/usr/share/taidan/tweaks/` named after the tweak's id, with an executable `up` script and an
+optional `tweak.toml` (fields in `Tweak`, `libtaidan/tweaks.rs`). `up 1` turns the tweak on. `up 0`
+only runs when an earlier, unfinished install turned it on and the user has since turned it off.
+Both run as root.
 
-`up` gets the user's choices as JSON on stdin (`Settings` in `libtaidan/settings.rs`), roughly:
+`up` gets the user's choices as JSON on stdin (`Settings` in `libtaidan/settings.rs`):
 
 ```jsonc
 {
@@ -179,18 +175,17 @@ since turned off. Both run as root.
 }
 ```
 
-The proxy URL on stdin never has the username and password in it. `up` gets the whole proxy,
-credentials and all, in `http_proxy` and friends for its own downloads. A tweak that sets the proxy
-up anywhere that outlives the install should only do so when `proxy_persist` is `true`, Taidan
-removes its own proxy config otherwise.
+The proxy URL on stdin never has credentials in it. For its own downloads, `up` gets the full proxy
+in `http_proxy` and friends. A tweak should only set the proxy up somewhere that outlives the install
+when `proxy_persist` is `true`, otherwise Taidan removes its own proxy config.
 
 With `proxy_persist` on, Taidan writes the proxy to `/etc/environment` (without credentials) and
 `/etc/dnf/libdnf5.conf.d/50-taidan-proxy.conf` (root only). libdnf5 has no `no_proxy`, so repos
 whose `baseurl`, `metalink` or `mirrorlist` host is in the bypass list get `proxy=` in
-`/etc/dnf/repos.override.d/50-taidan-proxy-bypass.repo`. This is a best effort: the mirrors a
-metalink or mirrorlist hands out are only known at runtime and still go through the proxy.
+`/etc/dnf/repos.override.d/50-taidan-proxy-bypass.repo`. Mirrors handed out by a metalink or
+mirrorlist are only known at runtime, so they still go through the proxy.
 
-Compared to the GTK version:
+Changes from the GTK version:
 
 - `langlocale` is now `locale`
 - `theme_is_dark` is now `dark_mode`, which can be `null`
@@ -202,8 +197,7 @@ Compared to the GTK version:
 
 ### Branding
 
-Other distros can swap Ultramarine's look out from the same file. Every key is optional.
-Colors follow `#rrggbb` or `#aarrggbb`.
+Other distros can replace Ultramarine's look from the same file. Every key is optional. Colors are `#rrggbb` or `#aarrggbb`.
 
 ```toml
 logo = "/usr/share/pixmaps/my-distro.svg"  # header and window icon
@@ -222,7 +216,7 @@ hero_image_dark = "/usr/share/backgrounds/my-distro-dark.png"
 ```
 
 The picture falls back to `/usr/share/backgrounds/default.png` (or `default-dark.png`), then to
-Ultramarine's. The distro name comes from `NAME=` in `/etc/os-release`. Choosing the legible font in
-the accessibility settings always uses Atkinson Hyperlegible Next instead of `font`.
+Ultramarine's. The distro name comes from `NAME=` in `/etc/os-release`. The legible font option in
+the accessibility settings overrides `font` with Atkinson Hyperlegible Next.
 
 [Slint]: https://slint.dev

@@ -1,4 +1,3 @@
-//! the tweaks page: distro tweaks to turn on, see [`libtaidan::tweaks::Tweak`]
 use std::rc::Rc;
 
 use slint::{ComponentHandle, Model, VecModel};
@@ -6,7 +5,6 @@ use slint::{ComponentHandle, Model, VecModel};
 use crate::ui::{AppWindow, TweakItem, Tweaks};
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tweaks: &Tweaks<'_>) {
-    // only reads a few EFI variables, quick enough for startup
     let available = crate::RT.block_on(libtaidan::tweaks::available(crate::install::can_use_dnf()));
     let items = available
         .into_iter()
@@ -28,10 +26,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tweaks: &Tweaks<'_>) {
             item.on = on;
             model.set_row_data(i, item);
             let enabled = model.iter().filter(|t| t.on).collect::<Vec<_>>();
-            crate::SETTINGS.write().tweaks = enabled.iter().map(|t| t.id.to_string()).collect();
             if let Some(ui) = ui.upgrade() {
-                // the summary picks one by whether the install goes online, the install skips
-                // those that need the internet otherwise
                 let names = |offline: bool| {
                     let names = enabled.iter().filter(|t| !(offline && t.needs_internet));
                     slint::ModelRc::new(VecModel::from(
@@ -44,4 +39,9 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tweaks: &Tweaks<'_>) {
             }
         }
     });
+}
+
+#[must_use]
+pub fn enabled(tweaks: &Tweaks<'_>) -> libtaidan::settings::TweakIds {
+    tweaks.get_items().iter().filter(|t| t.on).map(|t| t.id.to_string()).collect()
 }

@@ -1,90 +1,48 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
-import { Modal } from "../modal.slint";
-import { TdnText, TdnStyle } from "../components.slint";
+import { TdnText, TdnTile, TdnPressable } from "../components.slint";
 import { Icon } from "../slintcn/components/icon.slint";
 import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
 import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
 import { Palette } from "../slintcn/theme/palette.slint";
 import { Palette as StdPalette } from "std-widgets.slint";
 import { Appearance } from "../appearance.slint";
-import { FocusRing } from "../slintcn/components/focus-ring.slint";
 
-// the wallpaper with a window on it, in light or dark, picked like a radio button
-component ThemeTile inherits Rectangle {
+component ThemeTile inherits TdnTile {
     in property <string> text;
     in property <bool> dark;
-    in property <bool> checked;
     callback picked();
-    // Enter, to go on with this one
     callback accepted();
-    // Left or Right, to the other tile
     callback switched();
-    // whether this is part of a dialog, see `Modal`
-    in property <bool> in-dialog;
 
-    property <bool> pointer-focus;
-
-    forward-focus: focus;
+    badge-inset: 0.4rem;
+    tab-focusable: root.checked;
+    click-focuses: true;
+    ring-radius: Tokens.radius-lg + self.ring-offset;
+    activated => { root.picked(); }
+    key(event) => {
+        if event.text == Key.Return {
+            if !event.repeat {
+                root.picked();
+                root.accepted();
+            }
+            return accept;
+        }
+        if event.text == Key.LeftArrow || event.text == Key.RightArrow {
+            root.switched();
+            return accept;
+        }
+        reject
+    }
     accessible-role: radio-button;
     accessible-label: root.text;
-    accessible-checkable: true;
-    accessible-checked: root.checked;
-    accessible-action-default => { if Modal.open == root.in-dialog { root.picked(); } }
-
-    border-radius: Tokens.radius-lg;
-    border-width: root.checked ? 2px : 1px;
-    border-color: root.checked ? TdnStyle.accent : Tokens.color-border-hairline;
-    background: Tokens.color-card;
-    animate border-color { duration: Tokens.motion-fast; }
-
-    // a layer that fades in, see `A11yTile`
-    Rectangle {
-        border-radius: root.border-radius;
-        background: TdnStyle.accent;
-        opacity: root.checked ? 0.15 : 0;
-        animate opacity { duration: Tokens.motion-fast; }
-    }
-
-    Rectangle {
-        border-radius: root.border-radius;
-        background: Tokens.color-foreground;
-        opacity: area.pressed ? 0.1 : area.has-hover ? 0.05 : 0;
-        animate opacity { duration: Tokens.motion-fast; easing: ease-out; }
-    }
-
-    // the picked tile is the only Tab stop, as in a radio group
-    focus := FocusScope {
-        enabled: Modal.open == root.in-dialog;
-        focus-on-tab-navigation: root.checked;
-        key-pressed(event) => {
-            root.pointer-focus = false;
-            if event.text == " " {
-                if !event.repeat { root.picked(); }
-                return accept;
-            }
-            if event.text == Key.Return {
-                if !event.repeat {
-                    root.picked();
-                    root.accepted();
-                }
-                return accept;
-            }
-            if event.text == Key.LeftArrow || event.text == Key.RightArrow {
-                root.switched();
-                return accept;
-            }
-            reject
-        }
-    }
 
     VerticalLayout {
         padding: 0.6rem;
         spacing: 0.6rem;
 
         Rectangle {
-            // the wallpaper's 16:9
             height: self.width * 9 / 16;
             border-radius: Tokens.radius-md;
             clip: true;
@@ -97,8 +55,7 @@ component ThemeTile inherits Rectangle {
                 accessible-role: none;
             }
 
-            // a window, so the difference shows even where the wallpapers look alike
-            Rectangle {
+            window-mockup := Rectangle {
                 x: parent.width * 0.18;
                 y: parent.height * 0.22;
                 width: parent.width * 0.64;
@@ -132,57 +89,18 @@ component ThemeTile inherits Rectangle {
             font-weight: Tokens.typography-weight-medium;
         }
     }
-
-    // a check in the corner, so it isn't only the color that says which one it is
-    if root.checked: Rectangle {
-        x: Dir.x(parent.width - self.width - 0.4rem, self.width, parent.width);
-        y: 0.4rem;
-        width: 1.4rem;
-        height: self.width;
-        border-radius: self.width / 2;
-        background: TdnStyle.accent;
-
-        Icon {
-            commands: LucidePaths.check;
-            size: parent.width * 0.65;
-            tint: TdnStyle.accent-foreground;
-            stroke-width: 3px;
-        }
-    }
-
-    area := TouchArea {
-        mouse-cursor: pointer;
-        pointer-event(ev) => {
-            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-        }
-        clicked => {
-            root.picked();
-            focus.focus();
-        }
-    }
-
-    if focus.has-focus && !root.pointer-focus: FocusRing {
-        host-width: parent.width;
-        host-height: parent.height;
-        radius: Tokens.radius-lg + self.offset;
-    }
 }
 
-// the accent colors as a row of swatches, a radio group with one Tab stop, where Left and Right
-// pick the next one as they read. The focus moves along with the pick, so screen readers say
-// which color it is
 component AccentRow inherits Rectangle {
-    // Enter, to go on with the picked one
     callback accepted();
 
     property <length> size: 1.75rem;
     property <bool> pointer-focus;
-    // set by the arrows, so the swatch they pick takes the focus
-    property <bool> moving;
+    property <bool> focus-follows-pick;
 
     function move(delta: int) {
         let step = Lang.rtl ? -delta : delta;
-        root.moving = true;
+        root.focus-follows-pick = true;
         if Appearance.accent < 0 {
             Appearance.accent = step > 0 ? 0 : Appearance.accents.length - 1;
         } else {
@@ -197,42 +115,35 @@ component AccentRow inherits Rectangle {
         alignment: center;
         spacing: 0.75rem;
 
-        for accent[i] in Appearance.accents: swatch := Rectangle {
+        for accent[i] in Appearance.accents: swatch := TdnPressable {
             property <bool> checked: i == Appearance.accent;
 
             layout-order: Dir.order(i);
             width: root.size;
             height: root.size;
+            pointer-focus <=> root.pointer-focus;
+            tab-focusable: self.checked || (Appearance.accent < 0 && i == 0);
+            click-focuses: true;
+            ring-radius: self.width / 2 + self.ring-offset;
+            activated => { Appearance.accent = i; }
+            key(event) => {
+                if event.text == Key.LeftArrow { root.move(-1); return accept; }
+                if event.text == Key.RightArrow { root.move(1); return accept; }
+                if event.text == Key.Return {
+                    if !event.repeat { root.accepted(); }
+                    return accept;
+                }
+                reject
+            }
             accessible-role: radio-button;
             accessible-label: Lang.t("page-theme-accent-" + accent.id, []);
             accessible-checkable: true;
             accessible-checked: self.checked;
-            accessible-action-default => { if !Modal.open { Appearance.accent = i; } }
 
             changed checked => {
-                if self.checked && root.moving {
-                    root.moving = false;
-                    focus.focus();
-                }
-            }
-
-            // on the picked one, or the first while none is
-            focus := FocusScope {
-                enabled: !Modal.open;
-                focus-on-tab-navigation: swatch.checked || (Appearance.accent < 0 && i == 0);
-                key-pressed(event) => {
-                    root.pointer-focus = false;
-                    if event.text == Key.LeftArrow { root.move(-1); return accept; }
-                    if event.text == Key.RightArrow { root.move(1); return accept; }
-                    if event.text == " " {
-                        if !event.repeat { Appearance.accent = i; }
-                        return accept;
-                    }
-                    if event.text == Key.Return {
-                        if !event.repeat { root.accepted(); }
-                        return accept;
-                    }
-                    reject
+                if self.checked && root.focus-follows-pick {
+                    root.focus-follows-pick = false;
+                    self.focus();
                 }
             }
 
@@ -241,36 +152,16 @@ component AccentRow inherits Rectangle {
                 background: accent.color;
             }
 
-            // a check, so it isn't only the color that says which one it is
             if swatch.checked: Icon {
                 commands: LucidePaths.check;
                 size: root.size * 0.55;
                 tint: accent.check;
                 stroke-width: 3px;
             }
-
-            TouchArea {
-                mouse-cursor: pointer;
-                pointer-event(ev) => {
-                    if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-                }
-                clicked => {
-                    Appearance.accent = i;
-                    focus.focus();
-                }
-            }
-
-            if focus.has-focus && !root.pointer-focus: FocusRing {
-                host-width: swatch.width;
-                host-height: swatch.height;
-                radius: swatch.width / 2 + self.offset;
-            }
         }
     }
 }
 
-// light or dark mode, for the new user and for the rest of the setup, which switches as soon as
-// one is picked
 export component ThemePage inherits TdnPage {
     pageid: "theme";
     step_i: 0;
@@ -279,16 +170,13 @@ export component ThemePage inherits TdnPage {
     property <bool> dark: Theme.mode == ThemeMode.dark;
 
     function pick(dark: bool) {
-        // the std widgets and `Theme` (so every token) follow this
         StdPalette.color-scheme = dark ? ColorScheme.dark : ColorScheme.light;
     }
 
-    // for when the page is shown, the picked tile rather than always the first
     public function focus-picked() {
         if root.dark { dark-tile.focus(); } else { light-tile.focus(); }
     }
 
-    // the tiles at their own height, in the middle of the page, the accents under them
     VerticalLayout {
         vertical-stretch: 1;
         alignment: center;
@@ -344,4 +232,3 @@ export component ThemePage inherits TdnPage {
         }
     }
 }
-

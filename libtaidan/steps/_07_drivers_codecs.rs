@@ -1,87 +1,74 @@
 use crate::{Verb, prelude::*, root};
 use tokio::process::Command;
-/// an NVIDIA driver branch RPM Fusion packages, oldest first, so the oldest of several sorts
-/// lowest
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum NvidiaBranch {
-    /// the last branch for Maxwell, Pascal and Volta, `akmod-nvidia-580xx`
     R580,
-    /// `akmod-nvidia`, Turing and newer
     Latest,
 }
 
-/// every driver package Taidan may install, which are all the helper takes for drivers
+const TERRA_NVIDIA_RELEASE: &str = "terra-release-nvidia";
+const NVIDIA_COMMON_PACKAGES: [&str; 2] = ["nvidia-gpu-firmware", "libva-nvidia-driver"];
+const BROADCOM_PACKAGES: [&str; 2] = ["broadcom-wl", "akmod-wl"];
+
 pub(crate) fn driver_packages() -> Vec<&'static str> {
-    let mut pkgs = vec!["nvidia-gpu-firmware", "libva-nvidia-driver", "broadcom-wl", "akmod-wl"];
-    pkgs.extend(NvidiaBranch::R580.packages());
-    pkgs.extend(NvidiaBranch::Latest.packages());
-    pkgs
+    [
+        &[TERRA_NVIDIA_RELEASE][..],
+        &NVIDIA_COMMON_PACKAGES,
+        &NvidiaBranch::R580.packages(),
+        &NvidiaBranch::Latest.packages(),
+        &BROADCOM_PACKAGES,
+    ]
+    .concat()
 }
 
 impl NvidiaBranch {
-    /// the akmod, the driver and the CUDA libraries, which also have Vulkan and OpenGL
     fn packages(self) -> [&'static str; 3] {
         match self {
-            Self::R580 => [
-                "akmod-nvidia-580xx",
-                "xorg-x11-drv-nvidia-580xx",
-                "xorg-x11-drv-nvidia-580xx-cuda",
-            ],
-            Self::Latest => ["akmod-nvidia", "xorg-x11-drv-nvidia", "xorg-x11-drv-nvidia-cuda"],
+            Self::R580 => ["akmod-nvidia-580xx", "nvidia-driver-580xx", "nvidia-driver-580xx-cuda"],
+            Self::Latest => ["akmod-nvidia", "nvidia-driver", "nvidia-driver-cuda"],
         }
     }
 }
 
-/// which packaged branches drive an NVIDIA chip, from its name in `lspci`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum NvidiaChip {
-    /// every branch from `oldest` to `newest`
     Supported { oldest: NvidiaBranch, newest: NvidiaBranch },
-    /// older than any packaged branch supports
     TooOld,
-    /// not a chip this knows, e.g. `Device 2c05` when `pci.ids` doesn't have it yet
     Unknown,
 }
+
+// 390xx (Fermi) and 470xx (Kepler) have no GBM, which the Wayland-only desktops need, and 340xx
+// is dead. `C5x` to `C7x` are nForce chipset graphics.
+const PRE_MAXWELL: &[&str] = &["NV", "MCP", "C5", "C6", "C7", "G7", "G8", "G9", "GT", "GF", "GK"];
+const MAXWELL_TO_VOLTA: &[&str] = &["GM", "GP", "GV"];
+const TURING_AND_NEWER: &[&str] = &["TU", "GA", "GH", "AD", "GB"];
 
 impl NvidiaChip {
     fn from_chipset(chipset: &str) -> Self {
         use NvidiaBranch::{Latest, R580};
-        const fn branches(oldest: NvidiaBranch, newest: NvidiaBranch) -> NvidiaChip {
-            NvidiaChip::Supported { oldest, newest }
-        }
         let prefix = |p: &[&str]| p.iter().any(|p| chipset.starts_with(p));
-        // RPM Fusion stopped packaging 340xx, and 390xx (Fermi) and 470xx (Kepler) have no GBM,
-        // which the Wayland-only desktops need, so those stay on nouveau. `C5x` to `C7x` are
-        // nForce chipset graphics, e.g. `C51 [GeForce 6150 LE]`
-        if prefix(&["NV", "MCP", "C5", "C6", "C7", "G7", "G8", "G9", "GT", "GF", "GK"]) {
+        if prefix(PRE_MAXWELL) {
             Self::TooOld
-        // Maxwell, Pascal and Volta, dropped in the 590 driver
-        } else if prefix(&["GM", "GP", "GV"]) {
-            branches(R580, R580)
-        // Turing, Ampere, Hopper, Ada and Blackwell. 580 drives all of them too
-        } else if prefix(&["TU", "GA", "GH", "AD", "GB"]) {
-            branches(R580, Latest)
+        } else if prefix(MAXWELL_TO_VOLTA) {
+            Self::Supported { oldest: R580, newest: R580 }
+        } else if prefix(TURING_AND_NEWER) {
+            Self::Supported { oldest: R580, newest: Latest }
         } else {
             Self::Unknown
         }
     }
 }
 
-/// what to install for every NVIDIA GPU in the system
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum NvidiaDriver {
     Branch(NvidiaBranch),
-    /// every GPU is too old for a packaged driver, nouveau drives them
     TooOld,
-    /// no GPU was found, or one isn't known, so nothing is installed rather than a driver that
-    /// might take the display away
     Unknown,
-    /// no single branch drives every GPU, e.g. a Kepler card next to a Turing one
     Incompatible,
 }
 
 impl NvidiaDriver {
-    /// the oldest branch any of the GPUs needs, if it drives the rest too
     fn for_chipsets<S: AsRef<str>>(chipsets: &[S]) -> Self {
         let chips: Vec<_> = chipsets.iter().map(|c| NvidiaChip::from_chipset(c.as_ref())).collect();
         if chips.is_empty() || chips.contains(&NvidiaChip::Unknown) {
@@ -106,7 +93,6 @@ impl NvidiaDriver {
     }
 }
 
-/// makes the NVIDIA GPU drive the displays instead of the integrated one, for `STELLAR_OPTION`
 pub(crate) const NVIDIA_PRIMARY_GPU_CONF: &str = r#"Section "OutputClass"
 	Identifier "nvidia-primary"
 	MatchDriver "nvidia-drm"
@@ -116,84 +102,63 @@ EndSection
 "#;
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct DriversCodecs;
-#[derive(Clone, Copy, Debug, Default)]
 pub struct Drivers;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Codecs;
-impl super::Step for DriversCodecs {
-    #[tracing::instrument(skip(settings, sender))]
-    async fn run<C: crate::Callback>(
-        &self,
-        settings: &crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        sender: &C,
-    ) -> Res<()> {
-        if !settings.install_codecs_drivers || settings.nointernet {
-            return Ok(());
-        }
-        let pci = pci_devices().await;
-        // a failed driver doesn't fail the installation, the system works without it, but the
-        // done page says so
-        let mut done = Setup::default();
-        match Drivers::setup_nvidia(cfg, &pci).await {
-            Ok(setup) => done |= setup,
-            Err(e) => {
-                tracing::warn!(?e, "cannot setup nvidia drivers");
-                done.failed = true;
-            }
-        }
-        match Drivers::setup_broadcom(cfg, &pci).await {
-            Ok(setup) => done |= setup,
-            Err(e) => {
-                tracing::warn!(?e, "cannot setup broadcom drivers");
-                done.failed = true;
-            }
-        }
-        if done.reboot {
-            sender.send(crate::InstallMsg::NeedsReboot);
-        }
-        if done.failed {
-            sender.send(crate::InstallMsg::DriversFailed);
-        }
-        // FIXME: refactor this to somewhere else not in this file
-        // also this is done inside `_05_dnfdownloadapps.rs`
-        // Codecs::install_codecs().await?;
-        Ok(())
+pub(super) async fn run(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    sender: &impl crate::Callback,
+) -> Res<()> {
+    if !settings.install_codecs_drivers || settings.nointernet {
+        return Ok(());
     }
+    let pci = pci_devices().await;
+    let mut done = Setup::default();
+    match Drivers::setup_nvidia(cfg, &pci).await {
+        Ok(setup) => done |= setup,
+        Err(e) => {
+            tracing::warn!(?e, "cannot setup nvidia drivers");
+            done.failed = true;
+        }
+    }
+    done |= Drivers::setup_broadcom(cfg, &pci).await;
+    if done.needs_reboot {
+        sender.send(crate::InstallMsg::NeedsReboot);
+    }
+    if done.failed {
+        sender.send(crate::InstallMsg::DriversFailed);
+    }
+    // FIXME: refactor this to somewhere else not in this file
+    // also this is done inside `_05_dnfdownloadapps.rs`
+    // Codecs::install_codecs().await?;
+    Ok(())
 }
 
-/// what setting up a driver did
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct Setup {
-    /// a reboot would load the driver
-    reboot: bool,
-    /// some of it didn't work, e.g. the packages are in but the kernel module didn't build
+    needs_reboot: bool,
     failed: bool,
 }
 
 impl std::ops::BitOrAssign for Setup {
     fn bitor_assign(&mut self, rhs: Self) {
-        self.reboot |= rhs.reboot;
+        self.needs_reboot |= rhs.needs_reboot;
         self.failed |= rhs.failed;
     }
 }
 
-/// hardware that needs extra drivers, as installed by [`DriversCodecs`]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Hardware {
-    /// an NVIDIA GPU a packaged driver supports
     pub nvidia: bool,
     pub broadcom_wifi: bool,
-    /// Secure Boot keeps the NVIDIA or Broadcom Wi-Fi driver from loading, so they aren't
-    /// installed, see `Drivers::kmods_would_load`
     pub secure_boot_blocks: bool,
 }
 
-/// detect hardware that [`DriversCodecs`] would install drivers for
 pub async fn detect_hardware() -> Hardware {
     let pci = pci_devices().await;
     let nvidia = has_nvidia_gpu(&pci)
+        && !super::is_ostree().await
         && matches!(Drivers::get_nvidia_driver().await, Ok(NvidiaDriver::Branch(_)));
     let broadcom_wifi = has_wl_only_wifi(&pci);
     Hardware {
@@ -205,13 +170,11 @@ pub async fn detect_hardware() -> Hardware {
 
 const PCI_VENDOR_NVIDIA: u16 = 0x10de;
 const PCI_VENDOR_BROADCOM: u16 = 0x14e4;
+const PCI_CLASS_VGA: u32 = 0x0300;
+const PCI_CLASS_3D: u32 = 0x0302;
 
-/// Broadcom Wi-Fi chips that only `wl` (`broadcom-wl`) can drive on Fedora.
-///
-/// This is `wl`'s device list minus the chips `brcmsmac` handles (4727, 0576, 4353, 4357),
-/// which work out of the box with linux-firmware. The b43 chips stay in, since Fedora doesn't
-/// ship the proprietary b43 firmware they need. Newer chips are `brcmfmac`'s and aren't
-/// supported by `wl` at all. See <https://wiki.debian.org/wl>.
+// `wl`'s device list (https://wiki.debian.org/wl) minus the `brcmsmac` chips, which work with
+// linux-firmware. the b43 chips stay since Fedora doesn't ship their proprietary firmware
 const WL_ONLY_DEVICES: &[u16] = &[
     0x4311, 0x4312, // BCM4311
     0x4315, // BCM4312
@@ -229,13 +192,11 @@ const WL_ONLY_DEVICES: &[u16] = &[
 struct PciDevice {
     vendor: u16,
     device: u16,
-    /// class, subclass and prog-if, e.g. `0x030000` for a VGA controller
-    class: u32,
+    class_code: u32,
 }
 
 impl PciDevice {
-    /// read a device from its directory in `/sys/bus/pci/devices`
-    async fn read(dir: &std::path::Path) -> Option<Self> {
+    async fn read_from_sysfs(dir: &std::path::Path) -> Option<Self> {
         let read = async |name| {
             let s = tokio::fs::read_to_string(dir.join(name)).await.ok()?;
             u32::from_str_radix(s.trim().trim_start_matches("0x"), 16).ok()
@@ -243,18 +204,16 @@ impl PciDevice {
         Some(Self {
             vendor: read("vendor").await?.try_into().ok()?,
             device: read("device").await?.try_into().ok()?,
-            class: read("class").await?,
+            class_code: read("class").await?,
         })
     }
 
-    /// a display controller that the NVIDIA driver drives, i.e. VGA or 3D, but not e.g. the
-    /// HDMI audio function or an nForce chipset
     const fn is_nvidia_gpu(self) -> bool {
-        self.vendor == PCI_VENDOR_NVIDIA && matches!(self.class >> 8, 0x0300 | 0x0302)
+        self.vendor == PCI_VENDOR_NVIDIA
+            && matches!(self.class_code >> 8, PCI_CLASS_VGA | PCI_CLASS_3D)
     }
 }
 
-/// every PCI device in sysfs, or none if it can't be read
 async fn pci_devices() -> Vec<PciDevice> {
     let mut dir = match tokio::fs::read_dir("/sys/bus/pci/devices").await {
         Ok(dir) => dir,
@@ -265,7 +224,7 @@ async fn pci_devices() -> Vec<PciDevice> {
     };
     let mut devices = vec![];
     while let Ok(Some(entry)) = dir.next_entry().await {
-        match PciDevice::read(&entry.path()).await {
+        match PciDevice::read_from_sysfs(&entry.path()).await {
             Some(dev) => devices.push(dev),
             None => tracing::debug!(path = ?entry.path(), "cannot read PCI device"),
         }
@@ -288,37 +247,28 @@ impl Codecs {
     }
 }
 
-/// how [`install_pkgs`] installed packages
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Installed {
-    /// with dnf, so akmods builds kmods on the running system
     Dnf,
-    /// layered with rpm-ostree, which builds kmods in the transaction and needs a reboot
     Ostree,
-    /// not at all, since the config skips dnf on a non-atomic system
     Skipped,
 }
 
-/// install packages with rpm-ostree on atomic systems, or dnf unless the config skips it
 async fn install_pkgs(cfg: &crate::cfg::Config, pkgs: &[&str]) -> Res<Installed> {
-    if super::is_ostree().await {
-        let owned = pkgs.iter().map(|&p| p.to_owned()).collect();
-        root(Verb::RpmOstreeInstall { pkgs: owned })
-            .await
-            .wrap_message(|_| format!("pkgs={pkgs:?}"))?;
-        return Ok(Installed::Ostree);
-    }
-    if cfg.taidan0.skip_dnf {
+    let owned = pkgs.iter().map(|&p| p.to_owned()).collect();
+    let (verb, installed) = if super::is_ostree().await {
+        (Verb::RpmOstreeInstall { pkgs: owned }, Installed::Ostree)
+    } else if cfg.taidan0.skip_dnf {
         tracing::info!(?pkgs, "skip_dnf is set, not installing driver packages");
         return Ok(Installed::Skipped);
-    }
-    let owned = pkgs.iter().map(|&p| p.to_owned()).collect();
-    root(Verb::DnfDrivers { pkgs: owned }).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
-    Ok(Installed::Dnf)
+    } else {
+        (Verb::DnfDrivers { pkgs: owned }, Installed::Dnf)
+    };
+    root(verb).await.wrap_message(|_| format!("pkgs={pkgs:?}"))?;
+    Ok(installed)
 }
 
 impl Drivers {
-    /// the driver for every NVIDIA GPU `lspci` lists
     async fn get_nvidia_driver() -> Res<NvidiaDriver> {
         let out = Command::new("lspci")
             .output()
@@ -335,16 +285,7 @@ impl Drivers {
         Ok(driver)
     }
 
-    async fn setup_nvidia_kargs() -> Res<()> {
-        root(Verb::NvidiaKargs).await?;
-        Ok(())
-    }
-
-    /// the kernel that boots next, which may be newer than the running one if an earlier attempt
-    /// or the image installed one. Updates from [`super::DownloadUpdates`] only install on the
-    /// restart, then akmods builds the module for their kernel while booting
-    async fn next_kernel() -> Res<String> {
-        // grubby reads the boot loader entries, which only root may
+    async fn kernel_booting_next() -> Res<String> {
         let out = crate::root_output(Verb::DefaultKernel).await;
         if let Ok(out) = &out
             && let Some(kver) = out.trim().strip_prefix("/boot/vmlinuz-")
@@ -358,12 +299,8 @@ impl Drivers {
         Ok(kver.trim().to_owned())
     }
 
-    /// Waits for akmods to build the given kernel module, then checks that it's there.
-    ///
-    /// The akmod's `%posttrans` starts a build in the background, a second `akmods` waits on its
-    /// lock and skips kmods that are already up to date, so this also builds it if that didn't.
-    async fn kmod_built(module: &str) -> Res<bool> {
-        let kver = Self::next_kernel().await?;
+    async fn build_kmod(module: &str) -> Res<bool> {
+        let kver = Self::kernel_booting_next().await?;
         tracing::info!(kver, module, "Waiting for akmods to build the kernel module");
         if let Err(e) = root(Verb::Akmods { kernel: kver.clone() }).await {
             tracing::warn!(?e, "akmods failed");
@@ -377,10 +314,6 @@ impl Drivers {
             .is_ok_and(|s| s.success()))
     }
 
-    /// whether a module akmods builds would load: Secure Boot is off, or the key akmods signs with
-    /// is enrolled. Otherwise the kernel refuses it, and as the driver packages turn off nouveau,
-    /// the next boot would be stuck on the firmware framebuffer. On atomic systems rpm-ostree
-    /// builds the kmods in its transaction without that key, so Secure Boot always blocks them
     async fn kmods_would_load() -> bool {
         const AKMODS_KEY: &str = "/etc/pki/akmods/certs/public_key.der";
         match secure_boot_enforced().await {
@@ -391,6 +324,7 @@ impl Drivers {
                 return false;
             }
         }
+        // rpm-ostree builds kmods without the akmods signing key
         if super::is_ostree().await {
             return false;
         }
@@ -401,12 +335,14 @@ impl Drivers {
         out.is_ok_and(|out| String::from_utf8_lossy(&out.stdout).contains("already enrolled"))
     }
 
-    /// Returns whether the kernel module is ready, so a reboot would load it.
     async fn setup_nvidia(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<Setup> {
         tracing::info!("Setting up Nvidia drivers");
-        let primary_gpu = std::env::var("STELLAR_OPTION").is_ok_and(|x| x == "1");
         if !has_nvidia_gpu(pci) {
             tracing::info!("No Nvidia GPU detected");
+            return Ok(Setup::default());
+        }
+        if super::is_ostree().await {
+            tracing::info!("ostree images get the Nvidia driver from their nvidia layer");
             return Ok(Setup::default());
         }
         if !Self::kmods_would_load().await {
@@ -416,14 +352,12 @@ impl Drivers {
             );
             return Ok(Setup::default());
         }
-        // nouveau keeps driving the GPU unless a driver is sure to support it
         let branch = match Self::get_nvidia_driver().await? {
             NvidiaDriver::Branch(branch) => branch,
             NvidiaDriver::TooOld => {
                 tracing::info!("Nvidia GPU is too old for any packaged driver");
                 return Ok(Setup::default());
             }
-            // skipped on purpose when unsure, so the done page doesn't call it a failure
             NvidiaDriver::Unknown => {
                 tracing::warn!("cannot tell which Nvidia GPU this is, not installing a driver");
                 return Ok(Setup::default());
@@ -433,107 +367,86 @@ impl Drivers {
                 return Ok(Setup::default());
             }
         };
-        let mut pkgs = vec!["nvidia-gpu-firmware", "libva-nvidia-driver"];
-        pkgs.extend(branch.packages());
-        let installed = install_pkgs(cfg, &pkgs).await?;
-        if installed == Installed::Skipped {
+        if install_pkgs(cfg, &[TERRA_NVIDIA_RELEASE]).await? == Installed::Skipped {
             return Ok(Setup::default());
         }
-        // the driver works without it, so the done page mentions it but it's not worth more
+        let pkgs = [&NVIDIA_COMMON_PACKAGES[..], &branch.packages()].concat();
+        install_pkgs(cfg, &pkgs).await?;
+        let primary_gpu = std::env::var("STELLAR_OPTION").is_ok_and(|x| x == "1");
         let mut primary_failed = false;
-        if primary_gpu {
-            // a snippet of its own, the packaged `nvidia.conf` stays as it is. Xorg applies every
-            // `OutputClass` that matches, so this only adds the option
-            if let Err(e) = root(Verb::NvidiaPrimaryGpu).await {
-                tracing::warn!(?e, "cannot set nvidia as primary gpu");
-                primary_failed = true;
-            }
+        if primary_gpu && let Err(e) = root(Verb::NvidiaPrimaryGpu).await {
+            tracing::warn!(?e, "cannot set nvidia as primary gpu");
+            primary_failed = true;
         }
-        if installed == Installed::Ostree {
-            // the kmod is built inside the rpm-ostree transaction, which needs a reboot anyway
-            Self::setup_nvidia_kargs().await?;
-            return Ok(Setup { reboot: true, failed: primary_failed });
-        }
-
-        let built = Self::kmod_built("nvidia").await?;
+        let built = Self::build_kmod("nvidia").await?;
         if !built {
             tracing::warn!("Nvidia kernel module isn't built, not asking for a reboot");
         }
-        Ok(Setup { reboot: built, failed: !built || primary_failed })
+        Ok(Setup { needs_reboot: built, failed: !built || primary_failed })
     }
 
-    /// Returns whether a reboot would load the drivers, i.e. the `wl` kernel module is ready or
-    /// rpm-ostree layered the packages.
-    async fn setup_broadcom(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Res<Setup> {
-        let mut done = Setup::default();
-        if has_wl_only_wifi(pci) && !Self::kmods_would_load().await {
+    async fn setup_broadcom(cfg: &crate::cfg::Config, pci: &[PciDevice]) -> Setup {
+        if !has_wl_only_wifi(pci) {
+            return Setup::default();
+        }
+        if !Self::kmods_would_load().await {
             tracing::warn!(
                 "Secure Boot is on and the module wouldn't be signed with an enrolled key, so \
                  wl wouldn't load. Not installing it"
             );
-        } else if has_wl_only_wifi(pci) {
-            tracing::info!("Setting up broadcom wifi drivers");
-            // broadcom-wl blacklists the in-kernel drivers, so wl only takes over after a reboot
-            match install_pkgs(cfg, &["broadcom-wl", "akmod-wl"]).await {
-                Ok(Installed::Dnf) => {
-                    let built = Self::kmod_built("wl").await.unwrap_or_else(|e| {
-                        tracing::warn!(?e, "cannot check the wl kernel module");
-                        false
-                    });
-                    if !built {
-                        tracing::warn!("wl kernel module isn't built, not asking for a reboot");
-                    }
-                    done |= Setup { reboot: built, failed: !built };
+            return Setup::default();
+        }
+        tracing::info!("Setting up broadcom wifi drivers");
+        match install_pkgs(cfg, &BROADCOM_PACKAGES).await {
+            Ok(Installed::Dnf) => {
+                let built = Self::build_kmod("wl").await.unwrap_or_else(|e| {
+                    tracing::warn!(?e, "cannot check the wl kernel module");
+                    false
+                });
+                if !built {
+                    tracing::warn!("wl kernel module isn't built, not asking for a reboot");
                 }
-                // built inside the rpm-ostree transaction
-                Ok(Installed::Ostree) => done.reboot = true,
-                Ok(Installed::Skipped) => {}
-                Err(e) => {
-                    tracing::warn!(?e, "fail to install broadcom wifi drivers");
-                    done.failed = true;
-                }
+                Setup { needs_reboot: built, failed: !built }
+            }
+            Ok(Installed::Ostree) => Setup { needs_reboot: true, failed: false },
+            Ok(Installed::Skipped) => Setup::default(),
+            Err(e) => {
+                tracing::warn!(?e, "fail to install broadcom wifi drivers");
+                Setup { needs_reboot: false, failed: true }
             }
         }
-        Ok(done)
     }
 }
 
-/// whether the kernel only loads signed modules: Secure Boot is on in the firmware and shim
-/// hasn't had validation turned off in MokManager, as the kernel decides it. [`None`] if it can't
-/// be told
 pub(crate) async fn secure_boot_enforced() -> Option<bool> {
     const EFIVARS: &str = "/sys/firmware/efi/efivars";
-    // the last byte of an EFI variable, after 4 bytes of attributes
-    let var = |name: &'static str| async move {
+    const EFI_VAR_ATTRIBUTES_LEN: usize = 4;
+    const MOK_VALIDATION_DISABLED: u8 = 1;
+    let efi_var_value = |name: &'static str| async move {
         match tokio::fs::read(format!("{EFIVARS}/{name}")).await {
-            Ok(bytes) => Ok(bytes.get(4).copied()),
+            Ok(bytes) => Ok(bytes.get(EFI_VAR_ATTRIBUTES_LEN).copied()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e),
         }
     };
     if !tokio::fs::try_exists("/sys/firmware/efi").await.unwrap_or_default() {
-        // BIOS, no Secure Boot
         return Some(false);
     }
     if !tokio::fs::try_exists(EFIVARS).await.unwrap_or_default() {
         return None;
     }
-    match var("SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c").await {
+    match efi_var_value("SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c").await {
         Ok(Some(1)) => {}
-        // not there means firmware without Secure Boot
         Ok(Some(0) | None) => return Some(false),
         Ok(Some(_)) | Err(_) => return None,
     }
-    // 1 when validation was turned off in MokManager
-    match var("MokSBStateRT-605dab50-e046-4300-abb6-3dd810dd8b23").await {
-        Ok(Some(1)) => Some(false),
+    match efi_var_value("MokSBStateRT-605dab50-e046-4300-abb6-3dd810dd8b23").await {
+        Ok(Some(MOK_VALIDATION_DISABLED)) => Some(false),
         Ok(_) => Some(true),
         Err(_) => None,
     }
 }
 
-/// the chips of every NVIDIA GPU in `lspci`'s output, e.g. `GA106` from
-/// `01:00.0 VGA compatible controller: NVIDIA Corporation GA106 [GeForce RTX 3060] (rev a1)`
 fn nvidia_chipsets(lspci: &str) -> Vec<&str> {
     lspci
         .lines()
@@ -560,9 +473,9 @@ mod tests {
 02:00.0 VGA compatible controller: NVIDIA Corporation TU116 [GeForce GTX 1660 SUPER] (rev a1)
 ";
         assert_eq!(nvidia_chipsets(lspci), ["GK208B", "TU116"]);
-        // a GPU newer than `pci.ids`
-        let lspci = "01:00.0 VGA compatible controller: NVIDIA Corporation Device 2c05 (rev a1)";
-        assert_eq!(nvidia_chipsets(lspci), ["Device"]);
+        let lspci_newer_than_pci_ids =
+            "01:00.0 VGA compatible controller: NVIDIA Corporation Device 2c05 (rev a1)";
+        assert_eq!(nvidia_chipsets(lspci_newer_than_pci_ids), ["Device"]);
         assert!(
             nvidia_chipsets("00:02.0 VGA compatible controller: Intel Corporation UHD").is_empty()
         );
@@ -591,7 +504,6 @@ mod tests {
     fn nvidia_driver_for_chipsets() {
         use NvidiaBranch::{Latest, R580};
         let driver = |chips: &[&str]| NvidiaDriver::for_chipsets(chips);
-        // nothing detected never means the latest driver
         assert_eq!(driver(&[]), NvidiaDriver::Unknown);
         assert_eq!(driver(&[""]), NvidiaDriver::Unknown);
         assert_eq!(driver(&["Device"]), NvidiaDriver::Unknown);
@@ -603,68 +515,61 @@ mod tests {
         assert_eq!(driver(&["GM107", "GP104"]), NvidiaDriver::Branch(R580));
         assert_eq!(driver(&["TU116"]), NvidiaDriver::Branch(Latest));
         assert_eq!(driver(&["GA106M", "AD104"]), NvidiaDriver::Branch(Latest));
-        // the oldest branch that drives both
         assert_eq!(driver(&["GP108", "TU116"]), NvidiaDriver::Branch(R580));
         assert_eq!(driver(&["AD104", "GP108"]), NvidiaDriver::Branch(R580));
-    }
-
-    #[test]
-    fn helper_takes_every_driver_package() {
-        let all = driver_packages();
-        let used = [
-            &["nvidia-gpu-firmware", "libva-nvidia-driver"][..],
-            &NvidiaBranch::R580.packages(),
-            &NvidiaBranch::Latest.packages(),
-            &["broadcom-wl", "akmod-wl"],
-        ];
-        assert!(used.concat().iter().all(|p| all.contains(p)));
     }
 
     #[test]
     fn nvidia_branch_packages() {
         assert_eq!(NvidiaBranch::Latest.packages()[0], "akmod-nvidia");
         assert!(NvidiaBranch::R580.packages().iter().all(|p| p.contains("-580xx")));
+        assert!(driver_packages().contains(&TERRA_NVIDIA_RELEASE));
+        assert!(!driver_packages().iter().any(|p| p.starts_with("xorg-x11-drv-nvidia")));
     }
 
-    const fn dev(vendor: u16, device: u16, class: u32) -> PciDevice {
-        PciDevice { vendor, device, class }
+    const fn dev(vendor: u16, device: u16, class_code: u32) -> PciDevice {
+        PciDevice { vendor, device, class_code }
     }
 
     #[test]
     fn nvidia_gpu_by_class() {
-        // nForce chipset bits and the HDMI audio function aren't GPUs
         let nforce = [dev(0x10de, 0x0aa2, 0x0c0500), dev(0x10de, 0x0ab4, 0x060100)];
         assert!(!has_nvidia_gpu(&nforce));
-        assert!(!has_nvidia_gpu(&[dev(0x10de, 0x228e, 0x040300)]));
-        // VGA, and 3D for laptop dGPUs
-        assert!(has_nvidia_gpu(&[dev(0x10de, 0x2503, 0x030000)]));
-        assert!(has_nvidia_gpu(&[dev(0x10de, 0x2520, 0x030200)]));
-        // an Intel iGPU isn't one either
-        assert!(!has_nvidia_gpu(&[dev(0x8086, 0x46a6, 0x030000)]));
+        let hdmi_audio = dev(0x10de, 0x228e, 0x040300);
+        assert!(!has_nvidia_gpu(&[hdmi_audio]));
+        let vga = dev(0x10de, 0x2503, 0x030000);
+        assert!(has_nvidia_gpu(&[vga]));
+        let laptop_3d = dev(0x10de, 0x2520, 0x030200);
+        assert!(has_nvidia_gpu(&[laptop_3d]));
+        let intel_igpu = dev(0x8086, 0x46a6, 0x030000);
+        assert!(!has_nvidia_gpu(&[intel_igpu]));
     }
 
     #[test]
     fn wl_only_broadcom_wifi() {
-        // BCM4360 and BCM4352 need wl
-        assert!(has_wl_only_wifi(&[dev(0x14e4, 0x43a0, 0x028000)]));
-        assert!(has_wl_only_wifi(&[dev(0x14e4, 0x43b1, 0x028000)]));
-        // BCM4313 is brcmsmac's, BCM4350 and BCM43602 are brcmfmac's
-        assert!(!has_wl_only_wifi(&[dev(0x14e4, 0x4727, 0x028000)]));
-        assert!(!has_wl_only_wifi(&[dev(0x14e4, 0x43a3, 0x028000)]));
-        assert!(!has_wl_only_wifi(&[dev(0x14e4, 0x43ba, 0x028000)]));
-        // a non-Broadcom device with a matching id
-        assert!(!has_wl_only_wifi(&[dev(0x8086, 0x4360, 0x028000)]));
+        let bcm4360 = dev(0x14e4, 0x43a0, 0x028000);
+        let bcm4352 = dev(0x14e4, 0x43b1, 0x028000);
+        assert!(has_wl_only_wifi(&[bcm4360]));
+        assert!(has_wl_only_wifi(&[bcm4352]));
+        let bcm4313_brcmsmac = dev(0x14e4, 0x4727, 0x028000);
+        let bcm4350_brcmfmac = dev(0x14e4, 0x43a3, 0x028000);
+        let bcm43602_brcmfmac = dev(0x14e4, 0x43ba, 0x028000);
+        assert!(!has_wl_only_wifi(&[bcm4313_brcmsmac]));
+        assert!(!has_wl_only_wifi(&[bcm4350_brcmfmac]));
+        assert!(!has_wl_only_wifi(&[bcm43602_brcmfmac]));
+        let non_broadcom_with_wl_device_id = dev(0x8086, 0x4360, 0x028000);
+        assert!(!has_wl_only_wifi(&[non_broadcom_with_wl_device_id]));
     }
 
     #[tokio::test]
     async fn reads_sysfs_pci_device() {
-        let dir = std::env::temp_dir().join(format!("taidan-pci-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("vendor"), "0x10de\n").unwrap();
-        std::fs::write(dir.join("device"), "0x2503\n").unwrap();
-        std::fs::write(dir.join("class"), "0x030000\n").unwrap();
-        let read = PciDevice::read(&dir).await;
-        std::fs::remove_dir_all(&dir).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        for (name, value) in
+            [("vendor", "0x10de\n"), ("device", "0x2503\n"), ("class", "0x030000\n")]
+        {
+            std::fs::write(dir.path().join(name), value).unwrap();
+        }
+        let read = PciDevice::read_from_sysfs(dir.path()).await;
         assert_eq!(read, Some(dev(0x10de, 0x2503, 0x030000)));
     }
 }

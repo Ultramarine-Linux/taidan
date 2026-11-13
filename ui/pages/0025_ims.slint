@@ -1,20 +1,14 @@
-import { Lang, Dir } from "../lang.slint";
+import { Lang } from "../lang.slint";
 import { Ims } from "../ims.slint";
-import { TdnText, TdnBtn, TdnToggleRow, TdnDialog, TdnStyle, TdnScrollList } from "../components.slint";
+import { TdnNote, TdnToggleRow, TdnDialog, TdnScrollList } from "../components.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
-// input methods to add, opened from the keyboard page
 export component ImsDialog inherits TdnDialog {
     title: Lang.t("page-keyboard-ims", []);
+    description: Lang.t("page-keyboard-ims-desc", []);
+    done-text: Lang.t("done", []);
     dialog-width: 26rem;
     dismissed => { Ims.open = false; }
-
-    TdnText {
-        text: Lang.t("page-keyboard-ims-desc", []);
-        color: Tokens.color-muted-foreground;
-        horizontal-alignment: Dir.text-start;
-        wrap: word-wrap;
-    }
 
     scroll := TdnScrollList {
         spacing: 0.5rem;
@@ -22,12 +16,10 @@ export component ImsDialog inherits TdnDialog {
         for im[i] in Ims.items: VerticalLayout {
             spacing: 0.5rem;
 
-            // a heading where the language changes
-            if i == 0 || Ims.items[i - 1].lang != im.lang: TdnText {
+            if i == 0 || Ims.items[i - 1].lang != im.lang: TdnNote {
                 text: im.lang;
                 font-weight: Tokens.typography-weight-medium;
-                color: Tokens.color-muted-foreground;
-                horizontal-alignment: Dir.text-start;
+                wrap: no-wrap;
             }
 
             TdnToggleRow {
@@ -36,24 +28,8 @@ export component ImsDialog inherits TdnDialog {
                 checked: im.on;
                 toggled(on) => { Ims.set(i, on); }
                 focus-in(y, height) => { scroll.reveal(y, height); }
-                // Enter closes it like Done, Space toggles
                 accepted => { root.dismissed(); }
             }
         }
     }
-
-    HorizontalLayout {
-        alignment: Dir.end;
-
-        done := TdnBtn {
-            in-dialog: true;
-            text: Lang.t("done", []);
-            enter-hint: true;
-            background-color: TdnStyle.accent;
-            foreground-color: TdnStyle.accent-foreground;
-            clicked => { root.dismissed(); }
-        }
-    }
-
-    init => { done.focus(); }
 }

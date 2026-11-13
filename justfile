@@ -12,19 +12,18 @@ test-desktop:
 build-tdnx:
   cargo build --release -p tdnx --no-default-features --features server-oobe
 
-# regenerates the time zone page's maps from Natural Earth (public domain)
+# regenerate the time zone maps from Natural Earth
 maps:
   #!/usr/bin/env bash
   set -euo pipefail
   dir=$(mktemp -d)
   trap 'rm -rf "$dir"' EXIT
-  ne=https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson
-  curl -sSfL -o "$dir/land.geojson" "$ne/ne_110m_land.geojson"
-  curl -sSfL -o "$dir/zones.geojson" "$ne/ne_10m_time_zones.geojson"
+  natural_earth=https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson
+  curl -sSfL -o "$dir/land.geojson" "$natural_earth/ne_110m_land.geojson"
+  curl -sSfL -o "$dir/zones.geojson" "$natural_earth/ne_10m_time_zones.geojson"
   cargo run --release --example mkmaps -- "$dir/land.geojson" "$dir/zones.geojson" data/icons
 
-# bumps taidan and taidan_ui to a version, or by `major`, `minor`, or `patch`. Doesn't commit or tag.
-# needs cargo-edit (`cargo install cargo-edit`)
+# set the version, or bump by major, minor or patch (needs cargo-edit)
 bump to="patch":
   #!/usr/bin/env bash
   set -euo pipefail

@@ -3,7 +3,7 @@ import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
 import { Install } from "../install.slint";
 import { Modal } from "../modal.slint";
-import { TdnText, TdnSpinner, TdnStyle } from "../components.slint";
+import { TdnText, TdnPara, TdnSpinner, TdnStyle } from "../components.slint";
 import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
 
 export component InstallingPage inherits TdnBasePg {
@@ -13,11 +13,8 @@ export component InstallingPage inherits TdnBasePg {
         { key: "count", value: Install.stage-count },
     ]);
 
-    // nothing to press here, so the focus goes to the progress, which screen readers read out as
-    // the stage changes
     forward-focus: status;
 
-    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is
     VerticalLayout {
         accessible-role: groupbox;
         accessible-label: Lang.t("page-installing-configuring", []);
@@ -61,7 +58,6 @@ export component InstallingPage inherits TdnBasePg {
 
                     TdnSpinner {
                         width: 1.6rem;
-                        // the progress around it says what's going on
                         accessible-role: none;
                     }
                 }
@@ -71,12 +67,10 @@ export component InstallingPage inherits TdnBasePg {
                     alignment: center;
                     spacing: 0.2rem;
 
-                    TdnText {
+                    TdnPara {
                         text: Lang.t("page-installing-configuring", []);
                         font-size: 1.5 * Tokens.text-rem;
                         font-weight: Tokens.typography-weight-medium;
-                        horizontal-alignment: Dir.text-start;
-                        wrap: word-wrap;
                     }
 
                     TdnText {
@@ -87,8 +81,6 @@ export component InstallingPage inherits TdnBasePg {
                         overflow: elide;
                     }
 
-                    // how far the stage is, when it says (dnf's `[n/m]` lines). Hidden rather
-                    // than left out, so the text doesn't move when it shows
                     Rectangle {
                         visible: Install.stage-progress >= 0;
                         height: 0.25rem;
@@ -97,9 +89,8 @@ export component InstallingPage inherits TdnBasePg {
                         accessible-role: none;
 
                         Rectangle {
-                            property <length> filled: parent.width * clamp(Install.stage-progress, 0, 1);
                             x: Dir.x(0, self.width, parent.width);
-                            width: self.filled;
+                            width: parent.width * clamp(Install.stage-progress, 0, 1);
                             border-radius: parent.border-radius;
                             background: TdnStyle.accent;
                         }

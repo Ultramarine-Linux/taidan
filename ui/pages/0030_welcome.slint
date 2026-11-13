@@ -1,16 +1,14 @@
 import { Tokens } from "../slintcn/theme/tokens.slint";
 import { TdnBasePg, TdnHero } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
-import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
+import { TdnPara, TdnBtn } from "../components.slint";
 import { Cfg } from "../cfg.slint";
 
 export component WelcomePage inherits TdnBasePg {
-    // false on the first page, which depends on `skip_pages`
-    in property <bool> can-prev: Cfg.prev-page(self.index) != self.index;
+    property <bool> can-prev: Cfg.prev-page(self.index) != self.index;
 
     forward-focus: go;
 
-    // a named group around the page, like `TdnPage`'s, so screen readers say which page it is
     VerticalLayout {
         accessible-role: groupbox;
         accessible-label: Lang.t("page-welcome-hello", []);
@@ -18,8 +16,6 @@ export component WelcomePage inherits TdnBasePg {
         TdnHero {
             vertical-stretch: 1;
 
-            // back to the keyboard, so a wrong layout can still be fixed. In the top corner, away
-            // from Let's Go.
             if root.can-prev: TdnBtn {
                 x: Dir.x(1rem, self.width, parent.width);
                 y: 1rem;
@@ -28,7 +24,6 @@ export component WelcomePage inherits TdnBasePg {
                 border-radius: self.height / 2;
                 padding-x: 0;
                 icon-size: 1rem;
-                // a dark scrim reads on any wallpaper
                 background-color: #000000a0;
                 foreground-color: white;
                 icon: Lang.rtl ? @image-url("../../data/icons/go-previous-symbolic-rtl.svg")
@@ -45,13 +40,11 @@ export component WelcomePage inherits TdnBasePg {
             padding-bottom: 1.5rem;
             spacing: 2rem;
 
-            TdnText {
+            TdnPara {
                 text: Lang.t("page-welcome-hello", []);
                 font-size: 3 * Tokens.text-rem;
                 font-weight: 800;
-                horizontal-alignment: Dir.text-start;
                 horizontal-stretch: 1;
-                wrap: word-wrap;
             }
 
             VerticalLayout {
@@ -60,9 +53,7 @@ export component WelcomePage inherits TdnBasePg {
                 horizontal-stretch: 0;
 
                 go := TdnBtn {
-                    enter-hint: true;
-                    background-color: TdnStyle.accent;
-                    foreground-color: TdnStyle.accent-foreground;
+                    primary: true;
                     text: Cfg.get_string("welcome.next", Lang.t("page-welcome-go", []));
                     clicked => root.next_page();
                 }

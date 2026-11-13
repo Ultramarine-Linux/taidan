@@ -4,18 +4,13 @@ use std::{
     sync::LazyLock,
 };
 
-use tokio::io::AsyncWriteExt;
-
 use crate::err::{Res, TaidanErrHelper};
 
-/// every valid tweak this CPU supports. What to offer or run is [`available()`], which also
-/// checks [`Tweak::needs_dnf`] and [`Tweak::secure_boot`]
 pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
     let tweaks = Tweak::list()
         .inspect_err(|err| tracing::error!(?err, "cannot list tweaks"))
         .unwrap_or_default()
         .into_iter()
-        // hidden here rather than failing in `up` later on
         .filter(|t| {
             let supported = t.is_supported();
             if !supported {
@@ -28,8 +23,6 @@ pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
     tweaks
 });
 
-/// the [`TWEAKS`] this system can take, given whether dnf can install packages here (see
-/// `steps::can_use_dnf`) and whether Secure Boot is enforced
 pub async fn available(can_use_dnf: bool) -> Vec<&'static Tweak> {
     let secure_boot = if TWEAKS.iter().any(|t| t.secure_boot.is_some()) {
         crate::steps::secure_boot_enforced().await.unwrap_or_else(|| {
@@ -67,20 +60,15 @@ pub async fn available(can_use_dnf: bool) -> Vec<&'static Tweak> {
 ///
 /// The ID of a tweak is determined by the directory name (`my_tweak`, `other_tweak`).
 ///
-/// `up 1` turns the tweak on. `up 0` turns it back off, and only runs for a tweak an earlier,
-/// unfinished attempt turned on (see [`ON_RECORD`]) that the user has since turned off.
+/// `up 1` turns the tweak on. `up 0` turns it back off after an unfinished attempt turned it on.
 ///
-/// The `tweak.toml` file is optional, and so are all of its fields:
-/// - `ftl_name` (alias `name`): the fluent ID for the name of the tweak, defaults to `<id>-name`
-/// - `ftl_desc` (alias `desc`): the fluent ID for the description of the tweak, defaults to `<id>-desc`
-/// - `x86_64_level`: the minimum x86-64 microarchitecture level (1 to 4) the tweak needs.
-///   Tweaks that set it are hidden on CPUs below that level and on other architectures.
-/// - `needs_internet`: whether `up` downloads anything, e.g. packages. Such tweaks aren't run
-///   when setting up without internet, off by default
-/// - `needs_dnf`: whether `up` installs packages with dnf. Such tweaks are hidden on atomic
-///   (rpm-ostree) systems and with `taidan0.skip_dnf`, off by default
-/// - `secure_boot`: if set, the tweak is only offered when whether Secure Boot is enforced matches
-///   it, e.g. `false` hides it while Secure Boot is on
+/// every field of `tweak.toml` is optional:
+/// - `ftl_name` (alias `name`): fluent ID of the name, defaults to `<id>-name`
+/// - `ftl_desc` (alias `desc`): fluent ID of the description, defaults to `<id>-desc`
+/// - `x86_64_level`: minimum x86-64 level (1 to 4), hidden below it and on other architectures
+/// - `needs_internet`: `up` downloads something, skipped offline
+/// - `needs_dnf`: `up` installs packages with dnf, hidden on atomic and with `taidan0.skip_dnf`
+/// - `secure_boot`: only offered when it matches whether Secure Boot is enforced
 #[derive(Clone, Debug, Default, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Tweak {
@@ -114,14 +102,6 @@ impl Tweak {
     }
     /// Obtain [`Tweak`] from the path to the tweak directory, assuming the entry is valid.
     ///
-    /// A missing `tweak.toml` gives the defaults.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `tweak.toml` exists but cannot be read or parsed. Falling back to the
-    /// defaults there would drop requirements like [`Self::x86_64_level`], and offer the tweak on
-    /// machines it doesn't support.
-    ///
     /// # Panics
     ///
     /// Panics if `dir` ends in `..`, see [`Path::file_name()`].
@@ -151,13 +131,10 @@ impl Tweak {
         Ok(tweak)
     }
 
-    /// Whether this machine meets the tweak's requirements, see [`Self::x86_64_level`].
     #[must_use]
     pub fn is_supported(&self) -> bool {
         self.x86_64_level.is_none_or(|level| x86_64_level() >= level)
     }
-    /// Whether the tweak can be offered, given whether dnf can install packages and whether Secure
-    /// Boot is enforced, see [`Self::needs_dnf`] and [`Self::secure_boot`].
     #[must_use]
     pub fn is_allowed(&self, can_use_dnf: bool, secure_boot: bool) -> bool {
         (can_use_dnf || !self.needs_dnf) && self.secure_boot.is_none_or(|sb| sb == secure_boot)
@@ -170,7 +147,6 @@ impl Tweak {
     /// The constructor expects the directory to contain an executable file named `up`.
     /// For more information, see the struct docs.
     /// [`std::io::ErrorKind::NotFound`], [`std::io::ErrorKind::PermissionDenied`] may be returned.
-    /// A `tweak.toml` that exists but cannot be read or parsed is also an error, see [`Self::from_cfg_path()`].
     #[tracing::instrument]
     pub fn from_dir(path: PathBuf) -> std::io::Result<Self> {
         debug_assert!(path.is_dir());
@@ -207,14 +183,12 @@ impl Tweak {
                     .ok()
                     .filter(|entry| entry.path().is_dir())
             })
-            // a broken tweak is left out, rather than taking the others with it
             .filter_map(|dir_entry| {
                 Self::from_dir(dir_entry.path())
                     .inspect_err(|err| tracing::error!(?err, "skipping invalid tweak"))
                     .ok()
             })
             .collect::<Vec<_>>();
-        // the order directories are read in isn't stable
         tweaks.sort_by(|a, b| a.id().cmp(b.id()));
         Ok(tweaks.into_boxed_slice())
     }
@@ -229,27 +203,17 @@ impl Tweak {
         self.path.file_name().unwrap()
     }
 
-    /// Run `up` with the serialized `settings`, as root through the helper, which finds it in
-    /// `/usr/share/taidan/tweaks` by the id. Whether it succeeded, failures are logged
-    // not the settings, which have the user's name and the proxy in them
     #[tracing::instrument(skip(settings))]
     pub async fn run(&self, settings: &[u8], on: bool) -> bool {
         let verb = crate::Verb::RunTweak { id: self.id().to_string_lossy().into_owned(), on };
-        // `up`'s output goes to the log as it is, rather than into an error
-        let cmd = crate::helper::command(&verb).stdin(std::process::Stdio::piped()).spawn();
-        let mut cmd = match cmd {
+        let inherit = std::process::Stdio::inherit;
+        let mut cmd = match crate::spawn_helper(&verb, settings, inherit(), inherit()).await {
             Ok(cmd) => cmd,
             Err(err) => {
                 tracing::error!(?err, "cannot run pkexec");
                 return false;
             }
         };
-        if let Some(mut stdin) = cmd.stdin.take()
-            && let Err(err) = stdin.write_all(&crate::helper::stdin(&verb, settings)).await
-        {
-            // `up` may not read the settings at all, and exit before they're written
-            tracing::debug!(?err, "cannot pass the settings to `up`");
-        }
         match cmd.wait().await {
             Ok(x) if x.success() => true,
             Ok(x) => {
@@ -264,29 +228,16 @@ impl Tweak {
     }
 }
 
-/// the settings `up` gets on stdin, with the proxy's username and password cut out. `up` already
-/// has the whole proxy in `http_proxy` and friends for its own downloads, while what's on stdin is
-/// what a tweak would write into a config file or log. A proxy whose credentials can't be cut
-/// out is left out altogether
-///
-/// # Errors
-/// The settings can't be serialized.
 pub fn settings_json(settings: &crate::settings::Settings) -> serde_json::Result<Vec<u8>> {
     let mut settings = settings.clone();
     settings.proxy = settings.proxy.as_ref().and_then(crate::proxy::Proxy::without_credentials);
     serde_json::to_vec(&settings)
 }
 
-/// ids of the tweaks an unfinished install turned on, one per line, so a retry with one of them
-/// turned off can turn it off again. One that was started but may not have finished, turning on
-/// or off, has [`STARTED`] in front, a retry runs it again either way. Removed once the install
-/// finishes, from then on they're the user's
 pub const ON_RECORD: &str = "/var/lib/taidan/tweaks-on";
 
-/// in front of a tweak in [`ON_RECORD`] that may be only partly turned on or off
 pub const STARTED: char = '?';
 
-/// what [`ON_RECORD`] says, empty if there's none
 #[must_use]
 pub fn recorded_on() -> Vec<String> {
     std::fs::read_to_string(ON_RECORD)
@@ -294,11 +245,6 @@ pub fn recorded_on() -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// writes `ids` to [`ON_RECORD`], world-readable since the OOBE reads it as its own user, or
-/// removes it when there are none
-///
-/// # Errors
-/// Cannot write or remove the file.
 pub async fn record_on(ids: &[String]) -> Res<()> {
     if ids.is_empty() {
         return clear_on_record().await;
@@ -308,27 +254,17 @@ pub async fn record_on(ids: &[String]) -> Res<()> {
         .wrap_msg("cannot record the tweaks turned on")
 }
 
-/// what [`record_on`] does, run by the helper as root. Replaced whole, so a full disk can't
-/// leave it empty, and on disk before what it records is done, a power cut mustn't lose it
 pub(crate) fn write_on_record(ids: &[String]) -> std::io::Result<()> {
     let content: String = ids.iter().map(|id| format!("{id}\n")).collect();
     crate::helper::write_atomic(Path::new(ON_RECORD), content.as_bytes(), 0o644)
 }
 
-/// removes [`ON_RECORD`], if it's there
-///
-/// # Errors
-/// Cannot remove the file.
 pub async fn clear_on_record() -> Res<()> {
-    if !tokio::fs::try_exists(ON_RECORD).await.unwrap_or(true) {
-        return Ok(());
-    }
-    crate::root(crate::Verb::ClearTweakRecord).await.wrap_msg("cannot remove the tweaks record")
+    let failure = "cannot remove the tweaks record";
+    crate::root_if_any_exists(&[ON_RECORD], crate::Verb::ClearTweakRecord, failure).await
 }
 
-/// The x86-64 microarchitecture level of the running CPU, or 0 on other architectures.
-///
-/// See <https://gitlab.com/x86-psABIs/x86-64-ABI> for the features each level needs.
+// see https://gitlab.com/x86-psABIs/x86-64-ABI for the features each level needs
 #[must_use]
 pub fn x86_64_level() -> u8 {
     #[cfg(target_arch = "x86_64")]
@@ -410,6 +346,8 @@ mod tests {
         let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
         assert_eq!(tweak.x86_64_level, None);
         assert!(tweak.ftl_name.ends_with("-name"));
+        assert!(!tweak.needs_dnf);
+        assert_eq!(tweak.secure_boot, None);
     }
 
     #[test]
@@ -422,9 +360,8 @@ mod tests {
         assert!(Tweak::from_dir(dir.path().to_path_buf()).unwrap().needs_internet);
     }
 
-    // a broken tweak.toml must not fall back to no CPU requirement
     #[test]
-    fn unparsable_toml_is_rejected() {
+    fn unparsable_toml_is_rejected_rather_than_dropping_the_cpu_requirement() {
         for toml in ["x86_64_level = \"3\"\n", "x86_64_level = 3\nunknown = 1\n", "not toml ["] {
             let dir = tweak_dir(Some(toml));
             let err = Tweak::from_dir(dir.path().to_path_buf()).unwrap_err();
@@ -438,29 +375,18 @@ mod tests {
         let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
         assert!(tweak.needs_dnf);
         assert_eq!(tweak.secure_boot, Some(false));
-        let dir = tweak_dir(None);
-        let tweak = Tweak::from_dir(dir.path().to_path_buf()).unwrap();
-        assert!(!tweak.needs_dnf);
-        assert_eq!(tweak.secure_boot, None);
     }
 
-    // (atomic, Secure Boot) combinations, `can_use_dnf` is false on atomic
     #[test]
     fn constraints_filter() {
         let constrained = Tweak { needs_dnf: true, secure_boot: Some(false), ..Tweak::default() };
         let free = Tweak::default();
-        for (atomic, secure_boot, shown) in
-            [(false, false, true), (false, true, false), (true, false, false), (true, true, false)]
+        for (dnf, secure_boot, shown) in
+            [(true, false, true), (true, true, false), (false, false, false), (false, true, false)]
         {
-            assert_eq!(
-                constrained.is_allowed(!atomic, secure_boot),
-                shown,
-                "atomic={atomic} secure_boot={secure_boot}"
-            );
-            assert!(
-                free.is_allowed(!atomic, secure_boot),
-                "atomic={atomic} secure_boot={secure_boot}"
-            );
+            let case = format!("dnf={dnf} secure_boot={secure_boot}");
+            assert_eq!(constrained.is_allowed(dnf, secure_boot), shown, "{case}");
+            assert!(free.is_allowed(dnf, secure_boot), "{case}");
         }
         let dnf_only = Tweak { needs_dnf: true, ..Tweak::default() };
         assert!(dnf_only.is_allowed(true, true));

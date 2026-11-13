@@ -1,128 +1,111 @@
 use crate::prelude::*;
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SystemSetup;
-impl super::Step for SystemSetup {
-    /// adds the language pack for the user's language to the apps to install
-    #[tracing::instrument(skip(settings))]
-    async fn pre<C: crate::Callback>(
-        &self,
-        settings: &mut crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        _: &C,
-    ) -> Res<()> {
-        if settings.nointernet || settings.locale.is_empty() || !super::can_use_dnf(cfg).await {
-            return Ok(());
-        }
-        let candidates = langpack_candidates(&settings.locale);
-        match available(&candidates).await {
-            Ok(found) => {
-                // the first one that exists, the most specific of the distro's own
-                if let Some(pkg) = candidates.into_iter().find(|c| found.contains(c)) {
-                    tracing::info!(pkg, "Installing the language pack");
-                    settings.actions[1].push(pkg);
-                } else {
-                    tracing::info!(locale = settings.locale, "No language pack for this locale");
-                }
-            }
-            Err(e) => tracing::warn!(?e, "cannot look up language packs"),
-        }
-        Ok(())
+pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
+    if let Some(ids) = settings.tweaks.ids() {
+        apply_tweaks(settings, cfg, ids).await?;
+    } else {
+        tracing::warn!("the settings don't say which tweaks to turn on, leaving them as they are");
     }
+    apply_location(settings).await;
+    if let Err(e) = crate::i18n::apply_keymap_to_user(settings, cfg).await {
+        tracing::warn!(?e, "cannot carry over the keyboard layout");
+    }
+    if let Err(e) = crate::a11y::apply_to_user(settings, cfg).await {
+        tracing::warn!(?e, "cannot carry over the accessibility settings");
+    }
+    if !cfg.taidan0.systemd_homed
+        && video_group_exists().await
+        && let Err(e) =
+            crate::root(crate::Verb::AddToVideo { user: settings.username.clone() }).await
+    {
+        tracing::warn!(?e, "cannot add the user to the video group");
+    }
+    Ok(())
+}
 
-    #[tracing::instrument(skip(settings))]
-    async fn run<C: crate::Callback>(
-        &self,
-        settings: &crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        _: &C,
-    ) -> Res<()> {
-        if let Some(ids) = settings.tweaks.ids() {
-            let sett = crate::tweaks::settings_json(settings)?;
-            // the ones an earlier attempt turned on, to turn off again if they aren't anymore.
-            // Recorded as it goes, so an attempt cut short still says what it turned on
-            let mut recorded = crate::tweaks::recorded_on();
-            let record = |ids: &[String]| {
-                let ids = ids.to_vec();
-                async move {
-                    if let Err(e) = crate::tweaks::record_on(&ids).await {
-                        tracing::warn!(?e, "cannot record the tweaks turned on");
-                    }
-                }
-            };
-            // a hidden one isn't run even if the settings have it
-            let tweaks = crate::tweaks::available(super::can_use_dnf(cfg).await).await;
-            for tweak in tweaks {
-                let id = tweak.id().to_string_lossy().into_owned();
-                let started = format!("{}{id}", crate::tweaks::STARTED);
-                let on = ids.contains(&id);
-                // one that may be only partly applied runs again whichever way it's wanted
-                if !recorded.contains(&started) && on == recorded.contains(&id) {
-                    continue;
-                }
-                if on && settings.nointernet && tweak.needs_internet {
-                    tracing::info!(id, "skipping tweak that needs the internet");
-                    // one an earlier attempt only got partway through turning on is turned off
-                    // again instead, nothing would after this install
-                    if recorded.contains(&started) && tweak.run(&sett, false).await {
-                        recorded.retain(|r| *r != started);
-                        record(&recorded).await;
-                    }
-                    continue;
-                }
-                recorded.retain(|r| *r != id && *r != started);
-                // before turning it on, so a retry still knows to turn it off
-                if on {
-                    recorded.push(started.clone());
-                    record(&recorded).await;
-                    recorded.pop();
-                }
-                let ok = tweak.run(&sett, on).await;
-                if !ok {
-                    recorded.push(started);
-                } else if on {
-                    recorded.push(id);
-                }
-                record(&recorded).await;
-            }
-        } else {
-            tracing::warn!(
-                "the settings don't say which tweaks to turn on, leaving them as they are"
-            );
-        }
-        // GNOME's location switch, off by default when it's off here, so the user can still turn
-        // it on in Settings. Back to GNOME's default when it's on, for a retry after an attempt
-        // with it off. Left alone when the page was skipped
-        if let Some(on) = settings.location {
-            let what = if on { "on" } else { "off" };
-            if let Err(e) = crate::root(crate::Verb::Location { on }).await {
-                tracing::warn!(?e, "cannot turn {what} location services");
+pub(super) async fn pre(
+    settings: &mut crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+) -> Res<()> {
+    if settings.nointernet || settings.locale.is_empty() || !super::can_use_dnf(cfg).await {
+        return Ok(());
+    }
+    let candidates = langpack_candidates(&settings.locale);
+    match packages_in_repos(&candidates).await {
+        Ok(found) => {
+            if let Some(pkg) = candidates.into_iter().find(|c| found.contains(c)) {
+                tracing::info!(pkg, "Installing the language pack");
+                settings.actions[1].push(pkg);
+            } else {
+                tracing::info!(locale = settings.locale, "No language pack for this locale");
             }
         }
-        if let Err(e) = crate::i18n::apply_keymap_to_user(settings, cfg).await {
-            tracing::warn!(?e, "cannot carry over the keyboard layout");
+        Err(e) => tracing::warn!(?e, "cannot look up language packs"),
+    }
+    Ok(())
+}
+
+async fn apply_tweaks(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    wanted_on: &[String],
+) -> Res<()> {
+    let sett = crate::tweaks::settings_json(settings)?;
+    let mut recorded = crate::tweaks::recorded_on();
+    let tweaks = crate::tweaks::available(super::can_use_dnf(cfg).await).await;
+    for tweak in tweaks {
+        let id = tweak.id().to_string_lossy().into_owned();
+        let started = format!("{}{id}", crate::tweaks::STARTED);
+        let on = wanted_on.contains(&id);
+        let partly_applied = recorded.contains(&started);
+        if !partly_applied && on == recorded.contains(&id) {
+            continue;
         }
-        if let Err(e) = crate::a11y::apply_to_user(settings, cfg).await {
-            tracing::warn!(?e, "cannot carry over the accessibility settings");
+        if on && settings.nointernet && tweak.needs_internet {
+            tracing::info!(id, "skipping tweak that needs the internet");
+            if partly_applied && tweak.run(&sett, false).await {
+                recorded.retain(|r| *r != started);
+                persist_record(&recorded).await;
+            }
+            continue;
         }
-        // for cameras and brightness controls on systems where these aren't given to the seat
-        let has_video = tokio::fs::read_to_string("/etc/group")
-            .await
-            .is_ok_and(|groups| groups.lines().any(|l| l.starts_with("video:")));
-        // homed users get it when they're created
-        if has_video
-            && !cfg.taidan0.systemd_homed
-            && let Err(e) =
-                crate::root(crate::Verb::AddToVideo { user: settings.username.clone() }).await
-        {
-            tracing::warn!(?e, "cannot add the user to the video group");
+        recorded.retain(|r| *r != id && *r != started);
+        if on {
+            persist_record(&[recorded.as_slice(), std::slice::from_ref(&started)].concat()).await;
         }
-        Ok(())
+        if !tweak.run(&sett, on).await {
+            recorded.push(started);
+        } else if on {
+            recorded.push(id);
+        }
+        persist_record(&recorded).await;
+    }
+    Ok(())
+}
+
+async fn persist_record(ids: &[String]) {
+    if let Err(e) = crate::tweaks::record_on(ids).await {
+        tracing::warn!(?e, "cannot record the tweaks turned on");
     }
 }
 
-/// language pack packages for a POSIX locale like `pt_BR.UTF-8`, best first: Ultramarine's, which
-/// pull in Fedora's, then Fedora's, each for the language in that country and then on its own
+async fn apply_location(settings: &crate::settings::Settings) {
+    if let Some(on) = settings.location
+        && let Err(e) = crate::root(crate::Verb::Location { on }).await
+    {
+        tracing::warn!(?e, on, "cannot switch location services");
+    }
+}
+
+async fn video_group_exists() -> bool {
+    tokio::fs::read_to_string("/etc/group")
+        .await
+        .is_ok_and(|groups| groups.lines().any(|l| l.starts_with("video:")))
+}
+
+pub(crate) const LANGPACK_PREFIXES: [&str; 3] =
+    ["ultramarine-langpacks-", "langpacks-", "glibc-langpack-"];
+
 fn langpack_candidates(locale: &str) -> Vec<String> {
     let name = locale.split(['.', '@']).next().unwrap_or_default();
     let lang = name.split('_').next().unwrap_or_default();
@@ -133,19 +116,13 @@ fn langpack_candidates(locale: &str) -> Vec<String> {
     if lang != name {
         names.push(lang);
     }
-    let mut pkgs: Vec<_> = ["ultramarine-langpacks-", "langpacks-"]
-        .iter()
-        .flat_map(|prefix| names.iter().map(move |n| format!("{prefix}{n}")))
-        .collect();
-    // for languages without a `langpacks-*`, glibc's has at least the locale, and only comes per
-    // language
-    pkgs.push(format!("glibc-langpack-{lang}"));
-    pkgs
+    let (glibc, per_name) = LANGPACK_PREFIXES.split_last().expect("langpack prefixes");
+    let per_name =
+        per_name.iter().flat_map(|prefix| names.iter().map(move |n| prefix.to_string() + n));
+    per_name.chain([format!("{glibc}{lang}")]).collect()
 }
 
-/// which of `pkgs` the repositories have
-async fn available(pkgs: &[String]) -> Res<Vec<String>> {
-    // as root, to use the system's metadata cache rather than downloading one for this user
+async fn packages_in_repos(pkgs: &[String]) -> Res<Vec<String>> {
     let out = crate::root_output(crate::Verb::RepoQuery { pkgs: pkgs.to_vec() }).await?;
     Ok(out.lines().map(str::to_owned).collect())
 }

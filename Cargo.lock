@@ -861,6 +861,7 @@ checksum = "5abbd6eeda6885048d357edc66748eea6e0268e3dd11f326fff5bd248d779c26"
 dependencies = [
  "core_maths",
  "displaydoc",
+ "log",
 ]
 
 [[package]]
@@ -1504,18 +1505,6 @@ name = "endi"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
-
-[[package]]
-name = "enum_dispatch"
-version = "0.3.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa18ce2bc66555b3218614519ac839ddb759a7d6720732f979ef8d13be147ecd"
-dependencies = [
- "once_cell",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
 
 [[package]]
 name = "enumflags2"
@@ -3141,6 +3130,7 @@ checksum = "413099315636c588ee8f011190b329b971a09a8fae9d157e01dcae8379468514"
 dependencies = [
  "displaydoc",
  "icu_locale_core",
+ "log",
  "serde",
  "stable_deref_trait",
  "writeable",
@@ -3638,7 +3628,6 @@ version = "0.3.0"
 dependencies = [
  "basic-toml",
  "const_format",
- "enum_dispatch",
  "futures",
  "itertools 0.15.0",
  "phf 0.14.0",
@@ -3647,6 +3636,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "strum",
  "taidan_proc_macros",
  "tempfile",
  "thiserror 2.0.21",
@@ -6202,7 +6192,6 @@ dependencies = [
 name = "taidan"
 version = "1.0.0"
 dependencies = [
- "basic-toml",
  "color-eyre",
  "deunicode",
  "fluent",
@@ -6220,7 +6209,6 @@ dependencies = [
  "regex",
  "rust-embed",
  "sentry",
- "serde",
  "serde_json",
  "slint",
  "strip-ansi-escapes",

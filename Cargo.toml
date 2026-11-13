@@ -1,7 +1,6 @@
 [workspace]
 members = ["taidan_proc_macros", "taidan_ui", "libtaidan", "tdnx"]
 
-# taidan and taidan_ui, which are released together
 [workspace.package]
 version = "1.0.0"
 
@@ -16,8 +15,7 @@ serde_json = "1.0.154"
 tempfile = { version = "3.27.0", default-features = false }
 tracing = "0.1.44"
 
-# the defaults without the system tray. `unstable-winit-030` for the monitor size, to scale the
-# window to the screen, and it brings winit's X11 support back in too
+# `unstable-winit-030` is for the monitor size, and it also pulls winit's X11 support back in
 [workspace.dependencies.slint]
 version = "1.18.1"
 default-features = false
@@ -51,9 +49,7 @@ readme = "README.md"
 keywords = ["oobe", "ultramarine", "linux"]
 
 [dependencies]
-basic-toml = "0.1.10"
 color-eyre = "0.6.5"
-# romanizes full names for the suggested username
 deunicode = "1.6.2"
 fluent = "0.17.0"
 futures = { workspace = true }
@@ -61,21 +57,18 @@ i18n-embed = { version = "0.16.0", features = [
     "filesystem-assets",
     "fluent-system",
 ] }
-icu = { version = "2.4.0", features = ["unstable"] }
-# time zone offsets and local times, from the system tzdata
+icu = { version = "2.4.0", features = ["unstable", "logging"] }
 jiff = { version = "0.2.38", features = ["tzdb-zoneinfo"] }
-# decodes the welcome image off the UI thread, and gives Slint's `@image-url` the `webp` decoder
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 itertools = { workspace = true }
 libc = "0.2.191"
-libtaidan = { version = "0.3.0", path = "libtaidan" }
+libtaidan = { workspace = true }
 parking_lot = "0.13.0"
 poly_l10n = "0.0.7"
 regex = { workspace = true }
 rust-embed = { version = "8.13.0", features = ["include-exclude"] }
 sentry = { version = "0.49.5", features = ["logs", "tracing"] }
-serde = "1.0.229"
-serde_json = "1.0.154"
+serde_json = { workspace = true }
 slint = { workspace = true }
 strip-ansi-escapes = "0.2.1"
 taidan_proc_macros = { path = "taidan_proc_macros" }
@@ -134,6 +127,8 @@ unimplemented = "warn"
 unneeded_field_pattern = "warn"
 unwrap_in_result = "warn"
 needless_for_each = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
 
 [profile.release]
 lto = "fat"
@@ -147,8 +142,6 @@ split-debuginfo = "unpacked"
 [profile.dev.package."*"]
 debug = false
 
-# Optimize only the crates doing per-frame work (rendering, text, images) in dev builds,
-# so the UI is usable without paying to optimize every dependency.
 [profile.dev.package."i-slint-core"]
 opt-level = 3
 [profile.dev.package."i-slint-backend-winit"]

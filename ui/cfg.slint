@@ -4,7 +4,6 @@ export global Cfg {
     pure callback get_brush(path: string, default: brush) -> brush;
     pure callback get_color(path: string, default: color) -> color;
     pure callback distro_icon() -> image;
-    // `logo` in /etc/taidan.toml is a path to the distro's own
     distro_icon() => { Cfg.get_image("logo", @image-url("../data/icons/distro-icon.svg")) }
     get_string(path, default) => default;
     get_image(path, default) => default;
@@ -12,19 +11,14 @@ export global Cfg {
     get_color(path, default) => default;
     in-out property <string> version: "0.0.0";
     in-out property <string> distro: "Ultramarine Linux";
-    // a developer running Taidan on their own machine, see `is_dev_session` in src/install.rs
     in property <bool> dev-session;
-    // welcome page image, decoded off the UI thread and set from Rust
     in property <image> hero-light: @image-url("../data/icons/background-light.webp");
     in property <image> hero-dark: @image-url("../data/icons/background-dark.webp");
-    // small copies for the theme page's cards, see `decode_hero` in src/cfg.rs
     in property <image> hero-light-thumb: @image-url("../data/icons/background-light.webp");
     in property <image> hero-dark-thumb: @image-url("../data/icons/background-dark.webp");
-    // the page Next and Back go to from a page, past the ones in `skip_pages` of /etc/taidan.toml
     pure callback next-page(page: int) -> int;
     pure callback prev-page(page: int) -> int;
     next-page(page) => page + 1;
     prev-page(page) => page - 1;
-    // whether `skip_pages` hides the summary page's tweaks
     in property <bool> skip-tweaks;
 }

@@ -1,35 +1,13 @@
 use crate::prelude::*;
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SetHostname;
-impl super::Step for SetHostname {
-    #[tracing::instrument(skip(settings))]
-    async fn run<C: crate::Callback>(
-        &self,
-        settings: &crate::settings::Settings,
-        _: &crate::cfg::Config,
-        _: &C,
-    ) -> Res<()> {
-        // an empty name keeps whatever the system already has. A name that didn't take isn't
-        // worth failing setup over, the system's is a fine place to end up
-        if !settings.device_name.is_empty()
-            && let Err(e) = crate::root(crate::Verb::SetHostname {
-                hostname: settings.device_name.clone(),
-                pretty: true,
-            })
-            .await
+pub(super) async fn run(settings: &crate::settings::Settings) -> Res<()> {
+    for (hostname, pretty) in [(&settings.device_name, true), (&settings.hostname, false)] {
+        if !hostname.is_empty()
+            && let Err(e) =
+                crate::root(crate::Verb::SetHostname { hostname: hostname.clone(), pretty }).await
         {
-            tracing::warn!(?e, name = settings.device_name, "cannot set the device name");
+            tracing::warn!(?e, hostname, pretty, "cannot set the hostname");
         }
-        if !settings.hostname.is_empty()
-            && let Err(e) = crate::root(crate::Verb::SetHostname {
-                hostname: settings.hostname.clone(),
-                pretty: false,
-            })
-            .await
-        {
-            tracing::warn!(?e, hostname = settings.hostname, "cannot set the hostname");
-        }
-        Ok(())
     }
+    Ok(())
 }

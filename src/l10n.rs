@@ -25,9 +25,7 @@ static PO_ASSETS: LazyLock<Arc<B>> = LazyLock::new(|| {
     )
 });
 
-/// the embedded languages that [`PO_ASSETS`] also has. `available_languages` can't list a
-/// [`FileSystemAssets`], it gets file names without their language directory and finds only the
-/// fallback
+// i18n_embed's `available_languages` can't list a `FileSystemAssets`
 static PO_AVAILABLE_LANGS: LazyLock<Vec<LanguageIdentifier>> =
     LazyLock::new(|| po_langs(&***PO_ASSETS));
 
@@ -44,8 +42,6 @@ fn po_langs(assets: &dyn i18n_embed::I18nAssets) -> Vec<LanguageIdentifier> {
     langs
 }
 
-/// Create a new loader according to the list of languages, leaving out ones [`PO_ASSETS`] doesn't
-/// have. If the translations there can't be loaded, the embedded ones are used instead.
 #[must_use]
 pub fn new_loader(langs: Vec<LanguageIdentifier>) -> FluentLanguageLoader {
     let loader = fluent_language_loader!();
@@ -61,17 +57,16 @@ pub fn new_loader(langs: Vec<LanguageIdentifier>) -> FluentLanguageLoader {
         ?present,
         "cannot load the translations in {PO_PATH}, using the embedded ones"
     );
-    // a fresh loader, the failed one may be half loaded
-    let loader = fluent_language_loader!();
+    let fresh_loader = fluent_language_loader!();
     let mut embedded =
         langs.into_iter().filter(|li| crate::AVAILABLE_LANGS.contains(li)).collect_vec();
     if embedded.is_empty() {
         embedded = vec![fallback];
     }
-    if let Err(e) = loader.load_languages(&crate::Localizations, &embedded) {
+    if let Err(e) = fresh_loader.load_languages(&crate::Localizations, &embedded) {
         tracing::error!(?e, ?embedded, "cannot load the embedded translations either");
     }
-    loader
+    fresh_loader
 }
 
 pub static PO_LOADER: LazyLock<RwLock<FluentLanguageLoader>> = LazyLock::new(|| {
@@ -93,25 +88,33 @@ pub struct LanguageRow {
 taidan_proc_macros::comptime_localedef_langrows!(LANGS);
 
 impl LanguageRow {
-    /// `localedef` also lists legacy glibc aliases (`bokmal`, `deutsch`, …) that aren't locales.
-    /// Real ones have a territory (`en-US`) or are a bare 2–3 letter language code (`eo`).
-    fn is_alias(&self) -> bool {
-        !self.locale.contains('-') && self.locale.len() > 3
+    fn is_legacy_glibc_alias(&self) -> bool {
+        let has_territory = self.locale.contains('-');
+        let is_bare_language_code = self.locale.len() <= 3;
+        !has_territory && !is_bare_language_code
     }
 
-    /// [`Self::locale`] as a BCP-47 tag (`en-US`), the proc macro already normalizes `localedef`'s
-    /// POSIX names (`en_US`) but this keeps any stragglers working.
     fn bcp47(&self) -> slint::SharedString {
         self.locale.replace('_', "-").into()
     }
 }
 
-/// the system locale for a language tag from [`LANGS`], `pt-BR` → `pt_BR.UTF-8`, `None` for ones
-/// that can't be one
+const OWO_TAG: &str = "en-Xowo";
+const OWO_LOCALE: &str = "en-owo";
+
+#[must_use]
+pub fn without_codeset(locale: &str) -> &str {
+    locale.split_once('.').map_or(locale, |(name, _)| name)
+}
+
+#[must_use]
+pub fn icu_tag(locale: &str) -> &str {
+    if locale == OWO_LOCALE { "en-US" } else { locale }
+}
+
 fn posix_locale(lang: &str) -> Option<String> {
-    let tag = lang.split_once('.').map_or(lang, |(left, _)| left);
-    // the OwO translation is only for the UI, the system gets US English
-    if tag == "en-Xowo" {
+    let tag = without_codeset(lang);
+    if tag == OWO_TAG {
         return Some("en_US.UTF-8".to_owned());
     }
     if tag.is_empty() || tag.split('-').any(|part| part.starts_with('X')) {
@@ -120,24 +123,17 @@ fn posix_locale(lang: &str) -> Option<String> {
     Some(format!("{}.UTF-8", tag.replace('-', "_")))
 }
 
-/// translations in another language that are close enough to show for a language, by its base
-/// language, before English
-const EXTRA_FALLBACKS: &[(&str, &str)] = &[("yue", "zh-Hant")];
+const CROSS_LANGUAGE_FALLBACKS: &[(&str, &str)] = &[("yue", "zh-Hant")];
 
-/// the translations to show for `locale`, best first, out of `available`. Only ones in the same
-/// language and those in [`EXTRA_FALLBACKS`], then `en-US`, never an unrelated language the
-/// solver offers (`pt-BR` → `es`)
 fn ui_langs(
     locale: LanguageIdentifier,
     available: &[LanguageIdentifier],
 ) -> Vec<LanguageIdentifier> {
-    let extra = EXTRA_FALLBACKS
-        .iter()
-        .filter(|(lang, _)| locale.language.as_str() == *lang)
-        .filter_map(|(_, fallback)| fallback.parse::<LanguageIdentifier>().ok())
-        .collect_vec();
     let base = locale.language;
-    // the solver doesn't return the tag itself, so an exact match (e.g. en-Xowo) goes first
+    let extra = CROSS_LANGUAGE_FALLBACKS
+        .iter()
+        .filter(move |(lang, _)| base.as_str() == *lang)
+        .filter_map(|(_, fallback)| fallback.parse::<LanguageIdentifier>().ok());
     std::iter::once(locale.clone())
         .chain(
             crate::LOCALE_SOLVER.solve_locale(locale).into_iter().filter(|li| li.language == base),
@@ -149,14 +145,9 @@ fn ui_langs(
         .collect_vec()
 }
 
-/// switches the UI to `lang`, a BCP 47 tag, and keeps it for the installed system. Returns the
-/// tag of the translation it got, which may be a fallback
 pub fn set_lang(lang: &str) -> String {
     let mut shown = "en-US".to_owned();
-    if let Ok(locale) = lang
-        .split_once('.')
-        .map_or(lang, |(left, _)| left)
-        .to_owned()
+    if let Ok(locale) = without_codeset(lang)
         .parse::<LanguageIdentifier>()
         .inspect_err(|e| tracing::error!(?e, ?lang, "Cannot apply language"))
     {
@@ -167,20 +158,16 @@ pub fn set_lang(lang: &str) -> String {
         }
         *PO_LOADER.write() = new_loader(locales);
     }
-    let posix = posix_locale(lang).unwrap_or_default();
-    if !posix.is_empty() {
-        crate::a11y::language_changed(&posix);
+    let posix = posix_locale(lang);
+    if let Some(posix) = &posix {
+        crate::a11y::language_changed(posix);
     }
-    // applied to the system by the installation's `SetLocale` step
-    crate::SETTINGS.write().locale = posix;
+    crate::SETTINGS.write().locale = posix.unwrap_or_default();
     shown
 }
 
-/// whether `lang`, a BCP 47 tag, is written right to left, from the likely script of the language
-/// (`ar` → Arabic, `uz-Arab`, …)
 fn is_rtl(lang: &str) -> bool {
-    let tag = lang.split_once('.').map_or(lang, |(left, _)| left);
-    icu::locale::LanguageIdentifier::try_from_str(tag)
+    icu::locale::LanguageIdentifier::try_from_str(without_codeset(lang))
         .inspect_err(|e| tracing::error!(?e, lang, "cannot parse locale for its direction"))
         .is_ok_and(|li| icu::locale::LocaleDirectionality::new_extended().is_right_to_left(&li))
 }
@@ -203,13 +190,10 @@ fn display_hdl<T>(
         } else {
             let mut opt = dn::DisplayNamesOptions::default();
             opt.style = Some(dn::Style::Short);
-            let locale =
-                if current_lang.locale == "en-owo" { "en-US" } else { &current_lang.locale };
-            let locale = icu::locale::Locale::try_from_str(locale)
+            let locale = icu::locale::Locale::try_from_str(icu_tag(&current_lang.locale))
                 .unwrap_or_else(|e| panic!("cannot parse locale {current_lang:?}: {e}"));
             assert_ne!(locale, icu::locale::Locale::UNKNOWN, "locale {current_lang:?} is unk");
 
-            // ICU's built-in data lacks names in many languages, those get English ones
             let fmt = dn::multi::LocaleDisplayNamesFormatter::try_new((&locale).into(), opt)
                 .or_else(|e| {
                     tracing::debug!(?e, ?locale, "no display names, using English ones");
@@ -226,123 +210,87 @@ fn display_hdl<T>(
     })
 }
 
-/// applies keymap changes on a worker thread, and only the newest request is applied, so scrolling
-/// through the layout list doesn't queue up a `localectl` call per row
-/// a keymap for the worker below, and whether it goes to the system too, not only the session
-type KeymapReq = (String, Option<String>, bool);
+struct KeymapReq {
+    layout: String,
+    variant: Option<String>,
+    also_system: bool,
+}
 
-/// the window the keymap worker tells when the system keymap couldn't be saved
-static KEYMAP_UI: std::sync::OnceLock<slint::Weak<crate::ui::AppWindow>> =
-    std::sync::OnceLock::new();
+impl KeymapReq {
+    fn merge(self, newer: Self) -> Self {
+        Self { also_system: self.also_system || newer.also_system, ..newer }
+    }
 
-static KEYMAP_TX: LazyLock<std::sync::mpsc::Sender<KeymapReq>> = LazyLock::new(|| {
-    let (tx, rx) = std::sync::mpsc::channel::<KeymapReq>();
-    std::thread::spawn(move || {
-        while let Ok(mut req) = rx.recv() {
-            while let Ok(newer) = rx.try_recv() {
-                // a picked one stays picked for the system, even if the newest is only the session
-                let system = req.2 || newer.2;
-                req = newer;
-                req.2 = system;
-            }
-            let (layout, variant, system) = req;
-            let saved = match crate::RT.block_on(libtaidan::i18n::set_keymap(
-                None,
-                &layout,
-                variant.as_deref(),
-                system,
-            )) {
-                Ok(saved) => saved,
-                Err(e) => {
-                    tracing::error!(?e, layout, ?variant, "cannot set keymap");
-                    // the system's may have been saved, but there's no telling
-                    true
-                }
-            };
-            // only a request for the system says anything about it
-            if system && let Some(ui) = KEYMAP_UI.get() {
-                let res = ui.upgrade_in_event_loop(move |ui| {
-                    use slint::ComponentHandle as _;
-                    ui.global::<crate::ui::Lang<'_>>().set_keymap_not_saved(!saved);
-                });
-                if let Err(e) = res {
-                    tracing::error!(?e, "cannot tell the UI about the keymap");
-                }
-            }
+    fn apply(self, ui: &slint::Weak<crate::ui::AppWindow>) {
+        let Self { layout, variant, also_system } = self;
+        let saved = crate::RT
+            .block_on(libtaidan::i18n::set_keymap(None, &layout, variant.as_deref(), also_system))
+            .inspect_err(|e| tracing::error!(?e, layout, ?variant, "cannot set keymap"))
+            .unwrap_or(true);
+        if also_system {
+            crate::ui::on_ui(ui, move |ui| {
+                use slint::ComponentHandle as _;
+                ui.global::<crate::ui::Lang<'_>>().set_keymap_not_saved(!saved);
+            });
         }
-    });
-    tx
-});
+    }
+}
 
-/// keeps the keymap for the installed system, without applying it
-fn save_keymap(layout: &str, variant: Option<&str>) {
+fn save_keymap_without_applying(layout: &str, variant: Option<&str>) {
     let mut settings = crate::SETTINGS.write();
     layout.clone_into(&mut settings.kb_layout);
     settings.kb_variant = variant.map(ToOwned::to_owned);
 }
 
-/// whether US English goes along with `layout`, see [`libtaidan::i18n::XkbKeymap::new`]
+struct KeymapSetter(std::sync::mpsc::Sender<KeymapReq>);
+
+impl KeymapSetter {
+    fn new(ui: slint::Weak<crate::ui::AppWindow>) -> Self {
+        Self(crate::ui::latest_worker(KeymapReq::merge, move |req: KeymapReq| req.apply(&ui)))
+    }
+
+    fn set(
+        &self,
+        lang: &crate::ui::Lang<'_>,
+        layout: &str,
+        variant: Option<&str>,
+        also_system: bool,
+    ) {
+        save_keymap_without_applying(layout, variant);
+        if also_system {
+            crate::SETTINGS.write().kb_picked = true;
+        }
+        let req = KeymapReq {
+            layout: layout.to_owned(),
+            variant: variant.map(ToOwned::to_owned),
+            also_system,
+        };
+        if let Err(e) = self.0.send(req) {
+            tracing::error!(?e, "keymap worker is gone");
+        }
+        lang.set_latin_fallback(has_latin_fallback(layout, variant));
+    }
+}
+
 fn has_latin_fallback(layout: &str, variant: Option<&str>) -> bool {
     libtaidan::i18n::XkbKeymap::new(layout, variant).has_latin_fallback()
 }
 
-/// keeps the keymap and applies it, to the system too if `system`, which is what picking one on
-/// the page does, else only to the session
-fn set_keymap(layout: &str, variant: Option<&str>, system: bool) {
-    save_keymap(layout, variant);
-    if system {
-        crate::SETTINGS.write().kb_picked = true;
-    }
-    if let Err(e) = KEYMAP_TX.send((layout.to_owned(), variant.map(ToOwned::to_owned), system)) {
-        tracing::error!(?e, "keymap worker is gone");
-    }
-}
-
-/// the first of a comma-separated list of layouts or variants, `None` if it's empty
-fn first_of(list: &str) -> Option<String> {
+fn first_of_comma_list(list: &str) -> Option<String> {
     let first = list.split(',').next().unwrap_or_default().trim();
     (!first.is_empty()).then(|| first.to_owned())
 }
 
-/// the first layout and variant of the X11 keymap in `/etc/vconsole.conf`, see
-/// [`libtaidan::i18n::XkbKeymap::parse_vconsole`]
-fn parse_vconsole_keymap(conf: &str) -> Option<(Option<String>, Option<String>)> {
-    libtaidan::i18n::XkbKeymap::parse_vconsole(conf)
-        .map(|km| (first_of(&km.layouts), first_of(&km.variants)))
-}
-
-/// the first layout and variant of the keymap in `/etc/X11/xorg.conf.d/00-keyboard.conf`, see
-/// [`libtaidan::i18n::XkbKeymap::parse_xorg`]
-fn parse_xorg_keymap(conf: &str) -> (Option<String>, Option<String>) {
-    let km = libtaidan::i18n::XkbKeymap::parse_xorg(conf);
-    (first_of(&km.layouts), first_of(&km.variants))
-}
-
-/// the keymap the system already has, so the keyboard page starts there instead of changing it.
-/// Read from the files `systemd-localed` keeps it in, the same way it does, `vconsole.conf` first,
-/// so there's no blocking `localectl` call before the UI is up
 fn system_keymap() -> Option<(String, Option<String>)> {
-    let read = |path: &str| {
-        std::fs::read_to_string(path)
-            .inspect_err(|e| tracing::debug!(?e, path, "cannot read the keymap"))
-            .ok()
-    };
-    let (layout, variant) =
-        read("/etc/vconsole.conf").as_deref().and_then(parse_vconsole_keymap).or_else(|| {
-            read("/etc/X11/xorg.conf.d/00-keyboard.conf").as_deref().map(parse_xorg_keymap)
-        })?;
-    let keymap = layout.map(|layout| (layout, variant));
+    let km = crate::RT.block_on(libtaidan::i18n::XkbKeymap::system())?;
+    let keymap = first_of_comma_list(&km.layouts).map(|l| (l, first_of_comma_list(&km.variants)));
     tracing::debug!(?keymap, "System keymap");
     keymap
 }
 
-/// a search query shared between a Slint callback and the [`slint::FilterModel`] it drives
-type Query = Rc<RefCell<String>>;
+const LATIN_GREEK_CYRILLIC_COMBINING_DIACRITICS: std::ops::RangeInclusive<char> =
+    '\u{300}'..='\u{36f}';
 
-/// `text` lowercased and without accents, so a search for `sao paulo` finds `São Paulo`
-///
-/// only the combining diacritics of Latin, Greek and Cyrillic are dropped, and the composed form
-/// comes back, so e.g. kana with dakuten and Hangul are left as they are
 #[must_use]
 pub fn fold_search(text: &str) -> String {
     use icu::normalizer::{ComposingNormalizerBorrowed, DecomposingNormalizerBorrowed};
@@ -350,18 +298,66 @@ pub fn fold_search(text: &str) -> String {
     let stripped = DecomposingNormalizerBorrowed::new_nfd()
         .normalize(&lower)
         .chars()
-        .filter(|c| !matches!(c, '\u{300}'..='\u{36f}'))
+        .filter(|c| !LATIN_GREEK_CYRILLIC_COMBINING_DIACRITICS.contains(c))
         .collect::<String>();
     ComposingNormalizerBorrowed::new_nfc().normalize(&stripped).into_owned()
 }
 
-/// whether any of `haystacks` has `query`, which is already [`fold_search`]ed
-fn matches(query: &str, haystacks: &[&str]) -> bool {
-    query.is_empty() || haystacks.iter().any(|h| fold_search(h).contains(query))
+fn matches(folded_query: &str, haystacks: impl IntoIterator<Item = impl AsRef<str>>) -> bool {
+    folded_query.is_empty()
+        || haystacks.into_iter().any(|h| fold_search(h.as_ref()).contains(folded_query))
 }
 
-/// # Panics
-/// If `en-US` is missing from [`LANGS`].
+type Filter<T> = Box<dyn Fn(&T) -> bool>;
+
+struct Searchable<T: Clone + 'static> {
+    query: Rc<RefCell<String>>,
+    source: Rc<slint::VecModel<T>>,
+    filtered: Rc<slint::FilterModel<Rc<slint::VecModel<T>>, Filter<T>>>,
+}
+
+impl<T: Clone + 'static> Searchable<T> {
+    fn new(items: Vec<T>, haystacks: impl Fn(&T) -> Vec<slint::SharedString> + 'static) -> Self {
+        let query = Rc::new(RefCell::new(String::new()));
+        let source = Rc::new(slint::VecModel::from(items));
+        let filter: Filter<T> = {
+            let query = Rc::clone(&query);
+            Box::new(move |item| {
+                let query = query.borrow();
+                query.is_empty() || matches(&query, haystacks(item))
+            })
+        };
+        let filtered = Rc::new(slint::FilterModel::new(Rc::clone(&source), filter));
+        Self { query, source, filtered }
+    }
+
+    fn model(&self) -> slint::ModelRc<T> {
+        slint::ModelRc::from(Rc::clone(&self.filtered))
+    }
+
+    fn search(&self, query: &str) {
+        *self.query.borrow_mut() = fold_search(query);
+        self.filtered.reset();
+    }
+
+    fn replace_items(&self, items: Vec<T>) {
+        self.query.borrow_mut().clear();
+        self.source.set_vec(items);
+    }
+}
+
+fn strip_legacy_tt_tags(translated: &str) -> String {
+    translated.replace("<tt>", "").replace("</tt>", "")
+}
+
+fn refresh_localized_time_zone_names(ui: &crate::ui::AppWindow) {
+    use slint::ComponentHandle as _;
+    let tz = ui.global::<crate::ui::Tz<'_>>();
+    if !tz.get_current().id.is_empty() {
+        tz.invoke_refresh();
+    }
+}
+
 pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
     use crate::ui::{FluentArg, Language};
     use slint::{ComponentHandle, Model, ToSharedString};
@@ -369,16 +365,11 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
         tracing::trace!(?id);
         let mut fargs = fluent::FluentArgs::new();
         args.iter().for_each(|FluentArg { key, value }| {
-            // for some reason k, v are owned values
-            // weird design of `Model::iter()`
             fargs.set(key.to_string(), value.to_string());
         });
         let s = PO_LOADER.read().get_args_fluent(&id, Some(&fargs));
-        // the source string dropped the GTK-era `<tt>` tags, but translations keep them until
-        // they're redone in Weblate, and Slint text has no markup
-        s.replace("<tt>", "").replace("</tt>", "").into()
+        strip_legacy_tt_tags(&s).into()
     });
-    // Start in the system language if we have it, otherwise English.
     let initial = poly_l10n::system_want_langids()
         .find_map(|li| {
             let tag = li.to_string();
@@ -386,8 +377,8 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
         })
         .or_else(|| LANGS.iter().find(|lang| lang.locale == "en-US"))
         .expect("no english");
-    // by the translation shown, a language without one would be English laid out right to left
-    lang.set_rtl(is_rtl(&set_lang(&initial.bcp47())));
+    let shown_translation = set_lang(&initial.bcp47());
+    lang.set_rtl(is_rtl(&shown_translation));
     lang.set_current_language(Language {
         locale: initial.bcp47(),
         native_name: initial.native_name.to_shared_string(),
@@ -397,76 +388,54 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
     lang.on_set_lang({
         let ui = ui.clone();
         move |lang| {
-            let loaded =
-                if lang.locale == "en-owo" { set_lang("en-Xowo") } else { set_lang(&lang.locale) };
-            // before `current_language` changes, like the translations, see `Lang.select`
+            let loaded = set_lang(if lang.locale == OWO_LOCALE { OWO_TAG } else { &lang.locale });
             if let Some(ui) = ui.upgrade() {
                 ui.global::<crate::ui::Lang<'_>>().set_rtl(is_rtl(&loaded));
-                crate::ims::follow_locale(&ui);
+                crate::ims::follow_locale_unless_picked(&ui);
             }
-            ui.upgrade_in_event_loop(|ui| {
-                // runs after `current_language` changed. The time zone names are localized in
-                // Rust, so redo them even when the time zone page is skipped. Ones never shown
-                // yet are filled when their page or the summary is entered.
-                let tz = ui.global::<crate::ui::Tz<'_>>();
-                if !tz.get_current().id.is_empty() {
-                    tz.invoke_refresh();
-                }
+            crate::ui::on_ui(&ui, |ui| {
+                refresh_localized_time_zone_names(&ui);
                 ui.window().request_redraw();
-            })
-            .expect("event loop err");
+            });
         }
     });
-    if KEYMAP_UI.set(ui.clone()).is_err() {
-        tracing::warn!("keymaps initialized twice");
-    }
     init_keymaps(ui, lang);
 }
 
-/// fills [`crate::ui::Lang::set_languages`]
 fn init_language_list(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
     use crate::ui::Language;
-    use slint::{ComponentHandle, FilterModel, ModelRc, ToSharedString, VecModel};
+    use slint::{ComponentHandle, ToSharedString};
     let all_langs = LANGS
         .iter()
-        .filter(|row| row.locale == "en-owo" || !row.is_alias())
+        .filter(|row| row.locale == OWO_LOCALE || !row.is_legacy_glibc_alias())
         .map(|row| Language {
             locale: row.bcp47(),
             native_name: row.native_name.to_shared_string(),
         })
-        .collect::<VecModel<_>>();
-    let query = Query::default();
-    // the UI language when the search was typed. The arrow keys switch the language while the
-    // search stays, and the matches mustn't change under them
+        .collect_vec();
     let query_lang = Rc::new(RefCell::new(None::<Language>));
-    let model = Rc::new(FilterModel::new(all_langs, {
-        let (query, query_lang) = (Rc::clone(&query), Rc::clone(&query_lang));
+    let languages = Searchable::new(all_langs, {
+        let query_lang = Rc::clone(&query_lang);
         move |row: &Language| {
-            let query = query.borrow();
-            if query.is_empty() {
-                return true;
-            }
-            // also match the name as displayed when the search was typed
-            let shown = query_lang.borrow().clone().unwrap_or_else(|| row.clone());
-            matches(&query, &[&row.locale, &row.native_name, &display_name(row, &shown)])
+            let shown_in = query_lang.borrow().clone().unwrap_or_else(|| row.clone());
+            vec![row.locale.clone(), row.native_name.clone(), display_name(row, &shown_in)]
         }
-    }));
-    lang.set_languages(ModelRc::from(Rc::clone(&model)));
+    });
+    lang.set_languages(languages.model());
     lang.on_filter_languages({
         let ui = ui.clone();
         move |q| {
-            *query.borrow_mut() = fold_search(&q);
             *query_lang.borrow_mut() =
                 ui.upgrade().map(|ui| ui.global::<crate::ui::Lang<'_>>().get_current_language());
-            model.reset();
+            languages.search(&q);
         }
     });
 }
 
-fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
+fn sorted_keymaps() -> Vec<crate::ui::Keymap> {
     use crate::ui::{Keymap, KeymapVariant};
-    use slint::{ComponentHandle, FilterModel, Model, ModelRc, ToSharedString, VecModel};
-    let keymaps = libtaidan::i18n::LAYOUTS
+    use slint::{ModelRc, ToSharedString, VecModel};
+    libtaidan::i18n::LAYOUTS
         .entries()
         .map(|(id, layout)| Keymap {
             id: id.to_shared_string(),
@@ -483,10 +452,14 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
                     .collect::<VecModel<_>>(),
             ),
         })
-        // `us` first, as it's the most likely pick, then the rest alphabetically
         .sorted_by_key(|km| (km.id != "us", km.name.clone()))
-        .collect_vec();
-    // start at the system's keymap, `us` (sorted first) if it's unknown
+        .collect_vec()
+}
+
+fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
+    use crate::ui::{Keymap, KeymapVariant};
+    use slint::{ComponentHandle, Model};
+    let keymaps = sorted_keymaps();
     let system = system_keymap();
     let initial = system
         .as_ref()
@@ -499,66 +472,43 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
         .and_then(|variant| initial.variants.iter().find(|v| v.id == variant.as_str()))
         .unwrap_or_default();
 
-    let keymap_query = Query::default();
-    let keymap_model = Rc::new(FilterModel::new(VecModel::from(keymaps), {
-        let keymap_query = Rc::clone(&keymap_query);
-        move |km: &Keymap| matches(&keymap_query.borrow(), &[&km.id, &km.name])
-    }));
-    lang.set_keymaps(ModelRc::from(Rc::clone(&keymap_model)));
-    lang.on_filter_keymaps(move |q| {
-        *keymap_query.borrow_mut() = fold_search(&q);
-        keymap_model.reset();
-    });
+    let keymaps = Searchable::new(keymaps, |km: &Keymap| vec![km.id.clone(), km.name.clone()]);
+    lang.set_keymaps(keymaps.model());
+    lang.on_filter_keymaps(move |q| keymaps.search(&q));
 
-    let variant_query = Query::default();
-    let variant_filter = {
-        let variant_query = Rc::clone(&variant_query);
-        move |v: &KeymapVariant| matches(&variant_query.borrow(), &[&v.id, &v.name])
-    };
-    lang.set_variants(initial.variants.clone());
+    let variants =
+        Rc::new(Searchable::new(initial.variants.iter().collect(), |v: &KeymapVariant| {
+            vec![v.id.clone(), v.name.clone()]
+        }));
+    lang.set_variants(variants.model());
     lang.on_filter_variants({
-        let variant_query = Rc::clone(&variant_query);
-        let ui = ui.clone();
-        move |q| {
-            *variant_query.borrow_mut() = fold_search(&q);
-            if let Some(ui) = ui.upgrade() {
-                let lang = ui.global::<crate::ui::Lang<'_>>();
-                lang.set_variants(ModelRc::new(FilterModel::new(
-                    lang.get_current_keymap().variants,
-                    variant_filter.clone(),
-                )));
-            }
-        }
+        let variants = Rc::clone(&variants);
+        move |q| variants.search(&q)
     });
 
-    // applied to the session, KWin doesn't follow the system's layout and would type as US
-    // English, e.g. a password typed here wouldn't work at the login screen. Not to the system,
-    // which has it already, and more completely than what's parsed here (all its layouts, its
-    // options). Not in a dev session, where it would change the developer's keyboard
+    let setter = Rc::new(KeymapSetter::new(ui.clone()));
     let initial_variant_id =
         (!initial_variant.id.is_empty()).then_some(initial_variant.id.as_str());
     if crate::install::is_dev_session() {
-        save_keymap(&initial.id, initial_variant_id);
+        save_keymap_without_applying(&initial.id, initial_variant_id);
+        lang.set_latin_fallback(has_latin_fallback(&initial.id, initial_variant_id));
     } else {
-        set_keymap(&initial.id, initial_variant_id, false);
+        // KWin doesn't follow the system's layout
+        setter.set(lang, &initial.id, initial_variant_id, false);
     }
-    lang.set_latin_fallback(has_latin_fallback(&initial.id, initial_variant_id));
     lang.set_current_keymap(initial);
     lang.set_current_variant(initial_variant);
     lang.on_select_keymap({
-        let ui = ui.clone();
+        let (ui, setter) = (ui.clone(), Rc::clone(&setter));
         move |km| {
             let Some(ui) = ui.upgrade() else { return };
             let lang = ui.global::<crate::ui::Lang<'_>>();
             if km.id == lang.get_current_keymap().id {
                 return;
             }
-            // the variant search is cleared in Slint before this is called
-            variant_query.borrow_mut().clear();
-            lang.set_variants(km.variants.clone());
+            variants.replace_items(km.variants.iter().collect());
             lang.set_current_variant(KeymapVariant::default());
-            set_keymap(&km.id, None, true);
-            lang.set_latin_fallback(has_latin_fallback(&km.id, None));
+            setter.set(&lang, &km.id, None, true);
             lang.set_current_keymap(km);
         }
     });
@@ -569,8 +519,7 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
             let lang = ui.global::<crate::ui::Lang<'_>>();
             let layout = lang.get_current_keymap().id;
             let id = (!variant.id.is_empty()).then_some(variant.id.as_str());
-            set_keymap(&layout, id, true);
-            lang.set_latin_fallback(has_latin_fallback(&layout, id));
+            setter.set(&lang, &layout, id, true);
             lang.set_current_variant(variant);
         }
     });
@@ -581,7 +530,7 @@ fn display_name(
     current_language: &crate::ui::Language,
 ) -> slint::SharedString {
     use slint::ToSharedString;
-    if lang.locale == "en-owo" {
+    if lang.locale == OWO_LOCALE {
         return "OWO".into();
     }
     let Ok(locale) = icu::locale::Locale::try_from_str(&lang.locale)
@@ -598,7 +547,7 @@ mod tests {
 
     #[test]
     fn search_ignores_accents() {
-        let found = |query: &str, text: &str| matches(&fold_search(query), &[text]);
+        let found = |query: &str, text: &str| matches(&fold_search(query), [text]);
         assert!(found("sao paulo", "São Paulo"));
         assert!(found("SÃO", "sao paulo"));
         assert!(found("francais", "Français"));
@@ -606,7 +555,11 @@ mod tests {
         assert!(found("cestina", "Čeština"));
         assert!(found("ελληνικα", "Ελληνικά"));
         assert!(found("istanbul", "İstanbul"));
-        // CJK and Hangul are left alone
+    }
+
+    #[test]
+    fn search_leaves_cjk_and_hangul_alone() {
+        let found = |query: &str, text: &str| matches(&fold_search(query), [text]);
         assert!(found("日本", "日本語"));
         assert!(found("が", "がっこう"));
         assert!(!found("か", "が"));
@@ -617,30 +570,15 @@ mod tests {
 
     #[test]
     fn languages_without_icu_names_are_listed() {
-        // only where the build machine has the locales, `localedef --list-archive` is the source
         let has = |tag: &str| LANGS.iter().any(|row| row.bcp47() == tag);
-        if std::process::Command::new("localedef")
+        let build_machine_has_ka_ge = std::process::Command::new("localedef")
             .arg("--list-archive")
             .output()
-            .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).lines().any(|l| l == "ka_GE.utf8"))
-        {
+            .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).lines().any(|l| l == "ka_GE.utf8"));
+        if build_machine_has_ka_ge {
             assert!(has("ka-GE"));
         }
         assert!(LANGS.len() > 200, "{}", LANGS.len());
-    }
-
-    #[test]
-    fn vconsole_keymap() {
-        let conf = "# Written by systemd-localed(8)\nKEYMAP=de\nFONT=eurlatgr\nXKBLAYOUT=\"de,us\"\nXKBMODEL=pc105\nXKBVARIANT=nodeadkeys,\n";
-        assert_eq!(
-            parse_vconsole_keymap(conf),
-            Some((Some("de".to_owned()), Some("nodeadkeys".to_owned())))
-        );
-        assert_eq!(parse_vconsole_keymap("XKBLAYOUT=us\n"), Some((Some("us".to_owned()), None)));
-        // localed then goes on to the xorg config
-        assert_eq!(parse_vconsole_keymap("KEYMAP=us\n#XKBLAYOUT=de\n"), None);
-        assert_eq!(parse_vconsole_keymap("XKBLAYOUT=\n"), None);
-        assert_eq!(parse_vconsole_keymap("XKBOPTIONS=ctrl:nocaps\n"), Some((None, None)));
     }
 
     #[test]
@@ -666,7 +604,6 @@ mod tests {
                 .map(ToString::to_string)
                 .collect_vec()
         };
-        // no Portuguese translation, and Spanish isn't one
         assert_eq!(langs("pt-BR"), ["en-US"]);
         assert_eq!(langs("es-MX").first().map(String::as_str), Some("es"));
         assert_eq!(langs("es-MX").last().map(String::as_str), Some("en-US"));
@@ -680,13 +617,6 @@ mod tests {
                 l == "en-US" || l.split('-').next() == tag.split('-').next() || l == "zh-Hant"
             }));
         }
-    }
-
-    #[test]
-    fn xorg_keymap() {
-        let conf = "# Written by systemd-localed(8)\nSection \"InputClass\"\n        Identifier \"system-keyboard\"\n        MatchIsKeyboard \"on\"\n        Option \"XkbLayout\" \"de,us\"\n        Option \"XkbModel\" \"pc105\"\n        Option \"XkbVariant\" \"nodeadkeys,\"\nEndSection\n";
-        assert_eq!(parse_xorg_keymap(conf), (Some("de".to_owned()), Some("nodeadkeys".to_owned())));
-        assert_eq!(parse_xorg_keymap("Option \"XkbLayout\" \"de\"\n"), (None, None));
     }
 
     #[test]

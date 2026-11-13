@@ -1,23 +1,16 @@
 pub use taidan_ui::*;
 
-/// # Panics
-/// If the UI cannot be created or the event loop fails.
 pub fn run() {
     tracing::debug!("Starting Taidan");
-    let screen = crate::screen::init();
+    let screen = crate::screen::select_scaling_backend();
     let ui = AppWindow::new().expect("cannot create app");
-    // set before the event loop starts, which is when the screens are known
-    if screen.set(ui.as_weak()).is_err() {
-        tracing::warn!("window already given to the screen scaling");
-    }
-    // Wayland ignores the window `icon`; compositors look up `<app_id>.desktop` instead.
-    // Must be set after the platform exists (AppWindow::new) and before the window is shown.
+    _ = screen.set(ui.as_weak());
+    // Wayland ignores the window icon for `<app_id>.desktop`, which must be set before showing
     slint::set_xdg_app_id(crate::APPID).expect("cannot set xdg app id");
     crate::l10n::initialize_ui(&ui.as_weak(), &ui.global::<Lang<'_>>());
-    let cfg: Cfg<'_> = ui.global();
     let nav = crate::cfg::PageNav::new(&crate::CFG, &ui.global());
     let first_page = nav.first();
-    crate::cfg::initialize_ui(ui.as_weak(), &cfg, nav);
+    crate::cfg::initialize_ui(ui.as_weak(), &ui.global(), nav);
     crate::account::initialize_ui(ui.as_weak(), &ui.global());
     crate::install::initialize_ui(&ui.as_weak(), &ui.global());
     crate::avatar::initialize_ui(&ui.as_weak(), &ui.global());
@@ -27,11 +20,12 @@ pub fn run() {
     crate::theme::initialize_ui(&ui.global());
     crate::ims::initialize_ui(&ui.as_weak(), &ui.global());
     crate::a11y::initialize_ui(&ui.as_weak(), &ui.global());
-    init_actions(ui.as_weak(), &ui.global());
+    crate::wallpaper::initialize_ui(&ui);
+    init_actions(&ui.global());
     ui.set_pagenum(first_page);
     ui.set_framed(crate::install::is_dev_session());
-    // the OOBE has to be completed, Alt+F4 shouldn't drop to an unconfigured system. Finishing
-    // quits the event loop directly instead of closing the window.
+    let software = std::env::var("SLINT_BACKEND").is_ok_and(|b| b.contains("software"));
+    ui.set_rounded(!crate::install::is_dev_session() && !software);
     ui.window().on_close_requested(|| {
         if crate::install::is_dev_session() {
             slint::CloseRequestResponse::HideWindow
@@ -41,9 +35,9 @@ pub fn run() {
         }
     });
     ui.run().expect("cannot run ui");
-    // closing the window in a dev session skips finish(), so stop the helpers here too
     crate::network::shutdown();
     crate::a11y::shutdown();
+    crate::wallpaper::shutdown();
 }
 
 /// shows an error in a dialog right away, rather than ending the flow on the error page. For
@@ -56,9 +50,6 @@ pub fn show_error(ui: &AppWindow, title: &str, body: &str) {
     errors.set_open(true);
 }
 
-/// whether `taidan.debug_shell` is on the kernel command line, either bare or set to a true value
-/// like systemd's `systemd.debug_shell`. A root terminal has to be opt-in. The helper checks it
-/// too, this only saves asking it
 fn debug_shell_enabled() -> bool {
     match std::fs::read_to_string("/proc/cmdline") {
         Ok(cmdline) => libtaidan::helper::cmdline_has_debug_shell(&cmdline),
@@ -69,35 +60,74 @@ fn debug_shell_enabled() -> bool {
     }
 }
 
-fn init_actions(_ui: slint::Weak<impl slint::ComponentHandle + 'static>, actions: &Actions<'_>) {
+fn init_actions(actions: &Actions<'_>) {
     actions.on_power_off(|| {
         if crate::install::is_dev_session() {
             tracing::warn!("Dev session: not powering off");
             return;
         }
-        // as root, which logind lets through the unit's inhibitor
-        std::thread::spawn(|| {
-            if let Err(e) = crate::RT.block_on(libtaidan::root(libtaidan::Verb::PowerOff)) {
+        // logind lets root through the unit's inhibitor
+        block_on_thread(async {
+            if let Err(e) = libtaidan::root(libtaidan::Verb::PowerOff).await {
                 tracing::error!(?e, "cannot power off");
             }
         });
     });
     actions.on_open_terminal(|| {
-        // wait on a separate thread so the UI keeps running while the terminal is open
-        std::thread::spawn(|| {
+        block_on_thread(async {
             if !debug_shell_enabled() {
                 tracing::info!("Ignoring Alt+Shift+T, boot with taidan.debug_shell to enable it");
                 return;
             }
-            let Some(wayland_display) = std::env::var("WAYLAND_DISPLAY").ok() else {
+            let Ok(wayland_display) = std::env::var("WAYLAND_DISPLAY") else {
                 tracing::error!("no WAYLAND_DISPLAY for the debug terminal");
                 return;
             };
             let verb = libtaidan::Verb::DebugShell { wayland_display };
-            match crate::RT.block_on(libtaidan::root(verb)) {
-                Ok(()) => {}
-                Err(e) => tracing::warn!(?e, "debug terminal failed or exited"),
+            if let Err(e) = libtaidan::root(verb).await {
+                tracing::warn!(?e, "debug terminal failed or exited");
             }
         });
     });
+}
+
+pub fn on_ui<F: FnOnce(AppWindow) + Send + 'static>(ui: &slint::Weak<AppWindow>, f: F) {
+    if let Err(e) = ui.upgrade_in_event_loop(f) {
+        tracing::error!(?e, "cannot update the UI");
+    }
+}
+
+pub fn spawn_then<T, W, A>(ui: slint::Weak<AppWindow>, work: W, apply: A)
+where
+    T: Send + 'static,
+    W: FnOnce() -> T + Send + 'static,
+    A: FnOnce(&AppWindow, T) + Send + 'static,
+{
+    std::thread::spawn(move || {
+        let out = work();
+        on_ui(&ui, move |app| apply(&app, out));
+    });
+}
+
+pub fn block_on_thread<F>(future: F) -> std::thread::JoinHandle<F::Output>
+where
+    F: std::future::Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    std::thread::spawn(move || crate::RT.block_on(future))
+}
+
+pub fn latest_worker<T, M, H>(merge: M, mut handle: H) -> std::sync::mpsc::Sender<T>
+where
+    T: Send + 'static,
+    M: Fn(T, T) -> T + Send + 'static,
+    H: FnMut(T) + Send + 'static,
+{
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        while let Ok(oldest) = rx.recv() {
+            handle(rx.try_iter().fold(oldest, &merge));
+        }
+    });
+    tx
 }

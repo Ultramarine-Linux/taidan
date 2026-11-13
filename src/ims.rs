@@ -1,5 +1,3 @@
-//! the keyboard page's input methods, see [`libtaidan::i18n::IMS`]. They follow the UI language
-//! until the user turns one on or off, from then on they're what the user picked
 use std::rc::Rc;
 
 use slint::{ComponentHandle, Model, VecModel};
@@ -11,8 +9,6 @@ fn imf() -> libtaidan::i18n::I18nImf {
 }
 
 fn items() -> Vec<ImItem> {
-    // what `skip_pages = ["inputmethod"]` did before the page became part of the keyboard page,
-    // with no items the keyboard page and summary show none and none are set up
     if crate::CFG.skip_pages.contains(&crate::cfg::SkipPage::InputMethod) {
         return vec![];
     }
@@ -30,20 +26,20 @@ fn items() -> Vec<ImItem> {
         .collect()
 }
 
-/// the ones turned on, for the keyboard page and the summary
-fn show_enabled(ims: &Ims<'_>, model: &VecModel<ImItem>) {
-    let enabled = model.iter().filter(|im| im.on).map(|im| im.name).collect::<Vec<_>>();
-    ims.set_enabled(enabled.join(", ").into());
+fn names_on(items: &impl Model<Data = ImItem>) -> Vec<String> {
+    items.iter().filter(|im| im.on).map(|im| im.name.into()).collect()
 }
 
-/// names of the ones turned on
+fn show_enabled(ims: &Ims<'_>, model: &VecModel<ImItem>) {
+    ims.set_enabled(names_on(model).join(", ").into());
+}
+
 #[must_use]
 pub fn enabled(ims: &Ims<'_>) -> Vec<String> {
-    ims.get_items().iter().filter(|im| im.on).map(|im| im.name.into()).collect()
+    names_on(&ims.get_items())
 }
 
-/// turns on the ones for the UI language, unless the user picked some already
-pub fn follow_locale(ui: &AppWindow) {
+pub fn follow_locale_unless_picked(ui: &AppWindow) {
     if crate::SETTINGS.read().ims_picked {
         return;
     }
@@ -72,16 +68,13 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, ims: &Ims<'_>) {
             let Some(mut item) = model.row_data(i) else { return };
             item.on = on;
             model.set_row_data(i, item);
-            let mut settings = crate::SETTINGS.write();
-            settings.ims = model.iter().filter(|im| im.on).map(|im| im.name.into()).collect();
-            settings.ims_picked = true;
-            drop(settings);
+            crate::SETTINGS.write().ims_picked = true;
             if let Some(ui) = ui.upgrade() {
                 show_enabled(&ui.global(), &model);
             }
         }
     });
     if let Some(ui) = ui.upgrade() {
-        follow_locale(&ui);
+        follow_locale_unless_picked(&ui);
     }
 }

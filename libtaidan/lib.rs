@@ -3,9 +3,10 @@ pub mod a11y;
 pub mod cfg;
 pub mod dnf;
 pub mod err;
-pub mod flatpak;
 pub mod helper;
+pub mod home;
 pub mod i18n;
+pub mod kconfig;
 pub mod passwd;
 pub mod prelude;
 pub mod proxy;
@@ -13,11 +14,9 @@ pub mod server_setup;
 pub mod settings;
 pub mod steps;
 pub mod theme;
-pub mod time;
 pub mod tweaks;
 
 use crate::prelude::*;
-use steps::Step;
 
 pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
     let dir =
@@ -30,12 +29,8 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 pub enum InstallMsg {
     UpdStage(steps::Stage),
     NeedsReboot,
-    /// some drivers couldn't be installed, the installation still finishes without them
     DriversFailed,
-    /// the system language couldn't be set, usually since its language pack isn't installed
-    /// (offline, or on an atomic edition), the installation still finishes in the old one
     LocaleFailed,
-    /// updates were downloaded and install on the next restart
     UpdatesReady,
     Finish,
     StageProgress(f64),
@@ -68,39 +63,47 @@ pub async fn start_install(
 ) -> Res<()> {
     tracing::info!("Starting installation");
     proxy::set(settings.proxy.clone());
+    persist_proxy(settings).await;
+    i18n::fill_settings(settings, cfg);
+    for stage in steps::Stage::all() {
+        callback.send(InstallMsg::UpdStage(*stage));
+        tracing::debug!(?stage, "Running pre()");
+        stage.pre(settings, cfg).await?;
+        tracing::info!(?stage, "Running stage");
+        stage.run(settings, cfg, callback).await?;
+    }
+    write_proxy_repo_overrides(settings).await;
+    steps::unlock_user(settings, cfg).await?;
+    steps::fix_homed_ims(settings, cfg).await;
+    // a rerun with the user record still there could remove the account and its home, so only
+    // mark the system configured once the record is gone
+    passwd::clear_record().await?;
+    clear_tweaks_record().await;
+    mark_configured().await;
+    callback.send(InstallMsg::Finish);
+    Ok(())
+}
+
+async fn persist_proxy(settings: &settings::Settings) {
     let saved = match &settings.proxy {
         Some(proxy) if settings.proxy_persist => proxy.persist().await,
-        // one saved by an earlier attempt would otherwise stay
         _ => proxy::clear().await,
     };
     if let Err(e) = saved {
         tracing::error!(?e, "cannot save the proxy");
     }
-    i18n::fill_settings(settings, cfg);
-    for stage in steps::Stage::all() {
-        callback.send(InstallMsg::UpdStage(*stage));
-        tracing::debug!(?stage, "Running pre()");
-        stage.pre(settings, cfg, callback).await?;
-        tracing::info!(?stage, "Running stage");
-        stage.run(settings, cfg, callback).await?;
-    }
-    // the repos the install added, like the drivers' or a tweak's, may need overrides too
+}
+
+async fn write_proxy_repo_overrides(settings: &settings::Settings) {
     if settings.proxy_persist
         && let Some(proxy) = &settings.proxy
         && let Err(e) = proxy.write_repo_overrides().await
     {
         tracing::warn!(?e, "cannot keep dnf from using the proxy for the bypassed hosts");
     }
-    // the user may log in now, it was locked so a half-installed system couldn't be logged in to.
-    steps::unlock_user(settings, cfg).await?;
-    steps::fix_homed_ims(settings, cfg).await;
-    // the user is theirs now, so no later run of Taidan should remove it. Not marked configured
-    // if the record stays, since a machine that leaves the OOBE with it could later have the
-    // account and its home removed by a rerun
-    passwd::clear_record().await?;
-    // the tweaks are the user's now too, a later rerun shouldn't undo them. After the user record,
-    // which a retry needs, while this is only needed if the install doesn't finish. If it dies
-    // before this, the repair in Taidan's startup clears it
+}
+
+async fn clear_tweaks_record() {
     for attempt in 1..=3 {
         match tweaks::clear_on_record().await {
             Ok(()) => break,
@@ -108,59 +111,49 @@ pub async fn start_install(
         }
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     }
-    // right away rather than when the user leaves the last page, or a machine that dies on it
-    // would boot into the OOBE again with the record gone and the user still there
-    mark_configured().await;
-    callback.send(InstallMsg::Finish);
-    Ok(())
 }
 
-#[allow(clippy::arithmetic_side_effects)]
-mod parseutil {
-    /// # Panics
-    /// - cannot convert bytes to `&str`
-    /// - cannot parse to `u32`
-    pub fn send_frac(callback: &impl crate::Callback, num: u32, den: u32) {
-        if den == 0 {
-            return;
-        }
-
-        callback.send(crate::InstallMsg::StageProgress(f64::from(num) / f64::from(den)))
-    }
-}
-
-/// runs `cmd`, with `input` on its stdin if there's any, and returns its stdout
-async fn run_cmd(
+async fn spawn(
     mut cmd: tokio::process::Command,
     name: &'static str,
     input: Option<&[u8]>,
-) -> Res<Vec<u8>> {
+    stdout: impl Into<std::process::Stdio>,
+    stderr: impl Into<std::process::Stdio>,
+) -> Res<tokio::process::Child> {
+    use std::process::Stdio;
     use tokio::io::AsyncWriteExt;
-    cmd.stdout(std::process::Stdio::piped());
-    // for the error, which would say nothing about why otherwise
-    cmd.stderr(std::process::Stdio::piped());
-    // not the OOBE's, a tty nobody types into, where a command asking something would wait
-    // forever. Without stdin, it fails
-    cmd.stdin(if input.is_some() {
-        std::process::Stdio::piped()
-    } else {
-        std::process::Stdio::null()
-    });
-    let mut p = cmd.spawn().map_err(|e| Err::FailToRunProgram(name, e))?;
+    cmd.stdout(stdout).stderr(stderr);
+    cmd.stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() });
+    let mut child = cmd.spawn().map_err(Err::_fail_to_run(name))?;
     if let Some(input) = input
-        && let Some(mut stdin) = p.stdin.take()
+        && let Some(mut stdin) = child.stdin.take()
+        && let Err(e) = stdin.write_all(input).await
     {
-        // a failed write shows up as the program failing, so wait for it anyway
-        if let Err(e) = stdin.write_all(input).await {
-            tracing::error!(?e, name, "cannot write to stdin");
-        }
-        drop(stdin);
+        tracing::error!(?e, name, "cannot write to stdin");
     }
-    let p = p.wait_with_output().await.map_err(|e| Err::FailToRunProgram(name, e))?;
+    Ok(child)
+}
+
+pub(crate) async fn spawn_helper(
+    verb: &Verb,
+    input: &[u8],
+    stdout: impl Into<std::process::Stdio>,
+    stderr: impl Into<std::process::Stdio>,
+) -> Res<tokio::process::Child> {
+    let request = helper::stdin(verb, input);
+    spawn(helper::command(verb), verb.name(), Some(&request), stdout, stderr).await
+}
+
+async fn run_cmd(
+    cmd: tokio::process::Command,
+    name: &'static str,
+    input: Option<&[u8]>,
+) -> Res<Vec<u8>> {
+    use std::process::Stdio;
+    let child = spawn(cmd, name, input, Stdio::piped(), Stdio::piped()).await?;
+    let p = child.wait_with_output().await.map_err(Err::_fail_to_run(name))?;
     if !p.status.success() {
         let e = Err::program_fail(name, &p);
-        // not an error, the output can name the user and the caller reports the failure itself.
-        // The message ends with the program's last output line
         tracing::debug!(name, %e, "command failed");
         return Err(e);
     }
@@ -172,46 +165,28 @@ async fn run_cmd(
 
 pub use helper::Verb;
 
-/// runs `verb` as root through `pkexec` and [`helper`]
-///
-/// # Errors
-/// - the helper failed to run
-/// - it refused the request, or what it ran exited with a non-zero status code
 pub async fn root(verb: Verb) -> Res<()> {
     root_with_stdin(verb, &[]).await
 }
 
-/// like [`root`], but returns what the helper printed
-///
-/// # Errors
-/// - the helper failed to run
-/// - it refused the request, or what it ran exited with a non-zero status code
 pub async fn root_output(verb: Verb) -> Res<String> {
     let out = run_helper(&verb, &[]).await?;
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
-/// like [`root`], but passes `input` on to the verb, for secrets that shouldn't be in arguments,
-/// which anyone can read, and files
-///
-/// # Errors
-/// - the helper failed to run
-/// - it refused the request, or what it ran exited with a non-zero status code
 pub async fn root_with_stdin(verb: Verb, input: &[u8]) -> Res<()> {
     run_helper(&verb, input).await.map(drop)
 }
 
-/// how long [`run_helper`] waits before each try again when `pkexec` itself fails
-const PKEXEC_BACKOFF: [std::time::Duration; 2] =
+// pkexec refuses for a moment after a vt switch makes the session inactive
+const PKEXEC_RETRY_BACKOFF: [std::time::Duration; 2] =
     [std::time::Duration::from_secs(2), std::time::Duration::from_secs(4)];
 
-/// runs the helper for `verb` with `input`, and returns its stdout. Tried again a few times when
-/// `pkexec` refuses, which it can for a moment after a VT switch makes the session inactive
 async fn run_helper(verb: &Verb, input: &[u8]) -> Res<Vec<u8>> {
     tracing::debug!(?verb, "running taidan-helper");
-    let stdin = helper::stdin(verb, input);
-    let run = || run_cmd(helper::command(verb), verb.name(), Some(&stdin));
-    for (attempt, backoff) in PKEXEC_BACKOFF.into_iter().enumerate() {
+    let request = helper::stdin(verb, input);
+    let run = || run_cmd(helper::command(verb), verb.name(), Some(&request));
+    for (attempt, backoff) in PKEXEC_RETRY_BACKOFF.into_iter().enumerate() {
         match run().await {
             Err(e) if pkexec_refused(&e) => {
                 tracing::warn!(?e, attempt, verb = verb.name(), "pkexec refused, retrying");
@@ -223,64 +198,80 @@ async fn run_helper(verb: &Verb, input: &[u8]) -> Res<Vec<u8>> {
     run().await
 }
 
-/// whether `pkexec` refused to run the helper at all, i.e. it wasn't authorized or there was no
-/// agent, not the helper refusing the request (exit 2) or what it ran failing
 fn pkexec_refused(e: &Err) -> bool {
     // pkexec's messages aren't translated
     matches!(e, Err::ProgramFail { rc: Some(126 | 127), output, .. }
         if output.contains("Error executing command as another user"))
 }
 
-/// runs `argv` as `user`, with `input` on its stdin, directly if that's who this runs as already,
-/// otherwise through the helper, which only runs things as the user the installation made
-///
-/// # Errors
-/// - the command failed to run
-/// - it exited with a non-zero status code
-pub async fn as_user(user: &str, argv: Vec<String>, input: Option<&[u8]>) -> Res<()> {
+pub(crate) async fn run_here(argv: &[String], input: Option<&[u8]>) -> Res<()> {
+    let Some((name, args)) = argv.split_first() else { return Ok(()) };
+    let mut cmd = tokio::process::Command::new(name);
+    cmd.args(args);
+    run_cmd(cmd, "as-user", input).await.map(drop)
+}
+
+pub async fn as_user(
+    user: &str,
+    argv: impl IntoIterator<Item: AsRef<str>>,
+    input: Option<&[u8]>,
+) -> Res<()> {
+    let argv = argv.into_iter().map(|a| a.as_ref().to_owned()).collect_vec();
     let current = uzers::get_current_username();
     if current.as_ref().is_some_and(|c| c.as_encoded_bytes() == user.as_bytes()) {
-        let Some((name, args)) = argv.split_first() else { return Ok(()) };
-        let mut cmd = tokio::process::Command::new(name);
-        cmd.args(args);
-        return run_cmd(cmd, "as-user", input).await.map(drop);
+        return run_here(&argv, input).await;
     }
     root_with_stdin(Verb::AsUser { user: user.to_owned(), argv }, input.unwrap_or_default()).await
 }
 
-/// marks the system as configured so the OOBE doesn't run on the next boot, failures are logged.
-/// Safe to run more than once
 pub async fn mark_configured() {
     if let Err(e) = root(Verb::MarkConfigured).await {
         tracing::error!(?e, "cannot mark the system configured");
     }
 }
 
-/// whether the files that start the OOBE on boot are still there, see [`mark_configured`]
+pub(crate) const UNCONFIGURED_MARKERS: [&str; 2] = ["/var/.unconfigured", "/.unconfigured"];
+
 #[must_use]
 pub fn marked_unconfigured() -> bool {
-    ["/var/.unconfigured", "/.unconfigured"].iter().any(|m| std::path::Path::new(m).exists())
+    UNCONFIGURED_MARKERS.iter().any(|m| std::path::Path::new(m).exists())
+}
+
+pub(crate) async fn root_if_any_exists(
+    paths: &[&str],
+    verb: Verb,
+    failure: &'static str,
+) -> Res<()> {
+    for path in paths {
+        if tokio::fs::try_exists(path).await.unwrap_or(true) {
+            return root(verb).await.wrap_msg(failure);
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn fail(rc: i32, output: &str) -> Err {
+        Err::ProgramFail { name: "unlock-user", output: output.to_owned(), rc: Some(rc) }
+    }
+
+    const PKEXEC_DENIED: &str = "Error executing command as another user: Not authorized\n\nThis \
+                                 incident has been reported.\n";
+
     #[test]
-    fn pkexec_refused_only_for_pkexec() {
-        let fail = |rc, output: &str| Err::ProgramFail {
-            name: "unlock-user",
-            output: output.to_owned(),
-            rc: Some(rc),
-        };
-        let denied = "Error executing command as another user: Not authorized\n\nThis incident has \
-                      been reported.\n";
-        assert!(pkexec_refused(&fail(127, denied)));
+    fn pkexec_refused_for_pkexec() {
+        assert!(pkexec_refused(&fail(127, PKEXEC_DENIED)));
         let dismissed = "Error executing command as another user: Request dismissed\n";
         assert!(pkexec_refused(&fail(126, dismissed)));
-        // the helper refusing the request, and what it ran failing
+    }
+
+    #[test]
+    fn pkexec_refused_not_for_the_helper_or_what_it_ran() {
         assert!(!pkexec_refused(&fail(2, "taidan-helper: the input is over 4096 bytes\n")));
         assert!(!pkexec_refused(&fail(127, "sh: line 1: foo: command not found\n")));
-        assert!(!pkexec_refused(&fail(1, denied)));
+        assert!(!pkexec_refused(&fail(1, PKEXEC_DENIED)));
     }
 }

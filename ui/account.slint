@@ -1,35 +1,25 @@
 export struct Avatar {
-    // path of the image file
     id: string,
     image: image,
 }
 
-// a row of the icon picker, indices into `Account.avatars`, -1 for the camera
 export struct AvatarRow {
     slots: [int],
 }
 
-// the user account being created, written to the backend settings by `save()`
 export global Account {
     in-out property <string> fullname;
     in-out property <string> username;
     in-out property <string> password;
     in-out property <string> password-repeat;
-    // preset user icons
     in property <[Avatar]> avatars;
-    // how the picker lays out the camera and `avatars`, from Rust
     in property <[AvatarRow]> avatar-rows: [{ slots: [-1] }];
-    // the chosen user icon, `avatar-id` is empty if none
     in-out property <string> avatar-id;
     in-out property <image> avatar;
-    // set once the user types a username themselves, so we stop suggesting one from the full name
     in-out property <bool> username-touched;
 
-    // the username the background check last finished for, and whether it's taken
     in-out property <string> checked-username;
     in-out property <bool> checked-taken;
-    // fluent id of the message explaining why `username` can't be used, empty if it can or the
-    // background check hasn't finished
     out property <string> username-error: username-syntax-error(username) != ""
         ? username-syntax-error(username)
         : checked-username == username && checked-taken ? "page-whoareyou-error-taken" : "";
@@ -40,19 +30,11 @@ export global Account {
 
     changed username => { check-username(username); }
 
-    // fluent id of what's wrong with `username` apart from it being taken, empty if nothing.
-    // Cheap, so it runs on every keystroke
     pure callback username-syntax-error(username: string) -> string;
-    // looks up whether `username` is taken in the background, then sets `checked-username` and
-    // `checked-taken`
     callback check-username(username: string);
-    // whether `fullname` has nothing that would cut it short in the passwd entry
     pure callback valid-fullname(fullname: string) -> bool;
-    // whether `password` is longer than the system can hash
     pure callback long-password(password: string) -> bool;
-    // username suggested by the full name, empty if none can be derived
     pure callback suggest-username(fullname: string, current: string) -> string;
-    // what to call the user: their first name, else their username
     pure callback first-name(fullname: string, username: string) -> string;
     callback save();
 

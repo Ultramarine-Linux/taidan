@@ -1,62 +1,25 @@
-import { Lang, Dir } from "../lang.slint";
+import { Lang } from "../lang.slint";
 import { Tweaks } from "../tweaks.slint";
 import { Network } from "../network.slint";
-import { TdnText, TdnBtn, TdnToggleRow, TdnDialog, TdnStyle, TdnScrollList } from "../components.slint";
-import { Tokens } from "../slintcn/theme/tokens.slint";
+import { TdnDialog, TdnOptionRow, TdnScrollList } from "../components.slint";
 
-// optional distro tweaks, opened from the summary page
 export component TweaksDialog inherits TdnDialog {
     title: Lang.t("page-tweaks", []);
+    description: Lang.t("page-tweaks-desc", []);
+    done-text: Lang.t("page-tweaks-done", []);
     dialog-width: 26rem;
     dismissed => { Tweaks.open = false; }
 
-    TdnText {
-        text: Lang.t("page-tweaks-desc", []);
-        color: Tokens.color-muted-foreground;
-        horizontal-alignment: Dir.text-start;
-        wrap: word-wrap;
-    }
-
     scroll := TdnScrollList {
-        for tweak[i] in Tweaks.items: VerticalLayout {
-            // it would be skipped, so it can't be turned on and shows as off. It keeps the choice
-            // for when the install goes online again
+        for tweak[i] in Tweaks.items: TdnOptionRow {
             property <bool> unavailable: tweak.needs-internet && !Network.install-online;
-            spacing: 0.4rem;
-
-            TdnToggleRow {
-                in-dialog: true;
-                text: Lang.t(tweak.name, []);
-                enabled: !unavailable;
-                checked: tweak.on && !unavailable;
-                toggled(on) => { Tweaks.set(i, on); }
-                focus-in(y, height) => { scroll.reveal(y, height); }
-                // Enter closes it like Done, Space toggles
-                accepted => { root.dismissed(); }
-            }
-
-            TdnText {
-                text: unavailable ? Lang.t("page-tweaks-needs-internet", []) : Lang.t(tweak.desc, []);
-                color: Tokens.color-muted-foreground;
-                font-size: Tokens.typography-body-sm-size;
-                horizontal-alignment: Dir.text-start;
-                wrap: word-wrap;
-            }
+            text: Lang.t(tweak.name, []);
+            description: self.unavailable ? Lang.t("page-tweaks-needs-internet", []) : Lang.t(tweak.desc, []);
+            enabled: !self.unavailable;
+            checked: tweak.on && !self.unavailable;
+            toggled(on) => { Tweaks.set(i, on); }
+            focus-in(y, height) => { scroll.reveal(y, height); }
+            accepted => { root.dismissed(); }
         }
     }
-
-    HorizontalLayout {
-        alignment: Dir.end;
-
-        done := TdnBtn {
-            in-dialog: true;
-            text: Lang.t("page-tweaks-done", []);
-            enter-hint: true;
-            background-color: TdnStyle.accent;
-            foreground-color: TdnStyle.accent-foreground;
-            clicked => { root.dismissed(); }
-        }
-    }
-
-    init => { done.focus(); }
 }

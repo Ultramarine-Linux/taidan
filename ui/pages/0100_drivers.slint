@@ -1,16 +1,14 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Drivers } from "../install.slint";
-import { TdnText, TdnToggleRow } from "../components.slint";
-import { Card } from "../slintcn/components/card.slint";
+import { TdnText, TdnPara, TdnNote, TdnToggleRow, TdnFormColumn, TdnSideCard } from "../components.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
 export component DriverRow inherits HorizontalLayout {
     in property <image> icon;
     in property <string> text;
-    // faded, for drivers that won't be installed. Not `opacity`, which renders the row to a layer
-    // and shifts the text by a pixel when it toggles.
     in property <bool> dimmed;
+    // not `opacity`, which renders the row to a layer and shifts the text by a pixel when it toggles
     property <color> color: root.dimmed ? Tokens.color-foreground.transparentize(0.5) : Tokens.color-foreground;
 
     spacing: 0.75rem;
@@ -32,11 +30,8 @@ export component DriverRow inherits HorizontalLayout {
     }
 }
 
-// what gets installed for the detected hardware, also shown on the summary page
 export component DriverList inherits VerticalLayout {
-    // the install goes without internet, which the optional drivers and codecs are downloaded with
     in property <bool> offline;
-    // dims the optional drivers, the built-in ones are always installed
     property <bool> optional-dimmed: !Drivers.install || root.offline;
 
     spacing: 0.5rem;
@@ -70,42 +65,36 @@ export component DriversPage inherits TdnPage {
     step_i: 2;
     forward-focus: toggle;
 
+    property <bool> show-secure-boot-enrollment: Drivers.secure-boot && Drivers.install && (Drivers.nvidia || Drivers.broadcom-wifi);
+
     HorizontalLayout {
         spacing: 1rem;
 
-        VerticalLayout {
-            alignment: start;
-            horizontal-stretch: 100;
-            max-width: 21rem;
-            spacing: 1.25rem;
+        TdnFormColumn {
+            column-width: 21rem;
+            column-padding-top: 0;
+            column-spacing: 1.25rem;
 
-            TdnText {
+            TdnPara {
                 text: Lang.t("page-drivers-desc", []);
-                horizontal-alignment: Dir.text-start;
-                wrap: word-wrap;
                 font-size: 1.1 * Tokens.text-rem;
             }
 
-            TdnText {
+            TdnPara {
                 text: Lang.t("page-drivers-proprietary", []);
-                horizontal-alignment: Dir.text-start;
-                wrap: word-wrap;
                 font-size: 1.1 * Tokens.text-rem;
             }
 
             toggle := TdnToggleRow {
-                // codecs come with the drivers on purpose, and when dnf is skipped there are none
                 text: Lang.t(Drivers.codecs ? "page-drivers-install-codecs" : "page-drivers-install", []);
                 checked: Drivers.install;
                 toggled(on) => { Drivers.install = on; }
                 accepted => { root.try-next(); }
             }
 
-            // only when drivers Secure Boot blocks were detected and are wanted
-            if Drivers.secure-boot && Drivers.install && (Drivers.nvidia || Drivers.broadcom-wifi): HorizontalLayout {
+            if root.show-secure-boot-enrollment: HorizontalLayout {
                 spacing: 1rem;
 
-                // dark on light whatever the theme, which scanners read best
                 Rectangle {
                     width: 6rem;
                     height: self.width;
@@ -127,40 +116,24 @@ export component DriversPage inherits TdnPage {
                     alignment: center;
                     spacing: 0.4rem;
 
-                    TdnText {
+                    TdnPara {
                         text: Lang.t("page-drivers-secure-boot", []);
-                        horizontal-alignment: Dir.text-start;
-                        wrap: word-wrap;
                     }
 
-                    TdnText {
+                    TdnNote {
                         text: Drivers.secure-boot-url;
-                        color: Tokens.color-muted-foreground;
-                        horizontal-alignment: Dir.text-start;
-                        wrap: word-wrap;
                     }
                 }
             }
         }
 
-        // pushes the list to the end edge on wider windows
-        Rectangle {
-            layout-order: Dir.order(1);
-            horizontal-stretch: 1;
-        }
-
-        Card {
-            layout-order: Dir.order(2);
-            horizontal-stretch: 0;
+        TdnSideCard {
             width: 15rem;
-            card-radius: md;
+            fill-height: true;
+            content-padding: 0.75rem;
+            content-spacing: 0;
 
-            VerticalLayout {
-                alignment: start;
-                padding: 0.75rem;
-
-                DriverList { }
-            }
+            DriverList { }
         }
     }
 }
