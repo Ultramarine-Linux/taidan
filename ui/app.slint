@@ -25,12 +25,13 @@ import { InstallingPage } from "pages/0130_installing.slint";
 import { DonePage } from "pages/0140_done.slint";
 import { ErrorPage } from "pages/0150_error.slint";
 import { Install, InstallState, Drivers, Location } from "install.slint";
-import { TdnText, TdnBtn, Modal } from "components.slint";
+import { TdnText, TdnBtn, TdnErrorDialog, Modal } from "components.slint";
 import { Actions } from "actions.slint";
 import { Appearance } from "appearance.slint";
+import { Errors } from "errors.slint";
 import { ImsDialog } from "pages/0025_ims.slint";
 import { Ims } from "ims.slint";
-export { Lang, Cfg, Account, Step, StepHdl, Pages, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y, Appearance, Ims }
+export { Lang, Cfg, Account, Step, StepHdl, Pages, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y, Appearance, Ims, Errors }
 
 export component AppWindow inherits Window {
     // set from Rust to the first page not in `skip_pages`, Next and Back skip those too
@@ -323,5 +324,15 @@ export component AppWindow inherits Window {
     if A11y.more-open: A11yMoreDialog {
         width: 100%;
         height: 100%;
+    }
+
+    // immediate errors, e.g. a broken config the distro's maintainers need to see. Last, so it
+    // sits over anything else that was open
+    if Errors.open: TdnErrorDialog {
+        width: 100%;
+        height: 100%;
+        title: Errors.title != "" ? Errors.title : Lang.t("page-error", []);
+        body: Errors.body;
+        dismissed => { Errors.open = false; }
     }
 }

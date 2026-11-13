@@ -46,6 +46,16 @@ pub fn run() {
     crate::a11y::shutdown();
 }
 
+/// shows an error in a dialog right away, rather than ending the flow on the error page. For
+/// problems the OOBE can't fix itself, like a broken config, that the distro's maintainers need to
+/// see too
+pub fn show_error(ui: &AppWindow, title: &str, body: &str) {
+    let errors = ui.global::<Errors<'_>>();
+    errors.set_title(title.into());
+    errors.set_body(body.into());
+    errors.set_open(true);
+}
+
 /// whether `taidan.debug_shell` is on the kernel command line, either bare or set to a true value
 /// like systemd's `systemd.debug_shell`. A root terminal has to be opt-in. The helper checks it
 /// too, this only saves asking it

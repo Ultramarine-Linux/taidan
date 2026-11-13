@@ -1044,6 +1044,45 @@ export component TdnDialog inherits Rectangle {
     }
 }
 
+// an error shown right away over the page, rather than ending the flow on `ErrorPage`. For
+// problems the OOBE can't fix itself, like a broken config, that the distro's maintainers need to
+// see too. Open it with `Errors.show`
+export component TdnErrorDialog inherits TdnDialog {
+    in property <string> body;
+
+    init => { close.focus(); }
+
+    HorizontalLayout {
+        spacing: 1rem;
+
+        Image {
+            source: @image-url("../data/icons/dialog-error-symbolic.svg");
+            colorize: Tokens.color-destructive;
+            width: 2.5rem;
+            height: self.width;
+            accessible-role: none;
+        }
+
+        TdnText {
+            vertical-alignment: TextVerticalAlignment.top;
+            horizontal-alignment: Dir.text-start;
+            wrap: word-wrap;
+            text: root.body;
+        }
+    }
+
+    HorizontalLayout {
+        alignment: Dir.end;
+
+        close := TdnBtn {
+            in-dialog: true;
+            text: Lang.t("close", []);
+            enter-hint: true;
+            clicked => { root.dismissed(); }
+        }
+    }
+}
+
 // a list in a dialog that scrolls once the dialog shrinks it to fit the window, otherwise as tall
 // as what's in it. Slint scrolls a focused item into view on its own, items also call `reveal`
 // from their `focus-in` so their focus ring isn't cut off at the edge

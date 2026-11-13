@@ -10,6 +10,8 @@ cancel = Cancel
 skip = Skip
 # btn (close a dialog after making changes in it)
 done = Done
+# btn (close an error dialog)
+close = Close
 # window title, read out by screen readers and shown in window switchers
 window-title = { $distro } Setup
 # hidden menu entry for the Alt+Shift+T debug terminal, read out by screen readers

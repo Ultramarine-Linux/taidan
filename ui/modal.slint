@@ -2,6 +2,7 @@ import { Camera } from "camera.slint";
 import { Network } from "network.slint";
 import { Tweaks } from "tweaks.slint";
 import { A11y } from "a11y.slint";
+import { Errors } from "errors.slint";
 import { Ims } from "ims.slint";
 
 // whether a dialog is open, and while one is, only controls with `in-dialog` set can take keyboard
@@ -9,7 +10,7 @@ import { Ims } from "ims.slint";
 // Options" over the accessibility page) has the one underneath give up the keyboard itself, see
 // `A11yContent`
 export global Modal {
-    out property <bool> open: Camera.open || Network.password-ssid != "" || Network.hidden-open || Network.enterprise-open || Network.offline-prompt || Network.proxy-open || Network.ip-open || Tweaks.open || Ims.open || A11y.open || A11y.more-open;
+    out property <bool> open: Camera.open || Network.password-ssid != "" || Network.hidden-open || Network.enterprise-open || Network.offline-prompt || Network.proxy-open || Network.ip-open || Tweaks.open || Ims.open || A11y.open || A11y.more-open || Errors.open;
     // the page being shown, kept in sync by `AppWindow`, so an opener only takes the focus back
     // on the page it opened the dialog from
     in-out property <int> page;
