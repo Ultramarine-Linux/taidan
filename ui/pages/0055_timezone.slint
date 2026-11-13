@@ -1,7 +1,7 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Tz, TimeZone } from "../timezone.slint";
-import { TdnText, TdnInput, TdnListRow, TdnStyle } from "../components.slint";
+import { TdnText, TdnSearchInput, TdnListRow, TdnStyle, TdnCurrentRow, TdnScroll } from "../components.slint";
 import { Card } from "../slintcn/components/card.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 import { ListView } from "std-widgets.slint";
@@ -80,25 +80,16 @@ export component TimezonePage inherits TdnPage {
     }
 
     function move-arrow-key-row(delta: int) {
-        if !searching || Tz.results.length == 0 { return; }
+        if Tz.results.length == 0 { return; }
         arrow-key-row = max(0, min(Tz.results.length - 1, active-row + delta));
-        scroll-to-arrow-key-row();
-    }
-
-    function scroll-to-arrow-key-row() {
-        let top = arrow-key-row * row-height;
-        if top < -list.content-y {
-            list.content-y = -top;
-        } else if top + row-height > -list.content-y + list.visible-height {
-            list.content-y = list.visible-height - top - row-height;
-        }
+        list.content-y = TdnScroll.content-y-showing(arrow-key-row, row-height, list.content-y, list.visible-height);
     }
 
     VerticalLayout {
         spacing: 0.75rem;
 
-        search := TdnInput {
-            icon: @image-url("../../data/icons/system-search-symbolic.svg");
+        search := TdnSearchInput {
+            navigable: root.searching;
             placeholder: Lang.t("page-timezone-search", []);
             // screen readers hear the row Enter would pick as the description changes
             description: !root.searching ? ""
@@ -113,30 +104,17 @@ export component TimezonePage inherits TdnPage {
                 if root.searching && Tz.results.length > 0 { root.pick(Tz.results[root.active-row]); }
                 else if !root.searching { root.try-next(); }
             }
-            key-pressed(event) => {
-                if !root.searching { return reject; }
-                if event.text == Key.DownArrow { move-arrow-key-row(1); return accept; }
-                if event.text == Key.UpArrow { move-arrow-key-row(-1); return accept; }
-                if event.text == Key.PageDown { move-arrow-key-row(10); return accept; }
-                if event.text == Key.PageUp { move-arrow-key-row(-10); return accept; }
-                reject
-            }
+            move(rows) => { move-arrow-key-row(rows); }
         }
 
         Card {
             vertical-stretch: 1;
             card-radius: md;
 
-            // `ListView` only creates the rows in view, so this finds the current zone's row
-            for zone[i] in Tz.results: Rectangle {
-                property <bool> current: zone.id == Tz.current.id;
-                width: 0;
-                height: 0;
-                init => { if self.current { root.current-row = i; } }
-                changed current => {
-                    if self.current { root.current-row = i; }
-                    else if root.current-row == i { root.current-row = -1; }
-                }
+            for zone[i] in Tz.results: TdnCurrentRow {
+                model-row: i;
+                current: zone.id == Tz.current.id;
+                current-row <=> root.current-row;
             }
 
             if !root.searching: WorldMap {

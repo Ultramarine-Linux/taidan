@@ -1,76 +1,42 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
-import { Modal } from "../modal.slint";
-import { TdnText, TdnStyle } from "../components.slint";
+import { TdnText, TdnTile, TdnPressable } from "../components.slint";
 import { Icon } from "../slintcn/components/icon.slint";
 import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
 import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
 import { Palette } from "../slintcn/theme/palette.slint";
 import { Palette as StdPalette } from "std-widgets.slint";
 import { Appearance } from "../appearance.slint";
-import { FocusRing } from "../slintcn/components/focus-ring.slint";
 
-component ThemeTile inherits Rectangle {
+component ThemeTile inherits TdnTile {
     in property <string> text;
     in property <bool> dark;
-    in property <bool> checked;
     callback picked();
     callback accepted();
     callback switched();
 
-    property <bool> pointer-focus;
-
-    forward-focus: focus;
+    badge-inset: 0.4rem;
+    tab-focusable: root.checked;
+    click-focuses: true;
+    ring-radius: Tokens.radius-lg + self.ring-offset;
+    activated => { root.picked(); }
+    key(event) => {
+        if event.text == Key.Return {
+            if !event.repeat {
+                root.picked();
+                root.accepted();
+            }
+            return accept;
+        }
+        if event.text == Key.LeftArrow || event.text == Key.RightArrow {
+            root.switched();
+            return accept;
+        }
+        reject
+    }
     accessible-role: radio-button;
     accessible-label: root.text;
-    accessible-checkable: true;
-    accessible-checked: root.checked;
-    accessible-action-default => { if !Modal.open { root.picked(); } }
-
-    border-radius: Tokens.radius-lg;
-    border-width: root.checked ? 2px : 1px;
-    border-color: root.checked ? TdnStyle.accent : Tokens.color-border-hairline;
-    background: Tokens.color-card;
-    animate border-color { duration: Tokens.motion-fast; }
-
-    Rectangle {
-        border-radius: root.border-radius;
-        background: TdnStyle.accent;
-        opacity: root.checked ? 0.15 : 0;
-        animate opacity { duration: Tokens.motion-fast; }
-    }
-
-    Rectangle {
-        border-radius: root.border-radius;
-        background: Tokens.color-foreground;
-        opacity: area.pressed ? 0.1 : area.has-hover ? 0.05 : 0;
-        animate opacity { duration: Tokens.motion-fast; easing: ease-out; }
-    }
-
-    focus := FocusScope {
-        enabled: !Modal.open;
-        focus-on-tab-navigation: root.checked;
-        key-pressed(event) => {
-            root.pointer-focus = false;
-            if event.text == " " {
-                if !event.repeat { root.picked(); }
-                return accept;
-            }
-            if event.text == Key.Return {
-                if !event.repeat {
-                    root.picked();
-                    root.accepted();
-                }
-                return accept;
-            }
-            if event.text == Key.LeftArrow || event.text == Key.RightArrow {
-                root.switched();
-                return accept;
-            }
-            reject
-        }
-    }
 
     VerticalLayout {
         padding: 0.6rem;
@@ -123,39 +89,6 @@ component ThemeTile inherits Rectangle {
             font-weight: Tokens.typography-weight-medium;
         }
     }
-
-    if root.checked: Rectangle {
-        x: Dir.x(parent.width - self.width - 0.4rem, self.width, parent.width);
-        y: 0.4rem;
-        width: 1.4rem;
-        height: self.width;
-        border-radius: self.width / 2;
-        background: TdnStyle.accent;
-
-        Icon {
-            commands: LucidePaths.check;
-            size: parent.width * 0.65;
-            tint: TdnStyle.accent-foreground;
-            stroke-width: 3px;
-        }
-    }
-
-    area := TouchArea {
-        mouse-cursor: pointer;
-        pointer-event(ev) => {
-            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-        }
-        clicked => {
-            root.picked();
-            focus.focus();
-        }
-    }
-
-    if focus.has-focus && !root.pointer-focus: FocusRing {
-        host-width: parent.width;
-        host-height: parent.height;
-        radius: Tokens.radius-lg + self.offset;
-    }
 }
 
 component AccentRow inherits Rectangle {
@@ -182,41 +115,35 @@ component AccentRow inherits Rectangle {
         alignment: center;
         spacing: 0.75rem;
 
-        for accent[i] in Appearance.accents: swatch := Rectangle {
+        for accent[i] in Appearance.accents: swatch := TdnPressable {
             property <bool> checked: i == Appearance.accent;
 
             layout-order: Dir.order(i);
             width: root.size;
             height: root.size;
+            pointer-focus <=> root.pointer-focus;
+            tab-focusable: self.checked || (Appearance.accent < 0 && i == 0);
+            click-focuses: true;
+            ring-radius: self.width / 2 + self.ring-offset;
+            activated => { Appearance.accent = i; }
+            key(event) => {
+                if event.text == Key.LeftArrow { root.move(-1); return accept; }
+                if event.text == Key.RightArrow { root.move(1); return accept; }
+                if event.text == Key.Return {
+                    if !event.repeat { root.accepted(); }
+                    return accept;
+                }
+                reject
+            }
             accessible-role: radio-button;
             accessible-label: Lang.t("page-theme-accent-" + accent.id, []);
             accessible-checkable: true;
             accessible-checked: self.checked;
-            accessible-action-default => { if !Modal.open { Appearance.accent = i; } }
 
             changed checked => {
                 if self.checked && root.focus-follows-pick {
                     root.focus-follows-pick = false;
-                    focus.focus();
-                }
-            }
-
-            focus := FocusScope {
-                enabled: !Modal.open;
-                focus-on-tab-navigation: swatch.checked || (Appearance.accent < 0 && i == 0);
-                key-pressed(event) => {
-                    root.pointer-focus = false;
-                    if event.text == Key.LeftArrow { root.move(-1); return accept; }
-                    if event.text == Key.RightArrow { root.move(1); return accept; }
-                    if event.text == " " {
-                        if !event.repeat { Appearance.accent = i; }
-                        return accept;
-                    }
-                    if event.text == Key.Return {
-                        if !event.repeat { root.accepted(); }
-                        return accept;
-                    }
-                    reject
+                    self.focus();
                 }
             }
 
@@ -230,23 +157,6 @@ component AccentRow inherits Rectangle {
                 size: root.size * 0.55;
                 tint: accent.check;
                 stroke-width: 3px;
-            }
-
-            TouchArea {
-                mouse-cursor: pointer;
-                pointer-event(ev) => {
-                    if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-                }
-                clicked => {
-                    Appearance.accent = i;
-                    focus.focus();
-                }
-            }
-
-            if focus.has-focus && !root.pointer-focus: FocusRing {
-                host-width: swatch.width;
-                host-height: swatch.height;
-                radius: swatch.width / 2 + self.offset;
             }
         }
     }

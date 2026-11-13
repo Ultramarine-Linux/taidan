@@ -1,8 +1,5 @@
 use crate::prelude::*;
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct DnfInstallApps;
-
 // RPM Fusion says to swap before installing `@multimedia`, otherwise `--skip-broken` silently
 // drops the codecs (https://rpmfusion.org/Howto/Multimedia). `--allowerasing` doesn't help since
 // libsolv drops weak `--skip-broken` jobs before it tries erasing anything
@@ -20,31 +17,27 @@ async fn swap_ffmpeg(callback: &impl crate::Callback) {
     }
 }
 
-impl super::Step for DnfInstallApps {
-    #[tracing::instrument(skip(settings, sender))]
-    async fn run<C: crate::Callback>(
-        &self,
-        settings: &crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        sender: &C,
-    ) -> Res<()> {
-        if settings.nointernet {
-            return Ok(());
-        }
-        let dnf = super::can_use_dnf(cfg).await;
-        let pkgs: &[String] = if dnf { &settings.actions[1] } else { &[] };
-        let codecs = super::_07_drivers_codecs::Codecs::codecs();
-        if pkgs.iter().any(|pkg| codecs.contains(&pkg.as_str())) {
-            swap_ffmpeg(sender).await;
-        }
-        super::flatpaks_and_packages(sender, &settings.actions[2], pkgs, false).await?;
-        if dnf {
-            for script in &settings.actions[3] {
-                super::root(crate::Verb::RunScript { script: script.clone() })
-                    .await
-                    .wrap_message(|_| format!("script failed: {script}"))?;
-            }
-        }
-        Ok(())
+pub(super) async fn run(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    sender: &impl crate::Callback,
+) -> Res<()> {
+    if settings.nointernet {
+        return Ok(());
     }
+    let dnf = super::can_use_dnf(cfg).await;
+    let pkgs: &[String] = if dnf { &settings.actions[1] } else { &[] };
+    let codecs = super::_07_drivers_codecs::Codecs::codecs();
+    if pkgs.iter().any(|pkg| codecs.contains(&pkg.as_str())) {
+        swap_ffmpeg(sender).await;
+    }
+    super::flatpaks_and_packages(sender, &settings.actions[2], pkgs, false).await?;
+    if dnf {
+        for script in &settings.actions[3] {
+            super::root(crate::Verb::RunScript { script: script.clone() })
+                .await
+                .wrap_message(|_| format!("script failed: {script}"))?;
+        }
+    }
+    Ok(())
 }

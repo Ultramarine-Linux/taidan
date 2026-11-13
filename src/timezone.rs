@@ -292,8 +292,7 @@ struct State {
 }
 
 fn locale(ui: &AppWindow) -> String {
-    let locale = ui.global::<Lang<'_>>().get_current_language().locale;
-    if locale == "en-owo" { "en-US".to_owned() } else { locale.into() }
+    crate::l10n::icu_tag(&ui.global::<Lang<'_>>().get_current_language().locale).to_owned()
 }
 
 fn show_results(ui: &AppWindow, state: &State) {

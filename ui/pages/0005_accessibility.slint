@@ -2,10 +2,8 @@ import { TdnBasePg } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { A11y } from "../a11y.slint";
 import { Modal } from "../modal.slint";
-import { TdnText, TdnBtn, TdnStyle, TdnToggleRow, TdnDialog, TdnField, TdnSelect, TdnScrollList } from "../components.slint";
-import { FocusRing } from "../slintcn/components/focus-ring.slint";
+import { TdnText, TdnPara, TdnBtn, TdnStyle, TdnTile, TdnOptionRow, TdnDialog, TdnField, TdnSelect, TdnScrollList } from "../components.slint";
 import { Icon } from "../slintcn/components/icon.slint";
-import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
 // icons from Lucide (https://lucide.dev), ISC license
@@ -16,60 +14,17 @@ global A11yIcons {
     out property <string> keyboard: "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M5.5 8h1.5 M9.5 8h1.5 M13.5 8h1.5 M17.5 8h1.5 M7.5 12h1.5 M11.5 12h1.5 M15.5 12h1.5 M7 16h10";
 }
 
-component A11yTile inherits Rectangle {
+component A11yTile inherits TdnTile {
     in property <string> icon;
     in property <string> text;
-    in property <bool> checked;
-    in property <bool> in-dialog;
     callback toggled(bool);
 
-    property <bool> pointer-focus;
-
-    function toggle() {
-        root.toggled(!root.checked);
-    }
+    activated => { root.toggled(!root.checked); }
+    accessible-role: button;
+    accessible-label: root.text;
 
     width: 10rem;
     height: self.width;
-    forward-focus: focus;
-    accessible-role: button;
-    accessible-label: root.text;
-    accessible-checkable: true;
-    accessible-checked: root.checked;
-    accessible-action-default => { if Modal.open == root.in-dialog { root.toggle(); } }
-
-    border-radius: Tokens.radius-lg;
-    border-width: root.checked ? 2px : 1px;
-    border-color: root.checked ? TdnStyle.accent : Tokens.color-border-hairline;
-    background: Tokens.color-card;
-    animate border-color { duration: Tokens.motion-fast; }
-
-    // animating the opaque background to a translucent tint would dip through the page color
-    Rectangle {
-        border-radius: root.border-radius;
-        background: TdnStyle.accent;
-        opacity: root.checked ? 0.15 : 0;
-        animate opacity { duration: Tokens.motion-fast; }
-    }
-
-    Rectangle {
-        border-radius: root.border-radius;
-        background: Tokens.color-foreground;
-        opacity: area.pressed ? 0.1 : area.has-hover ? 0.05 : 0;
-        animate opacity { duration: Tokens.motion-fast; easing: ease-out; }
-    }
-
-    focus := FocusScope {
-        enabled: Modal.open == root.in-dialog;
-        key-pressed(event) => {
-            root.pointer-focus = false;
-            if event.text == Key.Return || event.text == " " {
-                if !event.repeat { root.toggle(); }
-                return accept;
-            }
-            reject
-        }
-    }
 
     VerticalLayout {
         padding: 0.75rem;
@@ -94,35 +49,6 @@ component A11yTile inherits Rectangle {
             font-size: 1.2 * Tokens.text-rem;
             wrap: word-wrap;
         }
-    }
-
-    if root.checked: Rectangle {
-        x: Dir.x(parent.width - self.width - 0.5rem, self.width, parent.width);
-        y: 0.5rem;
-        width: 1.4rem;
-        height: self.width;
-        border-radius: self.width / 2;
-        background: TdnStyle.accent;
-
-        Icon {
-            commands: LucidePaths.check;
-            size: parent.width * 0.65;
-            tint: TdnStyle.accent-foreground;
-            stroke-width: 3px;
-        }
-    }
-
-    area := TouchArea {
-        mouse-cursor: pointer;
-        pointer-event(ev) => {
-            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-        }
-        clicked => { root.toggle(); }
-    }
-
-    if focus.has-focus && !root.pointer-focus: FocusRing {
-        host-width: parent.width;
-        host-height: parent.height;
     }
 }
 
@@ -228,12 +154,10 @@ component A11yContent inherits VerticalLayout {
             }
         }
 
-        TdnText {
+        TdnPara {
             layout-order: Dir.order(1);
             text: Lang.t("page-accessibility-hint", []);
             font-size: 1.2 * Tokens.text-rem;
-            horizontal-alignment: Dir.text-start;
-            wrap: word-wrap;
             min-width: 0;
         }
     }
@@ -247,7 +171,6 @@ component A11yContent inherits VerticalLayout {
             in-dialog: root.in-active-dialog;
             outline: true;
             text: Lang.t("page-accessibility-more", []);
-            foreground-color: Tokens.color-foreground;
             clicked => {
                 root.more-opened-from-here = true;
                 A11y.more-open = true;
@@ -257,10 +180,8 @@ component A11yContent inherits VerticalLayout {
         TdnBtn {
             layout-order: Dir.order(1);
             in-dialog: root.in-active-dialog;
+            primary: true;
             text: root.next-text;
-            enter-hint: true;
-            background-color: TdnStyle.accent;
-            foreground-color: TdnStyle.accent-foreground;
             clicked => { root.next(); }
         }
     }
@@ -328,110 +249,30 @@ export component AccessibilityDialog inherits Rectangle {
     init => { content.focus-first(); }
 }
 
-component OptionRow inherits VerticalLayout {
-    in property <string> text;
-    in property <string> desc;
-    in property <bool> checked;
-    callback toggled(bool);
-    callback accepted();
-    callback focus-in(length, length);
-
-    spacing: 0.4rem;
-
-    TdnToggleRow {
-        in-dialog: true;
-        text: root.text;
-        checked: root.checked;
-        toggled(on) => { root.toggled(on); }
-        accepted => { root.accepted(); }
-        focus-in(y, height) => { root.focus-in(y, height); }
-    }
-
-    TdnText {
-        text: root.desc;
-        color: Tokens.color-muted-foreground;
-        font-size: Tokens.typography-body-sm-size;
-        horizontal-alignment: Dir.text-start;
-        wrap: word-wrap;
-    }
-}
-
 export component A11yMoreDialog inherits TdnDialog {
     title: Lang.t("page-accessibility-more", []);
+    done-text: Lang.t("page-accessibility-done", []);
     dialog-width: 26rem;
     dismissed => { A11y.more-open = false; }
 
+    function set-option(index: int, on: bool) {
+        if index == 0 { A11y.larger-text = on; }
+        if index == 1 { A11y.legible-font = on; }
+        if index == 2 { A11y.reduce-motion = on; }
+        if index == 3 { A11y.slow-keys = on; }
+        if index == 4 { A11y.bounce-keys = on; }
+        if index == 5 { A11y.dwell-click = on; }
+        A11y.changed();
+    }
+
     scroll := TdnScrollList {
-        OptionRow {
-            text: Lang.t("page-accessibility-larger-text", []);
-            desc: Lang.t("page-accessibility-larger-text-desc", []);
-            checked: A11y.larger-text;
+        for option[i] in ["larger-text", "legible-font", "reduce-motion", "slow-keys", "bounce-keys", "dwell-click"]: TdnOptionRow {
+            text: Lang.t("page-accessibility-" + option, []);
+            description: Lang.t("page-accessibility-" + option + "-desc", []);
+            checked: [A11y.larger-text, A11y.legible-font, A11y.reduce-motion, A11y.slow-keys, A11y.bounce-keys, A11y.dwell-click][i];
+            toggled(on) => { root.set-option(i, on); }
             accepted => { root.dismissed(); }
             focus-in(y, height) => { scroll.reveal(y, height); }
-            toggled(on) => {
-                A11y.larger-text = on;
-                A11y.changed();
-            }
-        }
-
-        OptionRow {
-            text: Lang.t("page-accessibility-legible-font", []);
-            desc: Lang.t("page-accessibility-legible-font-desc", []);
-            checked: A11y.legible-font;
-            accepted => { root.dismissed(); }
-            focus-in(y, height) => { scroll.reveal(y, height); }
-            toggled(on) => {
-                A11y.legible-font = on;
-                A11y.changed();
-            }
-        }
-
-        OptionRow {
-            text: Lang.t("page-accessibility-reduce-motion", []);
-            desc: Lang.t("page-accessibility-reduce-motion-desc", []);
-            checked: A11y.reduce-motion;
-            accepted => { root.dismissed(); }
-            focus-in(y, height) => { scroll.reveal(y, height); }
-            toggled(on) => {
-                A11y.reduce-motion = on;
-                A11y.changed();
-            }
-        }
-
-        OptionRow {
-            text: Lang.t("page-accessibility-slow-keys", []);
-            desc: Lang.t("page-accessibility-slow-keys-desc", []);
-            checked: A11y.slow-keys;
-            accepted => { root.dismissed(); }
-            focus-in(y, height) => { scroll.reveal(y, height); }
-            toggled(on) => {
-                A11y.slow-keys = on;
-                A11y.changed();
-            }
-        }
-
-        OptionRow {
-            text: Lang.t("page-accessibility-bounce-keys", []);
-            desc: Lang.t("page-accessibility-bounce-keys-desc", []);
-            checked: A11y.bounce-keys;
-            accepted => { root.dismissed(); }
-            focus-in(y, height) => { scroll.reveal(y, height); }
-            toggled(on) => {
-                A11y.bounce-keys = on;
-                A11y.changed();
-            }
-        }
-
-        OptionRow {
-            text: Lang.t("page-accessibility-dwell-click", []);
-            desc: Lang.t("page-accessibility-dwell-click-desc", []);
-            checked: A11y.dwell-click;
-            accepted => { root.dismissed(); }
-            focus-in(y, height) => { scroll.reveal(y, height); }
-            toggled(on) => {
-                A11y.dwell-click = on;
-                A11y.changed();
-            }
         }
 
         TdnField {
@@ -454,19 +295,4 @@ export component A11yMoreDialog inherits TdnDialog {
             }
         }
     }
-
-    HorizontalLayout {
-        alignment: Dir.end;
-
-        done := TdnBtn {
-            in-dialog: true;
-            text: Lang.t("page-accessibility-done", []);
-            enter-hint: true;
-            background-color: TdnStyle.accent;
-            foreground-color: TdnStyle.accent-foreground;
-            clicked => { root.dismissed(); }
-        }
-    }
-
-    init => { done.focus(); }
 }

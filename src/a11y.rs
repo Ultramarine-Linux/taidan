@@ -1,44 +1,119 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError, mpsc};
+use std::sync::{OnceLock, mpsc};
 use std::time::{Duration, Instant};
 
 use libtaidan::a11y::A11y as Opts;
+use parking_lot::Mutex;
 use slint::ComponentHandle;
 use zbus::blocking::Connection;
 
+use crate::child::ChildSlot;
 use crate::ui::{A11y, AppWindow};
 
 const KWIN_ZOOM_IN_PRESSES: usize = 4;
+const ORCA_RESTART_DELAY: Duration = Duration::from_millis(1500);
+const ORCA_EXIT_POLL: Duration = Duration::from_secs(1);
 
 type OrcaStartNumber = u64;
-
-static ORCA: Mutex<Option<(OrcaStartNumber, std::process::Child)>> = Mutex::new(None);
-
-static ORCA_STARTS: AtomicU64 = AtomicU64::new(0);
-
-static SHUT_DOWN: AtomicBool = AtomicBool::new(false);
-
-static ORCA_POSIX_LOCALE: Mutex<Option<String>> = Mutex::new(None);
-
-static WORKER: OnceLock<mpsc::Sender<Msg>> = OnceLock::new();
 
 enum Msg {
     Opts(Opts),
     RestartOrcaInNewLanguage,
 }
 
+struct Orca {
+    process: ChildSlot<OrcaStartNumber>,
+    starts: AtomicU64,
+    shut_down: AtomicBool,
+    posix_locale: Mutex<Option<String>>,
+    worker: OnceLock<mpsc::Sender<Msg>>,
+}
+
+static ORCA: Orca = Orca {
+    process: ChildSlot::new("orca"),
+    starts: AtomicU64::new(0),
+    shut_down: AtomicBool::new(false),
+    posix_locale: Mutex::new(None),
+    worker: OnceLock::new(),
+};
+
+impl Orca {
+    fn send(&self, msg: Msg) {
+        if let Some(tx) = self.worker.get()
+            && let Err(e) = tx.send(msg)
+        {
+            tracing::error!(?e, "accessibility worker is gone");
+        }
+    }
+
+    fn language_changed(&self, posix_locale: &str) {
+        let mut current = self.posix_locale.lock();
+        if current.as_deref() == Some(posix_locale) {
+            return;
+        }
+        *current = Some(posix_locale.to_owned());
+        drop(current);
+        self.send(Msg::RestartOrcaInNewLanguage);
+    }
+
+    fn shutdown(&self) {
+        self.shut_down.store(true, Ordering::SeqCst);
+        self.process.stop();
+    }
+
+    fn start(&'static self, ui: &slint::Weak<AppWindow>) {
+        let mut cmd = std::process::Command::new("orca");
+        cmd.arg("--replace");
+        let locale = self.posix_locale.lock().clone();
+        if let Some(locale) = locale {
+            cmd.envs(locale_env(&locale)).env_remove("LC_ALL").env_remove("LC_MESSAGES");
+        }
+        if let Err(e) = sandbox::apply(&mut cmd) {
+            tracing::error!(?e, "cannot set up Orca's sandbox, not starting it");
+            screen_reader_off(ui);
+            return;
+        }
+        let mut orca = self.process.lock();
+        if self.shut_down.load(Ordering::SeqCst) {
+            return;
+        }
+        match cmd.spawn() {
+            Ok(child) => {
+                let n = self.starts.fetch_add(1, Ordering::SeqCst);
+                *orca = Some((n, child));
+                let ui = ui.clone();
+                std::thread::spawn(move || self.turn_tile_off_when_exits(n, &ui));
+            }
+            Err(e) => {
+                tracing::error!(?e, "cannot start Orca");
+                drop(orca);
+                screen_reader_off(ui);
+            }
+        }
+    }
+
+    fn turn_tile_off_when_exits(&self, n: OrcaStartNumber, ui: &slint::Weak<AppWindow>) {
+        loop {
+            std::thread::sleep(ORCA_EXIT_POLL);
+            let mut orca = self.process.lock();
+            let Some((started, child)) = orca.as_mut().filter(|(started, _)| *started == n) else {
+                return;
+            };
+            match child.try_wait() {
+                Ok(None) => continue,
+                Ok(Some(status)) => tracing::warn!(?status, started, "Orca exited by itself"),
+                Err(e) => tracing::warn!(?e, "cannot wait for Orca, taking it as gone"),
+            }
+            *orca = None;
+            drop(orca);
+            screen_reader_off(ui);
+            return;
+        }
+    }
+}
+
 pub fn language_changed(posix_locale: &str) {
-    let mut current = ORCA_POSIX_LOCALE.lock().unwrap_or_else(PoisonError::into_inner);
-    if current.as_deref() == Some(posix_locale) {
-        return;
-    }
-    *current = Some(posix_locale.to_owned());
-    drop(current);
-    if let Some(tx) = WORKER.get()
-        && let Err(e) = tx.send(Msg::RestartOrcaInNewLanguage)
-    {
-        tracing::error!(?e, "accessibility worker is gone");
-    }
+    ORCA.language_changed(posix_locale);
 }
 
 fn saved_path() -> Option<std::path::PathBuf> {
@@ -95,8 +170,7 @@ fn set(a11y: &A11y<'_>, opts: &Opts) {
 }
 
 pub fn shutdown() {
-    SHUT_DOWN.store(true, Ordering::SeqCst);
-    stop_orca();
+    ORCA.shutdown();
 }
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, a11y: &A11y<'_>) {
@@ -107,22 +181,18 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, a11y: &A11y<'_>) {
     });
     let opts = load_saved_this_boot();
     set(a11y, &opts);
-    crate::SETTINGS.write().a11y = opts;
-    if let Err(e) = tx.send(Msg::Opts(opts)) {
-        tracing::error!(?e, "accessibility worker is gone");
-    }
-    if WORKER.set(tx.clone()).is_err() {
+    if ORCA.worker.set(tx).is_err() {
         tracing::warn!("accessibility worker already started");
     }
+    crate::SETTINGS.write().a11y = opts;
+    ORCA.send(Msg::Opts(opts));
     a11y.on_changed({
         let ui = ui.clone();
         move || {
             let Some(ui) = ui.upgrade() else { return };
             let opts = read(&ui.global::<A11y<'_>>());
             crate::SETTINGS.write().a11y = opts;
-            if let Err(e) = tx.send(Msg::Opts(opts)) {
-                tracing::error!(?e, "accessibility worker is gone");
-            }
+            ORCA.send(Msg::Opts(opts));
         }
     });
 }
@@ -163,7 +233,7 @@ fn worker(rx: &mpsc::Receiver<Msg>, ui: &slint::Weak<AppWindow>) {
             match msg {
                 Msg::Opts(opts) => latest_opts = Some(opts),
                 Msg::RestartOrcaInNewLanguage => {
-                    orca_restart_at = Some(Instant::now() + Duration::from_millis(1500));
+                    orca_restart_at = Some(Instant::now() + ORCA_RESTART_DELAY);
                 }
             }
         }
@@ -182,24 +252,18 @@ fn worker(rx: &mpsc::Receiver<Msg>, ui: &slint::Weak<AppWindow>) {
         }
         if next.screen_reader != prev.screen_reader || (restart_orca && next.screen_reader) {
             orca_restart_at = None;
-            stop_orca();
+            ORCA.process.stop();
             if next.screen_reader {
-                start_orca(ui);
+                ORCA.start(ui);
             }
         }
         applied = Some(next);
     }
-    stop_orca();
+    ORCA.process.stop();
 }
 
-const fn forget_kwin_saved_zoom() -> libtaidan::a11y::Entry {
-    libtaidan::a11y::Entry {
-        file: "kwinrc",
-        group: "Effect-zoom",
-        key: "InitialZoom",
-        value: None,
-        write_as_bool: false,
-    }
+const fn forget_kwin_saved_zoom() -> libtaidan::kconfig::KConfigEntry {
+    libtaidan::kconfig::KConfigEntry::delete("kwinrc", "Effect-zoom", "InitialZoom")
 }
 
 fn write_kwin_config(prev: Option<&Opts>, next: &Opts) {
@@ -212,9 +276,8 @@ fn write_kwin_config(prev: Option<&Opts>, next: &Opts) {
         if old.contains(&entry) {
             continue;
         }
-        let mut args = entry.kwriteconfig_args(entry.file);
-        args.push("--notify".to_owned());
-        match std::process::Command::new("kwriteconfig6").args(&args).status() {
+        let mut kwriteconfig = std::process::Command::new("kwriteconfig6");
+        match kwriteconfig.arg("--notify").args(entry.args(entry.file)).status() {
             Ok(status) if status.success() => {}
             Ok(status) => tracing::warn!(?status, ?entry, "kwriteconfig6 failed"),
             Err(e) => tracing::warn!(?e, ?entry, "cannot run kwriteconfig6"),
@@ -269,104 +332,21 @@ fn run_kwin_shortcut(bus: &Connection, name: &str) {
     }
 }
 
-fn lock_orca() -> MutexGuard<'static, Option<(OrcaStartNumber, std::process::Child)>> {
-    ORCA.lock().unwrap_or_else(PoisonError::into_inner)
-}
-
-fn stop_orca() {
-    let Some((_, mut child)) = lock_orca().take() else { return };
-    if let Ok(pid) = libc::pid_t::try_from(child.id()) {
-        // SAFETY: the child hasn't been waited for, so the pid is still Orca's and not reused
-        if unsafe { libc::kill(pid, libc::SIGTERM) } != 0 {
-            tracing::warn!(e = ?std::io::Error::last_os_error(), "cannot stop Orca");
-        }
-    }
-    let deadline = Instant::now() + Duration::from_secs(2);
-    while Instant::now() < deadline {
-        match child.try_wait() {
-            Ok(Some(_)) => return,
-            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
-            Err(e) => {
-                tracing::warn!(?e, "cannot wait for Orca");
-                break;
-            }
-        }
-    }
-    tracing::warn!("Orca didn't exit, killing it");
-    if let Err(e) = child.kill() {
-        tracing::warn!(?e, "cannot kill Orca");
-    }
-    if let Err(e) = child.wait() {
-        tracing::warn!(?e, "cannot wait for Orca");
-    }
-}
-
-fn start_orca(ui: &slint::Weak<AppWindow>) {
-    let mut cmd = std::process::Command::new("orca");
-    cmd.arg("--replace");
-    let locale = ORCA_POSIX_LOCALE.lock().unwrap_or_else(PoisonError::into_inner).clone();
-    if let Some(locale) = locale {
-        cmd.envs(locale_env(&locale)).env_remove("LC_ALL").env_remove("LC_MESSAGES");
-    }
-    if let Err(e) = sandbox::apply(&mut cmd) {
-        tracing::error!(?e, "cannot set up Orca's sandbox, not starting it");
-        screen_reader_off(ui);
-        return;
-    }
-    let mut orca = lock_orca();
-    if SHUT_DOWN.load(Ordering::SeqCst) {
-        return;
-    }
-    match cmd.spawn() {
-        Ok(child) => {
-            let n = ORCA_STARTS.fetch_add(1, Ordering::SeqCst);
-            *orca = Some((n, child));
-            let ui = ui.clone();
-            std::thread::spawn(move || turn_tile_off_when_orca_exits(n, &ui));
-        }
-        Err(e) => {
-            tracing::error!(?e, "cannot start Orca");
-            drop(orca);
-            screen_reader_off(ui);
-        }
-    }
-}
-
 fn locale_env(posix_locale: &str) -> [(&'static str, String); 2] {
-    let without_codeset = posix_locale.split_once('.').map_or(posix_locale, |(name, _)| name);
-    [("LANG", posix_locale.to_owned()), ("LANGUAGE", without_codeset.to_owned())]
-}
-
-fn turn_tile_off_when_orca_exits(n: OrcaStartNumber, ui: &slint::Weak<AppWindow>) {
-    loop {
-        std::thread::sleep(Duration::from_secs(1));
-        let mut orca = lock_orca();
-        let Some((started, child)) = orca.as_mut().filter(|(started, _)| *started == n) else {
-            return;
-        };
-        match child.try_wait() {
-            Ok(None) => continue,
-            Ok(Some(status)) => tracing::warn!(?status, started, "Orca exited by itself"),
-            Err(e) => tracing::warn!(?e, "cannot wait for Orca, taking it as gone"),
-        }
-        *orca = None;
-        drop(orca);
-        screen_reader_off(ui);
-        return;
-    }
+    [
+        ("LANG", posix_locale.to_owned()),
+        ("LANGUAGE", crate::l10n::without_codeset(posix_locale).to_owned()),
+    ]
 }
 
 fn screen_reader_off(ui: &slint::Weak<AppWindow>) {
-    let sent = ui.upgrade_in_event_loop(|ui| {
+    crate::ui::on_ui(ui, |ui| {
         let a11y = ui.global::<A11y<'_>>();
         if a11y.get_screen_reader() {
             a11y.set_screen_reader(false);
             a11y.invoke_changed();
         }
     });
-    if let Err(e) = sent {
-        tracing::warn!(?e, "cannot turn the screen reader tile off");
-    }
 }
 
 // polkit lets taidan run anything as root, and Orca's help and links could open apps that reach a

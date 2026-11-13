@@ -1,6 +1,5 @@
 import { Tokens, Theme, ThemeMode } from "slintcn/theme/tokens.slint";
 import { FocusRing } from "slintcn/components/focus-ring.slint";
-import { Label } from "slintcn/components/label.slint";
 import { Icon } from "slintcn/components/icon.slint";
 import { LucidePaths } from "slintcn/components/lucide-paths.slint";
 import { Cfg } from "cfg.slint";
@@ -32,36 +31,160 @@ export component TdnText inherits Text {
     font-weight: 400;
 }
 
-export component TdnBtn inherits Rectangle {
-    in property <string> text;
-    in property <image> icon;
-    in property <brush> background-color: Tokens.color-primary;
-    in property <color> foreground-color: root.outline ? Tokens.color-foreground : Tokens.color-primary-foreground;
-    in property <length> font-size: Tokens.typography-body-size;
-    in property <bool> enabled: true;
-    in property <length> padding-x: 1rem;
-    in property <length> icon-size: 1.25rem;
-    in property <length> min-size: 2.25rem;
-    in property <bool> enter-hint;
-    in property <bool> outline;
-    in property <bool> in-dialog;
-    callback clicked;
-    out property <bool> has-focus: focus.has-focus;
+export component TdnPara inherits TdnText {
+    horizontal-alignment: Dir.text-start;
+    wrap: word-wrap;
+}
 
-    property <bool> pointer-focus;
+export component TdnNote inherits TdnPara {
+    color: Tokens.color-muted-foreground;
+}
+
+export component TdnPressable inherits Rectangle {
+    in property <bool> enabled: true;
+    in property <bool> busy;
+    in property <bool> focusable: root.enabled;
+    in property <bool> tab-focusable: true;
+    in property <bool> in-dialog;
+    in property <bool> opens-dialog;
+    in property <bool> click-focuses;
+    in property <bool> ring-inset;
+    in property <length> ring-offset: Tokens.focus-ring-offset;
+    in property <length> ring-radius: Tokens.radius-md + self.ring-offset;
+    in-out property <bool> pointer-focus;
+    out property <bool> has-focus: focus.has-focus;
+    out property <bool> has-hover: area.has-hover;
+    out property <bool> pressed: area.pressed;
+    out property <bool> active: root.enabled && !root.busy;
+    callback activated;
+    callback key(KeyEvent) -> EventResult;
+    key(event) => { reject }
+    callback blurred(FocusReason);
 
     function press() {
-        root.clicked();
-        if !root.in-dialog { opener.opened(); }
+        root.activated();
+        if root.opens-dialog && !root.in-dialog { opener.opened(); }
     }
 
     forward-focus: focus;
+    accessible-enabled: root.active;
+    accessible-action-default => {
+        if root.active && Modal.open == root.in-dialog { root.press(); }
+    }
+
+    @children
+
+    focus := FocusScope {
+        enabled: root.focusable && Modal.open == root.in-dialog;
+        focus-on-tab-navigation: root.tab-focusable;
+        focus-gained(reason) => {
+            if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
+        }
+        focus-lost(reason) => { root.blurred(reason); }
+        key-pressed(event) => {
+            root.pointer-focus = false;
+            if root.key(event) == EventResult.accept { return accept; }
+            if event.text == Key.Return || event.text == " " {
+                if !event.repeat && root.active { root.press(); }
+                return accept;
+            }
+            reject
+        }
+    }
+
+    opener := DialogOpener {
+        restore => { focus.focus(); }
+    }
+
+    area := TouchArea {
+        enabled: root.active || (root.focusable && !root.busy);
+        mouse-cursor: root.active ? pointer : default;
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
+        }
+        clicked => {
+            if !root.active { return; }
+            root.press();
+            if root.click-focuses { focus.focus(); }
+        }
+    }
+
+    if focus.has-focus && !root.pointer-focus: FocusRing {
+        host-width: parent.width;
+        host-height: parent.height;
+        inset: root.ring-inset;
+        offset: root.ring-offset;
+        radius: root.ring-radius;
+    }
+}
+
+export component TdnTile inherits TdnPressable {
+    in property <bool> checked;
+    in property <length> badge-inset: 0.5rem;
+
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+
+    border-radius: Tokens.radius-lg;
+    border-width: root.checked ? 2px : 1px;
+    border-color: root.checked ? TdnStyle.accent : Tokens.color-border-hairline;
+    background: Tokens.color-card;
+    animate border-color { duration: Tokens.motion-fast; }
+
+    // animating the opaque background to a translucent tint would dip through the page color
+    Rectangle {
+        border-radius: root.border-radius;
+        background: TdnStyle.accent;
+        opacity: root.checked ? 0.15 : 0;
+        animate opacity { duration: Tokens.motion-fast; }
+    }
+
+    Rectangle {
+        border-radius: root.border-radius;
+        background: Tokens.color-foreground;
+        opacity: root.pressed ? 0.1 : root.has-hover ? 0.05 : 0;
+        animate opacity { duration: Tokens.motion-fast; easing: ease-out; }
+    }
+
+    @children
+
+    if root.checked: Rectangle {
+        x: Dir.x(parent.width - self.width - root.badge-inset, self.width, parent.width);
+        y: root.badge-inset;
+        width: 1.4rem;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: TdnStyle.accent;
+
+        Icon {
+            commands: LucidePaths.check;
+            size: parent.width * 0.65;
+            tint: TdnStyle.accent-foreground;
+            stroke-width: 3px;
+        }
+    }
+}
+
+export component TdnBtn inherits TdnPressable {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> primary;
+    in property <brush> background-color: root.primary ? TdnStyle.accent : Tokens.color-primary;
+    in property <color> foreground-color: root.primary ? TdnStyle.accent-foreground
+        : root.outline ? Tokens.color-foreground
+        : Tokens.color-primary-foreground;
+    in property <length> font-size: Tokens.typography-body-size;
+    in property <length> padding-x: 1rem;
+    in property <length> icon-size: 1.25rem;
+    in property <length> min-size: 2.25rem;
+    in property <bool> enter-hint: root.primary;
+    in property <bool> outline;
+    callback clicked;
+
+    opens-dialog: true;
+    activated => { root.clicked(); }
     accessible-role: button;
     accessible-label: root.text;
-    accessible-enabled: root.enabled;
-    accessible-action-default => {
-        if root.enabled && Modal.open == root.in-dialog { root.press(); }
-    }
 
     min-height: root.min-size * Tokens.text-scale;
     min-width: root.min-size * Tokens.text-scale;
@@ -69,36 +192,17 @@ export component TdnBtn inherits Rectangle {
 
     // Slint inlines a full copy of a component with `opacity` or an animated `background` on its
     // root at every use
-    frame := Rectangle {
+    Rectangle {
         border-radius: root.border-radius;
         border-width: root.outline ? 1px : 0;
         border-color: Tokens.color-border-hairline-strong;
         opacity: root.outline && !root.enabled ? 0.5 : 1;
-        background: root.outline ? (area.has-hover ? Tokens.color-accent : transparent)
+        background: root.outline ? (root.has-hover ? Tokens.color-accent : transparent)
             : !root.enabled ? root.background-color.transparentize(0.6)
-            : area.pressed ? root.background-color.transparentize(0.2)
-            : area.has-hover ? root.background-color.transparentize(0.1)
+            : root.pressed ? root.background-color.transparentize(0.2)
+            : root.has-hover ? root.background-color.transparentize(0.1)
             : root.background-color;
         animate background { duration: Tokens.motion-fast; }
-
-        focus := FocusScope {
-            enabled: root.enabled && Modal.open == root.in-dialog;
-            focus-gained(reason) => {
-                if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
-            }
-            key-pressed(event) => {
-                root.pointer-focus = false;
-                if event.text == Key.Return || event.text == " " {
-                    if !event.repeat { root.press(); }
-                    return accept;
-                }
-                reject
-            }
-        }
-
-        opener := DialogOpener {
-            restore => { focus.focus(); }
-        }
 
         HorizontalLayout {
             padding-left: root.padding-x * Tokens.text-scale;
@@ -139,20 +243,6 @@ export component TdnBtn inherits Rectangle {
                 }
             }
         }
-
-        area := TouchArea {
-            enabled: root.enabled;
-            mouse-cursor: root.enabled ? pointer : default;
-            pointer-event(ev) => {
-                if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-            }
-            clicked => { root.press(); }
-        }
-
-        if focus.has-focus && !root.pointer-focus: FocusRing {
-            host-width: parent.width;
-            host-height: parent.height;
-        }
     }
 }
 
@@ -162,7 +252,6 @@ export component TdnInput inherits Rectangle {
     in property <string> label;
     in property <string> description;
     in property <bool> enabled: true;
-    in property <bool> read-only;
     in property <bool> password;
     in property <bool> auto-focus;
     in property <image> icon;
@@ -175,7 +264,6 @@ export component TdnInput inherits Rectangle {
     public function select-all() { input.select-all(); }
 
     property <bool> revealed;
-    property <bool> reveal-pointer-focus;
     in property <bool> page-active: true;
     changed page-active => { if !self.page-active { root.revealed = false; } }
     property <bool> has-icon: root.icon.width > 0;
@@ -189,9 +277,8 @@ export component TdnInput inherits Rectangle {
     accessible-placeholder-text: root.label != "" ? root.placeholder : "";
     accessible-value: root.password ? "" : root.text;
     accessible-enabled: root.enabled;
-    accessible-read-only: root.read-only;
     accessible-action-set-value(v) => {
-        if root.enabled && !root.read-only && Modal.open == root.in-dialog {
+        if root.enabled && Modal.open == root.in-dialog {
             root.text = v;
             root.edited(v);
         }
@@ -237,7 +324,7 @@ export component TdnInput inherits Rectangle {
             selection-background-color: TdnStyle.accent.transparentize(0.6);
             font-size: Tokens.typography-body-size;
             single-line: true;
-            read-only: root.read-only || !root.enabled;
+            read-only: !root.enabled;
             enabled: root.enabled && Modal.open == root.in-dialog;
             input-type: root.password && !root.revealed ? InputType.password : InputType.text;
             vertical-alignment: center;
@@ -265,35 +352,23 @@ export component TdnInput inherits Rectangle {
             accessible-role: none;
         }
 
-        reveal := Rectangle {
+        reveal := TdnPressable {
             visible: root.password;
             width: root.password ? parent.height : 0;
             height: parent.height;
             x: Dir.x(parent.width - self.width, self.width, parent.width);
             border-radius: Tokens.radius-md;
+            enabled: root.enabled;
+            focusable: root.password && root.enabled;
+            in-dialog: root.in-dialog;
+            ring-inset: true;
+            ring-offset: 3px;
+            ring-radius: Tokens.radius-sm;
+            activated => { root.revealed = !root.revealed; }
             accessible-role: button;
             accessible-label: Lang.t("page-password-show", []);
-            accessible-enabled: root.enabled;
             accessible-checkable: true;
             accessible-checked: root.revealed;
-            accessible-action-default => {
-                if root.enabled && Modal.open == root.in-dialog { root.revealed = !root.revealed; }
-            }
-
-            reveal-focus := FocusScope {
-                enabled: root.password && root.enabled && Modal.open == root.in-dialog;
-                focus-gained(reason) => {
-                    if reason == FocusReason.tab-navigation { root.reveal-pointer-focus = false; }
-                }
-                key-pressed(event) => {
-                    root.reveal-pointer-focus = false;
-                    if event.text == Key.Return || event.text == " " {
-                        if !event.repeat { root.revealed = !root.revealed; }
-                        return accept;
-                    }
-                    reject
-                }
-            }
 
             Image {
                 source: @image-url("../data/icons/eye-open-negative-filled-symbolic.svg");
@@ -301,23 +376,6 @@ export component TdnInput inherits Rectangle {
                 height: self.width;
                 colorize: root.revealed ? Tokens.color-foreground : Tokens.color-muted-foreground;
                 accessible-role: none;
-            }
-
-            TouchArea {
-                enabled: root.enabled;
-                mouse-cursor: pointer;
-                pointer-event(ev) => {
-                    if ev.kind == PointerEventKind.down { root.reveal-pointer-focus = true; }
-                }
-                clicked => { root.revealed = !root.revealed; }
-            }
-
-            if reveal-focus.has-focus && !root.reveal-pointer-focus: FocusRing {
-                host-width: parent.width;
-                host-height: parent.height;
-                inset: true;
-                offset: 3px;
-                radius: Tokens.radius-sm;
             }
         }
 
@@ -328,44 +386,28 @@ export component TdnInput inherits Rectangle {
     }
 }
 
-export component TdnListRow inherits Rectangle {
+export component TdnListRow inherits TdnPressable {
     in property <string> text;
     in property <string> secondary;
     in property <bool> selected;
     in property <bool> highlighted;
-    in property <bool> focusable;
-    in property <bool> in-dialog;
     callback clicked;
 
-    property <bool> pointer-focus;
-
-    forward-focus: focus;
+    focusable: false;
+    activated => { root.clicked(); }
     accessible-role: list-item;
     accessible-label: root.secondary == "" ? root.text : root.text + ", " + root.secondary;
     accessible-item-selectable: true;
     accessible-item-selected: root.selected;
-    accessible-action-default => { if Modal.open == root.in-dialog { root.clicked(); } }
+    ring-inset: true;
+    ring-offset: 0;
+    ring-radius: Tokens.radius-sm;
 
     height: 2.25rem;
     border-radius: Tokens.radius-sm;
     background: root.selected ? TdnStyle.accent
-        : area.has-hover || root.highlighted ? Tokens.color-accent
+        : root.has-hover || root.highlighted ? Tokens.color-accent
         : transparent;
-
-    focus := FocusScope {
-        enabled: root.focusable && Modal.open == root.in-dialog;
-        focus-gained(reason) => {
-            if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
-        }
-        key-pressed(event) => {
-            root.pointer-focus = false;
-            if event.text == Key.Return || event.text == " " {
-                if !event.repeat { root.clicked(); }
-                return accept;
-            }
-            reject
-        }
-    }
 
     HorizontalLayout {
         padding-left: 0.75rem;
@@ -390,22 +432,6 @@ export component TdnListRow inherits Rectangle {
             accessible-role: none;
         }
     }
-
-    area := TouchArea {
-        mouse-cursor: pointer;
-        pointer-event(ev) => {
-            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-        }
-        clicked => { root.clicked(); }
-    }
-
-    if focus.has-focus && !root.pointer-focus: FocusRing {
-        host-width: parent.width;
-        host-height: parent.height;
-        inset: true;
-        offset: 0;
-        radius: Tokens.radius-sm;
-    }
 }
 
 export component TdnSelect inherits Rectangle {
@@ -418,8 +444,7 @@ export component TdnSelect inherits Rectangle {
     callback focus-in(y: length, height: length);
 
     property <bool> open;
-    property <bool> pointer-focus;
-    property <bool> has-focus: focus.has-focus;
+    property <bool> has-focus: header.has-focus;
 
     changed has-focus => {
         if self.has-focus { root.focus-in(root.absolute-position.y, root.height); }
@@ -439,7 +464,7 @@ export component TdnSelect inherits Rectangle {
         }
     }
 
-    forward-focus: focus;
+    forward-focus: header;
     accessible-role: combobox;
     accessible-label: root.label;
     accessible-value: root.options[root.index];
@@ -452,41 +477,35 @@ export component TdnSelect inherits Rectangle {
     VerticalLayout {
         spacing: 0.25rem;
 
-        header := Rectangle {
+        header := TdnPressable {
+            enabled: root.enabled;
+            in-dialog: root.in-dialog;
+            click-focuses: true;
+            accessible-role: none;
+            activated => { root.open = !root.open; }
+            key(event) => {
+                if event.text == Key.DownArrow { root.pick(root.index + 1); return accept; }
+                if event.text == Key.UpArrow { root.pick(root.index - 1); return accept; }
+                if event.text == Key.Home { root.pick(0); return accept; }
+                if event.text == Key.End { root.pick(root.options.length - 1); return accept; }
+                if event.text == Key.Escape && root.open {
+                    root.open = false;
+                    return accept;
+                }
+                reject
+            }
+            blurred(reason) => {
+                if reason == FocusReason.tab-navigation || reason == FocusReason.pointer-click {
+                    root.open = false;
+                }
+            }
+
             height: Tokens.density-input;
             border-radius: Tokens.radius-md;
             border-width: 1px;
             border-color: Tokens.color-border-hairline-strong;
-            background: area.has-hover && root.enabled ? Tokens.color-accent : Tokens.color-card;
+            background: self.has-hover && root.enabled ? Tokens.color-accent : Tokens.color-card;
             opacity: root.enabled ? 1 : 0.5;
-
-            focus := FocusScope {
-                enabled: root.enabled && Modal.open == root.in-dialog;
-                focus-gained(reason) => {
-                    if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
-                }
-                key-pressed(event) => {
-                    root.pointer-focus = false;
-                    if event.text == " " || event.text == Key.Return {
-                        if !event.repeat { root.open = !root.open; }
-                        return accept;
-                    }
-                    if event.text == Key.DownArrow { root.pick(root.index + 1); return accept; }
-                    if event.text == Key.UpArrow { root.pick(root.index - 1); return accept; }
-                    if event.text == Key.Home { root.pick(0); return accept; }
-                    if event.text == Key.End { root.pick(root.options.length - 1); return accept; }
-                    if event.text == Key.Escape && root.open {
-                        root.open = false;
-                        return accept;
-                    }
-                    reject
-                }
-                focus-lost(reason) => {
-                    if reason == FocusReason.tab-navigation || reason == FocusReason.pointer-click {
-                        root.open = false;
-                    }
-                }
-            }
 
             HorizontalLayout {
                 padding-left: 0.75rem;
@@ -512,23 +531,6 @@ export component TdnSelect inherits Rectangle {
                         tint: Tokens.color-muted-foreground;
                     }
                 }
-            }
-
-            area := TouchArea {
-                enabled: root.enabled;
-                mouse-cursor: pointer;
-                pointer-event(ev) => {
-                    if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-                }
-                clicked => {
-                    root.open = !root.open;
-                    focus.focus();
-                }
-            }
-
-            if focus.has-focus && !root.pointer-focus: FocusRing {
-                host-width: parent.width;
-                host-height: parent.height;
             }
         }
 
@@ -557,7 +559,6 @@ export component TdnSelect inherits Rectangle {
 
 export component TdnField inherits VerticalLayout {
     in property <string> label;
-    in property <bool> required;
     in property <string> help;
     in property <string> error;
     out property <string> description: root.error != "" ? root.error : root.help;
@@ -568,78 +569,101 @@ export component TdnField inherits VerticalLayout {
     HorizontalLayout {
         alignment: Dir.start;
 
-        Label {
-            text: root.label;
-            required: root.required;
-            clicked => { root.label-clicked(); }
+        Rectangle {
+            preferred-width: label-row.preferred-width;
+            min-width: 0;
+
+            label-row := HorizontalLayout {
+                Text {
+                    text: root.label;
+                    color: Tokens.color-foreground;
+                    font-size: Tokens.typography-body-size;
+                    font-weight: Tokens.typography-weight-medium;
+                    wrap: word-wrap;
+                    min-width: 0;
+                }
+            }
+
+            TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.label-clicked(); }
+            }
         }
     }
 
     @children
 
-    if root.description != "": TdnText {
+    if root.description != "": TdnNote {
         text: root.description;
         color: root.error != "" ? Tokens.color-destructive : Tokens.color-muted-foreground;
         font-size: Tokens.typography-body-sm-size;
-        horizontal-alignment: Dir.text-start;
-        wrap: word-wrap;
     }
 }
 
-export component TdnToggleRow inherits Rectangle {
+export component TdnTextField inherits TdnField {
+    in-out property <string> text;
+    in property <string> placeholder;
+    in property <string> input-description: root.description;
+    in property <bool> password;
+    in property <bool> invalid: root.error != "";
+    in property <bool> enabled: true;
+    in property <bool> in-dialog;
+    in property <bool> auto-focus;
+    in property <bool> page-active: true;
+    callback edited(string);
+    callback accepted(string);
+    public function select-all() { input.select-all(); }
+
+    forward-focus: input;
+    label-clicked => { input.focus(); }
+
+    input := TdnInput {
+        label: root.label;
+        description: root.input-description;
+        placeholder: root.placeholder;
+        text <=> root.text;
+        password: root.password;
+        invalid: root.invalid;
+        enabled: root.enabled;
+        in-dialog: root.in-dialog;
+        auto-focus: root.auto-focus;
+        page-active: root.page-active;
+        edited(text) => { root.edited(text); }
+        accepted(text) => { root.accepted(text); }
+    }
+}
+
+export component TdnToggleRow inherits TdnPressable {
     in property <string> text;
     in property <bool> checked;
-    in property <bool> enabled: true;
     callback toggled(bool);
     callback accepted();
-    in property <bool> in-dialog;
     callback focus-in(y: length, height: length);
-
-    property <bool> pointer-focus;
-    property <bool> has-focus: focus.has-focus;
 
     changed has-focus => {
         if self.has-focus { root.focus-in(root.absolute-position.y, root.height); }
     }
 
-    function toggle() {
-        if root.enabled { root.toggled(!root.checked); }
-    }
-
     property <float> disabled-fade: root.enabled ? 0 : 0.5;
 
-    forward-focus: focus;
+    focusable: true;
+    activated => { root.toggled(!root.checked); }
+    key(event) => {
+        if event.text != Key.Return { return reject; }
+        if !event.repeat { root.accepted(); }
+        accept
+    }
     accessible-role: switch;
-    accessible-enabled: root.enabled;
     accessible-label: root.text;
     accessible-checkable: true;
     accessible-checked: root.checked;
-    accessible-action-default => { if Modal.open == root.in-dialog { root.toggle(); } }
+    ring-radius: Tokens.radius-lg + self.ring-offset;
 
     min-height: 3rem;
     border-radius: Tokens.radius-lg;
     border-width: 1px;
     border-color: Tokens.color-border-hairline-strong;
     background: Tokens.color-card;
-
-    focus := FocusScope {
-        enabled: Modal.open == root.in-dialog;
-        focus-gained(reason) => {
-            if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
-        }
-        key-pressed(event) => {
-            root.pointer-focus = false;
-            if event.text == " " {
-                if !event.repeat { root.toggle(); }
-                return accept;
-            }
-            if event.text == Key.Return {
-                if !event.repeat { root.accepted(); }
-                return accept;
-            }
-            reject
-        }
-    }
 
     HorizontalLayout {
         padding-left: 0.85rem;
@@ -648,13 +672,10 @@ export component TdnToggleRow inherits Rectangle {
         padding-bottom: 0.4rem;
         spacing: 1rem;
 
-        TdnText {
+        TdnPara {
             text: root.text;
             color: Tokens.color-foreground.transparentize(root.disabled-fade);
-            horizontal-alignment: Dir.text-start;
-            vertical-alignment: center;
             font-weight: Tokens.typography-weight-medium;
-            wrap: word-wrap;
             min-width: 0;
         }
 
@@ -686,20 +707,6 @@ export component TdnToggleRow inherits Rectangle {
                 }
             }
         }
-    }
-
-    TouchArea {
-        mouse-cursor: root.enabled ? pointer : default;
-        pointer-event(ev) => {
-            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-        }
-        clicked => { root.toggle(); }
-    }
-
-    if focus.has-focus && !root.pointer-focus: FocusRing {
-        host-width: parent.width;
-        host-height: parent.height;
-        radius: Tokens.radius-lg + self.offset;
     }
 }
 
@@ -741,133 +748,10 @@ export component TdnSpinner inherits Rectangle {
     }
 }
 
-export component TdnWifiIcon inherits Rectangle {
-    in property <int> strength: 3;
-
-    width: 1.25rem;
-    height: self.width;
-    accessible-role: none;
-
-    Icon {
-        commands: LucidePaths.wifi-dot;
-        size: parent.width;
-    }
-
-    for arc[i] in [LucidePaths.wifi-1, LucidePaths.wifi-2, LucidePaths.wifi-3]: Icon {
-        commands: arc;
-        size: parent.width;
-        tint: root.strength > i ? Tokens.color-foreground : Tokens.color-foreground.transparentize(0.75);
-    }
-}
-
-export component TdnIconButton inherits Rectangle {
-    in property <string> icon;
-    in property <string> label;
-    in property <bool> enabled: true;
-    in property <bool> busy;
-    in property <string> description;
-    in property <bool> in-dialog;
-    out property <bool> has-focus: focus.has-focus;
-    callback clicked;
-
-    property <bool> pointer-focus;
-    property <bool> active: root.enabled && !root.busy;
-
-    forward-focus: focus;
-    accessible-role: button;
-    accessible-label: root.label;
-    accessible-description: root.description;
-    accessible-enabled: root.active;
-    accessible-action-default => {
-        if root.active && Modal.open == root.in-dialog { root.press(); }
-    }
-
-    function press() {
-        root.clicked();
-        if !root.in-dialog { opener.opened(); }
-    }
-
-    width: self.height;
-    height: 1.6rem * Tokens.text-scale;
-    border-radius: Tokens.radius-sm;
-
-    Rectangle {
-        border-radius: root.border-radius;
-        background: root.busy ? transparent
-            : !root.enabled ? TdnStyle.accent.transparentize(0.92)
-            : area.pressed ? TdnStyle.accent.transparentize(0.6)
-            : area.has-hover ? TdnStyle.accent.transparentize(0.75)
-            : TdnStyle.accent.transparentize(0.85);
-        animate background { duration: Tokens.motion-fast; }
-    }
-
-    focus := FocusScope {
-        enabled: (root.enabled || root.busy) && Modal.open == root.in-dialog;
-        focus-gained(reason) => {
-            if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
-        }
-        key-pressed(event) => {
-            root.pointer-focus = false;
-            if event.text == Key.Return || event.text == " " {
-                if !event.repeat && root.active { root.press(); }
-                return accept;
-            }
-            reject
-        }
-    }
-
-    opener := DialogOpener {
-        restore => { focus.focus(); }
-    }
-
-    if root.busy: TdnSpinner {
-        width: parent.height * 0.7;
-    }
-
-    if !root.busy: Icon {
-        commands: root.icon;
-        size: parent.height * 0.6;
-        tint: root.enabled ? TdnStyle.accent : Tokens.color-muted-foreground;
-    }
-
-    area := TouchArea {
-        enabled: root.active;
-        mouse-cursor: root.active ? pointer : default;
-        pointer-event(ev) => {
-            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-        }
-        clicked => { root.press(); }
-    }
-
-    if focus.has-focus && !root.pointer-focus: FocusRing {
-        host-width: parent.width;
-        host-height: parent.height;
-    }
-}
-
-export component TdnStatusIcon inherits Rectangle {
-    in property <bool> ok: true;
-    in property <string> label;
-    in property <string> description;
-
-    accessible-role: image;
-    accessible-label: root.label;
-    accessible-description: root.description;
-
-    width: self.height;
-    height: 1.6rem * Tokens.text-scale;
-    border-radius: Tokens.radius-sm;
-    background: root.ok ? Tokens.color-affirm.transparentize(0.75) : Tokens.color-secondary;
-
-    Icon {
-        commands: root.ok ? LucidePaths.check : LucidePaths.x-mark;
-        size: parent.height * 0.6;
-        tint: root.ok ? Tokens.color-foreground : Tokens.color-muted-foreground;
-    }
-}
-
 export component TdnDialog inherits Rectangle {
     in property <string> title;
+    in property <string> description;
+    in property <string> done-text;
     in property <length> dialog-width: 22rem;
     callback dismissed;
 
@@ -903,15 +787,29 @@ export component TdnDialog inherits Rectangle {
                 accessible-role: groupbox;
                 accessible-label: root.title;
 
-                TdnText {
+                TdnPara {
                     text: root.title;
                     font-size: 1.4 * Tokens.text-rem;
                     font-weight: 500;
-                    horizontal-alignment: Dir.text-start;
-                    wrap: word-wrap;
+                }
+
+                if root.description != "": TdnNote {
+                    text: root.description;
                 }
 
                 @children
+
+                if root.done-text != "": HorizontalLayout {
+                    alignment: Dir.end;
+
+                    TdnBtn {
+                        in-dialog: true;
+                        primary: true;
+                        text: root.done-text;
+                        clicked => { root.dismissed(); }
+                        init => { self.focus(); }
+                    }
+                }
             }
         }
     }
@@ -951,5 +849,165 @@ export component TdnScrollList inherits ScrollView {
         @children
 
         list-end := Rectangle { height: 0; }
+    }
+}
+
+export component TdnDialogActions inherits HorizontalLayout {
+    in property <string> cancel-text: Lang.t("cancel", []);
+    in property <string> submit-text;
+    in property <bool> submit-enabled: true;
+    in property <bool> busy;
+    out property <bool> cancel-has-focus: cancel-btn.has-focus;
+    callback cancelled;
+    callback submitted;
+    public function focus-cancel() { cancel-btn.focus(); }
+    public function focus-submit() { submit-btn.focus(); }
+
+    alignment: space-between;
+
+    HorizontalLayout {
+        spacing: 0.5rem;
+
+        cancel-btn := TdnBtn {
+            in-dialog: true;
+            text: root.cancel-text;
+            clicked => { root.cancelled(); }
+        }
+
+        @children
+    }
+
+    HorizontalLayout {
+        layout-order: Dir.order(1);
+        spacing: 0.75rem;
+
+        if root.busy: VerticalLayout {
+            alignment: center;
+            TdnSpinner { width: 1.1rem; }
+        }
+
+        submit-btn := TdnBtn {
+            layout-order: Dir.order(1);
+            in-dialog: true;
+            primary: true;
+            text: root.submit-text;
+            enabled: root.submit-enabled;
+            clicked => { root.submitted(); }
+        }
+    }
+}
+
+export component TdnSearchInput inherits TdnInput {
+    in property <bool> navigable: true;
+    callback move(rows: int);
+
+    icon: @image-url("../data/icons/system-search-symbolic.svg");
+    key-pressed(event) => {
+        if !root.navigable { return reject; }
+        if event.text == Key.DownArrow { root.move(1); return accept; }
+        if event.text == Key.UpArrow { root.move(-1); return accept; }
+        if event.text == Key.PageDown { root.move(10); return accept; }
+        if event.text == Key.PageUp { root.move(-10); return accept; }
+        reject
+    }
+}
+
+export global TdnScroll {
+    public pure function content-y-showing(row: int, row-height: length, content-y: length, visible-height: length) -> length {
+        let top = row * row-height;
+        if top < -content-y {
+            return -top;
+        }
+        if top + row-height > -content-y + visible-height {
+            return visible-height - top - row-height;
+        }
+        content-y
+    }
+}
+
+// `ListView` only creates the rows in view, so this tracks which model row is current
+export component TdnCurrentRow {
+    in property <int> model-row;
+    in property <bool> current;
+    in-out property <int> current-row;
+
+    width: 0;
+    height: 0;
+    init => { if root.current { root.current-row = root.model-row; } }
+    changed current => {
+        if root.current { root.current-row = root.model-row; }
+        else if root.current-row == root.model-row { root.current-row = -1; }
+    }
+}
+
+export component TdnOptionRow inherits VerticalLayout {
+    in property <string> text;
+    in property <string> description;
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+    callback accepted();
+    callback focus-in(y: length, height: length);
+
+    spacing: 0.4rem;
+
+    TdnToggleRow {
+        in-dialog: true;
+        text: root.text;
+        enabled: root.enabled;
+        checked: root.checked;
+        toggled(on) => { root.toggled(on); }
+        accepted => { root.accepted(); }
+        focus-in(y, height) => { root.focus-in(y, height); }
+    }
+
+    TdnNote {
+        text: root.description;
+        font-size: Tokens.typography-body-sm-size;
+    }
+}
+
+export component TdnFormColumn inherits HorizontalLayout {
+    in property <length> column-width: 23rem;
+    in property <length> column-padding-top: 1rem;
+    in property <length> column-spacing: 2rem;
+
+    spacing: 1rem;
+
+    VerticalLayout {
+        alignment: start;
+        horizontal-stretch: 100;
+        max-width: root.column-width;
+        padding-top: root.column-padding-top;
+        spacing: root.column-spacing;
+
+        @children
+    }
+
+    Rectangle {
+        layout-order: Dir.order(1);
+        horizontal-stretch: 1;
+    }
+}
+
+export component TdnSideCard inherits VerticalLayout {
+    in property <length> content-padding: 0.6rem;
+    in property <length> content-spacing: 0.75rem;
+    in property <bool> fill-height;
+
+    layout-order: Dir.order(1);
+    alignment: root.fill-height ? LayoutAlignment.stretch : LayoutAlignment.start;
+    horizontal-stretch: 0;
+
+    Card {
+        card-radius: md;
+
+        VerticalLayout {
+            alignment: start;
+            padding: root.content-padding;
+            spacing: root.content-spacing;
+
+            @children
+        }
     }
 }

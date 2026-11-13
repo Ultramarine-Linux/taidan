@@ -1,8 +1,11 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 
+use parking_lot::Mutex;
 use slint::ComponentHandle;
+
+use crate::ui::{on_ui, spawn_then};
 use v4l::io::traits::CaptureStream;
 use v4l::video::Capture;
 
@@ -130,7 +133,7 @@ static STREAM_THREAD: Mutex<Option<std::thread::JoinHandle<()>>> = Mutex::new(No
 
 fn show_error(ui: &slint::Weak<AppWindow>, stop: Arc<AtomicBool>, error: String) {
     tracing::error!(error, "camera error");
-    _ = ui.upgrade_in_event_loop(move |ui| {
+    on_ui(ui, move |ui| {
         if !stop.load(Ordering::Relaxed) {
             ui.global::<Camera<'_>>().set_error(error.into());
         }
@@ -169,9 +172,7 @@ fn stream(
         let data = buf.get(..usize::try_from(meta.bytesused).unwrap_or(buf.len())).unwrap_or(buf);
         let Some(frame) = decode_frame(&fmt, data) else { continue };
         let preview = (!preview_pending.load(Ordering::Acquire)).then(|| mirrored_preview(&frame));
-        if let Ok(mut latest) = latest_frame.lock() {
-            *latest = Some(frame);
-        }
+        *latest_frame.lock() = Some(frame);
         let Some(preview) = preview else { continue };
         preview_pending.store(true, Ordering::Release);
         let done = Arc::clone(&preview_pending);
@@ -216,30 +217,30 @@ fn start(ui: &slint::Weak<AppWindow>) {
         old.stop.store(true, Ordering::Relaxed);
     }
     let ui = ui.clone();
-    let previous = STREAM_THREAD.lock().ok().and_then(|mut t| t.take());
-    let thread = std::thread::spawn(move || {
+    let mut stream_thread = STREAM_THREAD.lock();
+    let previous = stream_thread.take();
+    *stream_thread = Some(std::thread::spawn(move || {
         if let Some(previous) = previous {
             wait_for_release(&previous);
         }
         if let Err(e) = stream(&ui, &stop, &latest_frame) {
             show_error(&ui, stop, e.to_string());
         }
-    });
-    if let Ok(mut t) = STREAM_THREAD.lock() {
-        *t = Some(thread);
-    }
+    }));
 }
 
 fn refresh(ui: &slint::Weak<AppWindow>) {
     if RUNNING.with_borrow(Option::is_some) {
         return;
     }
-    let ui = ui.clone();
-    std::thread::spawn(move || {
-        let available = find_camera().is_some();
-        tracing::debug!(available, "Checked for a camera");
-        _ = ui.upgrade_in_event_loop(move |ui| ui.global::<Camera<'_>>().set_available(available));
-    });
+    spawn_then(
+        ui.clone(),
+        || find_camera().is_some(),
+        |ui, available| {
+            tracing::debug!(available, "Checked for a camera");
+            ui.global::<Camera<'_>>().set_available(available);
+        },
+    );
 }
 
 fn stop(ui: &slint::Weak<AppWindow>) {
@@ -270,29 +271,27 @@ fn capture(ui: &slint::Weak<AppWindow>) {
         return;
     }
     let running = RUNNING.with_borrow(|r| {
-        r.as_ref().and_then(|r| Some((Arc::clone(&r.stop), r.latest_frame.lock().ok()?.clone()?)))
+        r.as_ref().and_then(|r| Some((Arc::clone(&r.stop), r.latest_frame.lock().clone()?)))
     });
     let Some((stopped, frame)) = running else { return };
     SAVING_PHOTO.set(true);
-    let ui = ui.clone();
-    std::thread::spawn(move || match save_photo(&frame) {
-        Ok((path, photo)) => {
-            _ = ui.upgrade_in_event_loop(move |app| {
-                SAVING_PHOTO.set(false);
-                if stopped.load(Ordering::Relaxed) {
-                    return;
+    spawn_then(
+        ui.clone(),
+        move || save_photo(&frame),
+        |app, saved| {
+            SAVING_PHOTO.set(false);
+            match saved {
+                Ok(_) if stopped.load(Ordering::Relaxed) => {}
+                Ok((path, photo)) => {
+                    let account = app.global::<Account<'_>>();
+                    account.set_avatar_id(path.to_string_lossy().as_ref().into());
+                    account.set_avatar(slint::Image::from_rgba8(photo));
+                    stop(&app.as_weak());
                 }
-                let account = app.global::<Account<'_>>();
-                account.set_avatar_id(path.to_string_lossy().as_ref().into());
-                account.set_avatar(slint::Image::from_rgba8(photo));
-                stop(&app.as_weak());
-            });
-        }
-        Err(e) => {
-            _ = ui.upgrade_in_event_loop(|_| SAVING_PHOTO.set(false));
-            show_error(&ui, stopped, format!("cannot save photo: {e}"));
-        }
-    });
+                Err(e) => show_error(&app.as_weak(), stopped, format!("cannot save photo: {e}")),
+            }
+        },
+    );
 }
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, camera: &Camera<'_>) {
@@ -305,12 +304,15 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, camera: &Camera<'_>) {
     camera.on_capture(with_ui(capture));
     camera.on_refresh(with_ui(refresh));
 
-    let ui = ui.clone();
-    std::thread::spawn(move || {
-        let presets = load_presets();
-        let available = find_camera().is_some();
-        tracing::debug!(presets = presets.len(), available, "Loaded user icons");
-        _ = ui.upgrade_in_event_loop(move |ui| {
+    spawn_then(
+        ui.clone(),
+        || {
+            let presets = load_presets();
+            let available = find_camera().is_some();
+            tracing::debug!(presets = presets.len(), available, "Loaded user icons");
+            (presets, available)
+        },
+        |ui, (presets, available)| {
             ui.global::<Camera<'_>>().set_available(available);
             let avatars = presets
                 .into_iter()
@@ -326,8 +328,8 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, camera: &Camera<'_>) {
             let account = ui.global::<Account<'_>>();
             account.set_avatars(slint::ModelRc::new(avatars));
             account.set_avatar_rows(slint::ModelRc::new(rows));
-        });
-    });
+        },
+    );
 }
 
 const CAMERA_SLOT: i32 = -1;

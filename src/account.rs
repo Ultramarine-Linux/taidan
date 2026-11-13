@@ -16,12 +16,11 @@ fn valid_fullname(s: &str) -> bool {
 fn spawn_username_checker(
     ui: slint::Weak<crate::ui::AppWindow>,
 ) -> std::sync::mpsc::Sender<String> {
-    let (tx, rx) = std::sync::mpsc::channel::<String>();
-    std::thread::spawn(move || {
-        while let Ok(oldest) = rx.recv() {
-            let name = rx.try_iter().last().unwrap_or(oldest);
+    crate::ui::latest_worker(
+        |_, newer| newer,
+        move |name: String| {
             let taken = libtaidan::passwd::username_problem(&name).is_some();
-            let posted = ui.upgrade_in_event_loop(move |ui| {
+            crate::ui::on_ui(&ui, move |ui| {
                 use slint::ComponentHandle;
                 let account = ui.global::<crate::ui::Account<'_>>();
                 if account.get_username() == name.as_str() {
@@ -29,12 +28,8 @@ fn spawn_username_checker(
                     account.set_checked_taken(taken);
                 }
             });
-            if posted.is_err() {
-                break;
-            }
-        }
-    });
-    tx
+        },
+    )
 }
 
 // Han reads differently in Chinese and Japanese, so romanizing it would be a guess

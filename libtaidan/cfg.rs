@@ -115,6 +115,11 @@ impl Config {
         }
     }
 
+    #[must_use]
+    pub fn desktop(&self) -> Desktop {
+        Desktop::current(&self.edition)
+    }
+
     pub fn read_os_release(&mut self) {
         let (name, variant_id) = os_release();
         self.distro = name;
@@ -139,12 +144,7 @@ fn parse_os_release(file: &str) -> (String, String) {
     let get = |key: &str| {
         let value =
             file.lines().find_map(|line| line.trim().strip_prefix(key)?.strip_prefix('='))?;
-        let value = value
-            .strip_prefix('"')
-            .and_then(|v| v.strip_suffix('"'))
-            .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
-            .unwrap_or(value);
-        Some(value.to_owned())
+        Some(unquote(value).to_owned())
     };
     let name = get("NAME").unwrap_or_else(|| {
         tracing::warn!("no NAME= in os-release, using Linux");
@@ -157,15 +157,46 @@ fn parse_os_release(file: &str) -> (String, String) {
     (name, variant_id)
 }
 
-#[must_use]
-pub fn desktop(edition: &str) -> String {
-    let edition = edition.to_ascii_lowercase();
-    edition.strip_prefix("atomic-").map(str::to_owned).unwrap_or(edition)
+pub(crate) fn unquote(value: &str) -> &str {
+    ['"', '\'']
+        .into_iter()
+        .find_map(|quote| value.strip_prefix(quote)?.strip_suffix(quote))
+        .unwrap_or(value)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Desktop {
+    Gnome,
+    Plasma,
+    Budgie,
+    Xfce,
+    Other,
+}
+
+impl Desktop {
+    #[must_use]
+    pub fn from_edition(edition: &str) -> Self {
+        let edition = edition.to_ascii_lowercase();
+        match edition.strip_prefix("atomic-").unwrap_or(&edition) {
+            "gnome" => Self::Gnome,
+            "budgie" => Self::Budgie,
+            "xfce" => Self::Xfce,
+            _ => Self::Other,
+        }
+    }
+
+    #[must_use]
+    pub fn current(edition: &str) -> Self {
+        if std::path::Path::new("/usr/bin/plasmashell").exists() {
+            return Self::Plasma;
+        }
+        Self::from_edition(edition)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Config, IGNORED_LEGACY_INTERNET_KEYS, SkipPage, desktop, parse_os_release};
+    use super::{Config, Desktop, IGNORED_LEGACY_INTERNET_KEYS, SkipPage, parse_os_release};
 
     #[test]
     fn defaults_are_the_serde_ones() {
@@ -196,9 +227,11 @@ mod tests {
 
     #[test]
     fn desktops() {
-        assert_eq!(desktop("budgie"), "budgie");
-        assert_eq!(desktop("atomic-GNOME"), "gnome");
-        assert_eq!(desktop(""), "");
+        assert_eq!(Desktop::from_edition("budgie"), Desktop::Budgie);
+        assert_eq!(Desktop::from_edition("atomic-GNOME"), Desktop::Gnome);
+        assert_eq!(Desktop::from_edition("atomic-xfce"), Desktop::Xfce);
+        assert_eq!(Desktop::from_edition("kde"), Desktop::Other);
+        assert_eq!(Desktop::from_edition(""), Desktop::Other);
     }
 
     #[test]

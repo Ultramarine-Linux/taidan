@@ -2,13 +2,7 @@ import { Tokens } from "../slintcn/theme/tokens.slint";
 import { TdnBasePg, TdnHero } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Install } from "../install.slint";
-import { TdnText, TdnBtn, TdnStyle, TdnSpinner } from "../components.slint";
-
-component Note inherits TdnText {
-    color: Tokens.color-muted-foreground;
-    horizontal-alignment: Dir.text-start;
-    wrap: word-wrap;
-}
+import { TdnPara, TdnNote, TdnBtn, TdnSpinner } from "../components.slint";
 
 export component DonePage inherits TdnBasePg {
     forward-focus: reboot;
@@ -38,27 +32,25 @@ export component DonePage inherits TdnBasePg {
                 horizontal-stretch: 1;
                 spacing: 0.5rem;
 
-                TdnText {
+                TdnPara {
                     text: Lang.t("page-done", []);
                     font-size: 3 * Tokens.text-rem;
                     font-weight: 800;
-                    horizontal-alignment: Dir.text-start;
-                    wrap: word-wrap;
                 }
 
-                if Install.updates-ready: Note {
+                if Install.updates-ready: TdnNote {
                     text: Lang.t(Install.needs-reboot ? "page-done-updates-drivers" : "page-done-updates", []);
                 }
 
-                if Install.drivers-failed: Note {
+                if Install.drivers-failed: TdnNote {
                     text: Lang.t("page-done-drivers-failed", []);
                 }
 
-                if Install.locale-failed: Note {
+                if Install.locale-failed: TdnNote {
                     text: Lang.t("page-done-locale-failed", []);
                 }
 
-                if Install.reboot-failed: Note {
+                if Install.reboot-failed: TdnNote {
                     text: Lang.t("page-done-reboot-failed", []);
                     color: Tokens.color-destructive;
                 }
@@ -93,10 +85,8 @@ export component DonePage inherits TdnBasePg {
 
                     reboot := TdnBtn {
                         layout-order: Dir.order(1);
-                        enter-hint: true;
+                        primary: true;
                         enabled: !Install.finishing;
-                        background-color: TdnStyle.accent;
-                        foreground-color: TdnStyle.accent-foreground;
                         text: Lang.t(
                             !Install.needs-reboot ? "page-done-login"
                             : Install.updates-ready ? "page-done-restart-update"

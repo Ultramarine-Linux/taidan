@@ -1,20 +1,16 @@
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
+use crate::child::ChildSlot;
 use crate::ui::AppWindow;
 
-const LIGHT: &str = "/usr/share/backgrounds/default.png";
-const DARK: &str = "/usr/share/backgrounds/default-dark.png";
+pub const LIGHT: &str = "/usr/share/backgrounds/default.png";
+pub const DARK: &str = "/usr/share/backgrounds/default-dark.png";
 const FALLBACK_COLOR: &str = "#113344";
 const OLD_WALLPAPER_LINGER: Duration = Duration::from_millis(500);
 
-static SWAYBG: Mutex<Option<Child>> = Mutex::new(None);
-
-fn lock_swaybg() -> MutexGuard<'static, Option<Child>> {
-    SWAYBG.lock().unwrap_or_else(PoisonError::into_inner)
-}
+static SWAYBG: ChildSlot = ChildSlot::new("swaybg");
 
 fn spawn_swaybg(dark: bool) -> Option<Child> {
     let image = if dark && Path::new(DARK).exists() { DARK } else { LIGHT };
@@ -29,30 +25,17 @@ fn spawn_swaybg(dark: bool) -> Option<Child> {
         .ok()
 }
 
-fn stop_swaybg(mut swaybg: Child) {
-    if let Err(e) = swaybg.kill() {
-        tracing::warn!(?e, "cannot stop swaybg");
-    }
-    if let Err(e) = swaybg.wait() {
-        tracing::warn!(?e, "cannot wait for swaybg");
-    }
-}
-
 fn show(dark: bool) {
-    let previous = std::mem::replace(&mut *lock_swaybg(), spawn_swaybg(dark));
-    if let Some(previous) = previous {
+    if let Some(previous) = SWAYBG.replace((), spawn_swaybg(dark)) {
         std::thread::spawn(move || {
             std::thread::sleep(OLD_WALLPAPER_LINGER);
-            stop_swaybg(previous);
+            crate::child::terminate("swaybg", previous);
         });
     }
 }
 
 pub fn shutdown() {
-    let swaybg = lock_swaybg().take();
-    if let Some(swaybg) = swaybg {
-        stop_swaybg(swaybg);
-    }
+    SWAYBG.stop();
 }
 
 pub fn initialize_ui(ui: &AppWindow) {

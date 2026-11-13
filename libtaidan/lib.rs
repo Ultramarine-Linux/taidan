@@ -3,9 +3,10 @@ pub mod a11y;
 pub mod cfg;
 pub mod dnf;
 pub mod err;
-pub mod flatpak;
 pub mod helper;
+pub mod home;
 pub mod i18n;
+pub mod kconfig;
 pub mod passwd;
 pub mod prelude;
 pub mod proxy;
@@ -16,7 +17,6 @@ pub mod theme;
 pub mod tweaks;
 
 use crate::prelude::*;
-use steps::Step;
 
 pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
     let dir =
@@ -68,7 +68,7 @@ pub async fn start_install(
     for stage in steps::Stage::all() {
         callback.send(InstallMsg::UpdStage(*stage));
         tracing::debug!(?stage, "Running pre()");
-        stage.pre(settings, cfg, callback).await?;
+        stage.pre(settings, cfg).await?;
         tracing::info!(?stage, "Running stage");
         stage.run(settings, cfg, callback).await?;
     }
@@ -113,38 +113,45 @@ async fn clear_tweaks_record() {
     }
 }
 
-#[allow(clippy::arithmetic_side_effects)]
-mod parseutil {
-    /// # Panics
-    /// - cannot convert bytes to `&str`
-    /// - cannot parse to `u32`
-    pub fn send_frac(callback: &impl crate::Callback, num: u32, den: u32) {
-        if den == 0 {
-            return;
-        }
-
-        callback.send(crate::InstallMsg::StageProgress(f64::from(num) / f64::from(den)))
-    }
-}
-
-async fn run_cmd(
+async fn spawn(
     mut cmd: tokio::process::Command,
     name: &'static str,
     input: Option<&[u8]>,
-) -> Res<Vec<u8>> {
+    stdout: impl Into<std::process::Stdio>,
+    stderr: impl Into<std::process::Stdio>,
+) -> Res<tokio::process::Child> {
     use std::process::Stdio;
     use tokio::io::AsyncWriteExt;
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
+    cmd.stdout(stdout).stderr(stderr);
     cmd.stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() });
-    let mut p = cmd.spawn().map_err(|e| Err::FailToRunProgram(name, e))?;
+    let mut child = cmd.spawn().map_err(Err::_fail_to_run(name))?;
     if let Some(input) = input
-        && let Some(mut stdin) = p.stdin.take()
+        && let Some(mut stdin) = child.stdin.take()
         && let Err(e) = stdin.write_all(input).await
     {
         tracing::error!(?e, name, "cannot write to stdin");
     }
-    let p = p.wait_with_output().await.map_err(|e| Err::FailToRunProgram(name, e))?;
+    Ok(child)
+}
+
+pub(crate) async fn spawn_helper(
+    verb: &Verb,
+    input: &[u8],
+    stdout: impl Into<std::process::Stdio>,
+    stderr: impl Into<std::process::Stdio>,
+) -> Res<tokio::process::Child> {
+    let request = helper::stdin(verb, input);
+    spawn(helper::command(verb), verb.name(), Some(&request), stdout, stderr).await
+}
+
+async fn run_cmd(
+    cmd: tokio::process::Command,
+    name: &'static str,
+    input: Option<&[u8]>,
+) -> Res<Vec<u8>> {
+    use std::process::Stdio;
+    let child = spawn(cmd, name, input, Stdio::piped(), Stdio::piped()).await?;
+    let p = child.wait_with_output().await.map_err(Err::_fail_to_run(name))?;
     if !p.status.success() {
         let e = Err::program_fail(name, &p);
         tracing::debug!(name, %e, "command failed");
@@ -177,8 +184,8 @@ const PKEXEC_RETRY_BACKOFF: [std::time::Duration; 2] =
 
 async fn run_helper(verb: &Verb, input: &[u8]) -> Res<Vec<u8>> {
     tracing::debug!(?verb, "running taidan-helper");
-    let stdin = helper::stdin(verb, input);
-    let run = || run_cmd(helper::command(verb), verb.name(), Some(&stdin));
+    let request = helper::stdin(verb, input);
+    let run = || run_cmd(helper::command(verb), verb.name(), Some(&request));
     for (attempt, backoff) in PKEXEC_RETRY_BACKOFF.into_iter().enumerate() {
         match run().await {
             Err(e) if pkexec_refused(&e) => {
@@ -197,13 +204,22 @@ fn pkexec_refused(e: &Err) -> bool {
         if output.contains("Error executing command as another user"))
 }
 
-pub async fn as_user(user: &str, argv: Vec<String>, input: Option<&[u8]>) -> Res<()> {
+pub(crate) async fn run_here(argv: &[String], input: Option<&[u8]>) -> Res<()> {
+    let Some((name, args)) = argv.split_first() else { return Ok(()) };
+    let mut cmd = tokio::process::Command::new(name);
+    cmd.args(args);
+    run_cmd(cmd, "as-user", input).await.map(drop)
+}
+
+pub async fn as_user(
+    user: &str,
+    argv: impl IntoIterator<Item: AsRef<str>>,
+    input: Option<&[u8]>,
+) -> Res<()> {
+    let argv = argv.into_iter().map(|a| a.as_ref().to_owned()).collect_vec();
     let current = uzers::get_current_username();
     if current.as_ref().is_some_and(|c| c.as_encoded_bytes() == user.as_bytes()) {
-        let Some((name, args)) = argv.split_first() else { return Ok(()) };
-        let mut cmd = tokio::process::Command::new(name);
-        cmd.args(args);
-        return run_cmd(cmd, "as-user", input).await.map(drop);
+        return run_here(&argv, input).await;
     }
     root_with_stdin(Verb::AsUser { user: user.to_owned(), argv }, input.unwrap_or_default()).await
 }
@@ -214,9 +230,24 @@ pub async fn mark_configured() {
     }
 }
 
+pub(crate) const UNCONFIGURED_MARKERS: [&str; 2] = ["/var/.unconfigured", "/.unconfigured"];
+
 #[must_use]
 pub fn marked_unconfigured() -> bool {
-    ["/var/.unconfigured", "/.unconfigured"].iter().any(|m| std::path::Path::new(m).exists())
+    UNCONFIGURED_MARKERS.iter().any(|m| std::path::Path::new(m).exists())
+}
+
+pub(crate) async fn root_if_any_exists(
+    paths: &[&str],
+    verb: Verb,
+    failure: &'static str,
+) -> Res<()> {
+    for path in paths {
+        if tokio::fs::try_exists(path).await.unwrap_or(true) {
+            return root(verb).await.wrap_msg(failure);
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -102,43 +102,37 @@ EndSection
 "#;
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct DriversCodecs;
-#[derive(Clone, Copy, Debug, Default)]
 pub struct Drivers;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Codecs;
-impl super::Step for DriversCodecs {
-    #[tracing::instrument(skip(settings, sender))]
-    async fn run<C: crate::Callback>(
-        &self,
-        settings: &crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        sender: &C,
-    ) -> Res<()> {
-        if !settings.install_codecs_drivers || settings.nointernet {
-            return Ok(());
-        }
-        let pci = pci_devices().await;
-        let mut done = Setup::default();
-        match Drivers::setup_nvidia(cfg, &pci).await {
-            Ok(setup) => done |= setup,
-            Err(e) => {
-                tracing::warn!(?e, "cannot setup nvidia drivers");
-                done.failed = true;
-            }
-        }
-        done |= Drivers::setup_broadcom(cfg, &pci).await;
-        if done.needs_reboot {
-            sender.send(crate::InstallMsg::NeedsReboot);
-        }
-        if done.failed {
-            sender.send(crate::InstallMsg::DriversFailed);
-        }
-        // FIXME: refactor this to somewhere else not in this file
-        // also this is done inside `_05_dnfdownloadapps.rs`
-        // Codecs::install_codecs().await?;
-        Ok(())
+pub(super) async fn run(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    sender: &impl crate::Callback,
+) -> Res<()> {
+    if !settings.install_codecs_drivers || settings.nointernet {
+        return Ok(());
     }
+    let pci = pci_devices().await;
+    let mut done = Setup::default();
+    match Drivers::setup_nvidia(cfg, &pci).await {
+        Ok(setup) => done |= setup,
+        Err(e) => {
+            tracing::warn!(?e, "cannot setup nvidia drivers");
+            done.failed = true;
+        }
+    }
+    done |= Drivers::setup_broadcom(cfg, &pci).await;
+    if done.needs_reboot {
+        sender.send(crate::InstallMsg::NeedsReboot);
+    }
+    if done.failed {
+        sender.send(crate::InstallMsg::DriversFailed);
+    }
+    // FIXME: refactor this to somewhere else not in this file
+    // also this is done inside `_05_dnfdownloadapps.rs`
+    // Codecs::install_codecs().await?;
+    Ok(())
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

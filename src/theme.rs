@@ -5,10 +5,6 @@ use crate::ui::{AccentItem, Appearance};
 const AA_TEXT_CONTRAST: f32 = 4.5;
 const CHECK_MARK_CONTRAST: f32 = 3.5;
 
-fn parse_hex(hex: &str) -> Color {
-    crate::cfg::parse_color(hex).unwrap_or_default()
-}
-
 fn relative_luminance(c: Color) -> f32 {
     let lin = |v: u8| {
         let v = f32::from(v) / 255.0;
@@ -47,7 +43,7 @@ pub fn initialize_ui(appearance: &Appearance<'_>) {
     }
     let accents = (libtaidan::theme::Accent::ALL.iter())
         .map(|a| {
-            let color = parse_hex(a.hex());
+            let color = crate::cfg::parse_color(a.hex()).unwrap_or_default();
             AccentItem {
                 id: a.id().into(),
                 color,
@@ -71,16 +67,12 @@ pub fn picked(appearance: &Appearance<'_>) -> Option<libtaidan::theme::Accent> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn hex_colors() {
-        assert_eq!(parse_hex("#3584e4"), Color::from_rgb_u8(0x35, 0x84, 0xe4));
-    }
+    use crate::cfg::parse_color;
 
     #[test]
     fn fills_take_white_text() {
         for accent in libtaidan::theme::Accent::ALL {
-            let color = parse_hex(accent.hex());
+            let color = parse_color(accent.hex()).unwrap();
             let fill = readable_fill(color);
             assert!(
                 white_text_contrast(fill) >= AA_TEXT_CONTRAST,
@@ -92,7 +84,10 @@ mod tests {
                 "{accent:?} was darkened though it passed"
             );
         }
-        assert_eq!(readable_fill(parse_hex("#3584e4")), Color::from_rgb_u8(0x30, 0x77, 0xcd));
+        assert_eq!(
+            readable_fill(parse_color("#3584e4").unwrap()),
+            Color::from_rgb_u8(0x30, 0x77, 0xcd)
+        );
     }
 
     #[test]
@@ -102,7 +97,7 @@ mod tests {
             a.max(b) / a.min(b)
         };
         for accent in libtaidan::theme::Accent::ALL {
-            let color = parse_hex(accent.hex());
+            let color = parse_color(accent.hex()).unwrap();
             let c = contrast(check_mark_color(color), color);
             assert!(c >= CHECK_MARK_CONTRAST, "{accent:?}'s check is {c}");
         }

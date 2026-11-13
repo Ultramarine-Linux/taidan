@@ -4,8 +4,6 @@ use std::{
     sync::LazyLock,
 };
 
-use tokio::io::AsyncWriteExt;
-
 use crate::err::{Res, TaidanErrHelper};
 
 pub static TWEAKS: LazyLock<Box<[Tweak]>> = LazyLock::new(|| {
@@ -208,19 +206,14 @@ impl Tweak {
     #[tracing::instrument(skip(settings))]
     pub async fn run(&self, settings: &[u8], on: bool) -> bool {
         let verb = crate::Verb::RunTweak { id: self.id().to_string_lossy().into_owned(), on };
-        let mut cmd =
-            match crate::helper::command(&verb).stdin(std::process::Stdio::piped()).spawn() {
-                Ok(cmd) => cmd,
-                Err(err) => {
-                    tracing::error!(?err, "cannot run pkexec");
-                    return false;
-                }
-            };
-        if let Some(mut stdin) = cmd.stdin.take()
-            && let Err(err) = stdin.write_all(&crate::helper::stdin(&verb, settings)).await
-        {
-            tracing::debug!(?err, "cannot pass the settings to `up`");
-        }
+        let inherit = std::process::Stdio::inherit;
+        let mut cmd = match crate::spawn_helper(&verb, settings, inherit(), inherit()).await {
+            Ok(cmd) => cmd,
+            Err(err) => {
+                tracing::error!(?err, "cannot run pkexec");
+                return false;
+            }
+        };
         match cmd.wait().await {
             Ok(x) if x.success() => true,
             Ok(x) => {
@@ -267,10 +260,8 @@ pub(crate) fn write_on_record(ids: &[String]) -> std::io::Result<()> {
 }
 
 pub async fn clear_on_record() -> Res<()> {
-    if !tokio::fs::try_exists(ON_RECORD).await.unwrap_or(true) {
-        return Ok(());
-    }
-    crate::root(crate::Verb::ClearTweakRecord).await.wrap_msg("cannot remove the tweaks record")
+    let failure = "cannot remove the tweaks record";
+    crate::root_if_any_exists(&[ON_RECORD], crate::Verb::ClearTweakRecord, failure).await
 }
 
 // see https://gitlab.com/x86-psABIs/x86-64-ABI for the features each level needs

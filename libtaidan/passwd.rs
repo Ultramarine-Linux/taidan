@@ -140,10 +140,8 @@ pub(crate) fn write_record(username: &str, keep_home: bool) -> std::io::Result<(
 }
 
 pub async fn clear_record() -> Res<()> {
-    if !tokio::fs::try_exists(CREATED_RECORD).await.unwrap_or(true) {
-        return Ok(());
-    }
-    crate::root(crate::Verb::ClearRecord).await.wrap_msg("cannot remove the created user record")
+    let failure = "cannot remove the created user record";
+    crate::root_if_any_exists(&[CREATED_RECORD], crate::Verb::ClearRecord, failure).await
 }
 
 #[must_use]

@@ -1,52 +1,30 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir, Keymap } from "../lang.slint";
 import { ListView, ScrollView } from "std-widgets.slint";
-import { TdnInput, TdnListRow, TdnText, Modal, DialogOpener } from "../components.slint";
+import { TdnSearchInput, TdnListRow, TdnText, TdnPara, TdnNote, TdnCurrentRow, TdnScroll, TdnPressable } from "../components.slint";
 import { Icon } from "../slintcn/components/icon.slint";
 import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
-import { FocusRing } from "../slintcn/components/focus-ring.slint";
 import { Ims } from "../ims.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 import { Card } from "../slintcn/components/card.slint";
 import { Separator } from "../slintcn/components/separator.slint";
 
-component ImsRow inherits Rectangle {
-    property <bool> pointer-focus;
+component ImsRow inherits TdnPressable {
     property <string> value: Ims.enabled == "" ? Lang.t("page-keyboard-ims-none", []) : Ims.enabled;
 
-    function open() {
-        Ims.open = true;
-        opener.opened();
-    }
-
-    forward-focus: focus;
+    opens-dialog: true;
+    activated => { Ims.open = true; }
     accessible-role: button;
     accessible-label: Lang.t("page-keyboard-ims", []) + ", " + root.value;
-    accessible-action-default => { if !Modal.open { root.open(); } }
+    ring-radius: Tokens.radius-lg + self.ring-offset;
 
     vertical-stretch: 0;
     height: 2.75rem;
     border-radius: Tokens.radius-lg;
     border-width: 1px;
     border-color: Tokens.color-border-hairline-strong;
-    background: area.has-hover ? Tokens.color-accent : Tokens.color-card;
+    background: self.has-hover ? Tokens.color-accent : Tokens.color-card;
     animate background { duration: Tokens.motion-fast; }
-
-    focus := FocusScope {
-        enabled: !Modal.open;
-        key-pressed(event) => {
-            root.pointer-focus = false;
-            if event.text == Key.Return || event.text == " " {
-                if !event.repeat { root.open(); }
-                return accept;
-            }
-            reject
-        }
-    }
-
-    opener := DialogOpener {
-        restore => { focus.focus(); }
-    }
 
     HorizontalLayout {
         padding-left: 1rem;
@@ -82,20 +60,6 @@ component ImsRow inherits Rectangle {
                 stroke-width: 2px;
             }
         }
-    }
-
-    area := TouchArea {
-        mouse-cursor: pointer;
-        pointer-event(ev) => {
-            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-        }
-        clicked => { root.open(); }
-    }
-
-    if focus.has-focus && !root.pointer-focus: FocusRing {
-        host-width: parent.width;
-        host-height: parent.height;
-        radius: Tokens.radius-lg + self.offset;
     }
 }
 
@@ -140,22 +104,11 @@ export component KeyboardPage inherits TdnPage {
         }
     }
 
-    pure function content-y-showing(row: int, content-y: length, visible-height: length) -> length {
-        let top = row * row-height;
-        if top < -content-y {
-            return -top;
-        }
-        if top + row-height > -content-y + visible-height {
-            return visible-height - top - row-height;
-        }
-        content-y
-    }
-
     function move-layout-cursor(delta: int) {
         if Lang.keymaps.length == 0 { return; }
         start-layout-cursor-at-current-layout();
         layout-cursor = max(0, min(Lang.keymaps.length - 1, layout-cursor + delta));
-        layouts.content-y = content-y-showing(layout-cursor, layouts.content-y, layouts.visible-height);
+        layouts.content-y = TdnScroll.content-y-showing(layout-cursor, row-height, layouts.content-y, layouts.visible-height);
     }
 
     function start-variant-cursor-at-current-variant() {
@@ -171,33 +124,22 @@ export component KeyboardPage inherits TdnPage {
     function move-variant-cursor(delta: int) {
         start-variant-cursor-at-current-variant();
         variant-cursor = max(0, min(Lang.variants.length, variant-cursor + delta));
-        variants.content-y = content-y-showing(variant-cursor, variants.content-y, variants.visible-height);
+        variants.content-y = TdnScroll.content-y-showing(variant-cursor, row-height, variants.content-y, variants.visible-height);
     }
 
     Card {
         vertical-stretch: 1;
 
-        // `ListView` only creates the rows in view, so these find the current ones
-        for keymap[i] in Lang.keymaps: Rectangle {
-            property <bool> current: keymap.id == Lang.current_keymap.id;
-            width: 0;
-            height: 0;
-            init => { if self.current { root.current-layout-row = i; } }
-            changed current => {
-                if self.current { root.current-layout-row = i; }
-                else if root.current-layout-row == i { root.current-layout-row = -1; }
-            }
+        for keymap[i] in Lang.keymaps: TdnCurrentRow {
+            model-row: i;
+            current: keymap.id == Lang.current_keymap.id;
+            current-row <=> root.current-layout-row;
         }
 
-        for variant[i] in Lang.variants: Rectangle {
-            property <bool> current: variant.id == Lang.current_variant.id;
-            width: 0;
-            height: 0;
-            init => { if self.current { root.current-variant-row = i; } }
-            changed current => {
-                if self.current { root.current-variant-row = i; }
-                else if root.current-variant-row == i { root.current-variant-row = -1; }
-            }
+        for variant[i] in Lang.variants: TdnCurrentRow {
+            model-row: i;
+            current: variant.id == Lang.current_variant.id;
+            current-row <=> root.current-variant-row;
         }
 
         HorizontalLayout {
@@ -208,9 +150,8 @@ export component KeyboardPage inherits TdnPage {
                 spacing: 0.75rem;
                 horizontal-stretch: 1;
 
-                search-layout := TdnInput {
+                search-layout := TdnSearchInput {
                     placeholder: Lang.t("page-keyboard-search-layout", []);
-                    icon: @image-url("../../data/icons/system-search-symbolic.svg");
                     description: root.layout-cursor >= 0 && root.layout-cursor < Lang.keymaps.length
                         ? Lang.keymaps[root.layout-cursor].name
                         : root.enter-picks-first-layout ? Lang.keymaps[0].name : Lang.current_keymap.name;
@@ -229,13 +170,7 @@ export component KeyboardPage inherits TdnPage {
                         }
                         search-variant.focus();
                     }
-                    key-pressed(event) => {
-                        if event.text == Key.DownArrow { move-layout-cursor(1); return accept; }
-                        if event.text == Key.UpArrow { move-layout-cursor(-1); return accept; }
-                        if event.text == Key.PageDown { move-layout-cursor(10); return accept; }
-                        if event.text == Key.PageUp { move-layout-cursor(-10); return accept; }
-                        reject
-                    }
+                    move(rows) => { move-layout-cursor(rows); }
                 }
 
                 layouts := ListView {
@@ -263,9 +198,8 @@ export component KeyboardPage inherits TdnPage {
                 spacing: 0.75rem;
                 horizontal-stretch: 1;
 
-                search-variant := TdnInput {
+                search-variant := TdnSearchInput {
                     placeholder: Lang.t("page-keyboard-search-variant", []);
-                    icon: @image-url("../../data/icons/system-search-symbolic.svg");
                     description: root.variant-cursor == root.default-variant-row ? Lang.t("default", [])
                         : root.variant-cursor > 0 && root.variant-cursor <= Lang.variants.length
                         ? Lang.variants[root.variant-cursor - 1].name
@@ -285,13 +219,7 @@ export component KeyboardPage inherits TdnPage {
                         }
                         root.try-next();
                     }
-                    key-pressed(event) => {
-                        if event.text == Key.DownArrow { move-variant-cursor(1); return accept; }
-                        if event.text == Key.UpArrow { move-variant-cursor(-1); return accept; }
-                        if event.text == Key.PageDown { move-variant-cursor(10); return accept; }
-                        if event.text == Key.PageUp { move-variant-cursor(-10); return accept; }
-                        reject
-                    }
+                    move(rows) => { move-variant-cursor(rows); }
                 }
 
                 variants := ScrollView {
@@ -319,20 +247,13 @@ export component KeyboardPage inherits TdnPage {
         }
     }
 
-    if Lang.latin-fallback: TdnText {
+    if Lang.latin-fallback: TdnNote {
         text: Lang.t("page-keyboard-latin-fallback", []);
-        color: Tokens.color-muted-foreground;
-        horizontal-alignment: Dir.text-start;
-        wrap: word-wrap;
-        vertical-stretch: 0;
     }
 
-    if Lang.keymap-not-saved: TdnText {
+    if Lang.keymap-not-saved: TdnPara {
         text: Lang.t("page-keyboard-not-saved", []);
         color: Tokens.color-destructive;
-        horizontal-alignment: Dir.text-start;
-        wrap: word-wrap;
-        vertical-stretch: 0;
     }
 
     if Ims.items.length > 0: ImsRow { }

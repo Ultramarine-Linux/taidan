@@ -1,6 +1,5 @@
 use std::sync::LazyLock;
 
-use super::parseutil as pu;
 use futures::FutureExt;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
@@ -13,24 +12,15 @@ const ERROR_TAIL_LINES: usize = 10;
 const DRAIN_LINE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
 const DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-pub(super) async fn run_logged(
+pub(crate) async fn run_logged(
     name: &'static str,
     verb: &crate::Verb,
     mut on_line: impl FnMut(&str),
 ) -> Res<()> {
     let (writer, reader) = tokio::net::unix::pipe::pipe().map_err(Err::_fail_to_run(name))?;
     let writer = writer.into_blocking_fd().map_err(Err::_fail_to_run(name))?;
-    let mut child = crate::helper::command(verb)
-        .stdin(std::process::Stdio::piped())
-        .stdout(writer.try_clone().map_err(Err::_fail_to_run(name))?)
-        .stderr(writer)
-        .spawn()
-        .map_err(Err::_fail_to_run(name))?;
-    if let Some(mut stdin) = child.stdin.take()
-        && let Err(e) = stdin.write_all(&crate::helper::stdin(verb, &[])).await
-    {
-        tracing::error!(?e, name, "cannot pass the request to the helper");
-    }
+    let stdout = writer.try_clone().map_err(Err::_fail_to_run(name))?;
+    let mut child = crate::spawn_helper(verb, &[], stdout, writer).await?;
 
     let log_path = crate::TEMP_DIR.join(format!("{name}.stdout.log"));
     let mut log =
@@ -100,12 +90,13 @@ pub(super) async fn run_logged(
     Err(e)
 }
 
-pub(super) async fn handle_dnf(callback: &impl crate::Callback, verb: crate::Verb) -> Res<()> {
+pub(crate) async fn handle_dnf(callback: &impl crate::Callback, verb: crate::Verb) -> Res<()> {
     run_logged("dnf5", &verb, |line| {
         if let Some(m) = PROGRESS_REGEX.captures(line)
-            && let (Ok(num), Ok(den)) = (m[1].parse(), m[2].parse())
+            && let (Ok(num), Ok(den)) = (m[1].parse::<u32>(), m[2].parse::<u32>())
+            && den != 0
         {
-            pu::send_frac(callback, num, den);
+            callback.send(crate::InstallMsg::StageProgress(f64::from(num) / f64::from(den)));
         }
     })
     .await

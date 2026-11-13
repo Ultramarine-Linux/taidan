@@ -100,9 +100,20 @@ impl LanguageRow {
 }
 
 const OWO_TAG: &str = "en-Xowo";
+const OWO_LOCALE: &str = "en-owo";
+
+#[must_use]
+pub fn without_codeset(locale: &str) -> &str {
+    locale.split_once('.').map_or(locale, |(name, _)| name)
+}
+
+#[must_use]
+pub fn icu_tag(locale: &str) -> &str {
+    if locale == OWO_LOCALE { "en-US" } else { locale }
+}
 
 fn posix_locale(lang: &str) -> Option<String> {
-    let tag = lang.split_once('.').map_or(lang, |(left, _)| left);
+    let tag = without_codeset(lang);
     if tag == OWO_TAG {
         return Some("en_US.UTF-8".to_owned());
     }
@@ -136,10 +147,7 @@ fn ui_langs(
 
 pub fn set_lang(lang: &str) -> String {
     let mut shown = "en-US".to_owned();
-    if let Ok(locale) = lang
-        .split_once('.')
-        .map_or(lang, |(left, _)| left)
-        .to_owned()
+    if let Ok(locale) = without_codeset(lang)
         .parse::<LanguageIdentifier>()
         .inspect_err(|e| tracing::error!(?e, ?lang, "Cannot apply language"))
     {
@@ -159,8 +167,7 @@ pub fn set_lang(lang: &str) -> String {
 }
 
 fn is_rtl(lang: &str) -> bool {
-    let tag = lang.split_once('.').map_or(lang, |(left, _)| left);
-    icu::locale::LanguageIdentifier::try_from_str(tag)
+    icu::locale::LanguageIdentifier::try_from_str(without_codeset(lang))
         .inspect_err(|e| tracing::error!(?e, lang, "cannot parse locale for its direction"))
         .is_ok_and(|li| icu::locale::LocaleDirectionality::new_extended().is_right_to_left(&li))
 }
@@ -183,9 +190,7 @@ fn display_hdl<T>(
         } else {
             let mut opt = dn::DisplayNamesOptions::default();
             opt.style = Some(dn::Style::Short);
-            let locale =
-                if current_lang.locale == "en-owo" { "en-US" } else { &current_lang.locale };
-            let locale = icu::locale::Locale::try_from_str(locale)
+            let locale = icu::locale::Locale::try_from_str(icu_tag(&current_lang.locale))
                 .unwrap_or_else(|e| panic!("cannot parse locale {current_lang:?}: {e}"));
             assert_ne!(locale, icu::locale::Locale::UNKNOWN, "locale {current_lang:?} is unk");
 
@@ -211,44 +216,25 @@ struct KeymapReq {
     also_system: bool,
 }
 
-fn coalesce_to_latest(mut req: KeymapReq, rx: &std::sync::mpsc::Receiver<KeymapReq>) -> KeymapReq {
-    while let Ok(newer) = rx.try_recv() {
-        let also_system = req.also_system || newer.also_system;
-        req = KeymapReq { also_system, ..newer };
+impl KeymapReq {
+    fn merge(self, newer: Self) -> Self {
+        Self { also_system: self.also_system || newer.also_system, ..newer }
     }
-    req
-}
 
-static KEYMAP_UI: std::sync::OnceLock<slint::Weak<crate::ui::AppWindow>> =
-    std::sync::OnceLock::new();
-
-static KEYMAP_TX: LazyLock<std::sync::mpsc::Sender<KeymapReq>> = LazyLock::new(|| {
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        while let Ok(req) = rx.recv() {
-            let KeymapReq { layout, variant, also_system } = coalesce_to_latest(req, &rx);
-            let saved = crate::RT
-                .block_on(libtaidan::i18n::set_keymap(
-                    None,
-                    &layout,
-                    variant.as_deref(),
-                    also_system,
-                ))
-                .inspect_err(|e| tracing::error!(?e, layout, ?variant, "cannot set keymap"))
-                .unwrap_or(true);
-            if also_system && let Some(ui) = KEYMAP_UI.get() {
-                let res = ui.upgrade_in_event_loop(move |ui| {
-                    use slint::ComponentHandle as _;
-                    ui.global::<crate::ui::Lang<'_>>().set_keymap_not_saved(!saved);
-                });
-                if let Err(e) = res {
-                    tracing::error!(?e, "cannot tell the UI about the keymap");
-                }
-            }
+    fn apply(self, ui: &slint::Weak<crate::ui::AppWindow>) {
+        let Self { layout, variant, also_system } = self;
+        let saved = crate::RT
+            .block_on(libtaidan::i18n::set_keymap(None, &layout, variant.as_deref(), also_system))
+            .inspect_err(|e| tracing::error!(?e, layout, ?variant, "cannot set keymap"))
+            .unwrap_or(true);
+        if also_system {
+            crate::ui::on_ui(ui, move |ui| {
+                use slint::ComponentHandle as _;
+                ui.global::<crate::ui::Lang<'_>>().set_keymap_not_saved(!saved);
+            });
         }
-    });
-    tx
-});
+    }
+}
 
 fn save_keymap_without_applying(layout: &str, variant: Option<&str>) {
     let mut settings = crate::SETTINGS.write();
@@ -256,23 +242,38 @@ fn save_keymap_without_applying(layout: &str, variant: Option<&str>) {
     settings.kb_variant = variant.map(ToOwned::to_owned);
 }
 
-fn has_latin_fallback(layout: &str, variant: Option<&str>) -> bool {
-    libtaidan::i18n::XkbKeymap::new(layout, variant).has_latin_fallback()
+struct KeymapSetter(std::sync::mpsc::Sender<KeymapReq>);
+
+impl KeymapSetter {
+    fn new(ui: slint::Weak<crate::ui::AppWindow>) -> Self {
+        Self(crate::ui::latest_worker(KeymapReq::merge, move |req: KeymapReq| req.apply(&ui)))
+    }
+
+    fn set(
+        &self,
+        lang: &crate::ui::Lang<'_>,
+        layout: &str,
+        variant: Option<&str>,
+        also_system: bool,
+    ) {
+        save_keymap_without_applying(layout, variant);
+        if also_system {
+            crate::SETTINGS.write().kb_picked = true;
+        }
+        let req = KeymapReq {
+            layout: layout.to_owned(),
+            variant: variant.map(ToOwned::to_owned),
+            also_system,
+        };
+        if let Err(e) = self.0.send(req) {
+            tracing::error!(?e, "keymap worker is gone");
+        }
+        lang.set_latin_fallback(has_latin_fallback(layout, variant));
+    }
 }
 
-fn set_keymap(layout: &str, variant: Option<&str>, also_system: bool) {
-    save_keymap_without_applying(layout, variant);
-    if also_system {
-        crate::SETTINGS.write().kb_picked = true;
-    }
-    let req = KeymapReq {
-        layout: layout.to_owned(),
-        variant: variant.map(ToOwned::to_owned),
-        also_system,
-    };
-    if let Err(e) = KEYMAP_TX.send(req) {
-        tracing::error!(?e, "keymap worker is gone");
-    }
+fn has_latin_fallback(layout: &str, variant: Option<&str>) -> bool {
+    libtaidan::i18n::XkbKeymap::new(layout, variant).has_latin_fallback()
 }
 
 fn first_of_comma_list(list: &str) -> Option<String> {
@@ -286,8 +287,6 @@ fn system_keymap() -> Option<(String, Option<String>)> {
     tracing::debug!(?keymap, "System keymap");
     keymap
 }
-
-type Query = Rc<RefCell<String>>;
 
 const LATIN_GREEK_CYRILLIC_COMBINING_DIACRITICS: std::ops::RangeInclusive<char> =
     '\u{300}'..='\u{36f}';
@@ -304,8 +303,47 @@ pub fn fold_search(text: &str) -> String {
     ComposingNormalizerBorrowed::new_nfc().normalize(&stripped).into_owned()
 }
 
-fn matches(folded_query: &str, haystacks: &[&str]) -> bool {
-    folded_query.is_empty() || haystacks.iter().any(|h| fold_search(h).contains(folded_query))
+fn matches(folded_query: &str, haystacks: impl IntoIterator<Item = impl AsRef<str>>) -> bool {
+    folded_query.is_empty()
+        || haystacks.into_iter().any(|h| fold_search(h.as_ref()).contains(folded_query))
+}
+
+type Filter<T> = Box<dyn Fn(&T) -> bool>;
+
+struct Searchable<T: Clone + 'static> {
+    query: Rc<RefCell<String>>,
+    source: Rc<slint::VecModel<T>>,
+    filtered: Rc<slint::FilterModel<Rc<slint::VecModel<T>>, Filter<T>>>,
+}
+
+impl<T: Clone + 'static> Searchable<T> {
+    fn new(items: Vec<T>, haystacks: impl Fn(&T) -> Vec<slint::SharedString> + 'static) -> Self {
+        let query = Rc::new(RefCell::new(String::new()));
+        let source = Rc::new(slint::VecModel::from(items));
+        let filter: Filter<T> = {
+            let query = Rc::clone(&query);
+            Box::new(move |item| {
+                let query = query.borrow();
+                query.is_empty() || matches(&query, haystacks(item))
+            })
+        };
+        let filtered = Rc::new(slint::FilterModel::new(Rc::clone(&source), filter));
+        Self { query, source, filtered }
+    }
+
+    fn model(&self) -> slint::ModelRc<T> {
+        slint::ModelRc::from(Rc::clone(&self.filtered))
+    }
+
+    fn search(&self, query: &str) {
+        *self.query.borrow_mut() = fold_search(query);
+        self.filtered.reset();
+    }
+
+    fn replace_items(&self, items: Vec<T>) {
+        self.query.borrow_mut().clear();
+        self.source.set_vec(items);
+    }
 }
 
 fn strip_legacy_tt_tags(translated: &str) -> String {
@@ -350,58 +388,46 @@ pub fn initialize_ui(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::L
     lang.on_set_lang({
         let ui = ui.clone();
         move |lang| {
-            let loaded =
-                if lang.locale == "en-owo" { set_lang(OWO_TAG) } else { set_lang(&lang.locale) };
+            let loaded = set_lang(if lang.locale == OWO_LOCALE { OWO_TAG } else { &lang.locale });
             if let Some(ui) = ui.upgrade() {
                 ui.global::<crate::ui::Lang<'_>>().set_rtl(is_rtl(&loaded));
                 crate::ims::follow_locale_unless_picked(&ui);
             }
-            ui.upgrade_in_event_loop(|ui| {
+            crate::ui::on_ui(&ui, |ui| {
                 refresh_localized_time_zone_names(&ui);
                 ui.window().request_redraw();
-            })
-            .expect("event loop err");
+            });
         }
     });
-    if KEYMAP_UI.set(ui.clone()).is_err() {
-        tracing::warn!("keymaps initialized twice");
-    }
     init_keymaps(ui, lang);
 }
 
 fn init_language_list(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
     use crate::ui::Language;
-    use slint::{ComponentHandle, FilterModel, ModelRc, ToSharedString, VecModel};
+    use slint::{ComponentHandle, ToSharedString};
     let all_langs = LANGS
         .iter()
-        .filter(|row| row.locale == "en-owo" || !row.is_legacy_glibc_alias())
+        .filter(|row| row.locale == OWO_LOCALE || !row.is_legacy_glibc_alias())
         .map(|row| Language {
             locale: row.bcp47(),
             native_name: row.native_name.to_shared_string(),
         })
-        .collect::<VecModel<_>>();
-    let query = Query::default();
+        .collect_vec();
     let query_lang = Rc::new(RefCell::new(None::<Language>));
-    let model = Rc::new(FilterModel::new(all_langs, {
-        let (query, query_lang) = (Rc::clone(&query), Rc::clone(&query_lang));
+    let languages = Searchable::new(all_langs, {
+        let query_lang = Rc::clone(&query_lang);
         move |row: &Language| {
-            let query = query.borrow();
-            if query.is_empty() {
-                return true;
-            }
             let shown_in = query_lang.borrow().clone().unwrap_or_else(|| row.clone());
-            let name_as_shown = display_name(row, &shown_in);
-            matches(&query, &[&row.locale, &row.native_name, &name_as_shown])
+            vec![row.locale.clone(), row.native_name.clone(), display_name(row, &shown_in)]
         }
-    }));
-    lang.set_languages(ModelRc::from(Rc::clone(&model)));
+    });
+    lang.set_languages(languages.model());
     lang.on_filter_languages({
         let ui = ui.clone();
         move |q| {
-            *query.borrow_mut() = fold_search(&q);
             *query_lang.borrow_mut() =
                 ui.upgrade().map(|ui| ui.global::<crate::ui::Lang<'_>>().get_current_language());
-            model.reset();
+            languages.search(&q);
         }
     });
 }
@@ -432,7 +458,7 @@ fn sorted_keymaps() -> Vec<crate::ui::Keymap> {
 
 fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'_>) {
     use crate::ui::{Keymap, KeymapVariant};
-    use slint::{ComponentHandle, FilterModel, Model, ModelRc, VecModel};
+    use slint::{ComponentHandle, Model};
     let keymaps = sorted_keymaps();
     let system = system_keymap();
     let initial = system
@@ -446,62 +472,43 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
         .and_then(|variant| initial.variants.iter().find(|v| v.id == variant.as_str()))
         .unwrap_or_default();
 
-    let keymap_query = Query::default();
-    let keymap_model = Rc::new(FilterModel::new(VecModel::from(keymaps), {
-        let keymap_query = Rc::clone(&keymap_query);
-        move |km: &Keymap| matches(&keymap_query.borrow(), &[&km.id, &km.name])
-    }));
-    lang.set_keymaps(ModelRc::from(Rc::clone(&keymap_model)));
-    lang.on_filter_keymaps(move |q| {
-        *keymap_query.borrow_mut() = fold_search(&q);
-        keymap_model.reset();
-    });
+    let keymaps = Searchable::new(keymaps, |km: &Keymap| vec![km.id.clone(), km.name.clone()]);
+    lang.set_keymaps(keymaps.model());
+    lang.on_filter_keymaps(move |q| keymaps.search(&q));
 
-    let variant_query = Query::default();
-    let variant_filter = {
-        let variant_query = Rc::clone(&variant_query);
-        move |v: &KeymapVariant| matches(&variant_query.borrow(), &[&v.id, &v.name])
-    };
-    lang.set_variants(initial.variants.clone());
+    let variants =
+        Rc::new(Searchable::new(initial.variants.iter().collect(), |v: &KeymapVariant| {
+            vec![v.id.clone(), v.name.clone()]
+        }));
+    lang.set_variants(variants.model());
     lang.on_filter_variants({
-        let variant_query = Rc::clone(&variant_query);
-        let ui = ui.clone();
-        move |q| {
-            *variant_query.borrow_mut() = fold_search(&q);
-            if let Some(ui) = ui.upgrade() {
-                let lang = ui.global::<crate::ui::Lang<'_>>();
-                lang.set_variants(ModelRc::new(FilterModel::new(
-                    lang.get_current_keymap().variants,
-                    variant_filter.clone(),
-                )));
-            }
-        }
+        let variants = Rc::clone(&variants);
+        move |q| variants.search(&q)
     });
 
+    let setter = Rc::new(KeymapSetter::new(ui.clone()));
     let initial_variant_id =
         (!initial_variant.id.is_empty()).then_some(initial_variant.id.as_str());
     if crate::install::is_dev_session() {
         save_keymap_without_applying(&initial.id, initial_variant_id);
+        lang.set_latin_fallback(has_latin_fallback(&initial.id, initial_variant_id));
     } else {
         // KWin doesn't follow the system's layout
-        set_keymap(&initial.id, initial_variant_id, false);
+        setter.set(lang, &initial.id, initial_variant_id, false);
     }
-    lang.set_latin_fallback(has_latin_fallback(&initial.id, initial_variant_id));
     lang.set_current_keymap(initial);
     lang.set_current_variant(initial_variant);
     lang.on_select_keymap({
-        let ui = ui.clone();
+        let (ui, setter) = (ui.clone(), Rc::clone(&setter));
         move |km| {
             let Some(ui) = ui.upgrade() else { return };
             let lang = ui.global::<crate::ui::Lang<'_>>();
             if km.id == lang.get_current_keymap().id {
                 return;
             }
-            variant_query.borrow_mut().clear();
-            lang.set_variants(km.variants.clone());
+            variants.replace_items(km.variants.iter().collect());
             lang.set_current_variant(KeymapVariant::default());
-            set_keymap(&km.id, None, true);
-            lang.set_latin_fallback(has_latin_fallback(&km.id, None));
+            setter.set(&lang, &km.id, None, true);
             lang.set_current_keymap(km);
         }
     });
@@ -512,8 +519,7 @@ fn init_keymaps(ui: &slint::Weak<crate::ui::AppWindow>, lang: &crate::ui::Lang<'
             let lang = ui.global::<crate::ui::Lang<'_>>();
             let layout = lang.get_current_keymap().id;
             let id = (!variant.id.is_empty()).then_some(variant.id.as_str());
-            set_keymap(&layout, id, true);
-            lang.set_latin_fallback(has_latin_fallback(&layout, id));
+            setter.set(&lang, &layout, id, true);
             lang.set_current_variant(variant);
         }
     });
@@ -524,7 +530,7 @@ fn display_name(
     current_language: &crate::ui::Language,
 ) -> slint::SharedString {
     use slint::ToSharedString;
-    if lang.locale == "en-owo" {
+    if lang.locale == OWO_LOCALE {
         return "OWO".into();
     }
     let Ok(locale) = icu::locale::Locale::try_from_str(&lang.locale)
@@ -541,7 +547,7 @@ mod tests {
 
     #[test]
     fn search_ignores_accents() {
-        let found = |query: &str, text: &str| matches(&fold_search(query), &[text]);
+        let found = |query: &str, text: &str| matches(&fold_search(query), [text]);
         assert!(found("sao paulo", "São Paulo"));
         assert!(found("SÃO", "sao paulo"));
         assert!(found("francais", "Français"));
@@ -553,7 +559,7 @@ mod tests {
 
     #[test]
     fn search_leaves_cjk_and_hangul_alone() {
-        let found = |query: &str, text: &str| matches(&fold_search(query), &[text]);
+        let found = |query: &str, text: &str| matches(&fold_search(query), [text]);
         assert!(found("日本", "日本語"));
         assert!(found("が", "がっこう"));
         assert!(!found("か", "が"));

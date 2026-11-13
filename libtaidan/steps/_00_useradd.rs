@@ -2,57 +2,47 @@ use secrecy::ExposeSecret;
 
 use crate::prelude::*;
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct UserAdd;
-impl super::Step for UserAdd {
-    #[tracing::instrument(skip(settings))]
-    async fn run<C: crate::Callback>(
-        &self,
-        settings: &crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        _: &C,
-    ) -> Res<()> {
-        if let Some(problem) = crate::passwd::username_problem(&settings.username) {
+pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
+    if let Some(problem) = crate::passwd::username_problem(&settings.username) {
+        return Err(Err::Message(format!(
+            "username `{}` can't be used: {problem:?}",
+            settings.username
+        )));
+    }
+    if settings.passwd.expose_secret().is_empty() {
+        return Err(Err::Msg("refusing to create a user without a password"));
+    }
+    let user_exists = || uzers::get_user_by_name(&settings.username).is_some();
+    let exists_err = || Err::Message(format!("user `{}` already exists", settings.username));
+    if user_exists() && !crate::passwd::created_by_us(&settings.username) {
+        return Err(exists_err());
+    }
+    remove_previous().await?;
+    if user_exists() {
+        return Err(exists_err());
+    }
+    // `useradd -m` takes over an existing home, homectl refuses to
+    let keep_home = !cfg.taidan0.systemd_homed && home_exists(&settings.username);
+    if keep_home {
+        tracing::info!(user = settings.username, "home is already there, keeping it");
+        if previous_uid(&settings.username).is_none() {
             return Err(Err::Message(format!(
-                "username `{}` can't be used: {problem:?}",
-                settings.username
+                "{} is already there and belongs to another user, or isn't a directory. \
+                 Move it away or pick another username",
+                home_path(&settings.username).display()
             )));
         }
-        if settings.passwd.expose_secret().is_empty() {
-            return Err(Err::Msg("refusing to create a user without a password"));
-        }
-        let user_exists = || uzers::get_user_by_name(&settings.username).is_some();
-        let exists_err = || Err::Message(format!("user `{}` already exists", settings.username));
-        if user_exists() && !crate::passwd::created_by_us(&settings.username) {
-            return Err(exists_err());
-        }
-        remove_previous().await?;
-        if user_exists() {
-            return Err(exists_err());
-        }
-        // `useradd -m` takes over an existing home, homectl refuses to
-        let keep_home = !cfg.taidan0.systemd_homed && home_exists(&settings.username);
-        if keep_home {
-            tracing::info!(user = settings.username, "home is already there, keeping it");
-            if previous_uid(&settings.username).is_none() {
-                return Err(Err::Message(format!(
-                    "{} is already there and belongs to another user, or isn't a directory. \
-                     Move it away or pick another username",
-                    home_path(&settings.username).display()
-                )));
-            }
-        }
-        crate::passwd::record_created(&settings.username, keep_home).await?;
-        if cfg.taidan0.systemd_homed {
-            homed(settings, cfg).await?;
-        } else {
-            useradd(settings).await?;
-        }
-        if let Err(e) = set_avatar(settings).await {
-            tracing::warn!(?e, "cannot set user icon");
-        }
-        Ok(())
     }
+    crate::passwd::record_created(&settings.username, keep_home).await?;
+    if cfg.taidan0.systemd_homed {
+        homed(settings, cfg).await?;
+    } else {
+        useradd(settings).await?;
+    }
+    if let Err(e) = set_avatar(settings).await {
+        tracing::warn!(?e, "cannot set user icon");
+    }
+    Ok(())
 }
 
 async fn set_avatar(settings: &crate::settings::Settings) -> Res<()> {
@@ -196,12 +186,16 @@ async fn stage_skel(
         tokio::fs::create_dir_all(&skel).await.map_err(Err::Io)?;
         if tokio::fs::try_exists("/etc/skel").await.unwrap_or_default() {
             let to = skel.to_string_lossy();
-            super::acmd("cp", &["-rT", "--no-preserve=ownership", "/etc/skel", &to]).await?;
+            super::acmd("cp", ["-rT", "--no-preserve=ownership", "/etc/skel", &to]).await?;
         }
-        let a11y = crate::a11y::write_to_skel(settings, cfg, &skel).await?;
-        let imf = super::_08_setup_imf::write_to_skel(settings, cfg, &skel).await?;
-        let theme = super::_01_settheme::write_to_skel(settings, cfg, &skel).await?;
-        let keymap = crate::i18n::write_keymap_to_skel(settings, &skel).await?;
+        let (home, desktop) = (crate::home::Home::Skel(skel.clone()), cfg.desktop());
+        let a11y = settings.a11y != crate::a11y::A11y::default();
+        if a11y {
+            settings.a11y.apply(&home, desktop, None).await?;
+        }
+        let imf = super::_08_setup_imf::apply_to_skel(settings, cfg, &home).await?;
+        let theme = super::_01_settheme::apply(settings, &home, desktop).await?;
+        let keymap = crate::i18n::apply_keymap(settings, &home, desktop).await?;
         Ok::<_, Err>(a11y || imf || theme || keymap)
     };
     match res.await {

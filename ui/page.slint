@@ -1,4 +1,4 @@
-import { TdnText, TdnBtn, TdnStyle } from "components.slint";
+import { TdnText, TdnPara, TdnBtn, TdnStyle } from "components.slint";
 import { Cfg } from "cfg.slint";
 import { Lang, Dir } from "lang.slint";
 import { A11y } from "a11y.slint";
@@ -22,13 +22,19 @@ export global Pages {
     out property <int> error: 14;
 }
 
+export global Nav {
+    in-out property <int> page;
+}
+
 export component TdnBasePg {
     in property <string> pageid;
     in property <int> index;
-    in property <int> current;
+    in property <int> current: Nav.page;
     out property <bool> active: index == current;
     callback next_page;
     callback prev_page;
+    next_page => { Nav.page = Cfg.next-page(Nav.page); }
+    prev_page => { Nav.page = Cfg.prev-page(Nav.page); }
 
     width: 100%;
     height: 100%;
@@ -198,11 +204,9 @@ export component TdnPage inherits TdnBasePg {
             show-steps: root.show-steps;
         }
 
-        TdnText {
+        TdnPara {
             font-size: 1.75 * Tokens.text-rem;
             font-weight: 500;
-            horizontal-alignment: Dir.text-start;
-            wrap: word-wrap;
             text: root.name;
         }
 
@@ -228,8 +232,7 @@ export component TdnPage inherits TdnBasePg {
                 text: root.next-text;
                 enabled: root.can-next;
                 enter-hint: root.next-enter-hint || self.has-focus;
-                background-color: TdnStyle.accent;
-                foreground-color: TdnStyle.accent-foreground;
+                primary: true;
                 clicked => { root.try-next(); }
             }
         }

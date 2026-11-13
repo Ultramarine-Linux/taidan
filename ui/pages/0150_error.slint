@@ -3,7 +3,7 @@ import { Lang, Dir } from "../lang.slint";
 import { Install } from "../install.slint";
 import { Actions } from "../actions.slint";
 import { Modal } from "../modal.slint";
-import { TdnText, TdnBtn, TdnStyle } from "../components.slint";
+import { TdnText, TdnNote, TdnBtn } from "../components.slint";
 import { ScrollView } from "std-widgets.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
@@ -45,11 +45,8 @@ export component ErrorPage inherits TdnBasePg {
                     horizontal-alignment: Dir.text-start;
                 }
 
-                TdnText {
+                TdnNote {
                     text: Lang.t("page-error-desc", []);
-                    color: Tokens.color-muted-foreground;
-                    horizontal-alignment: Dir.text-start;
-                    wrap: word-wrap;
                 }
             }
         }
@@ -112,9 +109,7 @@ export component ErrorPage inherits TdnBasePg {
                 retry := TdnBtn {
                     layout-order: Dir.order(1);
                     text: Lang.t("page-error-retry", []);
-                    enter-hint: true;
-                    background-color: TdnStyle.accent;
-                    foreground-color: TdnStyle.accent-foreground;
+                    primary: true;
                     clicked => { root.next_page(); }
                 }
             }

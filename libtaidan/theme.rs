@@ -1,3 +1,5 @@
+use crate::cfg::Desktop;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Accent {
@@ -63,11 +65,36 @@ impl Accent {
 
 #[must_use]
 pub fn accent_supported(edition: &str) -> bool {
-    accent_supported_with(edition, crate::a11y::is_plasma())
+    Desktop::current(edition).supports_accent()
 }
 
-fn accent_supported_with(edition: &str, is_plasma: bool) -> bool {
-    is_plasma || crate::cfg::desktop(edition) == "gnome"
+impl Desktop {
+    #[must_use]
+    pub fn supports_accent(self) -> bool {
+        matches!(self, Self::Plasma | Self::Gnome)
+    }
+
+    #[must_use]
+    pub const fn themes(self, dark: bool) -> Option<Themes> {
+        Some(match self {
+            Self::Gnome => {
+                Themes { gtk: if dark { "Adwaita-dark" } else { "Adwaita" }, icons: None, wm: None }
+            }
+            // budgie and xfce panels stay dark in either mode, so light mode keeps the icon themes
+            // with light panel icons
+            Self::Budgie => Themes {
+                gtk: if dark { "Fluent-round-Dark" } else { "Fluent-round-Light" },
+                icons: Some(if dark { "Fluent-dark" } else { "Fluent" }),
+                wm: None,
+            },
+            Self::Xfce => Themes {
+                gtk: if dark { "Orchis-Dark" } else { "Orchis-Light" },
+                icons: Some(if dark { "Papirus-Dark" } else { "Papirus" }),
+                wm: Some(if dark { "Orchis-Dark" } else { "Orchis-Light" }),
+            },
+            Self::Plasma | Self::Other => return None,
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,33 +102,6 @@ pub struct Themes {
     pub gtk: &'static str,
     pub icons: Option<&'static str>,
     pub wm: Option<&'static str>,
-}
-
-#[must_use]
-pub fn themes(edition: &str, dark: bool) -> Option<Themes> {
-    Some(match crate::cfg::desktop(edition).as_str() {
-        "gnome" => {
-            Themes { gtk: if dark { "Adwaita-dark" } else { "Adwaita" }, icons: None, wm: None }
-        }
-        // budgie and xfce panels stay dark in either mode, so light mode keeps the icon themes
-        // with light panel icons
-        "budgie" => Themes {
-            gtk: if dark { "Fluent-round-Dark" } else { "Fluent-round-Light" },
-            icons: Some(if dark { "Fluent-dark" } else { "Fluent" }),
-            wm: None,
-        },
-        "xfce" => Themes {
-            gtk: if dark { "Orchis-Dark" } else { "Orchis-Light" },
-            icons: Some(if dark { "Papirus-Dark" } else { "Papirus" }),
-            wm: Some(if dark { "Orchis-Dark" } else { "Orchis-Light" }),
-        },
-        _ => return None,
-    })
-}
-
-#[must_use]
-pub fn uses_xfconf(edition: &str) -> bool {
-    crate::cfg::desktop(edition) == "xfce"
 }
 
 #[cfg(test)]
@@ -120,18 +120,18 @@ mod tests {
 
     #[test]
     fn accent_only_where_it_works() {
-        assert!(accent_supported_with("gnome", false));
-        assert!(accent_supported_with("atomic-gnome", false));
-        assert!(accent_supported_with("kde", true));
-        assert!(accent_supported_with("", true));
-        assert!(!accent_supported_with("kde", false));
-        assert!(!accent_supported_with("budgie", false));
-        assert!(!accent_supported_with("xfce", false));
-        assert!(!accent_supported_with("", false));
+        assert!(Desktop::Gnome.supports_accent());
+        assert!(Desktop::from_edition("atomic-gnome").supports_accent());
+        assert!(Desktop::Plasma.supports_accent());
+        assert!(!Desktop::from_edition("kde").supports_accent());
+        assert!(!Desktop::Budgie.supports_accent());
+        assert!(!Desktop::Xfce.supports_accent());
+        assert!(!Desktop::from_edition("").supports_accent());
     }
 
     #[test]
     fn themes_per_edition() {
+        let themes = |edition, dark| Desktop::from_edition(edition).themes(dark);
         let budgie = themes("atomic-budgie", true).unwrap();
         assert_eq!((budgie.gtk, budgie.icons), ("Fluent-round-Dark", Some("Fluent-dark")));
         let budgie = themes("budgie", false).unwrap();
@@ -144,6 +144,6 @@ mod tests {
         let gnome = themes("gnome", true).unwrap();
         assert_eq!((gnome.gtk, gnome.icons), ("Adwaita-dark", None));
         assert_eq!(themes("plasma", true), None);
-        assert!(uses_xfconf("xfce") && !uses_xfconf("gnome"));
+        assert_eq!(Desktop::Plasma.themes(true), None);
     }
 }

@@ -1,33 +1,27 @@
-use super::super::i18n;
-use crate::prelude::*;
+use crate::{
+    cfg::Desktop,
+    home::{Home, HomeCmd},
+    i18n,
+    kconfig::KConfigEntry,
+    prelude::*,
+};
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SetupImf;
-impl super::Step for SetupImf {
-    #[tracing::instrument(skip(settings))]
-    async fn run<C: crate::Callback>(
-        &self,
-        settings: &crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        _: &C,
-    ) -> Res<()> {
-        if cfg.taidan0.systemd_homed {
-            return Ok(());
-        }
-        let Some(settings) = &with_installed_ims(settings, cfg, InstallPhase::After).await else {
-            if let Err(e) = remove_stale_fcitx5_config(settings).await {
-                tracing::warn!(?e, "cannot remove the Fcitx5 config of an earlier attempt");
-            }
-            return Ok(());
-        };
-        if let Err(e) = match settings.imf {
-            i18n::I18nImf::IBus => write_ibus_profile(settings).await,
-            i18n::I18nImf::Fcitx5 => write_fcitx5_profile(settings).await,
-        } {
-            tracing::warn!(?e, "cannot setup IMFs");
-        }
-        Ok(())
+pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
+    if cfg.taidan0.systemd_homed {
+        return Ok(());
     }
+    let desktop = cfg.desktop();
+    let Some(installed) = &with_installed_ims(settings, cfg, InstallPhase::After).await else {
+        if let Err(e) = remove_stale_fcitx5_config(settings, cfg, desktop).await {
+            tracing::warn!(?e, "cannot remove the Fcitx5 config of an earlier attempt");
+        }
+        return Ok(());
+    };
+    let res = async { apply(installed, &Home::user(settings, cfg).await?, desktop).await };
+    if let Err(e) = res.await {
+        tracing::warn!(?e, "cannot setup IMFs");
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -46,12 +40,7 @@ async fn with_installed_ims(
     }
     let mut ims = vec![];
     for name in &settings.ims {
-        let im = i18n::find_im(name);
-        let pkg = match settings.imf {
-            i18n::I18nImf::Fcitx5 => im.and_then(|im| im.fcitx5_pkg),
-            i18n::I18nImf::IBus => im.and_then(|im| im.ibus_pkg),
-        };
-        let Some(pkg) = pkg else { continue };
+        let Some(pkg) = i18n::find_im(name).and_then(|im| im.pkg(settings.imf)) else { continue };
         match tokio::process::Command::new("rpm").args(["-q", "--quiet", pkg]).status().await {
             Ok(status) if status.success() => ims.push(name.clone()),
             Ok(_) => tracing::info!(name, pkg, "input method isn't installed, not setting it up"),
@@ -63,15 +52,23 @@ async fn with_installed_ims(
 
 const FCITX5_LAUNCHER: &str = "/usr/share/applications/fcitx5-wayland-launcher.desktop";
 
+const FCITX5_PROFILE: &str = ".config/fcitx5/profile";
+
 // https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg
-const KWINRC_SELECT_FCITX5_ARGS: [[&str; 6]; 2] = [
-    ["--group", "Wayland", "--key", "InputMethod", "--", FCITX5_LAUNCHER],
-    ["--group", "Wayland", "--key", "VirtualKeyboardEnabled", "--type=bool", "true"],
-];
+fn kwinrc_select_fcitx5() -> [KConfigEntry; 2] {
+    [
+        KConfigEntry::value("kwinrc", "Wayland", "InputMethod", Some(FCITX5_LAUNCHER)),
+        KConfigEntry::bool("kwinrc", "Wayland", "VirtualKeyboardEnabled", true),
+    ]
+}
 
 const FCITX5_PROFILE_MARKER: &str = "# written by Taidan";
 
-async fn remove_stale_fcitx5_config(settings: &crate::settings::Settings) -> Res<()> {
+async fn remove_stale_fcitx5_config(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    desktop: Desktop,
+) -> Res<()> {
     const SCRIPT: &str = r#"
         profile="$1/fcitx5/profile"
         [ "$(head -n 1 -- "$profile" 2>/dev/null)" = "$2" ] || exit 0
@@ -82,20 +79,12 @@ async fn remove_stale_fcitx5_config(settings: &crate::settings::Settings) -> Res
             kwriteconfig6 --file "$1/kwinrc" --group Wayland --key VirtualKeyboardEnabled --delete
         fi
     "#;
-    let username = &settings.username;
-    let config = crate::a11y::home_of(username).await?.join(".config");
-    let plasma = if crate::a11y::is_plasma() { "plasma" } else { "" };
-    let argv = [
-        "sh",
-        "-c",
-        SCRIPT,
-        "sh",
-        &config.to_string_lossy(),
-        FCITX5_PROFILE_MARKER,
-        plasma,
-        FCITX5_LAUNCHER,
-    ];
-    crate::as_user(username, argv.map(str::to_owned).to_vec(), None).await
+    let home = Home::user(settings, cfg).await?;
+    let plasma = if desktop == Desktop::Plasma { "plasma" } else { "" };
+    let config = home.config();
+    let config = config.to_string_lossy();
+    let argv = ["sh", "-c", SCRIPT, "sh", &config, FCITX5_PROFILE_MARKER, plasma, FCITX5_LAUNCHER];
+    home.run(vec![HomeCmd::new(argv)]).await
 }
 
 fn fcitx5_profile(
@@ -143,66 +132,47 @@ fn fcitx5_profile(
     buf
 }
 
-fn write_file_argv(path: String) -> Vec<String> {
-    let script = r#"mkdir -p "${1%/*}" && exec cat > "$1""#;
-    ["sh", "-c", script, "sh"].map(str::to_owned).into_iter().chain([path]).collect()
-}
-
-async fn write_fcitx5_profile(settings: &crate::settings::Settings) -> Res<()> {
-    let username = &settings.username;
-    let config = crate::a11y::home_of(username).await?.join(".config");
-    let profile = config.join("fcitx5/profile").to_string_lossy().into_owned();
-    crate::as_user(username, write_file_argv(profile), Some(fcitx5_profile(settings).as_bytes()))
-        .await
-        .wrap_msg("cannot write ~/.config/fcitx5/profile")?;
-
-    if !crate::a11y::is_plasma() {
-        return Ok(());
-    }
-    let kwinrc = config.join("kwinrc");
-    let kwinrc = kwinrc.to_string_lossy();
-    for entry in KWINRC_SELECT_FCITX5_ARGS {
-        let mut argv = vec!["kwriteconfig6", "--file", &kwinrc];
-        argv.extend(entry);
-        let argv = argv.into_iter().map(str::to_owned).collect();
-        crate::as_user(username, argv, None).await.wrap_msg("cannot select Fcitx5 in kwinrc")?;
-    }
-    Ok(())
-}
-
-pub async fn write_to_skel(
-    settings: &crate::settings::Settings,
-    cfg: &crate::cfg::Config,
-    skel: &std::path::Path,
-) -> Res<bool> {
-    let Some(settings) = &with_installed_ims(settings, cfg, InstallPhase::Before).await else {
-        return Ok(false);
-    };
-    if settings.imf.is_ibus() {
-        return write_ibus_to_skel(settings, skel).await;
-    }
-    let config = skel.join(".config");
-    tokio::fs::create_dir_all(config.join("fcitx5")).await.map_err(Err::Io)?;
-    tokio::fs::write(config.join("fcitx5/profile"), fcitx5_profile(settings))
-        .await
-        .map_err(Err::Io)?;
-    if crate::a11y::is_plasma() {
-        let kwinrc = config.join("kwinrc");
-        let kwinrc = kwinrc.to_string_lossy();
-        for entry in KWINRC_SELECT_FCITX5_ARGS {
-            let mut args = vec!["--file", &*kwinrc];
-            args.extend(entry);
-            super::acmd("kwriteconfig6", &args).await?;
+fn im_cmds(settings: &crate::settings::Settings, home: &Home, desktop: Desktop) -> Vec<HomeCmd> {
+    match settings.imf {
+        i18n::I18nImf::IBus if !settings.ims.is_empty() && !has_ibus_engine(settings) => vec![],
+        i18n::I18nImf::IBus => home
+            .session(ibus_dconf_writes(settings))
+            .map(HomeCmd::best_effort)
+            .into_iter()
+            .collect(),
+        i18n::I18nImf::Fcitx5 if settings.ims.is_empty() => vec![home.remove_file(FCITX5_PROFILE)],
+        i18n::I18nImf::Fcitx5 => {
+            let mut cmds = vec![home.write_file(FCITX5_PROFILE, fcitx5_profile(settings))];
+            if desktop == Desktop::Plasma {
+                cmds.extend(home.kconfig(&kwinrc_select_fcitx5()));
+            }
+            cmds
         }
     }
-    Ok(true)
+}
+
+async fn apply(settings: &crate::settings::Settings, home: &Home, desktop: Desktop) -> Res<bool> {
+    let cmds = im_cmds(settings, home, desktop);
+    let wrote = !cmds.is_empty();
+    home.run(cmds).await?;
+    Ok(wrote)
+}
+
+pub(super) async fn apply_to_skel(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    skel: &Home,
+) -> Res<bool> {
+    match &with_installed_ims(settings, cfg, InstallPhase::Before).await {
+        Some(installed) => apply(installed, skel, cfg.desktop()).await,
+        None => Ok(false),
+    }
 }
 
 const EMPTY_STRING_ARRAY_GVARIANT: &str = "@as []";
 
-fn ibus_session_if_any_engine(settings: &crate::settings::Settings) -> Option<Vec<String>> {
-    let any = settings.ims.iter().any(|s| i18n::find_im(s).is_some_and(|im| im.ibus_ref.is_some()));
-    any.then(|| ibus_dconf_writes(settings)).and_then(crate::a11y::one_session)
+fn has_ibus_engine(settings: &crate::settings::Settings) -> bool {
+    settings.ims.iter().any(|s| i18n::find_im(s).is_some_and(|im| im.ibus_ref.is_some()))
 }
 
 fn ibus_dconf_writes(
@@ -251,44 +221,10 @@ pub async fn fix_homed(settings: &crate::settings::Settings, cfg: &crate::cfg::C
     tracing::info!(?installed, "some input methods didn't install, fixing the home");
     let settings =
         &installed.unwrap_or_else(|| crate::settings::Settings { ims: vec![], ..settings.clone() });
-    let home = match crate::a11y::home_of(&settings.username).await {
-        Ok(home) => home,
-        Err(e) => return tracing::warn!(?e, "cannot find the user's home"),
-    };
-    let cmds = if settings.imf.is_ibus() {
-        let Some(cmd) = crate::a11y::one_session(ibus_dconf_writes(settings)) else { return };
-        let mut env = vec!["env".to_owned()];
-        env.extend(crate::a11y::in_home(&home, cmd));
-        vec![(env, None)]
-    } else {
-        let profile = home.join(".config/fcitx5/profile").to_string_lossy().into_owned();
-        if settings.ims.is_empty() {
-            vec![(vec!["rm".to_owned(), "-f".to_owned(), profile], None)]
-        } else {
-            vec![(write_file_argv(profile), Some(fcitx5_profile(settings)))]
-        }
-    };
-    crate::a11y::run_in_home(settings, cfg, cmds).await;
-}
-
-async fn write_ibus_to_skel(
-    settings: &crate::settings::Settings,
-    skel: &std::path::Path,
-) -> Res<bool> {
-    let Some(cmd) = ibus_session_if_any_engine(settings) else { return Ok(false) };
-    tokio::fs::create_dir_all(skel.join(".config")).await.map_err(Err::Io)?;
-    let env = crate::a11y::in_home(skel, cmd);
-    let env = env.iter().map(String::as_str).collect::<Vec<_>>();
-    if let Err(e) = super::acmd("env", &env).await {
-        tracing::warn!(?e, "cannot set the IBus engines");
-        return Ok(false);
+    let res = async { apply(settings, &Home::user(settings, cfg).await?, cfg.desktop()).await };
+    if let Err(e) = res.await {
+        tracing::warn!(?e, "cannot fix the input methods in the systemd-homed home");
     }
-    Ok(true)
-}
-
-async fn write_ibus_profile(settings: &crate::settings::Settings) -> Res<()> {
-    let Some(cmd) = ibus_session_if_any_engine(settings) else { return Ok(()) };
-    crate::as_user(&settings.username, cmd, None).await.wrap_msg("failed to set the IBus engines")
 }
 
 #[cfg(test)]
@@ -348,8 +284,28 @@ mod tests {
 
     #[test]
     fn no_ibus_engines_writes_nothing() {
-        let settings =
-            crate::settings::Settings { ims: vec!["bogus".into()], ..Default::default() };
-        assert!(ibus_session_if_any_engine(&settings).is_none());
+        let skel = Home::Skel("/skel".into());
+        let settings = crate::settings::Settings {
+            ims: vec!["bogus".into()],
+            imf: i18n::I18nImf::IBus,
+            ..Default::default()
+        };
+        assert!(im_cmds(&settings, &skel, Desktop::Gnome).is_empty());
+        let none = crate::settings::Settings { ims: vec![], ..settings };
+        assert_eq!(im_cmds(&none, &skel, Desktop::Gnome).len(), 1);
+    }
+
+    #[test]
+    fn fcitx5_on_plasma_also_selects_it_in_kwin() {
+        let skel = Home::Skel("/skel".into());
+        let settings = crate::settings::Settings {
+            kb_layout: "us".into(),
+            ims: vec!["Mozc".into()],
+            ..Default::default()
+        };
+        assert_eq!(im_cmds(&settings, &skel, Desktop::Plasma).len(), 3);
+        assert_eq!(im_cmds(&settings, &skel, Desktop::Gnome).len(), 1);
+        let none = crate::settings::Settings { ims: vec![], ..settings };
+        assert_eq!(im_cmds(&none, &skel, Desktop::Plasma), [skel.remove_file(FCITX5_PROFILE)]);
     }
 }

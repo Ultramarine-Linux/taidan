@@ -2,8 +2,7 @@ import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Account, Avatar } from "../account.slint";
 import { Camera } from "../camera.slint";
-import { TdnInput, TdnField, TdnText, TdnStyle, TdnBtn, TdnSpinner, TdnDialog, Modal, DialogOpener } from "../components.slint";
-import { FocusRing } from "../slintcn/components/focus-ring.slint";
+import { TdnTextField, TdnText, TdnNote, TdnStyle, TdnSpinner, TdnDialog, TdnDialogActions, TdnFormColumn, TdnPressable, Modal } from "../components.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
 export component UserIcon inherits Rectangle {
@@ -29,30 +28,20 @@ export component UserIcon inherits Rectangle {
     }
 }
 
-component IconButton inherits Rectangle {
+component IconButton inherits TdnPressable {
     in property <image> image;
     in property <string> label;
     in property <bool> selected;
-    in property <bool> enabled: true;
     in property <bool> symbolic;
     callback clicked;
 
-    property <bool> pointer-focus;
-
-    function press() {
-        root.clicked();
-        opener.opened();
-    }
-
-    forward-focus: focus;
+    opens-dialog: true;
+    activated => { root.clicked(); }
     accessible-role: button;
     accessible-label: root.label;
-    accessible-enabled: root.enabled;
     accessible-checkable: !root.symbolic;
     accessible-checked: root.selected;
-    accessible-action-default => {
-        if root.enabled && !Modal.open { root.press(); }
-    }
+    ring-radius: self.width / 2 + self.ring-offset;
 
     width: 3.1rem;
     height: self.width;
@@ -81,41 +70,10 @@ component IconButton inherits Rectangle {
             width: 45%;
         }
 
-        if area.has-hover && root.enabled: Rectangle {
+        if root.has-hover && root.enabled: Rectangle {
             border-radius: self.width / 2;
             background: #ffffff30;
         }
-    }
-
-    focus := FocusScope {
-        enabled: root.enabled && !Modal.open;
-        key-pressed(event) => {
-            root.pointer-focus = false;
-            if event.text == " " || event.text == Key.Return {
-                if !event.repeat { root.press(); }
-                return accept;
-            }
-            reject
-        }
-    }
-
-    opener := DialogOpener {
-        restore => { focus.focus(); }
-    }
-
-    area := TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: pointer;
-        pointer-event(ev) => {
-            if ev.kind == PointerEventKind.down { root.pointer-focus = true; }
-        }
-        clicked => { root.press(); }
-    }
-
-    if focus.has-focus && !root.pointer-focus: FocusRing {
-        host-width: parent.width;
-        host-height: parent.height;
-        radius: parent.width / 2 + self.offset;
     }
 }
 
@@ -179,12 +137,9 @@ component IconPicker inherits VerticalLayout {
                 horizontal-alignment: Dir.text-start;
             }
 
-            TdnText {
+            TdnNote {
                 text: Lang.t("page-whoareyou-icon-desc", []);
-                color: Tokens.color-muted-foreground;
                 font-size: Tokens.typography-body-sm-size;
-                horizontal-alignment: Dir.text-start;
-                wrap: word-wrap;
             }
         }
     }
@@ -204,11 +159,11 @@ component IconPicker inherits VerticalLayout {
 export component CameraDialog inherits TdnDialog {
     title: Lang.t("page-whoareyou-camera", []);
     dismissed => { Camera.stop(); }
-    init => { cancel.focus(); }
+    init => { actions.focus-cancel(); }
 
     property <bool> can-take: Camera.error == "" && Camera.frame.width > 0;
     changed can-take => {
-        if self.can-take && cancel.has-focus { take.focus(); }
+        if self.can-take && actions.cancel-has-focus { actions.focus-submit(); }
     }
 
     HorizontalLayout {
@@ -240,25 +195,11 @@ export component CameraDialog inherits TdnDialog {
         }
     }
 
-    HorizontalLayout {
-        alignment: space-between;
-
-        cancel := TdnBtn {
-            in-dialog: true;
-            text: Lang.t("cancel", []);
-            clicked => { Camera.stop(); }
-        }
-
-        take := TdnBtn {
-            layout-order: Dir.order(1);
-            in-dialog: true;
-            text: Lang.t("page-whoareyou-camera-take", []);
-            enter-hint: true;
-            enabled: root.can-take;
-            background-color: TdnStyle.accent;
-            foreground-color: TdnStyle.accent-foreground;
-            clicked => { Camera.capture(); }
-        }
+    actions := TdnDialogActions {
+        submit-text: Lang.t("page-whoareyou-camera-take", []);
+        submit-enabled: root.can-take;
+        cancelled => { Camera.stop(); }
+        submitted => { Camera.capture(); }
     }
 }
 
@@ -287,69 +228,43 @@ export component WhoAreYouPage inherits TdnPage {
     HorizontalLayout {
         spacing: 1rem;
 
-        VerticalLayout {
-            alignment: start;
-            horizontal-stretch: 100;
-            max-width: 23rem;
-            padding-top: 1rem;
-            spacing: 2rem;
-
-            name-field := TdnField {
+        TdnFormColumn {
+            nameinput := TdnTextField {
                 label: Lang.t("page-whoareyou-fullname", []);
                 help: Lang.t("page-whoareyou-fullname-desc", []);
                 error: Account.fullname-valid ? "" : Lang.t("page-whoareyou-error-fullname", []);
-                label-clicked => { nameinput.focus(); }
-
-                nameinput := TdnInput {
-                    label: name-field.label;
-                    description: name-field.description;
-                    text <=> Account.fullname;
-                    invalid: !Account.fullname-valid;
-                    edited(text) => {
-                        root.next-after-username-check = false;
-                        if !Account.username-touched {
-                            Account.username = Account.suggest-username(text, Account.username);
-                        }
+                text <=> Account.fullname;
+                edited(text) => {
+                    root.next-after-username-check = false;
+                    if !Account.username-touched {
+                        Account.username = Account.suggest-username(text, Account.username);
                     }
-                    accepted => {
-                        userinput.focus();
-                        userinput.select-all();
-                    }
+                }
+                accepted => {
+                    userinput.focus();
+                    userinput.select-all();
                 }
             }
 
-            username-field := TdnField {
-                property <bool> invalid: Account.username != "" && Account.username-error != "";
+            userinput := TdnTextField {
                 label: Lang.t("page-whoareyou-username", []);
                 help: Lang.t("page-whoareyou-username-desc", []);
-                error: self.invalid ? Lang.t(Account.username-error, []) : "";
-                label-clicked => { userinput.focus(); }
-
-                userinput := TdnInput {
-                    label: username-field.label;
-                    description: username-field.description;
-                    text <=> Account.username;
-                    invalid: username-field.invalid;
-                    edited(text) => {
-                        Account.username-touched = text != "";
-                        root.next-after-username-check = false;
-                    }
-                    accepted => {
-                        root.next-after-username-check = !root.can-next && Account.username-error == ""
-                            && Account.checked-username != Account.username;
-                        root.try-next();
-                    }
+                error: Account.username != "" && Account.username-error != "" ? Lang.t(Account.username-error, []) : "";
+                text <=> Account.username;
+                edited(text) => {
+                    Account.username-touched = text != "";
+                    root.next-after-username-check = false;
+                }
+                accepted => {
+                    root.next-after-username-check = !root.can-next && Account.username-error == ""
+                        && Account.checked-username != Account.username;
+                    root.try-next();
                 }
             }
-        }
-
-        Rectangle {
-            layout-order: Dir.order(1);
-            horizontal-stretch: 1;
         }
 
         IconPicker {
-            layout-order: Dir.order(2);
+            layout-order: Dir.order(1);
             horizontal-stretch: 0;
             width: 13.5rem;
         }

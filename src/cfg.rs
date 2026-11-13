@@ -57,20 +57,13 @@ pub fn populate(cfg: &mut Config) {
     tracing::trace!("Populated config: {cfg:#?}");
 }
 
-fn block_on_new_thread<F>(future: F) -> std::thread::Result<F::Output>
-where
-    F: std::future::Future + Send + 'static,
-    F::Output: Send + 'static,
-{
-    std::thread::spawn(move || crate::RT.block_on(future)).join()
-}
-
 fn finish_interrupted_install() {
+    use crate::ui::block_on_thread;
     tracing::warn!("the system has a user but is still marked unconfigured, fixing");
-    if block_on_new_thread(libtaidan::mark_configured()).is_err() {
+    if block_on_thread(libtaidan::mark_configured()).join().is_err() {
         tracing::error!("marking the system configured panicked");
     }
-    if !matches!(block_on_new_thread(libtaidan::tweaks::clear_on_record()), Ok(Ok(()))) {
+    if !matches!(block_on_thread(libtaidan::tweaks::clear_on_record()).join(), Ok(Ok(()))) {
         tracing::error!("cannot remove the tweaks record");
     }
 }
@@ -128,13 +121,13 @@ fn decode_hero(dark: bool) -> image::DynamicImage {
     let (key, wallpaper, bundled): (_, _, &[u8]) = if dark {
         (
             "welcome.hero_image_dark",
-            "/usr/share/backgrounds/default-dark.png",
+            crate::wallpaper::DARK,
             include_bytes!("../data/icons/background-dark.webp"),
         )
     } else {
         (
             "welcome.hero_image",
-            "/usr/share/backgrounds/default.png",
+            crate::wallpaper::LIGHT,
             include_bytes!("../data/icons/background-light.webp"),
         )
     };
@@ -163,33 +156,31 @@ fn hero_thumb(img: &image::DynamicImage, width: u32) -> HeroBuffer {
 }
 
 fn load_hero_images(ui: slint::Weak<crate::ui::AppWindow>) {
-    std::thread::spawn(move || {
-        let (light, dark) = (decode_hero(false), decode_hero(true));
-        let (light_buf, dark_buf) = (to_buffer(&light), to_buffer(&dark));
-        let set = ui.upgrade_in_event_loop(move |app| {
-            use slint::ComponentHandle;
+    use slint::ComponentHandle;
+    crate::ui::spawn_then(
+        ui,
+        || {
+            let (light, dark) = (decode_hero(false), decode_hero(true));
+            let buffers = (to_buffer(&light), to_buffer(&dark));
+            (light, dark, buffers)
+        },
+        |app, (light, dark, (light_buf, dark_buf))| {
             let cfg = app.global::<crate::ui::Cfg<'_>>();
             cfg.set_hero_light(slint::Image::from_rgba8(light_buf));
             cfg.set_hero_dark(slint::Image::from_rgba8(dark_buf));
             let width = hero_thumb_width(app.get_ui_scale(), app.window().scale_factor());
             tracing::debug!(width, "Making the theme thumbnails");
-            let ui = app.as_weak();
-            std::thread::spawn(move || {
-                let (light, dark) = (hero_thumb(&light, width), hero_thumb(&dark, width));
-                let set = ui.upgrade_in_event_loop(move |app| {
+            crate::ui::spawn_then(
+                app.as_weak(),
+                move || (hero_thumb(&light, width), hero_thumb(&dark, width)),
+                |app, (light, dark)| {
                     let cfg = app.global::<crate::ui::Cfg<'_>>();
                     cfg.set_hero_light_thumb(slint::Image::from_rgba8(light));
                     cfg.set_hero_dark_thumb(slint::Image::from_rgba8(dark));
-                });
-                if let Err(e) = set {
-                    tracing::error!(?e, "cannot set the theme thumbnails");
-                }
-            });
-        });
-        if let Err(e) = set {
-            tracing::error!(?e, "cannot set hero images");
-        }
-    });
+                },
+            );
+        },
+    );
 }
 
 fn config_color(path: &str) -> Option<slint::Color> {

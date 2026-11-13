@@ -1,4 +1,9 @@
-use crate::prelude::*;
+use crate::{
+    cfg::Desktop,
+    home::{Home, HomeCmd},
+    kconfig::KConfigEntry as Entry,
+    prelude::*,
+};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
@@ -35,52 +40,6 @@ const GNOME_LARGE_TEXT_SCALE: &str = "1.25";
 
 const XFCE_DEFAULT_FONT_SIZE: u8 = 10;
 const XFCE_LARGER_TEXT_DPI: &str = "120";
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Entry {
-    pub file: &'static str,
-    pub group: &'static str,
-    pub key: &'static str,
-    pub value: Option<String>,
-    pub write_as_bool: bool,
-}
-
-impl Entry {
-    fn bool(file: &'static str, group: &'static str, key: &'static str, on: bool) -> Self {
-        Self { file, group, key, value: Some(on.to_string()), write_as_bool: true }
-    }
-
-    fn value(
-        file: &'static str,
-        group: &'static str,
-        key: &'static str,
-        value: Option<String>,
-    ) -> Self {
-        Self { file, group, key, value, write_as_bool: false }
-    }
-
-    #[must_use]
-    pub fn kwriteconfig_args(&self, file: &str) -> Vec<String> {
-        let mut args = vec![
-            "--file".to_owned(),
-            file.to_owned(),
-            "--group".to_owned(),
-            self.group.to_owned(),
-            "--key".to_owned(),
-            self.key.to_owned(),
-        ];
-        match &self.value {
-            Some(v) => {
-                if self.write_as_bool {
-                    args.extend(["--type".to_owned(), "bool".to_owned()]);
-                }
-                args.push(v.clone());
-            }
-            None => args.push("--delete".to_owned()),
-        }
-        args
-    }
-}
 
 fn qt_font_string(family: &str, size: u8) -> String {
     format!("{family},{size},-1,5,400,0,0,0,0,0,0,0,0,0,0,1")
@@ -178,7 +137,7 @@ impl A11y {
                 "kdeglobals",
                 "KDE",
                 "AnimationDurationFactor",
-                self.reduce_motion.then(|| "0".to_owned()),
+                self.reduce_motion.then_some("0"),
             ),
             Entry::bool(
                 "kwinrc",
@@ -209,10 +168,7 @@ impl A11y {
             reduce_motion: true,
             color_filter: 1,
         };
-        all.user_entries()
-            .into_iter()
-            .map(|e| Entry { value: None, write_as_bool: false, ..e })
-            .collect()
+        all.user_entries().into_iter().map(|e| Entry::delete(e.file, e.group, e.key)).collect()
     }
 
     fn user_entries(&self) -> Vec<Entry> {
@@ -260,92 +216,6 @@ impl A11y {
     }
 }
 
-pub(crate) fn is_plasma() -> bool {
-    std::path::Path::new("/usr/bin/plasmashell").exists()
-}
-
-pub(crate) fn gsettings(schema: &str, key: &str, value: Option<&str>) -> Vec<String> {
-    let mut cmd = vec!["dbus-run-session", "--", "gsettings"];
-    match value {
-        Some(value) => cmd.extend(["set", schema, key, value]),
-        None => cmd.extend(["reset", schema, key]),
-    }
-    cmd.into_iter().map(str::to_owned).collect()
-}
-
-const XFCONF_CREATE_IF_MISSING: &str = "-n";
-
-pub(crate) fn xfconf(channel: &str, property: &str, ty: &str, value: Option<&str>) -> Vec<String> {
-    let mut cmd = vec!["dbus-run-session", "--", "xfconf-query", "-c", channel, "-p", property];
-    match value {
-        Some(value) => cmd.extend([XFCONF_CREATE_IF_MISSING, "-t", ty, "-s", value]),
-        None => cmd.push("-r"),
-    }
-    cmd.into_iter().map(str::to_owned).collect()
-}
-
-const RUN_COUNTED_COMMANDS: &str = r#"
-status=0
-while [ $# -gt 0 ]; do
-    n=$1
-    shift
-    c=
-    i=1
-    while [ "$i" -le "$n" ]; do
-        c="$c \"\${$i}\""
-        i=$((i + 1))
-    done
-    eval "$c" || status=1
-    shift "$n"
-done
-if [ -n "$TAIDAN_XFCONF_WAIT" ]; then sleep "$TAIDAN_XFCONF_WAIT"; fi
-exit "$status"
-"#;
-
-// dbus-run-session doesn't wait for xfconfd to save as its bus goes away
-const XFCONFD_SAVE_DELAY: &str = "6";
-
-pub(crate) fn one_session(cmds: Vec<Vec<String>>) -> Option<Vec<String>> {
-    if cmds.is_empty() {
-        return None;
-    }
-    let mut any_xfconf = false;
-    let mut any_wants_dbus = false;
-    let mut args = vec![];
-    for cmd in cmds {
-        let cmd = match cmd.as_slice() {
-            [run, dashes, rest @ ..] if run == "dbus-run-session" && dashes == "--" => {
-                any_wants_dbus = true;
-                rest.to_vec()
-            }
-            _ => cmd,
-        };
-        any_xfconf |= cmd.first().is_some_and(|c| c == "xfconf-query");
-        let env_cmd = std::iter::once("env".to_owned()).chain(cmd).collect_vec();
-        args.push(env_cmd.len().to_string());
-        args.extend(env_cmd);
-    }
-    let mut out =
-        if any_wants_dbus { vec!["dbus-run-session".to_owned(), "--".to_owned()] } else { vec![] };
-    out.push("env".to_owned());
-    out.push(format!("TAIDAN_XFCONF_WAIT={}", if any_xfconf { XFCONFD_SAVE_DELAY } else { "" }));
-    out.extend(["sh", "-c", RUN_COUNTED_COMMANDS, "sh"].map(str::to_owned));
-    out.extend(args);
-    Some(out)
-}
-
-const HIDE_OOBE_SESSION_BUS: [&str; 2] = ["-u", "DBUS_SESSION_BUS_ADDRESS"];
-
-pub(crate) fn in_home(home: &std::path::Path, cmd: Vec<String>) -> Vec<String> {
-    let mut args = HIDE_OOBE_SESSION_BUS.map(str::to_owned).to_vec();
-    args.extend([
-        format!("HOME={}", home.display()),
-        format!("XDG_CONFIG_HOME={}", home.join(".config").display()),
-    ]);
-    args.extend(cmd);
-    args
-}
-
 const ORCA_AUTOSTART: &str = "[Desktop Entry]
 Type=Application
 Name=Orca Screen Reader
@@ -362,8 +232,9 @@ const fn flag(on: bool) -> Option<&'static str> {
 }
 
 impl A11y {
-    fn desktop_commands(&self, edition: &str) -> Vec<Vec<String>> {
-        if crate::theme::uses_xfconf(edition) {
+    fn desktop_commands(&self, desktop: Desktop) -> Vec<Vec<String>> {
+        use crate::home::gsettings;
+        if desktop == Desktop::Xfce {
             return self.xfconf_commands();
         }
         let keyboard = "org.gnome.desktop.a11y.keyboard";
@@ -408,6 +279,7 @@ impl A11y {
     }
 
     fn xfconf_commands(&self) -> Vec<Vec<String>> {
+        use crate::home::xfconf;
         let font = |family: &str| format!("{family} {XFCE_DEFAULT_FONT_SIZE}");
         let (sans, mono) = (font(LEGIBLE_SANS), font(LEGIBLE_MONO));
         let title = format!("{LEGIBLE_SANS} Bold {}", XFCE_DEFAULT_FONT_SIZE - 1);
@@ -449,26 +321,39 @@ impl A11y {
         ]
     }
 
-    fn needs_orca_autostart(&self, edition: &str) -> bool {
-        self.screen_reader && crate::cfg::desktop(edition) != "gnome"
+    fn needs_orca_autostart(&self, desktop: Desktop) -> bool {
+        self.screen_reader && desktop != Desktop::Gnome
     }
-}
 
-fn desktop_commands_if_installed(a11y: &A11y, edition: &str) -> Vec<Vec<String>> {
-    let tool = if crate::theme::uses_xfconf(edition) {
-        "/usr/bin/xfconf-query"
-    } else {
-        "/usr/bin/gsettings"
-    };
-    if !std::path::Path::new(tool).exists() {
-        tracing::info!(tool, "not found; skipping accessibility settings");
-        return vec![];
+    fn desktop_commands_if_installed(&self, desktop: Desktop) -> Vec<Vec<String>> {
+        let tool =
+            if desktop == Desktop::Xfce { "/usr/bin/xfconf-query" } else { "/usr/bin/gsettings" };
+        if !std::path::Path::new(tool).exists() {
+            tracing::info!(tool, "not found; skipping accessibility settings");
+            return vec![];
+        }
+        self.desktop_commands(desktop)
     }
-    a11y.desktop_commands(edition)
-}
 
-fn home_is_set_up_from_skel(cfg: &crate::cfg::Config) -> bool {
-    cfg.taidan0.systemd_homed
+    fn home_cmds(&self, home: &Home, desktop: Desktop, previous: Option<Self>) -> Vec<HomeCmd> {
+        if desktop == Desktop::Plasma {
+            let mut entries = if previous.is_some() { Self::reset_entries() } else { vec![] };
+            entries.extend(self.user_entries());
+            return home.kconfig(&entries).map(HomeCmd::best_effort).collect();
+        }
+        let session = home.session(self.desktop_commands_if_installed(desktop));
+        let mut cmds = session.map(HomeCmd::best_effort).into_iter().collect_vec();
+        if self.needs_orca_autostart(desktop) {
+            cmds.push(home.write_file(ORCA_AUTOSTART_OVERRIDE_PATH, ORCA_AUTOSTART));
+        } else if previous.is_some_and(|a| a.needs_orca_autostart(desktop)) {
+            cmds.push(home.remove_file(ORCA_AUTOSTART_OVERRIDE_PATH).best_effort());
+        }
+        cmds
+    }
+
+    pub async fn apply(&self, home: &Home, desktop: Desktop, previous: Option<Self>) -> Res<()> {
+        home.run(self.home_cmds(home, desktop, previous)).await
+    }
 }
 
 pub async fn apply_to_user(
@@ -476,10 +361,10 @@ pub async fn apply_to_user(
     cfg: &crate::cfg::Config,
 ) -> Res<()> {
     apply_to_gdm_greeter(settings.a11y.screen_reader).await;
-    if home_is_set_up_from_skel(cfg) || settings.a11y == A11y::default() {
+    if cfg.taidan0.systemd_homed || settings.a11y == A11y::default() {
         return Ok(());
     }
-    write_to_home(settings, cfg, None).await
+    settings.a11y.apply(&Home::user(settings, cfg).await?, cfg.desktop(), None).await
 }
 
 pub async fn reapply_to_user(
@@ -493,7 +378,7 @@ pub async fn reapply_to_user(
     if settings.a11y.screen_reader != applied.screen_reader {
         apply_to_gdm_greeter(settings.a11y.screen_reader).await;
     }
-    write_to_home(settings, cfg, Some(applied)).await
+    settings.a11y.apply(&Home::user(settings, cfg).await?, cfg.desktop(), Some(applied)).await
 }
 
 async fn apply_to_gdm_greeter(on: bool) {
@@ -505,176 +390,9 @@ async fn apply_to_gdm_greeter(on: bool) {
     }
 }
 
-pub(crate) type HomeCmd = (Vec<String>, Option<String>);
-
-pub(crate) async fn run_in_home(
-    settings: &crate::settings::Settings,
-    cfg: &crate::cfg::Config,
-    cmds: Vec<HomeCmd>,
-) {
-    use secrecy::ExposeSecret as _;
-    let user = settings.username.as_str();
-    if !cfg.taidan0.systemd_homed {
-        for (cmd, input) in cmds {
-            let res = crate::as_user(user, cmd.clone(), input.as_deref().map(str::as_bytes)).await;
-            if let Err(e) = res {
-                tracing::warn!(?e, ?cmd, "cannot write into the user's home");
-            }
-        }
-        return;
-    }
-    if cmds.is_empty() {
-        return;
-    }
-    let script = homed_script(&cmds);
-    let argv = ["sh", "-c", &script].map(str::to_owned).to_vec();
-    let password_line = format!("{}\n", settings.passwd.expose_secret());
-    let res = crate::root_with_stdin(
-        crate::Verb::AsUserHomed { user: user.to_owned(), argv },
-        password_line.as_bytes(),
-    )
-    .await;
-    if let Err(e) = res {
-        tracing::warn!(?e, "cannot write into the systemd-homed home");
-    }
-}
-
-fn homed_script(cmds: &[HomeCmd]) -> String {
-    use crate::proxy::sh_quote;
-    let mut script = "rc=0\n".to_owned();
-    for (cmd, input) in cmds {
-        let cmd = cmd.iter().map(|a| sh_quote(a)).join(" ");
-        match input {
-            Some(input) => script += &format!("printf %s {} | {cmd} || rc=1\n", sh_quote(input)),
-            None => script += &format!("{cmd} || rc=1\n"),
-        }
-    }
-    script + "exit $rc\n"
-}
-
-const WRITE_STDIN_TO_FILE_UNLOGGED: &str = r#"exec cat > "$1""#;
-
-async fn write_to_home(
-    settings: &crate::settings::Settings,
-    cfg: &crate::cfg::Config,
-    previously_applied: Option<A11y>,
-) -> Res<()> {
-    let home = home_of(&settings.username).await?;
-    let mut cmds: Vec<HomeCmd> = vec![];
-    if is_plasma() {
-        let config = home.join(".config");
-        let mut entries = if previously_applied.is_some() { A11y::reset_entries() } else { vec![] };
-        entries.extend(settings.a11y.user_entries());
-        for entry in entries {
-            let mut cmd = vec!["kwriteconfig6".to_owned()];
-            cmd.extend(entry.kwriteconfig_args(&config.join(entry.file).to_string_lossy()));
-            cmds.push((cmd, None));
-        }
-        run_in_home(settings, cfg, cmds).await;
-        return Ok(());
-    }
-    if let Some(cmd) = one_session(desktop_commands_if_installed(&settings.a11y, &cfg.edition)) {
-        let mut env = vec!["env".to_owned()];
-        env.extend(in_home(&home, cmd));
-        cmds.push((env, None));
-    }
-    if settings.a11y.needs_orca_autostart(&cfg.edition) {
-        let path = home.join(ORCA_AUTOSTART_OVERRIDE_PATH);
-        let dir = path.parent().unwrap_or(&home).to_string_lossy().into_owned();
-        let path = path.to_string_lossy().into_owned();
-        cmds.push((vec!["mkdir".to_owned(), "-p".to_owned(), dir], None));
-        cmds.push((
-            vec![
-                "sh".to_owned(),
-                "-c".to_owned(),
-                WRITE_STDIN_TO_FILE_UNLOGGED.to_owned(),
-                "sh".to_owned(),
-                path,
-            ],
-            Some(ORCA_AUTOSTART.to_owned()),
-        ));
-    } else if previously_applied.is_some_and(|a| a.needs_orca_autostart(&cfg.edition)) {
-        let path = home.join(ORCA_AUTOSTART_OVERRIDE_PATH).to_string_lossy().into_owned();
-        cmds.push((vec!["rm".to_owned(), "-f".to_owned(), path], None));
-    }
-    run_in_home(settings, cfg, cmds).await;
-    Ok(())
-}
-
-pub async fn write_to_skel(
-    settings: &crate::settings::Settings,
-    cfg: &crate::cfg::Config,
-    skel: &std::path::Path,
-) -> Res<bool> {
-    if settings.a11y == A11y::default() {
-        return Ok(false);
-    }
-    let config = skel.join(".config");
-    tokio::fs::create_dir_all(&config).await.map_err(Err::Io)?;
-    if is_plasma() {
-        for entry in settings.a11y.user_entries() {
-            let args = entry.kwriteconfig_args(&config.join(entry.file).to_string_lossy());
-            let args = args.iter().map(String::as_str).collect_vec();
-            if let Err(e) = crate::steps::acmd("kwriteconfig6", &args).await {
-                tracing::warn!(?e, ?entry, "cannot write accessibility setting");
-            }
-        }
-        return Ok(true);
-    }
-    if let Some(cmd) = one_session(desktop_commands_if_installed(&settings.a11y, &cfg.edition)) {
-        let env = in_home(skel, cmd);
-        let env = env.iter().map(String::as_str).collect_vec();
-        if let Err(e) = crate::steps::acmd("env", &env).await {
-            tracing::warn!(?e, "cannot write accessibility setting");
-        }
-    }
-    if settings.a11y.needs_orca_autostart(&cfg.edition) {
-        let path = skel.join(ORCA_AUTOSTART_OVERRIDE_PATH);
-        if let Some(dir) = path.parent() {
-            tokio::fs::create_dir_all(dir).await.map_err(Err::Io)?;
-        }
-        tokio::fs::write(&path, ORCA_AUTOSTART).await.map_err(Err::Io)?;
-    }
-    Ok(true)
-}
-
-const PASSWD_HOME_FIELD: usize = 5;
-
-pub(crate) async fn home_of(user: &str) -> Res<std::path::PathBuf> {
-    let out = tokio::process::Command::new("getent")
-        .args(["passwd", user])
-        .output()
-        .await
-        .map_err(|e| Err::FailToRunProgram("getent", e))?;
-    String::from_utf8_lossy(&out.stdout)
-        .trim()
-        .split(':')
-        .nth(PASSWD_HOME_FIELD)
-        .filter(|h| !h.is_empty())
-        .map(std::path::PathBuf::from)
-        .ok_or_else(|| Err::ProgramFail {
-            name: "getent",
-            output: format!("no home directory for {user}"),
-            rc: out.status.code(),
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn homed_script_quotes_and_feeds_stdin() {
-        let cmds: Vec<HomeCmd> = vec![
-            (vec!["echo".to_owned(), "it's; rm -rf /".to_owned()], None),
-            (vec!["cat".to_owned()], Some("a'b\n".to_owned())),
-            (vec!["false".to_owned()], None),
-        ];
-        let out =
-            std::process::Command::new("sh").args(["-c", &homed_script(&cmds)]).output().unwrap();
-        assert_eq!(String::from_utf8_lossy(&out.stdout), "it's; rm -rf /\na'b\n");
-        assert!(!out.status.success());
-    }
 
     #[test]
     fn nothing_on_writes_nothing() {
@@ -753,41 +471,9 @@ mod tests {
     }
 
     #[test]
-    fn one_session_runs_them_all() {
-        let cmd = |args: &[&str]| args.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
-        let dir = std::env::temp_dir().join(format!("taidan-one-session-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let out = dir.join("out");
-        let out_s = out.to_string_lossy().into_owned();
-        let all = one_session(vec![
-            cmd(&[
-                "dbus-run-session",
-                "--",
-                "sh",
-                "-c",
-                "printf '%s|' \"$@\" >> \"$0\"",
-                &out_s,
-                "a b",
-                "$(c)",
-                "'d'",
-            ]),
-            cmd(&["X=1", "sh", "-c", "printf '%s' \"$X\" >> \"$0\"", &out_s]),
-        ])
-        .unwrap();
-        assert_eq!(all[..3], ["dbus-run-session", "--", "env"]);
-        let without_dbus = &all[2..];
-        let status =
-            std::process::Command::new(&without_dbus[0]).args(&without_dbus[1..]).status().unwrap();
-        assert!(status.success());
-        assert_eq!(std::fs::read_to_string(&out).unwrap(), "a b|$(c)|'d'|1");
-        std::fs::remove_dir_all(&dir).unwrap();
-        assert!(one_session(vec![]).is_none());
-    }
-
-    #[test]
     fn desktop_commands() {
         let a11y = A11y { sticky_keys: true, legible_font: true, ..A11y::default() };
-        let gnome = a11y.desktop_commands("atomic-gnome");
+        let gnome = a11y.desktop_commands(Desktop::Gnome);
         assert!(gnome.iter().all(|c| c[2] == "gsettings"));
         assert!(gnome.iter().any(|c| c.ends_with(&["stickykeys-enable".into(), "true".into()])));
         assert!(gnome.iter().any(|c| c.last().unwrap() == "'Atkinson Hyperlegible Next 11'"));
@@ -795,7 +481,7 @@ mod tests {
             gnome.iter().any(|c| c[3] == "reset" && c.last().unwrap() == "text-scaling-factor");
         assert!(resets_turned_off_larger_text);
 
-        let xfce = a11y.desktop_commands("xfce");
+        let xfce = a11y.desktop_commands(Desktop::Xfce);
         assert!(xfce.iter().all(|c| c[2] == "xfconf-query"));
         let sticky = xfce.iter().find(|c| c.contains(&"/StickyKeys".to_owned())).unwrap();
         assert_eq!(sticky[7..], ["-n", "-t", "bool", "-s", "true"]);
@@ -804,34 +490,28 @@ mod tests {
     }
 
     #[test]
-    fn orca_autostart_outside_gnome() {
+    fn home_cmds_per_desktop() {
+        let skel = Home::Skel("/skel".into());
         let a11y = A11y { screen_reader: true, ..A11y::default() };
-        assert!(!a11y.needs_orca_autostart("gnome"));
-        assert!(a11y.needs_orca_autostart("budgie") && a11y.needs_orca_autostart("xfce"));
-        assert!(!A11y::default().needs_orca_autostart("xfce"));
+        let plasma = a11y.home_cmds(&skel, Desktop::Plasma, None);
+        assert_eq!(
+            plasma,
+            skel.kconfig(&a11y.user_entries()).map(HomeCmd::best_effort).collect_vec()
+        );
+        let orca = skel.write_file(ORCA_AUTOSTART_OVERRIDE_PATH, ORCA_AUTOSTART);
+        assert!(a11y.home_cmds(&skel, Desktop::Budgie, None).contains(&orca));
+        assert!(!a11y.home_cmds(&skel, Desktop::Gnome, None).contains(&orca));
+        let off = A11y::default().home_cmds(&skel, Desktop::Xfce, Some(a11y));
+        assert!(off.contains(&skel.remove_file(ORCA_AUTOSTART_OVERRIDE_PATH).best_effort()));
     }
 
     #[test]
-    fn kwriteconfig_args() {
-        let on = Entry::bool("kaccessrc", "Keyboard", "StickyKeys", true);
-        assert_eq!(
-            on.kwriteconfig_args("/home/u/.config/kaccessrc"),
-            [
-                "--file",
-                "/home/u/.config/kaccessrc",
-                "--group",
-                "Keyboard",
-                "--key",
-                "StickyKeys",
-                "--type",
-                "bool",
-                "true"
-            ]
+    fn orca_autostart_outside_gnome() {
+        let a11y = A11y { screen_reader: true, ..A11y::default() };
+        assert!(!a11y.needs_orca_autostart(Desktop::Gnome));
+        assert!(
+            a11y.needs_orca_autostart(Desktop::Budgie) && a11y.needs_orca_autostart(Desktop::Xfce)
         );
-        let off = Entry::value("kdeglobals", "KDE", "AnimationDurationFactor", None);
-        assert_eq!(
-            off.kwriteconfig_args("kdeglobals").last().map(String::as_str),
-            Some("--delete")
-        );
+        assert!(!A11y::default().needs_orca_autostart(Desktop::Xfce));
     }
 }

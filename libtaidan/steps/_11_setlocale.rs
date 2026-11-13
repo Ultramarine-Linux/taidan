@@ -1,27 +1,18 @@
 use crate::prelude::*;
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SetLocale;
-impl super::Step for SetLocale {
-    #[tracing::instrument(skip(settings, sender))]
-    async fn run<C: crate::Callback>(
-        &self,
-        settings: &crate::settings::Settings,
-        _: &crate::cfg::Config,
-        sender: &C,
-    ) -> Res<()> {
-        apply_keymap_to_login_screen(settings).await;
-        if settings.locale.is_empty() {
-            return Ok(());
-        }
-        if let Err(e) =
-            crate::root(crate::Verb::SetLocale { locale: settings.locale.clone() }).await
-        {
-            tracing::warn!(?e, locale = settings.locale, "cannot set the system language");
-            sender.send(crate::InstallMsg::LocaleFailed);
-        }
-        Ok(())
+pub(super) async fn run(
+    settings: &crate::settings::Settings,
+    sender: &impl crate::Callback,
+) -> Res<()> {
+    apply_keymap_to_login_screen(settings).await;
+    if settings.locale.is_empty() {
+        return Ok(());
     }
+    if let Err(e) = crate::root(crate::Verb::SetLocale { locale: settings.locale.clone() }).await {
+        tracing::warn!(?e, locale = settings.locale, "cannot set the system language");
+        sender.send(crate::InstallMsg::LocaleFailed);
+    }
+    Ok(())
 }
 
 async fn apply_keymap_to_login_screen(settings: &crate::settings::Settings) {

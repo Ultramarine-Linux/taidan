@@ -1,7 +1,7 @@
 import { TdnPage } from "../page.slint";
 import { Lang } from "../lang.slint";
 import { ListView } from "std-widgets.slint";
-import { TdnInput, TdnListRow } from "../components.slint";
+import { TdnSearchInput, TdnListRow, TdnCurrentRow, TdnScroll } from "../components.slint";
 import { Card } from "../slintcn/components/card.slint";
 
 export component LanguagePage inherits TdnPage {
@@ -24,45 +24,29 @@ export component LanguagePage inherits TdnPage {
         }
     }
 
-    function scroll-to-arrow-key-row() {
-        let top = arrow-key-row * row-height;
-        if top < -list.content-y {
-            list.content-y = -top;
-        } else if top + row-height > -list.content-y + list.visible-height {
-            list.content-y = list.visible-height - top - row-height;
-        }
-    }
-
     function move-arrow-key-row(delta: int) {
         if Lang.languages.length == 0 { return; }
         start-arrow-keys-at-current-language();
         arrow-key-row = max(0, min(Lang.languages.length - 1, arrow-key-row + delta));
         Lang.select(Lang.languages[arrow-key-row]);
-        scroll-to-arrow-key-row();
+        list.content-y = TdnScroll.content-y-showing(arrow-key-row, row-height, list.content-y, list.visible-height);
     }
 
     Card {
         vertical-stretch: 1;
 
-        // `ListView` only creates the rows in view, so this finds the current one
-        for lang[i] in Lang.languages: Rectangle {
-            property <bool> current: lang.locale == Lang.current_language.locale;
-            width: 0;
-            height: 0;
-            init => { if self.current { root.current-language-row = i; } }
-            changed current => {
-                if self.current { root.current-language-row = i; }
-                else if root.current-language-row == i { root.current-language-row = -1; }
-            }
+        for lang[i] in Lang.languages: TdnCurrentRow {
+            model-row: i;
+            current: lang.locale == Lang.current_language.locale;
+            current-row <=> root.current-language-row;
         }
 
         VerticalLayout {
             padding: 1rem;
             spacing: 0.75rem;
 
-            search := TdnInput {
+            search := TdnSearchInput {
                 placeholder: Lang.t("page-language-search-lang", []);
-                icon: @image-url("../../data/icons/system-search-symbolic.svg");
                 description: root.enter-picks-first-match ? Lang.name(Lang.languages[0]) : Lang.name(Lang.current_language);
                 edited(text) => {
                     arrow-key-row = -1;
@@ -75,13 +59,7 @@ export component LanguagePage inherits TdnPage {
                     if root.enter-picks-first-match { Lang.select(Lang.languages[0]); }
                     root.try-next();
                 }
-                key-pressed(event) => {
-                    if event.text == Key.DownArrow { move-arrow-key-row(1); return accept; }
-                    if event.text == Key.UpArrow { move-arrow-key-row(-1); return accept; }
-                    if event.text == Key.PageDown { move-arrow-key-row(10); return accept; }
-                    if event.text == Key.PageUp { move-arrow-key-row(-10); return accept; }
-                    reject
-                }
+                move(rows) => { move-arrow-key-row(rows); }
             }
 
             list := ListView {

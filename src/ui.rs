@@ -57,14 +57,14 @@ fn init_actions(actions: &Actions<'_>) {
             return;
         }
         // logind lets root through the unit's inhibitor
-        std::thread::spawn(|| {
-            if let Err(e) = crate::RT.block_on(libtaidan::root(libtaidan::Verb::PowerOff)) {
+        block_on_thread(async {
+            if let Err(e) = libtaidan::root(libtaidan::Verb::PowerOff).await {
                 tracing::error!(?e, "cannot power off");
             }
         });
     });
     actions.on_open_terminal(|| {
-        std::thread::spawn(|| {
+        block_on_thread(async {
             if !debug_shell_enabled() {
                 tracing::info!("Ignoring Alt+Shift+T, boot with taidan.debug_shell to enable it");
                 return;
@@ -74,9 +74,50 @@ fn init_actions(actions: &Actions<'_>) {
                 return;
             };
             let verb = libtaidan::Verb::DebugShell { wayland_display };
-            if let Err(e) = crate::RT.block_on(libtaidan::root(verb)) {
+            if let Err(e) = libtaidan::root(verb).await {
                 tracing::warn!(?e, "debug terminal failed or exited");
             }
         });
     });
+}
+
+pub fn on_ui<F: FnOnce(AppWindow) + Send + 'static>(ui: &slint::Weak<AppWindow>, f: F) {
+    if let Err(e) = ui.upgrade_in_event_loop(f) {
+        tracing::error!(?e, "cannot update the UI");
+    }
+}
+
+pub fn spawn_then<T, W, A>(ui: slint::Weak<AppWindow>, work: W, apply: A)
+where
+    T: Send + 'static,
+    W: FnOnce() -> T + Send + 'static,
+    A: FnOnce(&AppWindow, T) + Send + 'static,
+{
+    std::thread::spawn(move || {
+        let out = work();
+        on_ui(&ui, move |app| apply(&app, out));
+    });
+}
+
+pub fn block_on_thread<F>(future: F) -> std::thread::JoinHandle<F::Output>
+where
+    F: std::future::Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    std::thread::spawn(move || crate::RT.block_on(future))
+}
+
+pub fn latest_worker<T, M, H>(merge: M, mut handle: H) -> std::sync::mpsc::Sender<T>
+where
+    T: Send + 'static,
+    M: Fn(T, T) -> T + Send + 'static,
+    H: FnMut(T) + Send + 'static,
+{
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        while let Ok(oldest) = rx.recv() {
+            handle(rx.try_iter().fold(oldest, &merge));
+        }
+    });
+    tx
 }

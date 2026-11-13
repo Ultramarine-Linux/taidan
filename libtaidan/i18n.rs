@@ -1,5 +1,5 @@
 use super::root;
-use crate::prelude::*;
+use crate::{cfg::Desktop, home::Home, kconfig::KConfigEntry, prelude::*};
 
 taidan_proc_macros::keymap!(LAYOUTS);
 
@@ -174,15 +174,11 @@ impl InputMethod {
             I18nImf::IBus => self.ibus_ref.is_some(),
         }
     }
-    /// Gets the package for the current input method framework
-    ///
-    /// # Panics
-    /// Panics if and only if this IM is not available for the current framework.
     #[must_use]
-    pub fn get_pkg(self, imf: I18nImf) -> &'static str {
+    pub const fn pkg(self, imf: I18nImf) -> Option<&'static str> {
         match imf {
-            I18nImf::Fcitx5 => self.fcitx5_pkg.unwrap(),
-            I18nImf::IBus => self.ibus_pkg.unwrap(),
+            I18nImf::Fcitx5 => self.fcitx5_pkg,
+            I18nImf::IBus => self.ibus_pkg,
         }
     }
 }
@@ -294,19 +290,17 @@ impl XkbKeymap {
         !self.options.is_empty()
     }
 
-    fn kxkbrc_entries(&self) -> Vec<Vec<String>> {
-        let entry = |key: &str, rest: &[&str]| {
-            ["--group", "Layout", "--key", key].iter().chain(rest).map(|&s| s.to_owned()).collect()
-        };
+    fn kxkbrc_entries(&self) -> Vec<KConfigEntry> {
+        let entry = |key, value: &str| KConfigEntry::value("kxkbrc", "Layout", key, Some(value));
         // KWin ignores `Options` without `ResetOldOptions`, keeping `XKB_DEFAULT_OPTIONS`
         let mut entries = vec![
-            entry("Use", &["--type=bool", "true"]),
-            entry("LayoutList", &["--", &self.layouts]),
-            entry("VariantList", &["--", &self.variants]),
-            entry("Options", &["--", &self.options]),
+            KConfigEntry::bool("kxkbrc", "Layout", "Use", true),
+            entry("LayoutList", &self.layouts),
+            entry("VariantList", &self.variants),
+            entry("Options", &self.options),
         ];
         if !self.options.is_empty() {
-            entries.push(entry("ResetOldOptions", &["--type=bool", "true"]));
+            entries.push(KConfigEntry::bool("kxkbrc", "Layout", "ResetOldOptions", true));
         }
         entries
     }
@@ -322,12 +316,7 @@ impl XkbKeymap {
             {
                 continue;
             }
-            let val = val.trim();
-            let val = val
-                .strip_prefix('"')
-                .and_then(|v| v.strip_suffix('"'))
-                .or_else(|| val.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
-                .unwrap_or(val);
+            let val = crate::cfg::unquote(val.trim());
             found |= !val.is_empty();
             match key {
                 "XKBLAYOUT" => val.clone_into(&mut keymap.layouts),
@@ -400,17 +389,17 @@ fn escape_gvariant_string(s: &str) -> String {
 
 async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<()> {
     for entry in XkbKeymap::new(layout, variant).kxkbrc_entries() {
-        let mut argv = ["kwriteconfig6", "--file", "kxkbrc"].map(str::to_owned).to_vec();
-        argv.extend(entry);
-        crate::as_user(user, argv, None).await?;
+        crate::as_user(user, entry.command(None), None).await?;
     }
-    let args = [
-        ["--session", "--type=signal"],
-        ["--reply-timeout=100", "--reply-timeout=100"],
-        ["/Layouts", "org.kde.keyboard.reloadConfig"],
+    let argv = [
+        "dbus-send",
+        "--session",
+        "--type=signal",
+        "--reply-timeout=100",
+        "--reply-timeout=100",
+        "/Layouts",
+        "org.kde.keyboard.reloadConfig",
     ];
-    let mut argv = vec!["dbus-send".to_owned()];
-    argv.extend(args.concat().into_iter().map(str::to_owned));
     if let Err(e) = crate::as_user(user, argv, None).await {
         tracing::warn!(?e, "cannot tell KWin to reload the keyboard layout");
     }
@@ -420,15 +409,9 @@ async fn set_gsettings_keymap(user: &str, layout: &str, variant: Option<&str>) -
     // gsettings describe org.gnome.desktop.input-sources sources
     // List of input source identifiers available. Each source is specified as a tuple of 2 strings. The first string is the type and can be one of “xkb” or “ibus”. For “xkb” sources the second string is “xkb_layout+xkb_variant” or just “xkb_layout” if a XKB variant isn’t needed. For “ibus” sources the second string is the IBus engine name. An empty list means that the X server’s current XKB layout and variant won’t be touched and IBus won’t be used.
     let sources = XkbKeymap::new(layout, variant).gnome_sources().join(", ");
-    let args = [
-        ["DISPLAY=:0", "gsettings"],
-        ["set", "org.gnome.desktop.input-sources"],
-        ["sources", &format!("[{sources}]")],
-    ];
-    let mut argv = vec!["env".to_owned()];
-    argv.extend(args.concat().into_iter().map(str::to_owned));
-    crate::as_user(user, argv, None).await?;
-    Ok(())
+    let sources = format!("[{sources}]");
+    let argv = ["env", "DISPLAY=:0", "gsettings", "set", "org.gnome.desktop.input-sources"];
+    crate::as_user(user, argv.iter().chain(&["sources", &sources]), None).await
 }
 
 pub async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> Res<()> {
@@ -450,7 +433,7 @@ async fn system_keymap_to_keep() -> Option<XkbKeymap> {
     (several_layouts || !needs_latin_fallback).then_some(system)
 }
 
-async fn user_kxkbrc_entries(settings: &crate::settings::Settings) -> Option<Vec<Vec<String>>> {
+async fn user_kxkbrc_entries(settings: &crate::settings::Settings) -> Option<Vec<KConfigEntry>> {
     if !settings.kb_picked
         && let Some(system) = system_keymap_to_keep().await
     {
@@ -467,40 +450,24 @@ pub async fn apply_keymap_to_user(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
 ) -> Res<()> {
-    if cfg.taidan0.systemd_homed || !crate::a11y::is_plasma() {
+    if cfg.taidan0.systemd_homed || cfg.desktop() != Desktop::Plasma {
         return Ok(());
     }
-    let Some(entries) = user_kxkbrc_entries(settings).await else { return Ok(()) };
-    let home = crate::a11y::home_of(&settings.username).await?;
-    let file = home.join(".config/kxkbrc");
-    let file = file.to_string_lossy();
-    for entry in entries {
-        let mut argv = ["kwriteconfig6", "--file", &file].map(str::to_owned).to_vec();
-        argv.extend(entry);
-        crate::as_user(&settings.username, argv, None)
-            .await
-            .wrap_msg("cannot write the keyboard layout")?;
-    }
-    Ok(())
+    apply_keymap(settings, &Home::user(settings, cfg).await?, Desktop::Plasma).await.map(drop)
 }
 
-pub async fn write_keymap_to_skel(
+pub(crate) async fn apply_keymap(
     settings: &crate::settings::Settings,
-    skel: &std::path::Path,
+    home: &Home,
+    desktop: Desktop,
 ) -> Res<bool> {
-    if !crate::a11y::is_plasma() {
+    if desktop != Desktop::Plasma {
         return Ok(false);
     }
     let Some(entries) = user_kxkbrc_entries(settings).await else { return Ok(false) };
-    let config = skel.join(".config");
-    tokio::fs::create_dir_all(&config).await.map_err(Err::Io)?;
-    let file = config.join("kxkbrc");
-    let file = file.to_string_lossy();
-    for entry in entries {
-        let mut args = vec!["--file", &*file];
-        args.extend(entry.iter().map(String::as_str));
-        crate::steps::acmd("kwriteconfig6", &args).await?;
-    }
+    home.run(home.kconfig(&entries).collect())
+        .await
+        .wrap_msg("cannot write the keyboard layout")?;
     Ok(true)
 }
 
@@ -549,10 +516,9 @@ pub struct I18nCfg {
 impl I18nCfg {
     #[must_use]
     pub fn imf(&self, edition: &str) -> I18nImf {
-        self.imf.unwrap_or(if crate::cfg::desktop(edition) == "gnome" {
-            I18nImf::IBus
-        } else {
-            I18nImf::Fcitx5
+        self.imf.unwrap_or(match crate::cfg::Desktop::from_edition(edition) {
+            crate::cfg::Desktop::Gnome => I18nImf::IBus,
+            _ => I18nImf::Fcitx5,
         })
     }
 }
@@ -596,8 +562,10 @@ mod tests {
             ("cz,us", "qwerty,", "grp:win_space_toggle")
         );
         let entries = km.kxkbrc_entries();
-        assert!(entries.iter().any(|e| e[3] == "ResetOldOptions"));
-        assert!(entries.iter().any(|e| e[3] == "LayoutList" && e.last().unwrap() == "cz,us"));
+        assert!(entries.iter().any(|e| e.key == "ResetOldOptions"));
+        assert!(
+            entries.iter().any(|e| e.key == "LayoutList" && e.value.as_deref() == Some("cz,us"))
+        );
     }
 
     #[test]
@@ -682,7 +650,7 @@ mod tests {
     #[test]
     fn kxkbrc_clears_options() {
         let has = |km: &XkbKeymap, key: &str| {
-            km.kxkbrc_entries().iter().find(|e| e[3] == key).map(|e| e.last().cloned())
+            km.kxkbrc_entries().into_iter().find(|e| e.key == key).map(|e| e.value)
         };
         let de = XkbKeymap::new("de", None);
         assert_eq!(has(&de, "Options"), Some(Some(String::new())));

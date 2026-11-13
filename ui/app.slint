@@ -5,7 +5,7 @@ import { ThemePage } from "pages/0035_theme.slint";
 import { Lang } from "lang.slint";
 import { Cfg } from "cfg.slint";
 import { Account } from "account.slint";
-import { Pages } from "page.slint";
+import { Pages, Nav } from "page.slint";
 import { LanguagePage } from "pages/0010_language.slint";
 import { Theme, ThemeMode, Tokens } from "slintcn/theme/tokens.slint";
 import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
@@ -33,7 +33,7 @@ import { Ims } from "ims.slint";
 export { Lang, Cfg, Account, Pages, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y, Appearance, Ims }
 
 export component AppWindow inherits Window {
-    in-out property <int> pagenum: 0;
+    in-out property <int> pagenum <=> Nav.page;
     title: Lang.t("window-title", [{ key: "distro", value: Cfg.distro }]);
     in property <bool> framed: false;
     no-frame: !self.framed;
@@ -151,43 +151,18 @@ export component AppWindow inherits Window {
         border-radius: root.rounded ? Tokens.radius-xl : 0;
         clip: true;
 
-        accessibility := AccessibilityPage {
-            index: Pages.accessibility;
-            current: pagenum;
-            next_page => { pagenum = Cfg.next-page(pagenum); }
-        }
+        accessibility := AccessibilityPage { index: Pages.accessibility; }
 
-        language := LanguagePage {
-            index: Pages.language;
-            current: pagenum;
-            next_page => { pagenum = Cfg.next-page(pagenum); }
-        }
+        language := LanguagePage { index: Pages.language; }
 
-        keyboard := KeyboardPage {
-            index: Pages.keyboard;
-            current: pagenum;
-            prev_page => { pagenum = Cfg.prev-page(pagenum); }
-            next_page => { pagenum = Cfg.next-page(pagenum); }
-        }
+        keyboard := KeyboardPage { index: Pages.keyboard; }
 
-        welcome := WelcomePage {
-            index: Pages.welcome;
-            current: pagenum;
-            prev_page => { pagenum = Cfg.prev-page(pagenum); }
-            next_page => { pagenum = Cfg.next-page(pagenum); }
-        }
+        welcome := WelcomePage { index: Pages.welcome; }
 
-        theme := ThemePage {
-            index: Pages.theme;
-            current: pagenum;
-            prev_page => { pagenum = Cfg.prev-page(pagenum); }
-            next_page => { pagenum = Cfg.next-page(pagenum); }
-        }
+        theme := ThemePage { index: Pages.theme; }
 
         whoareyou := WhoAreYouPage {
             index: Pages.whoareyou;
-            current: pagenum;
-            prev_page => { pagenum = Cfg.prev-page(pagenum); }
             next_page => {
                 Account.save();
                 pagenum = Cfg.next-page(pagenum);
@@ -196,8 +171,6 @@ export component AppWindow inherits Window {
 
         password := PasswordPage {
             index: Pages.password;
-            current: pagenum;
-            prev_page => { pagenum = Cfg.prev-page(pagenum); }
             next_page => {
                 Account.save();
                 pagenum = Cfg.next-page(pagenum);
@@ -206,8 +179,6 @@ export component AppWindow inherits Window {
 
         timezone := TimezonePage {
             index: Pages.timezone;
-            current: pagenum;
-            prev_page => { pagenum = Cfg.prev-page(pagenum); }
             next_page => {
                 Tz.save();
                 pagenum = Cfg.next-page(pagenum);
@@ -216,8 +187,6 @@ export component AppWindow inherits Window {
 
         network := NetworkPage {
             index: Pages.network;
-            current: pagenum;
-            prev_page => { pagenum = Cfg.prev-page(pagenum); }
             next_page => {
                 Network.offline-chosen = false;
                 Network.save();
@@ -225,43 +194,24 @@ export component AppWindow inherits Window {
             }
         }
 
-        location := LocationPage {
-            index: Pages.location;
-            current: pagenum;
-            prev_page => { pagenum = Cfg.prev-page(pagenum); }
-            next_page => { pagenum = Cfg.next-page(pagenum); }
-        }
+        location := LocationPage { index: Pages.location; }
 
-        drivers := DriversPage {
-            index: Pages.drivers;
-            current: pagenum;
-            prev_page => { pagenum = Cfg.prev-page(pagenum); }
-            next_page => { pagenum = Cfg.next-page(pagenum); }
-        }
+        drivers := DriversPage { index: Pages.drivers; }
 
         summary := SummaryPage {
             index: Pages.summary;
-            current: pagenum;
-            prev_page => { pagenum = Cfg.prev-page(pagenum); }
             next_page => {
                 Install.start();
                 pagenum = Pages.installing;
             }
         }
 
-        installing := InstallingPage {
-            index: Pages.installing;
-            current: pagenum;
-        }
+        installing := InstallingPage { index: Pages.installing; }
 
-        done := DonePage {
-            index: Pages.done;
-            current: pagenum;
-        }
+        done := DonePage { index: Pages.done; }
 
         error := ErrorPage {
             index: Pages.error;
-            current: pagenum;
             prev_page => {
                 Install.reset();
                 pagenum = Pages.summary;

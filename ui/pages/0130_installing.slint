@@ -3,7 +3,7 @@ import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
 import { Install } from "../install.slint";
 import { Modal } from "../modal.slint";
-import { TdnText, TdnSpinner, TdnStyle } from "../components.slint";
+import { TdnText, TdnPara, TdnSpinner, TdnStyle } from "../components.slint";
 import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
 
 export component InstallingPage inherits TdnBasePg {
@@ -67,12 +67,10 @@ export component InstallingPage inherits TdnBasePg {
                     alignment: center;
                     spacing: 0.2rem;
 
-                    TdnText {
+                    TdnPara {
                         text: Lang.t("page-installing-configuring", []);
                         font-size: 1.5 * Tokens.text-rem;
                         font-weight: Tokens.typography-weight-medium;
-                        horizontal-alignment: Dir.text-start;
-                        wrap: word-wrap;
                     }
 
                     TdnText {

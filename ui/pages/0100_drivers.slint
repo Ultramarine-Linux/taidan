@@ -1,8 +1,7 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Drivers } from "../install.slint";
-import { TdnText, TdnToggleRow } from "../components.slint";
-import { Card } from "../slintcn/components/card.slint";
+import { TdnText, TdnPara, TdnNote, TdnToggleRow, TdnFormColumn, TdnSideCard } from "../components.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
 export component DriverRow inherits HorizontalLayout {
@@ -71,23 +70,18 @@ export component DriversPage inherits TdnPage {
     HorizontalLayout {
         spacing: 1rem;
 
-        VerticalLayout {
-            alignment: start;
-            horizontal-stretch: 100;
-            max-width: 21rem;
-            spacing: 1.25rem;
+        TdnFormColumn {
+            column-width: 21rem;
+            column-padding-top: 0;
+            column-spacing: 1.25rem;
 
-            TdnText {
+            TdnPara {
                 text: Lang.t("page-drivers-desc", []);
-                horizontal-alignment: Dir.text-start;
-                wrap: word-wrap;
                 font-size: 1.1 * Tokens.text-rem;
             }
 
-            TdnText {
+            TdnPara {
                 text: Lang.t("page-drivers-proprietary", []);
-                horizontal-alignment: Dir.text-start;
-                wrap: word-wrap;
                 font-size: 1.1 * Tokens.text-rem;
             }
 
@@ -122,39 +116,24 @@ export component DriversPage inherits TdnPage {
                     alignment: center;
                     spacing: 0.4rem;
 
-                    TdnText {
+                    TdnPara {
                         text: Lang.t("page-drivers-secure-boot", []);
-                        horizontal-alignment: Dir.text-start;
-                        wrap: word-wrap;
                     }
 
-                    TdnText {
+                    TdnNote {
                         text: Drivers.secure-boot-url;
-                        color: Tokens.color-muted-foreground;
-                        horizontal-alignment: Dir.text-start;
-                        wrap: word-wrap;
                     }
                 }
             }
         }
 
-        Rectangle {
-            layout-order: Dir.order(1);
-            horizontal-stretch: 1;
-        }
-
-        Card {
-            layout-order: Dir.order(2);
-            horizontal-stretch: 0;
+        TdnSideCard {
             width: 15rem;
-            card-radius: md;
+            fill-height: true;
+            content-padding: 0.75rem;
+            content-spacing: 0;
 
-            VerticalLayout {
-                alignment: start;
-                padding: 0.75rem;
-
-                DriverList { }
-            }
+            DriverList { }
         }
     }
 }

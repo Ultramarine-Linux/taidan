@@ -1,8 +1,7 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Location } from "../install.slint";
-import { TdnText, TdnToggleRow } from "../components.slint";
-import { Card } from "../slintcn/components/card.slint";
+import { TdnPara, TdnToggleRow, TdnFormColumn, TdnSideCard } from "../components.slint";
 import { Icon } from "../slintcn/components/icon.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
@@ -14,17 +13,11 @@ export component LocationPage inherits TdnPage {
     HorizontalLayout {
         spacing: 1rem;
 
-        VerticalLayout {
-            alignment: start;
-            horizontal-stretch: 100;
-            max-width: 21rem;
-            padding-top: 1rem;
-            spacing: 2rem;
+        TdnFormColumn {
+            column-width: 21rem;
 
-            TdnText {
+            TdnPara {
                 text: Lang.t("page-location-desc", []);
-                horizontal-alignment: Dir.text-start;
-                wrap: word-wrap;
                 font-size: 1.1 * Tokens.text-rem;
             }
 
@@ -36,56 +29,34 @@ export component LocationPage inherits TdnPage {
             }
         }
 
-        privacy-card-spacer := Rectangle {
-            layout-order: Dir.order(1);
-            horizontal-stretch: 1;
-        }
-
-        VerticalLayout {
-            layout-order: Dir.order(2);
-            alignment: start;
-            horizontal-stretch: 0;
+        TdnSideCard {
             width: 12.5rem;
+            content-spacing: 0.5rem;
 
-            Card {
-                card-radius: md;
+            HorizontalLayout {
+                spacing: 0.5rem;
 
-                VerticalLayout {
-                    padding: 0.6rem;
-                    spacing: 0.5rem;
-
-                    HorizontalLayout {
-                        spacing: 0.5rem;
-
-                        Icon {
-                            // "hat-glasses" from Lucide (https://lucide.dev), ISC license
-                            commands: "M14 18a2 2 0 0 0-4 0 M19 11l-2.11-6.657a2 2 0 0 0-2.752-1.148l-1.276.61A2 2 0 0 1 12 4H8.5a2 2 0 0 0-1.925 1.456L5 11 M2 11h20 M14 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0 M4 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0";
-                            size: 1.4rem;
-                            stroke-width: 1.75px;
-                        }
-
-                        TdnText {
-                            layout-order: Dir.order(1);
-                            text: Lang.t("page-location-tip-title", []);
-                            font-size: Tokens.typography-title-size;
-                            font-weight: Tokens.typography-weight-medium;
-                            horizontal-alignment: Dir.text-start;
-                            wrap: word-wrap;
-                        }
-                    }
-
-                    TdnText {
-                        text: Lang.t("page-location-tip", []);
-                        horizontal-alignment: Dir.text-start;
-                        wrap: word-wrap;
-                    }
-
-                    TdnText {
-                        text: Lang.t("page-location-tip-control", []);
-                        horizontal-alignment: Dir.text-start;
-                        wrap: word-wrap;
-                    }
+                Icon {
+                    // "hat-glasses" from Lucide (https://lucide.dev), ISC license
+                    commands: "M14 18a2 2 0 0 0-4 0 M19 11l-2.11-6.657a2 2 0 0 0-2.752-1.148l-1.276.61A2 2 0 0 1 12 4H8.5a2 2 0 0 0-1.925 1.456L5 11 M2 11h20 M14 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0 M4 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0";
+                    size: 1.4rem;
+                    stroke-width: 1.75px;
                 }
+
+                TdnPara {
+                    layout-order: Dir.order(1);
+                    text: Lang.t("page-location-tip-title", []);
+                    font-size: Tokens.typography-title-size;
+                    font-weight: Tokens.typography-weight-medium;
+                }
+            }
+
+            TdnPara {
+                text: Lang.t("page-location-tip", []);
+            }
+
+            TdnPara {
+                text: Lang.t("page-location-tip-control", []);
             }
         }
     }

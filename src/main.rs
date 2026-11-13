@@ -3,6 +3,7 @@ pub mod a11y;
 pub mod account;
 pub mod avatar;
 pub mod cfg;
+pub mod child;
 pub mod ims;
 pub mod install;
 pub mod l10n;

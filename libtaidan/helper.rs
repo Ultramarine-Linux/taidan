@@ -43,8 +43,11 @@ const PORTAL_BROWSER: &str = "/usr/bin/cog";
 const MAX_REQUEST_BYTES: u64 = 1 << 20;
 const MAX_INPUT_BYTES: u64 = 32 << 20;
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, strum::IntoStaticStr,
+)]
 #[serde(tag = "verb", rename_all = "kebab-case", deny_unknown_fields)]
+#[strum(serialize_all = "kebab-case")]
 pub enum Verb {
     MarkConfigured,
     Reboot,
@@ -110,60 +113,8 @@ struct Request {
 
 impl Verb {
     #[must_use]
-    pub const fn name(&self) -> &'static str {
-        match self {
-            Self::MarkConfigured => "mark-configured",
-            Self::Reboot => "reboot",
-            Self::PowerOff => "power-off",
-            Self::DebugShell { .. } => "debug-shell",
-            Self::StartPortal { .. } => "start-portal",
-            Self::StopPortal => "stop-portal",
-            Self::KillLeftovers => "kill-leftovers",
-            Self::KillLeftoversNow => "kill-leftovers-now",
-            Self::DropPolkitRule => "drop-polkit-rule",
-            Self::RecordCreated { .. } => "record-created",
-            Self::ClearRecord => "clear-record",
-            Self::RemoveUser { .. } => "remove-user",
-            Self::UserAdd { .. } => "user-add",
-            Self::HomedCreate { .. } => "homed-create",
-            Self::SetAvatar { .. } => "set-avatar",
-            Self::UnlockUser { .. } => "unlock-user",
-            Self::HomedUnlock { .. } => "homed-unlock",
-            Self::AddToVideo { .. } => "add-to-video",
-            Self::AsUser { .. } => "as-user",
-            Self::AsUserHomed { .. } => "as-user-homed",
-            Self::RunTweak { .. } => "run-tweak",
-            Self::RecordTweaks { .. } => "record-tweaks",
-            Self::ClearTweakRecord => "clear-tweak-record",
-            Self::ProxyPersist => "proxy-persist",
-            Self::ProxyRepoOverrides => "proxy-repo-overrides",
-            Self::ProxyClear => "proxy-clear",
-            Self::Location { .. } => "location",
-            Self::GdmScreenReader { .. } => "gdm-screen-reader",
-            Self::EnableNtp => "enable-ntp",
-            Self::SetTimezone { .. } => "set-timezone",
-            Self::SetHostname { .. } => "set-hostname",
-            Self::SetLocale { .. } => "set-locale",
-            Self::SetX11Keymap { .. } => "set-x11-keymap",
-            Self::RepoQuery { .. } => "repo-query",
-            Self::EnableRepo { .. } => "enable-repo",
-            Self::CoprEnable { .. } => "copr-enable",
-            Self::DnfExtras { .. } => "dnf-extras",
-            Self::DnfSwapFfmpeg => "dnf-swap-ffmpeg",
-            Self::DnfDrivers { .. } => "dnf-drivers",
-            Self::RpmOstreeInstall { .. } => "rpm-ostree-install",
-            Self::FlatpakInstall { .. } => "flatpak-install",
-            Self::RunScript { .. } => "run-script",
-            Self::DnfUpgradeOffline => "dnf-upgrade-offline",
-            Self::DnfOfflineClean => "dnf-offline-clean",
-            Self::DnfOfflineArm => "dnf-offline-arm",
-            Self::NvidiaPrimaryGpu => "nvidia-primary-gpu",
-            Self::DefaultKernel => "default-kernel",
-            Self::Akmods { .. } => "akmods",
-            Self::InstallCert { .. } => "install-cert",
-            Self::PruneCerts { .. } => "prune-certs",
-            Self::RemoveCertAttempt { .. } => "remove-cert-attempt",
-        }
+    pub fn name(&self) -> &'static str {
+        self.into()
     }
 
     #[must_use]
@@ -441,7 +392,7 @@ fn check_pkgs(pkgs: &[String], allowed: impl Fn(&str) -> bool) -> Result<(), Str
 
 fn allowed_extra(pkg: &str) -> bool {
     use crate::i18n::I18nImf;
-    let langpack = ["ultramarine-langpacks-", "langpacks-", "glibc-langpack-"]
+    let langpack = crate::steps::LANGPACK_PREFIXES
         .iter()
         .find_map(|prefix| pkg.strip_prefix(prefix))
         .is_some_and(|lang| word(lang, "_@"));
@@ -532,6 +483,23 @@ fn io(what: &str) -> impl FnOnce(std::io::Error) -> String + '_ {
     move |e| format!("{what}: {e}")
 }
 
+fn exited_0(done: std::io::Result<()>, what: &str) -> Result<i32, String> {
+    done.map(|()| 0).map_err(io(what))
+}
+
+trait ExitCode {
+    fn then_on_success(self, next: impl FnOnce() -> Self) -> Self;
+}
+
+impl ExitCode for Result<i32, String> {
+    fn then_on_success(self, next: impl FnOnce() -> Self) -> Self {
+        match self? {
+            0 => next(),
+            code => Ok(code),
+        }
+    }
+}
+
 impl Ctx {
     fn cmd(&self, program: &str) -> Command {
         let mut cmd = Command::new(program);
@@ -585,8 +553,8 @@ impl Ctx {
     fn execute(&self, verb: &Verb) -> Result<i32, String> {
         match verb {
             Verb::MarkConfigured => {
-                for marker in ["/var/.unconfigured", "/.unconfigured"] {
-                    remove_any(Path::new(marker)).map_err(io(marker))?;
+                for marker in crate::UNCONFIGURED_MARKERS {
+                    remove_any(marker).map_err(io(marker))?;
                 }
                 self.exec("systemctl", &["disable", "taidan-initial-setup-reconfiguration"])
             }
@@ -612,10 +580,7 @@ impl Ctx {
             Verb::StopPortal => self.exec("systemctl", &["stop", PORTAL_UNIT]),
             Verb::KillLeftovers => self.kill_leftovers("-TERM"),
             Verb::KillLeftoversNow => self.kill_leftovers("-KILL"),
-            Verb::DropPolkitRule => {
-                remove_any(Path::new(POLKIT_RULE)).map_err(io(POLKIT_RULE))?;
-                Ok(0)
-            }
+            Verb::DropPolkitRule => exited_0(remove_any(POLKIT_RULE), POLKIT_RULE),
             Verb::RecordCreated { user, keep_home } => {
                 if user_exists(user) {
                     return Err(format!("`{user}` exists already, only a new user is recorded"));
@@ -628,14 +593,11 @@ impl Ctx {
                 if let Some(live) = live {
                     return Err(format!("`{live}` was made already, remove it first"));
                 }
-                crate::passwd::write_record(user, *keep_home)
-                    .map_err(io("cannot write the record"))?;
-                Ok(0)
+                exited_0(crate::passwd::write_record(user, *keep_home), "cannot write the record")
             }
             Verb::ClearRecord => {
-                remove_any(Path::new(crate::passwd::CREATED_RECORD))
-                    .map_err(io(crate::passwd::CREATED_RECORD))?;
-                Ok(0)
+                let record = crate::passwd::CREATED_RECORD;
+                exited_0(remove_any(record), record)
             }
             Verb::RemoveUser { user, keep_home } => self.remove_user(user, *keep_home),
             Verb::UserAdd { user, fullname, uid } => self.useradd(user, fullname, *uid),
@@ -648,8 +610,7 @@ impl Ctx {
                 write_atomic(Path::new(&icon), &self.input, 0o644).map_err(io(&icon))?;
                 let dest = format!("/var/lib/AccountsService/users/{user}");
                 let content = format!("[User]\nIcon={icon}\nSystemAccount=false\n");
-                write_atomic(Path::new(&dest), content.as_bytes(), 0o600).map_err(io(&dest))?;
-                Ok(0)
+                exited_0(write_atomic(Path::new(&dest), content.as_bytes(), 0o600), &dest)
             }
             Verb::UnlockUser { user } => {
                 check_created(user)?;
@@ -704,41 +665,28 @@ impl Ctx {
                 Self::run(self.cmd(up).arg(if *on { "1" } else { "0" }), Some(&self.input))
             }
             Verb::RecordTweaks { ids } => {
-                crate::tweaks::write_on_record(ids)
-                    .map_err(io("cannot write the tweaks record"))?;
-                Ok(0)
+                exited_0(crate::tweaks::write_on_record(ids), "cannot write the tweaks record")
             }
             Verb::ClearTweakRecord => {
-                remove_any(Path::new(crate::tweaks::ON_RECORD))
-                    .map_err(io(crate::tweaks::ON_RECORD))?;
-                Ok(0)
+                exited_0(remove_any(crate::tweaks::ON_RECORD), crate::tweaks::ON_RECORD)
             }
-            Verb::ProxyPersist => {
-                let proxy = self.request_proxy()?;
-                proxy.persist_as_root()?;
-                Ok(0)
-            }
-            Verb::ProxyRepoOverrides => {
-                let proxy = self.request_proxy()?;
-                proxy
-                    .write_repo_overrides_as_root()
-                    .map_err(io("cannot write the dnf proxy overrides"))?;
-                Ok(0)
-            }
+            Verb::ProxyPersist => self.request_proxy()?.persist_as_root().map(|()| 0),
+            Verb::ProxyRepoOverrides => exited_0(
+                self.request_proxy()?.write_repo_overrides_as_root(),
+                "cannot write the dnf proxy overrides",
+            ),
             Verb::ProxyClear => {
-                crate::proxy::clear_as_root().map_err(io("cannot remove the saved proxy"))?;
-                Ok(0)
+                exited_0(crate::proxy::clear_as_root(), "cannot remove the saved proxy")
             }
             Verb::Location { on } => {
                 // a masked GeoClue would keep GNOME's location switch from turning it back on
                 let gnome = Path::new("/usr/bin/gnome-shell").exists();
                 let mask = !on && !gnome;
-                let code =
-                    self.exec("systemctl", &[if mask { "mask" } else { "unmask" }, GEOCLUE_UNIT])?;
-                if code != 0 {
-                    return Ok(code);
-                }
-                self.dconf_keyfile(LOCATION_OFF, (!on && gnome).then_some(LOCATION_OFF_KEYFILE))
+                self.exec("systemctl", &[if mask { "mask" } else { "unmask" }, GEOCLUE_UNIT])
+                    .then_on_success(|| {
+                        let keyfile = (!on && gnome).then_some(LOCATION_OFF_KEYFILE);
+                        self.dconf_keyfile(LOCATION_OFF, keyfile)
+                    })
             }
             Verb::GdmScreenReader { on } => {
                 if !Path::new(GDM_DCONF_PROFILE).exists() {
@@ -816,21 +764,15 @@ impl Ctx {
             ),
             Verb::NvidiaPrimaryGpu => {
                 const DEST: &str = "/etc/X11/xorg.conf.d/10-nvidia-primary.conf";
-                write_atomic(
-                    Path::new(DEST),
-                    crate::steps::NVIDIA_PRIMARY_GPU_CONF.as_bytes(),
-                    0o644,
-                )
-                .map_err(io(DEST))?;
-                Ok(0)
+                let conf = crate::steps::NVIDIA_PRIMARY_GPU_CONF.as_bytes();
+                exited_0(write_atomic(Path::new(DEST), conf, 0o644), DEST)
             }
             Verb::DefaultKernel => self.exec("grubby", &["--default-kernel"]),
             Verb::Akmods { kernel } => self.exec("akmods", &["--kernels", kernel]),
             Verb::InstallCert { network, attempt, file } => {
                 let dest = Path::new(CERT_DIR).join(network).join(attempt).join(file);
                 let content = self.input(1 << 20)?;
-                write_atomic(&dest, content, 0o600).map_err(io(&dest.to_string_lossy()))?;
-                Ok(0)
+                exited_0(write_atomic(&dest, content, 0o600), &dest.to_string_lossy())
             }
             Verb::PruneCerts { network, keep } => {
                 let dir = Path::new(CERT_DIR).join(network);
@@ -844,14 +786,13 @@ impl Ctx {
                     if keep.as_deref().is_some_and(|keep| entry.file_name() == *keep) {
                         continue;
                     }
-                    remove_any(&entry.path()).map_err(io(&entry.path().to_string_lossy()))?;
+                    remove_any(entry.path()).map_err(io(&entry.path().to_string_lossy()))?;
                 }
                 Ok(0)
             }
             Verb::RemoveCertAttempt { network, attempt } => {
                 let dir = Path::new(CERT_DIR).join(network).join(attempt);
-                remove_any(&dir).map_err(io(&dir.to_string_lossy()))?;
-                Ok(0)
+                exited_0(remove_any(&dir), &dir.to_string_lossy())
             }
         }
     }
@@ -951,27 +892,26 @@ impl Ctx {
         }
         let login_unknown = logins.is_none();
         let keep_home = keep_home || record.keep_home || login_unknown;
-        let code = if crate::passwd::HOMED_UIDS.contains(&uid) {
+        let removed = if crate::passwd::HOMED_UIDS.contains(&uid) {
             // homectl can't remove a user and keep its home
             if login_unknown {
                 return Err(format!("cannot tell whether `{user}` has been used"));
             }
-            self.exec("homectl", &["remove", user])?
+            self.exec("homectl", &["remove", user])
         } else if keep_home {
-            self.exec("userdel", &["--", user])?
+            self.exec("userdel", &["--", user])
         } else {
-            self.exec("userdel", &["-r", "--", user])?
+            self.exec("userdel", &["-r", "--", user])
         };
-        if code != 0 {
-            return Ok(code);
-        }
-        for dir in ["icons", "users"] {
-            let path = format!("/var/lib/AccountsService/{dir}/{user}");
-            if let Err(e) = remove_any(Path::new(&path)) {
-                eprintln!("taidan-helper: cannot remove {path}: {e}");
+        removed.then_on_success(|| {
+            for dir in ["icons", "users"] {
+                let path = format!("/var/lib/AccountsService/{dir}/{user}");
+                if let Err(e) = remove_any(&path) {
+                    eprintln!("taidan-helper: cannot remove {path}: {e}");
+                }
             }
-        }
-        Ok(0)
+            Ok(0)
+        })
     }
 
     fn useradd(&self, user: &str, fullname: &str, uid: Option<u32>) -> Result<i32, String> {
@@ -989,17 +929,13 @@ impl Ctx {
             args.extend(["-u", uid]);
         }
         args.extend(["--", user]);
-        let code = self.exec("useradd", &args)?;
-        if code != 0 {
-            return Ok(code);
-        }
-        write_created(user)?;
-        let input = format!("{user}:{hash}\n");
-        let code = Self::run(self.cmd("chpasswd").arg("-e"), Some(input.as_bytes()))?;
-        if code != 0 {
-            return Ok(code);
-        }
-        self.exec("usermod", &["-L", "--", user])
+        self.exec("useradd", &args)
+            .then_on_success(|| {
+                write_created(user)?;
+                let input = format!("{user}:{hash}\n");
+                Self::run(self.cmd("chpasswd").arg("-e"), Some(input.as_bytes()))
+            })
+            .then_on_success(|| self.exec("usermod", &["-L", "--", user]))
     }
 
     fn check_caller_owned_dir(&self, dir: &Path) -> Result<(), String> {
@@ -1030,11 +966,10 @@ impl Ctx {
             args.push(arg);
         }
         args.push(user.into());
-        let code = Self::run(self.cmd("homectl").args(&args), Some(&identity))?;
-        if code == 0 {
+        Self::run(self.cmd("homectl").args(&args), Some(&identity)).then_on_success(|| {
             write_created(user)?;
-        }
-        Ok(code)
+            Ok(0)
+        })
     }
 }
 
@@ -1151,7 +1086,8 @@ fn write_created(user: &str) -> Result<(), String> {
         .map_err(io(CREATED_USER_THIS_BOOT))
 }
 
-fn remove_any(path: &Path) -> std::io::Result<()> {
+pub(crate) fn remove_any(path: impl AsRef<Path>) -> std::io::Result<()> {
+    let path = path.as_ref();
     match std::fs::symlink_metadata(path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(e),
@@ -1620,8 +1556,8 @@ mod tests {
         assert_eq!(std::fs::read(&path).unwrap(), b"two");
         assert_eq!(path.metadata().unwrap().permissions().mode() & 0o777, 0o644);
         assert_eq!(std::fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
-        remove_any(&dir.path().join("a")).unwrap();
-        remove_any(&dir.path().join("a")).unwrap();
+        remove_any(dir.path().join("a")).unwrap();
+        remove_any(dir.path().join("a")).unwrap();
         assert!(!dir.path().join("a").exists());
     }
 }

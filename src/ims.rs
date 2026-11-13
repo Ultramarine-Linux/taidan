@@ -68,10 +68,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, ims: &Ims<'_>) {
             let Some(mut item) = model.row_data(i) else { return };
             item.on = on;
             model.set_row_data(i, item);
-            let mut settings = crate::SETTINGS.write();
-            settings.ims = names_on(&*model);
-            settings.ims_picked = true;
-            drop(settings);
+            crate::SETTINGS.write().ims_picked = true;
             if let Some(ui) = ui.upgrade() {
                 show_enabled(&ui.global(), &model);
             }

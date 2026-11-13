@@ -238,7 +238,7 @@ impl Proxy {
             .collect::<Vec<_>>();
         let overrides = repo_overrides(&repos, &self.no_proxy);
         if overrides.is_empty() {
-            return remove(REPO_OVERRIDE);
+            return crate::helper::remove_any(REPO_OVERRIDE);
         }
         crate::helper::write_atomic(Path::new(REPO_OVERRIDE), overrides.as_bytes(), 0o644)
     }
@@ -348,30 +348,20 @@ fn has_control(s: &str) -> bool {
 const DNF_DROPIN: &str = "/etc/dnf/libdnf5.conf.d/50-taidan-proxy.conf";
 
 pub async fn clear() -> Res<()> {
-    let exists = |path| async move { tokio::fs::try_exists(path).await.unwrap_or(true) };
-    if !exists(DNF_DROPIN).await && !exists(REPO_OVERRIDE).await {
-        return Ok(());
-    }
-    crate::root(crate::Verb::ProxyClear).await.wrap_msg("cannot remove the saved proxy")
-}
-
-fn remove(path: &str) -> std::io::Result<()> {
-    match std::fs::remove_file(path) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        res => res,
-    }
+    let failure = "cannot remove the saved proxy";
+    crate::root_if_any_exists(&[DNF_DROPIN, REPO_OVERRIDE], crate::Verb::ProxyClear, failure).await
 }
 
 pub(crate) fn clear_as_root() -> std::io::Result<()> {
-    remove(REPO_OVERRIDE)?;
-    remove(RPM_OSTREED_ETC)?;
+    crate::helper::remove_any(REPO_OVERRIDE)?;
+    crate::helper::remove_any(RPM_OSTREED_ETC)?;
     if Path::new(DNF_DROPIN).exists() {
         let env = std::fs::read_to_string(ETC_ENVIRONMENT).unwrap_or_default();
         let cleaned = without_proxy_vars(&env);
         if cleaned != env {
             crate::helper::write_atomic(Path::new(ETC_ENVIRONMENT), cleaned.as_bytes(), 0o644)?;
         }
-        remove(DNF_DROPIN)?;
+        crate::helper::remove_any(DNF_DROPIN)?;
     }
     Ok(())
 }

@@ -8,7 +8,7 @@ import { Tweaks } from "../tweaks.slint";
 import { Ims } from "../ims.slint";
 import { Cfg } from "../cfg.slint";
 import { Modal } from "../modal.slint";
-import { TdnText, TdnBtn, TdnToggleRow, TdnScrollList } from "../components.slint";
+import { TdnText, TdnNote, TdnBtn, TdnToggleRow, TdnScrollList } from "../components.slint";
 import { DriverList, DriverRow } from "0100_drivers.slint";
 import { UserIcon } from "0040_whoareyou.slint";
 import { Card } from "../slintcn/components/card.slint";
@@ -196,11 +196,8 @@ export component SummaryPage inherits TdnPage {
                                 text: Lang.t(name, []);
                             }
 
-                            if !Drivers.install && Tweaks.enabled-names.length == 0: TdnText {
+                            if !Drivers.install && Tweaks.enabled-names.length == 0: TdnNote {
                                 text: Lang.t("page-summary-software-none", []);
-                                color: Tokens.color-muted-foreground;
-                                horizontal-alignment: Dir.text-start;
-                                wrap: word-wrap;
                             }
                         }
                     }

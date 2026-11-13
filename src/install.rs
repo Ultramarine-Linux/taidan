@@ -4,27 +4,12 @@ use slint::ComponentHandle;
 use crate::ui::{
     AppWindow, Drivers, Install, InstallState, Location, Network, Pages, Theme, ThemeMode,
 };
+use crate::ui::{block_on_thread, on_ui, spawn_then};
 
 #[must_use]
 pub fn is_dev_session() -> bool {
     cfg!(debug_assertions)
         && uzers::get_current_username().is_none_or(|user| user.as_encoded_bytes() != b"taidan")
-}
-
-const fn stage_l10n_id(stage: Stage) -> &'static str {
-    match stage {
-        Stage::UserAdd(_) => "steps-useradd",
-        Stage::SetHostname(_) => "steps-sethostname",
-        Stage::SetTimezone(_) => "steps-settimezone",
-        Stage::SetTheme(_) => "steps-settheme",
-        Stage::SystemSetup(_) => "steps-systemsetup",
-        Stage::DnfDownloadApps(_) => "steps-dnfdownloadapps",
-        Stage::DnfInstallApps(_) => "steps-dnfinstallapps",
-        Stage::DriversCodecs(_) => "steps-driverscodecs",
-        Stage::SetupImf(_) => "steps-setupimf",
-        Stage::SetLocale(_) => "steps-setlocale",
-        Stage::DownloadUpdates(_) => "steps-dnfdownloadupdate",
-    }
 }
 
 fn panic_msg(payload: &(dyn std::any::Any + Send)) -> String {
@@ -104,11 +89,11 @@ async fn simulate_install(
 }
 
 fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
-    let set = ui.upgrade_in_event_loop(move |ui| {
+    on_ui(ui, move |ui| {
         let install = ui.global::<Install<'_>>();
         match msg {
             InstallMsg::UpdStage(stage) => {
-                install.set_stage_id(stage_l10n_id(stage).into());
+                install.set_stage_id(stage.l10n_id().into());
                 install.set_stage_num(i32::from(u8::from(stage)) + 1);
                 install.set_stage_progress(-1.0);
             }
@@ -125,9 +110,6 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
             InstallMsg::Finish => {}
         }
     });
-    if let Err(e) = set {
-        tracing::error!(?e, "cannot update install progress");
-    }
 }
 
 #[expect(clippy::cast_possible_truncation, reason = "a fraction, for display")]
@@ -164,19 +146,18 @@ fn start(ui: &slint::Weak<AppWindow>) {
     let account = app.global::<crate::ui::Account<'_>>();
     account.set_password("".into());
     account.set_password_repeat("".into());
-    let ui = ui.clone();
-    std::thread::spawn(move || {
-        let callback = {
-            let ui = ui.clone();
-            move |msg| on_install_msg(&ui, msg)
-        };
-        let error = run_install(&mut settings, &callback);
-        if error.is_none() {
-            *A11Y_APPLIED_AT_INSTALL.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
-                Some(AppliedA11y { username: settings.username.clone(), a11y: settings.a11y });
-        }
-        let used_internet = !settings.nointernet;
-        let set = ui.upgrade_in_event_loop(move |ui| {
+    let progress_ui = ui.clone();
+    spawn_then(
+        ui.clone(),
+        move || {
+            let error = run_install(&mut settings, &move |msg| on_install_msg(&progress_ui, msg));
+            if error.is_none() {
+                *A11Y_APPLIED_AT_INSTALL.lock() =
+                    Some(AppliedA11y { username: settings.username.clone(), a11y: settings.a11y });
+            }
+            (error, !settings.nointernet)
+        },
+        |ui, (error, used_internet)| {
             let install = ui.global::<Install<'_>>();
             // a `changed Install.state` in Slint can coalesce Failed → Running → Failed
             if let Some(error) = error {
@@ -188,11 +169,8 @@ fn start(ui: &slint::Weak<AppWindow>) {
                 install.set_state(InstallState::Done);
                 ui.set_pagenum(ui.global::<Pages<'_>>().get_done());
             }
-        });
-        if let Err(e) = set {
-            tracing::error!(?e, "cannot report install result");
-        }
-    });
+        },
+    );
 }
 
 fn save_page_choices(app: &AppWindow, install: &Install<'_>) {
@@ -204,7 +182,9 @@ fn save_page_choices(app: &AppWindow, install: &Install<'_>) {
     let dark_mode = crate::cfg::shows_page(crate::cfg::SkipPage::Theme)
         .then(|| app.global::<Theme<'_>>().get_mode() == ThemeMode::Dark);
     let accent = dark_mode.and_then(|_| crate::theme::picked(&app.global()));
+    let tweaks = crate::tweaks::enabled(&app.global());
     let mut settings = crate::SETTINGS.write();
+    settings.tweaks = tweaks;
     settings.install_codecs_drivers = install_codecs_drivers;
     settings.location = location;
     settings.download_updates = download_updates;
@@ -234,11 +214,11 @@ struct AppliedA11y {
     a11y: libtaidan::a11y::A11y,
 }
 
-static A11Y_APPLIED_AT_INSTALL: std::sync::Mutex<Option<AppliedA11y>> = std::sync::Mutex::new(None);
+static A11Y_APPLIED_AT_INSTALL: parking_lot::Mutex<Option<AppliedA11y>> =
+    parking_lot::Mutex::new(None);
 
 async fn reapply_changed_a11y() {
-    let applied =
-        A11Y_APPLIED_AT_INSTALL.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+    let applied = A11Y_APPLIED_AT_INSTALL.lock().clone();
     let Some(AppliedA11y { username, a11y: applied }) = applied else { return };
     let a11y = crate::SETTINGS.read().a11y;
     if a11y == applied {
@@ -262,7 +242,7 @@ async fn finish(ui: &slint::Weak<AppWindow>, reboot: bool) {
         libtaidan::mark_configured().await;
         if reboot && !reboot_with_retries().await {
             FINISHING.store(false, std::sync::atomic::Ordering::SeqCst);
-            _ = ui.upgrade_in_event_loop(|app| {
+            on_ui(ui, |app| {
                 let install = app.global::<Install<'_>>();
                 install.set_reboot_failed(true);
                 install.set_finishing(false);
@@ -333,7 +313,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
             }
             install.set_finishing(true);
             let ui = ui.clone();
-            std::thread::spawn(move || crate::RT.block_on(finish(&ui, reboot)));
+            block_on_thread(async move { finish(&ui, reboot).await });
         }
     });
     if let Some(app) = ui.upgrade() {
@@ -351,13 +331,17 @@ fn add_simulated_hardware(hw: &mut libtaidan::steps::Hardware) {
 }
 
 fn spawn_hardware_detection(ui: slint::Weak<AppWindow>) {
-    std::thread::spawn(move || {
-        let mut hw = crate::RT.block_on(libtaidan::steps::detect_hardware());
-        tracing::debug!(?hw, "Detected hardware");
-        if cfg!(debug_assertions) && std::env::var_os("TAIDAN_SIMULATE_HW").is_some() {
-            add_simulated_hardware(&mut hw);
-        }
-        let set = ui.upgrade_in_event_loop(move |ui| {
+    spawn_then(
+        ui,
+        || {
+            let mut hw = crate::RT.block_on(libtaidan::steps::detect_hardware());
+            tracing::debug!(?hw, "Detected hardware");
+            if cfg!(debug_assertions) && std::env::var_os("TAIDAN_SIMULATE_HW").is_some() {
+                add_simulated_hardware(&mut hw);
+            }
+            hw
+        },
+        |ui, hw| {
             let drivers = ui.global::<Drivers<'_>>();
             drivers.set_nvidia(hw.nvidia);
             drivers.set_broadcom_wifi(hw.broadcom_wifi);
@@ -368,11 +352,8 @@ fn spawn_hardware_detection(ui: slint::Weak<AppWindow>) {
                 }
                 drivers.set_secure_boot(true);
             }
-        });
-        if let Err(e) = set {
-            tracing::error!(?e, "cannot set detected hardware");
-        }
-    });
+        },
+    );
 }
 
 #[cfg(test)]

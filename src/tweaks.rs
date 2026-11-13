@@ -26,7 +26,6 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tweaks: &Tweaks<'_>) {
             item.on = on;
             model.set_row_data(i, item);
             let enabled = model.iter().filter(|t| t.on).collect::<Vec<_>>();
-            crate::SETTINGS.write().tweaks = enabled.iter().map(|t| t.id.to_string()).collect();
             if let Some(ui) = ui.upgrade() {
                 let names = |offline: bool| {
                     let names = enabled.iter().filter(|t| !(offline && t.needs_internet));
@@ -40,4 +39,9 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, tweaks: &Tweaks<'_>) {
             }
         }
     });
+}
+
+#[must_use]
+pub fn enabled(tweaks: &Tweaks<'_>) -> libtaidan::settings::TweakIds {
+    tweaks.get_items().iter().filter(|t| t.on).map(|t| t.id.to_string()).collect()
 }

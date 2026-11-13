@@ -1,63 +1,48 @@
 use crate::prelude::*;
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SystemSetup;
-impl super::Step for SystemSetup {
-    #[tracing::instrument(skip(settings))]
-    async fn run<C: crate::Callback>(
-        &self,
-        settings: &crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        _: &C,
-    ) -> Res<()> {
-        if let Some(ids) = settings.tweaks.ids() {
-            apply_tweaks(settings, cfg, ids).await?;
-        } else {
-            tracing::warn!(
-                "the settings don't say which tweaks to turn on, leaving them as they are"
-            );
-        }
-        apply_location(settings).await;
-        if let Err(e) = crate::i18n::apply_keymap_to_user(settings, cfg).await {
-            tracing::warn!(?e, "cannot carry over the keyboard layout");
-        }
-        if let Err(e) = crate::a11y::apply_to_user(settings, cfg).await {
-            tracing::warn!(?e, "cannot carry over the accessibility settings");
-        }
-        if !cfg.taidan0.systemd_homed
-            && video_group_exists().await
-            && let Err(e) =
-                crate::root(crate::Verb::AddToVideo { user: settings.username.clone() }).await
-        {
-            tracing::warn!(?e, "cannot add the user to the video group");
-        }
-        Ok(())
+pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
+    if let Some(ids) = settings.tweaks.ids() {
+        apply_tweaks(settings, cfg, ids).await?;
+    } else {
+        tracing::warn!("the settings don't say which tweaks to turn on, leaving them as they are");
     }
+    apply_location(settings).await;
+    if let Err(e) = crate::i18n::apply_keymap_to_user(settings, cfg).await {
+        tracing::warn!(?e, "cannot carry over the keyboard layout");
+    }
+    if let Err(e) = crate::a11y::apply_to_user(settings, cfg).await {
+        tracing::warn!(?e, "cannot carry over the accessibility settings");
+    }
+    if !cfg.taidan0.systemd_homed
+        && video_group_exists().await
+        && let Err(e) =
+            crate::root(crate::Verb::AddToVideo { user: settings.username.clone() }).await
+    {
+        tracing::warn!(?e, "cannot add the user to the video group");
+    }
+    Ok(())
+}
 
-    #[tracing::instrument(skip(settings))]
-    async fn pre<C: crate::Callback>(
-        &self,
-        settings: &mut crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        _: &C,
-    ) -> Res<()> {
-        if settings.nointernet || settings.locale.is_empty() || !super::can_use_dnf(cfg).await {
-            return Ok(());
-        }
-        let candidates = langpack_candidates(&settings.locale);
-        match packages_in_repos(&candidates).await {
-            Ok(found) => {
-                if let Some(pkg) = candidates.into_iter().find(|c| found.contains(c)) {
-                    tracing::info!(pkg, "Installing the language pack");
-                    settings.actions[1].push(pkg);
-                } else {
-                    tracing::info!(locale = settings.locale, "No language pack for this locale");
-                }
-            }
-            Err(e) => tracing::warn!(?e, "cannot look up language packs"),
-        }
-        Ok(())
+pub(super) async fn pre(
+    settings: &mut crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+) -> Res<()> {
+    if settings.nointernet || settings.locale.is_empty() || !super::can_use_dnf(cfg).await {
+        return Ok(());
     }
+    let candidates = langpack_candidates(&settings.locale);
+    match packages_in_repos(&candidates).await {
+        Ok(found) => {
+            if let Some(pkg) = candidates.into_iter().find(|c| found.contains(c)) {
+                tracing::info!(pkg, "Installing the language pack");
+                settings.actions[1].push(pkg);
+            } else {
+                tracing::info!(locale = settings.locale, "No language pack for this locale");
+            }
+        }
+        Err(e) => tracing::warn!(?e, "cannot look up language packs"),
+    }
+    Ok(())
 }
 
 async fn apply_tweaks(
@@ -118,6 +103,9 @@ async fn video_group_exists() -> bool {
         .is_ok_and(|groups| groups.lines().any(|l| l.starts_with("video:")))
 }
 
+pub(crate) const LANGPACK_PREFIXES: [&str; 3] =
+    ["ultramarine-langpacks-", "langpacks-", "glibc-langpack-"];
+
 fn langpack_candidates(locale: &str) -> Vec<String> {
     let name = locale.split(['.', '@']).next().unwrap_or_default();
     let lang = name.split('_').next().unwrap_or_default();
@@ -128,12 +116,10 @@ fn langpack_candidates(locale: &str) -> Vec<String> {
     if lang != name {
         names.push(lang);
     }
-    let mut pkgs: Vec<_> = ["ultramarine-langpacks-", "langpacks-"]
-        .iter()
-        .flat_map(|prefix| names.iter().map(move |n| format!("{prefix}{n}")))
-        .collect();
-    pkgs.push(format!("glibc-langpack-{lang}"));
-    pkgs
+    let (glibc, per_name) = LANGPACK_PREFIXES.split_last().expect("langpack prefixes");
+    let per_name =
+        per_name.iter().flat_map(|prefix| names.iter().map(move |n| prefix.to_string() + n));
+    per_name.chain([format!("{glibc}{lang}")]).collect()
 }
 
 async fn packages_in_repos(pkgs: &[String]) -> Res<Vec<String>> {
