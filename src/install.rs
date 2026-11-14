@@ -58,7 +58,7 @@ fn qr_code(url: &str) -> Option<slint::Image> {
         .ok()
 }
 
-const SIMULATED_ERROR_AFTER_STAGE: usize = 4;
+const SIMULATED_ERROR_AFTER_STAGE: Stage = Stage::SystemSetup;
 
 fn simulated_hw(name: &str) -> bool {
     std::env::var("TAIDAN_SIMULATE_HW")
@@ -68,10 +68,12 @@ fn simulated_hw(name: &str) -> bool {
 async fn simulate_install(
     callback: &(impl libtaidan::Callback + Sync),
 ) -> libtaidan::prelude::Res<()> {
-    for (i, stage) in Stage::all().iter().enumerate() {
+    for stage in Stage::all() {
         callback.send(InstallMsg::UpdStage(*stage));
         tokio::time::sleep(std::time::Duration::from_millis(700)).await;
-        if i == SIMULATED_ERROR_AFTER_STAGE && std::env::var_os("TAIDAN_SIMULATE_ERROR").is_some() {
+        if *stage == SIMULATED_ERROR_AFTER_STAGE
+            && std::env::var_os("TAIDAN_SIMULATE_ERROR").is_some()
+        {
             return Err(libtaidan::prelude::Err::Msg("simulated error (TAIDAN_SIMULATE_ERROR)"));
         }
     }
@@ -381,6 +383,15 @@ mod tests {
         rt.block_on(simulate_install(&callback)).unwrap();
         let msgs = msgs.into_inner().unwrap();
         assert_eq!(msgs.len(), Stage::all().len() + 1);
+        let stages = msgs
+            .iter()
+            .filter_map(|msg| match msg {
+                InstallMsg::UpdStage(stage) => Some(*stage),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(stages, Stage::all());
+        assert_eq!(stages.iter().filter(|stage| **stage == Stage::ApplySystemSettings).count(), 1);
         assert!(matches!(msgs.last(), Some(InstallMsg::Finish)));
     }
 }

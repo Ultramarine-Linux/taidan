@@ -1,13 +1,9 @@
 mod _00_useradd;
-mod _01_settheme;
 mod _04_systemsetup;
 mod _05_dnfdownloadapps;
 mod _06_dnfinstallapps;
 mod _07_drivers_codecs;
-mod _08_setup_imf;
-mod _09_sethostname;
-mod _10_settimezone;
-mod _11_setlocale;
+mod _08_apply_system_settings;
 mod _12_downloadupdates;
 
 use crate::prelude::*;
@@ -19,7 +15,7 @@ pub(crate) use _05_dnfdownloadapps::{DNF_EXTRAS_ARGS, imf_packages};
 pub(crate) use _07_drivers_codecs::secure_boot_enforced;
 pub(crate) use _07_drivers_codecs::{Codecs, NVIDIA_PRIMARY_GPU_CONF, driver_packages};
 pub use _07_drivers_codecs::{Hardware, detect_hardware};
-pub use _08_setup_imf::fix_homed as fix_homed_ims;
+pub use _08_apply_system_settings::fix_homed as fix_homed_ims;
 
 pub(crate) async fn is_ostree() -> bool {
     tokio::fs::try_exists("/ostree").await.unwrap_or_default()
@@ -59,15 +55,11 @@ async fn flatpaks_and_packages<C: crate::Callback>(
 pub enum Stage {
     #[default]
     UserAdd,
-    SetHostname,
-    SetTimezone,
-    SetTheme,
     SystemSetup,
     DnfDownloadApps,
     DnfInstallApps,
     DriversCodecs,
-    SetupImf,
-    SetLocale,
+    ApplySystemSettings,
     DownloadUpdates,
 }
 
@@ -76,15 +68,11 @@ impl Stage {
     pub const fn all() -> &'static [Self] {
         &[
             Self::UserAdd,
-            Self::SetHostname,
-            Self::SetTimezone,
-            Self::SetTheme,
             Self::SystemSetup,
             Self::DnfDownloadApps,
             Self::DnfInstallApps,
             Self::DriversCodecs,
-            Self::SetupImf,
-            Self::SetLocale,
+            Self::ApplySystemSettings,
             Self::DownloadUpdates,
         ]
     }
@@ -93,15 +81,11 @@ impl Stage {
     pub const fn l10n_id(self) -> &'static str {
         match self {
             Self::UserAdd => "steps-useradd",
-            Self::SetHostname => "steps-sethostname",
-            Self::SetTimezone => "steps-settimezone",
-            Self::SetTheme => "steps-settheme",
             Self::SystemSetup => "steps-systemsetup",
             Self::DnfDownloadApps => "steps-dnfdownloadapps",
             Self::DnfInstallApps => "steps-dnfinstallapps",
             Self::DriversCodecs => "steps-driverscodecs",
-            Self::SetupImf => "steps-setupimf",
-            Self::SetLocale => "steps-setlocale",
+            Self::ApplySystemSettings => "steps-applysystemsettings",
             Self::DownloadUpdates => "steps-dnfdownloadupdate",
         }
     }
@@ -128,15 +112,13 @@ impl Stage {
     ) -> Res<()> {
         match self {
             Self::UserAdd => _00_useradd::run(settings, cfg).await,
-            Self::SetHostname => _09_sethostname::run(settings).await,
-            Self::SetTimezone => _10_settimezone::run(settings).await,
-            Self::SetTheme => _01_settheme::run(settings, cfg).await,
             Self::SystemSetup => _04_systemsetup::run(settings, cfg).await,
             Self::DnfDownloadApps => _05_dnfdownloadapps::run(settings, cfg, callback).await,
             Self::DnfInstallApps => _06_dnfinstallapps::run(settings, cfg, callback).await,
             Self::DriversCodecs => _07_drivers_codecs::run(settings, cfg, callback).await,
-            Self::SetupImf => _08_setup_imf::run(settings, cfg).await,
-            Self::SetLocale => _11_setlocale::run(settings, callback).await,
+            Self::ApplySystemSettings => {
+                _08_apply_system_settings::run(settings, cfg, callback).await
+            }
             Self::DownloadUpdates => _12_downloadupdates::run(settings, cfg, callback).await,
         }
     }
@@ -164,3 +146,15 @@ pub async fn acmd(
 }
 
 pub(crate) use super::{root, root_with_stdin};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stage_numbers_are_contiguous_for_progress() {
+        for (index, stage) in Stage::all().iter().enumerate() {
+            assert_eq!(usize::from(u8::from(*stage)), index);
+        }
+    }
+}

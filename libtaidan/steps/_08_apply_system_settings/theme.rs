@@ -77,7 +77,7 @@ fn theme_commands(dark: bool, accent: Option<Accent>, desktop: Desktop) -> Vec<V
     cmds
 }
 
-pub(super) async fn apply(
+pub(in crate::steps) async fn apply(
     settings: &crate::settings::Settings,
     home: &Home,
     desktop: Desktop,
@@ -89,4 +89,28 @@ pub(super) async fn apply(
     };
     home.run(vec![cmd.best_effort()]).await?;
     Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn skipped_theme_leaves_the_home_untouched() {
+        let settings = crate::settings::Settings::default();
+        assert!(settings.dark_mode.is_none());
+        // No lookup or write for the empty username should be attempted.
+        run(&settings, &crate::cfg::Config::default()).await.unwrap();
+    }
+
+    #[test]
+    fn retry_uses_the_new_theme_and_accent() {
+        let first = theme_commands(true, Some(Accent::Blue), Desktop::Plasma);
+        let retry = theme_commands(false, Some(Accent::Green), Desktop::Plasma);
+        assert!(first.iter().flatten().any(|arg| arg == "BreezeDark"));
+        assert!(retry.iter().flatten().any(|arg| arg == "BreezeLight"));
+        assert!(!retry.iter().flatten().any(|arg| arg == "BreezeDark"));
+        assert!(retry.iter().flatten().any(|arg| arg == Accent::Green.hex()));
+        assert!(!retry.iter().flatten().any(|arg| arg == Accent::Blue.hex()));
+    }
 }

@@ -35,7 +35,8 @@ async fn with_installed_ims(
     cfg: &crate::cfg::Config,
     phase: InstallPhase,
 ) -> Option<crate::settings::Settings> {
-    if phase == InstallPhase::Before && !settings.nointernet && super::can_use_dnf(cfg).await {
+    if phase == InstallPhase::Before && !settings.nointernet && crate::steps::can_use_dnf(cfg).await
+    {
         return (!settings.ims.is_empty()).then(|| settings.clone());
     }
     let mut ims = vec![];
@@ -158,7 +159,7 @@ async fn apply(settings: &crate::settings::Settings, home: &Home, desktop: Deskt
     Ok(wrote)
 }
 
-pub(super) async fn apply_to_skel(
+pub(in crate::steps) async fn apply_to_skel(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
     skel: &Home,
@@ -244,6 +245,22 @@ mod tests {
         assert!(profile.contains("[Groups/0/Items/1]\n# Name\nName=pinyin\n"));
         assert!(profile.contains("[Groups/0/Items/2]\n# Name\nName=mozc\n"));
         assert!(!profile.contains("Items/3"));
+    }
+
+    #[test]
+    fn retry_replaces_input_method_choices_even_offline() {
+        let first = crate::settings::Settings {
+            kb_layout: "us".into(),
+            ims: vec!["Pinyin".into()],
+            nointernet: true,
+            ..Default::default()
+        };
+        let retry = crate::settings::Settings { ims: vec!["Mozc".into()], ..first.clone() };
+        let first_profile = fcitx5_profile(&first);
+        let retry_profile = fcitx5_profile(&retry);
+        assert!(first_profile.contains("Name=pinyin\n"));
+        assert!(retry_profile.contains("Name=mozc\n"));
+        assert!(!retry_profile.contains("Name=pinyin\n"));
     }
 
     #[test]

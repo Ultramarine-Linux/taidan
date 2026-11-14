@@ -193,8 +193,8 @@ async fn stage_skel(
         if a11y {
             settings.a11y.apply(&home, desktop, None).await?;
         }
-        let imf = super::_08_setup_imf::apply_to_skel(settings, cfg, &home).await?;
-        let theme = super::_01_settheme::apply(settings, &home, desktop).await?;
+        let imf = super::_08_apply_system_settings::apply_imf_to_skel(settings, cfg, &home).await?;
+        let theme = super::_08_apply_system_settings::apply_theme(settings, &home, desktop).await?;
         let keymap = crate::i18n::apply_keymap(settings, &home, desktop).await?;
         Ok::<_, Err>(a11y || imf || theme || keymap)
     };
