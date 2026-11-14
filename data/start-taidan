@@ -1,14 +1,127 @@
 #!/usr/bin/sh
 
-# create "home dir"
-mkdir -p /usr/lib/
-cp -r /etc/skel /usr/lib/
+status_dir=${RUNTIME_DIRECTORY:-/run/taidan}
 
-xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/http' &
-xdg-mime default org.mozilla.firefox.desktop 'x-scheme-handler/https' &
+if [ "$1" = session ]; then
+	TAIDAN_LOG=trace /usr/bin/taidan
+	echo $? >"$status_dir/exit-status.$TAIDAN_ATTEMPT"
+	exit 0
+fi
 
-swaybg -i /usr/share/backgrounds/default.png -m fill -c '#113344' >/dev/null 2>&1 &
-nm-applet &
-TAIDAN_LOG=trace /usr/bin/taidan
+max_restarts=3
+oobe_vt=7
+uid=$(id -u)
+cgroup_procs=/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)/cgroup.procs
 
-pkill kwin_wayland
+unconfigured() {
+	[ -e /.unconfigured ] || [ -e /var/.unconfigured ]
+}
+
+helper() {
+	pkexec /usr/libexec/taidan-helper "$1" </dev/null
+}
+
+wait_while() {
+	seconds=$1
+	shift
+	while "$@" && [ "$seconds" -gt 0 ]; do
+		sleep 1
+		seconds=$((seconds - 1))
+	done
+}
+
+find_own_leftovers() {
+	own_leftovers=
+	while read -r pid; do
+		case $pid in "$$" | "$PPID") continue ;; esac
+		stat=$(cat "/proc/$pid/stat" 2>/dev/null) || continue
+		# shellcheck disable=SC2086
+		set -- ${stat##*) }
+		[ "$2" = $$ ] && continue
+		[ "$(stat -c %u "/proc/$pid" 2>/dev/null)" = "$uid" ] && own_leftovers="$own_leftovers $pid"
+	done <"$cgroup_procs"
+	[ -n "$own_leftovers" ]
+}
+
+find_root_leftovers() {
+	root_leftovers=
+	while read -r pid; do
+		[ "$(stat -c %u "/proc/$pid" 2>/dev/null)" = 0 ] && root_leftovers="$root_leftovers $pid"
+	done <"$cgroup_procs"
+	[ -n "$root_leftovers" ]
+}
+
+stop_leftovers() {
+	if find_own_leftovers; then
+		echo "stopping what the last session left running:$own_leftovers" >&2
+		# shellcheck disable=SC2086
+		kill $own_leftovers 2>/dev/null
+		wait_while 5 find_own_leftovers
+		if [ -n "$own_leftovers" ]; then
+			echo "killing what didn't stop:$own_leftovers" >&2
+			# shellcheck disable=SC2086
+			kill -KILL $own_leftovers 2>/dev/null
+		fi
+	fi
+
+	chvt "$oobe_vt" 2>/dev/null
+	helper stop-portal 2>/dev/null
+	find_root_leftovers || return 0
+	echo "stopping what the last taidan left running:$root_leftovers" >&2
+	helper kill-leftovers
+	wait_while 300 find_root_leftovers
+	if [ -n "$root_leftovers" ]; then
+		echo "killing what didn't stop:$root_leftovers" >&2
+		helper kill-leftovers-now
+	fi
+}
+
+fail_forever() {
+	chvt "$oobe_vt" 2>/dev/null
+	helper drop-polkit-rule
+	stty -isig -echo -icanon </dev/tty 2>/dev/null
+	trap '' INT QUIT TSTP HUP
+	{
+		printf '\033[H\033[2J'
+		cat <<-EOM
+		Taidan Initial Setup failed to start ($1 attempts).
+
+		The system is not set up yet, so it will not continue to the login screen.
+
+		Logs:
+		  /var/log/taidan.stdout.log
+		  /var/log/taidan.stderr.log
+		  /tmp/taidan-logs*/taidan.log
+		  /tmp/libtaidan-*/
+
+		To try again, restart the computer (Ctrl+Alt+Delete).
+		For a root shell on tty9 (Ctrl+Alt+F9), boot with systemd.debug_shell on the
+		kernel command line.
+		EOM
+	} >/dev/tty 2>/dev/null
+	exec sleep infinity
+}
+
+restarts=0
+while :; do
+	status_file=$status_dir/exit-status.$restarts
+	rm -f "$status_file"
+	TAIDAN_ATTEMPT=$restarts dbus-run-session kwin_wayland --no-lockscreen \
+		--exit-with-session 'sh /usr/libexec/start-taidan session'
+	status=$(cat "$status_file" 2>/dev/null)
+	rm -f "$status_file"
+	if [ "$status" = 0 ] || ! unconfigured; then
+		exit 0
+	fi
+	if [ "$restarts" -ge "$max_restarts" ]; then
+		echo "taidan keeps failing (exit status ${status:-none}), giving up" >&2
+		stop_leftovers
+		fail_forever $((restarts + 1))
+	fi
+	restarts=$((restarts + 1))
+	echo "taidan exited before the setup was done (exit status ${status:-none}), restarting with the software renderer" >&2
+	stop_leftovers
+	# slint only falls back to software by itself when it can't create the renderer at all
+	export SLINT_BACKEND=winit-software
+	sleep 1
+done

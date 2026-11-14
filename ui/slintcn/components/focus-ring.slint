@@ -1,0 +1,18 @@
+import { Tokens } from "../theme/tokens.slint";
+
+export component FocusRing inherits Rectangle {
+    // a component root can't read `parent` in Slint
+    in property <length> host-width;
+    in property <length> host-height;
+    in property <length> offset:     Tokens.focus-ring-offset;
+    in property <length> radius:     Tokens.radius-md + root.offset;
+    in property <bool>   inset;
+
+    x: root.inset ? root.offset : -root.offset;
+    y: self.x;
+    width:  root.host-width  - 2 * self.x;
+    height: root.host-height - 2 * self.x;
+    border-width:  Tokens.focus-ring-width;
+    border-color:  Tokens.color-ring;
+    border-radius: root.radius;
+}

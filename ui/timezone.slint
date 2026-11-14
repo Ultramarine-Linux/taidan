@@ -1,0 +1,22 @@
+export struct TimeZone {
+    id: string,
+    city: string,
+    region: string,
+    offset: string,
+    x: float,
+    y: float,
+}
+
+export global Tz {
+    in property <[TimeZone]> zones;
+    in property <[TimeZone]> all-zones;
+    in property <[TimeZone]> results;
+    in property <TimeZone> current;
+    in property <string> current-time;
+
+    callback refresh();
+    callback search(query: string);
+    callback pick(id: string);
+    callback pick-at(x: float, y: float);
+    callback save();
+}

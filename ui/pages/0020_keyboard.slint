@@ -1,0 +1,260 @@
+import { TdnPage } from "../page.slint";
+import { Lang, Dir, Keymap } from "../lang.slint";
+import { ListView, ScrollView } from "std-widgets.slint";
+import { TdnSearchInput, TdnListRow, TdnText, TdnPara, TdnNote, TdnCurrentRow, TdnScroll, TdnPressable } from "../components.slint";
+import { Icon } from "../slintcn/components/icon.slint";
+import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
+import { Ims } from "../ims.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+import { Card } from "../slintcn/components/card.slint";
+import { Separator } from "../slintcn/components/separator.slint";
+
+component ImsRow inherits TdnPressable {
+    property <string> value: Ims.enabled == "" ? Lang.t("page-keyboard-ims-none", []) : Ims.enabled;
+
+    opens-dialog: true;
+    activated => { Ims.open = true; }
+    accessible-role: button;
+    accessible-label: Lang.t("page-keyboard-ims", []) + ", " + root.value;
+    ring-radius: Tokens.radius-lg + self.ring-offset;
+
+    vertical-stretch: 0;
+    height: 2.75rem;
+    border-radius: Tokens.radius-lg;
+    border-width: 1px;
+    border-color: Tokens.color-border-hairline-strong;
+    background: self.has-hover ? Tokens.color-accent : Tokens.color-card;
+    animate background { duration: Tokens.motion-fast; }
+
+    HorizontalLayout {
+        padding-left: 1rem;
+        padding-right: 0.75rem;
+        spacing: 0.5rem;
+
+        TdnText {
+            text: Lang.t("page-keyboard-ims", []);
+            horizontal-alignment: Dir.text-start;
+            horizontal-stretch: 0;
+            font-weight: Tokens.typography-weight-medium;
+            accessible-role: none;
+        }
+
+        TdnText {
+            layout-order: Dir.order(1);
+            text: root.value;
+            horizontal-alignment: Dir.text-end;
+            horizontal-stretch: 1;
+            overflow: elide;
+            color: Tokens.color-muted-foreground;
+            accessible-role: none;
+        }
+
+        VerticalLayout {
+            layout-order: Dir.order(2);
+            alignment: center;
+
+            Icon {
+                commands: Lang.rtl ? LucidePaths.chevron-left : LucidePaths.chevron-right;
+                size: 1.1rem;
+                tint: Tokens.color-muted-foreground;
+                stroke-width: 2px;
+            }
+        }
+    }
+}
+
+export component KeyboardPage inherits TdnPage {
+    pageid: "keyboard";
+    show-steps: false;
+    forward-focus: search-layout;
+
+    property <length> row-height: 2.25rem;
+    property <int> layout-cursor: -1;
+    property <int> variant-cursor: -1;
+    property <int> default-variant-row: 0;
+    property <int> current-layout-row: -1;
+    property <int> current-variant-row: -1;
+    property <bool> enter-picks-first-layout: search-layout.text != "" && layout-cursor < 0
+        && current-layout-row < 0 && Lang.keymaps.length > 0;
+    property <bool> enter-picks-first-variant: search-variant.text != "" && variant-cursor < 0
+        && current-variant-row < 0 && Lang.variants.length > 0;
+
+    pure function variant-row(index: int) -> int {
+        index + 1
+    }
+
+    function select-keymap(keymap: Keymap) {
+        if keymap.id != Lang.current_keymap.id {
+            search-variant.text = "";
+            variant-cursor = -1;
+            variants.content-y = 0;
+        }
+        Lang.select_keymap(keymap);
+    }
+
+    function select-variant(row: int) {
+        variant-cursor = row;
+        Lang.select_variant(row == default-variant-row ? { id: "", name: "" } : Lang.variants[row - 1]);
+    }
+
+    function start-layout-cursor-at-current-layout() {
+        if layout-cursor < 0 && current-layout-row >= 0 && current-layout-row < Lang.keymaps.length
+            && Lang.keymaps[current-layout-row].id == Lang.current_keymap.id {
+            layout-cursor = current-layout-row;
+        }
+    }
+
+    function move-layout-cursor(delta: int) {
+        if Lang.keymaps.length == 0 { return; }
+        start-layout-cursor-at-current-layout();
+        layout-cursor = max(0, min(Lang.keymaps.length - 1, layout-cursor + delta));
+        layouts.content-y = TdnScroll.content-y-showing(layout-cursor, row-height, layouts.content-y, layouts.visible-height);
+    }
+
+    function start-variant-cursor-at-current-variant() {
+        if variant-cursor >= 0 { return; }
+        if Lang.current_variant.id == "" {
+            variant-cursor = default-variant-row;
+        } else if current-variant-row >= 0 && current-variant-row < Lang.variants.length
+            && Lang.variants[current-variant-row].id == Lang.current_variant.id {
+            variant-cursor = variant-row(current-variant-row);
+        }
+    }
+
+    function move-variant-cursor(delta: int) {
+        start-variant-cursor-at-current-variant();
+        variant-cursor = max(0, min(Lang.variants.length, variant-cursor + delta));
+        variants.content-y = TdnScroll.content-y-showing(variant-cursor, row-height, variants.content-y, variants.visible-height);
+    }
+
+    Card {
+        vertical-stretch: 1;
+
+        for keymap[i] in Lang.keymaps: TdnCurrentRow {
+            model-row: i;
+            current: keymap.id == Lang.current_keymap.id;
+            current-row <=> root.current-layout-row;
+        }
+
+        for variant[i] in Lang.variants: TdnCurrentRow {
+            model-row: i;
+            current: variant.id == Lang.current_variant.id;
+            current-row <=> root.current-variant-row;
+        }
+
+        HorizontalLayout {
+            padding: 1rem;
+            spacing: 1rem;
+
+            VerticalLayout {
+                spacing: 0.75rem;
+                horizontal-stretch: 1;
+
+                search-layout := TdnSearchInput {
+                    placeholder: Lang.t("page-keyboard-search-layout", []);
+                    description: root.layout-cursor >= 0 && root.layout-cursor < Lang.keymaps.length
+                        ? Lang.keymaps[root.layout-cursor].name
+                        : root.enter-picks-first-layout ? Lang.keymaps[0].name : Lang.current_keymap.name;
+                    edited(text) => {
+                        layout-cursor = -1;
+                        // filtering drops rows without running their `changed current`
+                        root.current-layout-row = -1;
+                        layouts.content-y = 0;
+                        Lang.filter_keymaps(text);
+                    }
+                    accepted => {
+                        if root.layout-cursor >= 0 && root.layout-cursor < Lang.keymaps.length {
+                            select-keymap(Lang.keymaps[root.layout-cursor]);
+                        } else if root.enter-picks-first-layout {
+                            select-keymap(Lang.keymaps[0]);
+                        }
+                        search-variant.focus();
+                    }
+                    move(rows) => { move-layout-cursor(rows); }
+                }
+
+                layouts := ListView {
+                    for keymap[i] in Lang.keymaps: TdnListRow {
+                        height: row-height;
+                        text: keymap.name;
+                        secondary: keymap.id;
+                        selected: keymap.id == Lang.current_keymap.id;
+                        highlighted: i == root.layout-cursor || (i == 0 && root.enter-picks-first-layout);
+                        clicked => {
+                            layout-cursor = i;
+                            select-keymap(keymap);
+                        }
+                    }
+                }
+            }
+
+            Separator {
+                layout-order: Dir.order(1);
+                orientation: vertical;
+            }
+
+            VerticalLayout {
+                layout-order: Dir.order(2);
+                spacing: 0.75rem;
+                horizontal-stretch: 1;
+
+                search-variant := TdnSearchInput {
+                    placeholder: Lang.t("page-keyboard-search-variant", []);
+                    description: root.variant-cursor == root.default-variant-row ? Lang.t("default", [])
+                        : root.variant-cursor > 0 && root.variant-cursor <= Lang.variants.length
+                        ? Lang.variants[root.variant-cursor - 1].name
+                        : root.enter-picks-first-variant ? Lang.variants[0].name
+                        : Lang.current_variant.id == "" ? Lang.t("default", []) : Lang.current_variant.name;
+                    edited(text) => {
+                        variant-cursor = -1;
+                        root.current-variant-row = -1;
+                        variants.content-y = 0;
+                        Lang.filter_variants(text);
+                    }
+                    accepted => {
+                        if root.variant-cursor >= 0 && root.variant-cursor <= Lang.variants.length {
+                            select-variant(root.variant-cursor);
+                        } else if root.enter-picks-first-variant {
+                            select-variant(variant-row(0));
+                        }
+                        root.try-next();
+                    }
+                    move(rows) => { move-variant-cursor(rows); }
+                }
+
+                variants := ScrollView {
+                    VerticalLayout {
+                        alignment: start;
+
+                        TdnListRow {
+                            height: row-height;
+                            text: Lang.t("default", []);
+                            selected: Lang.current_variant.id == "";
+                            highlighted: root.variant-cursor == root.default-variant-row;
+                            clicked => { select-variant(root.default-variant-row); }
+                        }
+
+                        for variant[i] in Lang.variants: TdnListRow {
+                            height: row-height;
+                            text: variant.name;
+                            selected: variant.id == Lang.current_variant.id;
+                            highlighted: root.variant-cursor == variant-row(i) || (i == 0 && root.enter-picks-first-variant);
+                            clicked => { select-variant(variant-row(i)); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if Lang.latin-fallback: TdnNote {
+        text: Lang.t("page-keyboard-latin-fallback", []);
+    }
+
+    if Lang.keymap-not-saved: TdnPara {
+        text: Lang.t("page-keyboard-not-saved", []);
+        color: Tokens.color-destructive;
+    }
+
+    if Ims.items.length > 0: ImsRow { }
+}

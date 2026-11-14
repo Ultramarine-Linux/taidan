@@ -1,162 +1,113 @@
 use std::sync::LazyLock;
 
-use super::parseutil as pu;
 use futures::FutureExt;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 use crate::prelude::*;
 
 static PROGRESS_REGEX: LazyLock<regex::Regex> =
-    LazyLock::new(|| regex::Regex::new(r"^\[\s*(\d+)/(\d+)\]").unwrap());
+    LazyLock::new(|| regex::Regex::new(r"^\[\s*(\d+)/(\d+)]").unwrap());
 
-/// # Errors
-/// - if `dnf5` doesn't work correctly then maybe
-///
-/// # Panics
-/// No shut up clippy this function is mathematically impossible to panic
-#[allow(clippy::arithmetic_side_effects)]
-#[allow(clippy::indexing_slicing)]
-pub(super) async fn handle_dnf(
-    callback: &impl crate::Callback,
-    f: impl Fn(&mut tokio::process::Command) -> &mut tokio::process::Command + Send,
+const ERROR_TAIL_LINES: usize = 10;
+const DRAIN_LINE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+const DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+pub(crate) async fn run_logged(
+    name: &'static str,
+    verb: &crate::Verb,
+    mut on_line: impl FnMut(&str),
 ) -> Res<()> {
-    let mut cmd = tokio::process::Command::new("pkexec");
-    cmd.args(["--user", "root", "dnf5"]);
-    f(&mut cmd);
-    let (writer, reader) = tokio::net::unix::pipe::pipe().expect("cannot create pipe");
-    let writer = (writer.into_blocking_fd()).expect("cannot set blocking mode to pipe writer");
-    let mut output = cmd
-        .stdout(writer.try_clone().expect("cannot clone writer"))
-        .stderr(writer)
-        .spawn()
-        .map_err(|e| Err::FailToRunProgram("dnf5", e))?;
-    let log_path = &*crate::TEMP_DIR.join("dnf5.stdout.log");
-    let mut log = tokio::fs::File::create(log_path).await.expect("cannot create log file");
-    let mut stdout_lines = tokio::io::BufReader::new(reader).lines();
+    let (writer, reader) = tokio::net::unix::pipe::pipe().map_err(Err::_fail_to_run(name))?;
+    let writer = writer.into_blocking_fd().map_err(Err::_fail_to_run(name))?;
+    let stdout = writer.try_clone().map_err(Err::_fail_to_run(name))?;
+    let mut child = crate::spawn_helper(verb, &[], stdout, writer).await?;
+
+    let log_path = crate::TEMP_DIR.join(format!("{name}.stdout.log"));
+    let mut log =
+        match tokio::fs::OpenOptions::new().create(true).append(true).open(&log_path).await {
+            Ok(log) => Some(log),
+            Err(e) => {
+                tracing::warn!(?e, ?log_path, "cannot open log file");
+                None
+            }
+        };
+    let mut lines = tokio::io::BufReader::new(reader).split(b'\n');
+    let mut tail = std::collections::VecDeque::with_capacity(ERROR_TAIL_LINES);
+    let mut status = None;
+    let mut drain_deadline: Option<tokio::time::Instant> = None;
     loop {
-        let line = futures::select! {
-            line = async { stdout_lines.next_line().await }.fuse() => match line {
+        let line = if let Some(end) = drain_deadline {
+            let deadline = end.min(tokio::time::Instant::now() + DRAIN_LINE_TIMEOUT);
+            match tokio::time::timeout_at(deadline, lines.next_segment()).await {
                 Ok(line) => line,
-                Err(e) => {
-                    tracing::warn!(?e, "cannot read stdout");
+                Err(_) => break,
+            }
+        } else {
+            futures::select! {
+                line = lines.next_segment().fuse() => line,
+                s = child.wait().fuse() => {
+                    status = Some(s.map_err(Err::_fail_to_run(name))?);
+                    drain_deadline = Some(tokio::time::Instant::now() + DRAIN_TIMEOUT);
                     continue;
                 }
-            },
-            res = pu::wait_for("dnf5", &mut output).fuse() => break res,
-        };
-
-        let Some(line) = line else {
-            tracing::debug!("stdout EOF, waiting for dnf5 complete");
-            break pu::wait_for("dnf5", &mut output).await;
-        };
-
-        log.write_all(line.as_bytes()).await.expect("cannot write to log");
-        println!("dnf5: {line}");
-        let Some(matches) = PROGRESS_REGEX.captures(&line) else {
-            continue;
-        };
-        let Ok(numerator) = matches[1].parse() else {
-            continue;
-        };
-        let Ok(denominator) = matches[2].parse() else {
-            continue;
-        };
-        pu::send_frac(callback, numerator, denominator);
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct EnableRepo {
-    /// denotes the path to the file, the toml object and whether it is modified.
-    files: std::collections::HashMap<std::path::PathBuf, (Vec<u8>, bool)>,
-}
-
-impl EnableRepo {
-    /// Enable a dnf/yum repository.
-    ///
-    /// `repo` can be a url or a repo that has not been enabled but already defined in `/etc/yum.repos.d/`.
-    ///
-    /// You must run [`EnableRepo::save()`] after calling this function, since the toml editing
-    /// is only done in memory.
-    #[tracing::instrument]
-    pub(super) async fn enable_repo(&mut self, repo: &str) -> Res<()> {
-        tracing::debug!("Enabling repo");
-        if let Some((doc, b)) = self.files.iter_mut().find_map(|(_, (doc, b))| {
-            doc.starts_with(format!("[{repo}]\n").as_bytes()).then_some((doc, b))
-        }) {
-            const TARGET: &[u8] = b"\nenabled=";
-            if memchr::memmem::find(doc, b"\nenabled=1").is_some() {
-                return Ok(());
             }
-            if let Some(i) = memchr::memmem::find(doc, TARGET) {
-                doc[i + TARGET.len()] = b'1';
-                let mut j = 1;
-                while doc[i + TARGET.len() + j] != b'\n' {
-                    doc[i + TARGET.len() + j] = b' ';
-                    j += 1;
-                }
-            } else {
-                let mut newdoc = doc[..repo.len() + 3].to_vec();
-                newdoc.extend(b"enabled=1\n");
-                newdoc.extend(&doc[repo.len() + 3..]);
-                std::mem::swap(&mut newdoc, doc);
+        };
+        let line = match line {
+            Ok(Some(line)) => line,
+            Ok(None) => break,
+            Err(e) => {
+                tracing::warn!(?e, name, "cannot read output");
+                break;
             }
-            *b = true;
-            return Ok(());
-        }
-        if repo.starts_with("https://") || repo.starts_with("http://") {
-            let content = Self::get_repo_from_url(repo)
-                .await
-                .wrap_message(|_| format!("cannot get repo from url `{repo}`"))?;
-            let path = std::path::Path::new("/etc/yum.repos.d/")
-                .join(repo.rsplit_once('/').expect("cannot split url with `/`").1);
-            tokio::fs::write(&path, content)
-                .await
-                .map_err(Err::_read_file(std::borrow::Cow::Owned(path)))?;
-            return Ok(());
-        }
-        Err(Err::UnknownRepo(repo.to_owned()))
-    }
-    #[tracing::instrument]
-    async fn get_repo_from_url(url: &str) -> Res<String> {
-        tracing::debug!("Downloading repo file");
-        let r = super::REQWEST_CLIENT.get(url).send().await?.error_for_status()?;
-        Ok(r.text().await?)
-    }
-    #[tracing::instrument]
-    pub(super) async fn new() -> Res<Self> {
-        let mut readdir = tokio::fs::read_dir("/etc/yum.repos.d/")
-            .await
-            .map_err(Err::_read_dir("/etc/yum.repos.d/"))?;
-        let mut files = std::collections::HashMap::new();
-        while let Some(f) =
-            readdir.next_entry().await.map_err(Err::_read_dir("/etc/yum.repos.d/"))?
+        };
+        let line = String::from_utf8_lossy(&line);
+        let line = line.trim_end_matches('\r');
+
+        if let Some(f) = &mut log
+            && let Err(e) = f.write_all(format!("{line}\n").as_bytes()).await
         {
-            files.insert(
-                f.path(),
-                (
-                    std::fs::read(f.path()).map_err(Err::_read_file(std::borrow::Cow::Owned(
-                        f.path().as_path().to_owned(),
-                    )))?,
-                    false,
-                ),
-            );
+            tracing::warn!(?e, ?log_path, "cannot write to log file");
+            log = None;
         }
-        Ok(Self { files })
+        println!("{name}: {line}");
+        if !line.trim().is_empty() {
+            if tail.len() == ERROR_TAIL_LINES {
+                tail.pop_front();
+            }
+            tail.push_back(line.to_owned());
+        }
+        on_line(line);
     }
-    #[tracing::instrument]
-    pub(super) async fn save(&self) -> Res<()> {
-        tracing::debug!("Saving repos");
-        futures::future::try_join_all(self.files.iter().filter(|(_, (_, b))| *b).map(
-            |(p, (doc, _))| async move {
-                tokio::fs::write(p, doc)
-                    .await
-                    .map_err(Err::_read_file(std::borrow::Cow::Owned(p.to_owned())))
-            },
-        ))
-        .await?;
-        Ok(())
+    let status = match status {
+        Some(status) => status,
+        None => child.wait().await.map_err(Err::_fail_to_run(name))?,
+    };
+    if status.success() {
+        return Ok(());
     }
+    let e = Err::ProgramFail { name, output: Vec::from(tail).join("\n"), rc: status.code() };
+    tracing::error!(%e, "command failed");
+    Err(e)
+}
+
+pub(crate) async fn handle_dnf(callback: &impl crate::Callback, verb: crate::Verb) -> Res<()> {
+    run_logged("dnf5", &verb, |line| {
+        if let Some(m) = PROGRESS_REGEX.captures(line)
+            && let (Ok(num), Ok(den)) = (m[1].parse::<u32>(), m[2].parse::<u32>())
+            && den != 0
+        {
+            callback.send(crate::InstallMsg::StageProgress(f64::from(num) / f64::from(den)));
+        }
+    })
+    .await
+}
+
+#[tracing::instrument]
+pub(super) async fn enable_repo(repo: &str) -> Res<()> {
+    tracing::debug!("Enabling repo");
+    crate::root(crate::Verb::EnableRepo { repo: repo.to_owned() })
+        .await
+        .wrap_message(|_| format!("cannot enable repo `{repo}`"))
 }
 
 #[cfg(test)]

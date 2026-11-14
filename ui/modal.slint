@@ -1,0 +1,39 @@
+import { Camera } from "camera.slint";
+import { Network } from "network.slint";
+import { Tweaks } from "tweaks.slint";
+import { A11y } from "a11y.slint";
+import { Errors } from "errors.slint";
+import { Ims } from "ims.slint";
+
+export global Modal {
+    out property <bool> open: Camera.open || Network.password-ssid != "" || Network.hidden-open || Network.enterprise-open || Network.offline-prompt || Network.proxy-open || Network.ip-open || Tweaks.open || Ims.open || A11y.open || A11y.more-open || Errors.open;
+    // the page being shown, kept in sync by `AppWindow`, so an opener only takes the focus back
+    // on the page it opened the dialog from
+    in-out property <int> page;
+    in-out property <bool> focus-restored;
+}
+
+// Slint drops the focus along with a closed dialog
+export component DialogOpener {
+    callback restore();
+
+    property <int> opened-on-page: -1;
+    property <bool> modal-open: Modal.open;
+
+    public function opened() {
+        if Modal.open { root.opened-on-page = Modal.page; }
+    }
+
+    changed modal-open => {
+        if !root.modal-open && root.opened-on-page >= 0 {
+            if root.opened-on-page == Modal.page {
+                root.restore();
+                Modal.focus-restored = true;
+            }
+            root.opened-on-page = -1;
+        }
+    }
+
+    width: 0;
+    height: 0;
+}

@@ -1,29 +1,46 @@
 [workspace]
-members = ["taidan_proc_macros", "libtaidan", "tdnx"]
+members = ["taidan_proc_macros", "taidan_ui", "libtaidan", "tdnx"]
+
+[workspace.package]
+version = "1.0.0"
 
 [workspace.dependencies]
-futures = "0.3.32"
+futures = "0.3.34"
 itertools = "0.15.0"
 libtaidan = { path = "./libtaidan" }
 regex = "1.13.1"
 secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.140"
-tempfile = { version = "3.20.0", default-features = false }
+serde_json = "1.0.154"
+tempfile = { version = "3.27.0", default-features = false }
 tracing = "0.1.44"
+
+# `unstable-winit-030` is for the monitor size, and it also pulls winit's X11 support back in
+[workspace.dependencies.slint]
+version = "1.18.1"
+default-features = false
+features = [
+    "std",
+    "backend-winit-wayland",
+    "renderer-femtovg",
+    "renderer-software",
+    "accessibility",
+    "compat-1-2",
+    "unstable-winit-030",
+]
 
 [workspace.dependencies.tracing-subscriber]
 version = "0.3.23"
 features = ["env-filter", "tracing-log"]
 
 [workspace.dependencies.tokio]
-version = "1.46.1"
+version = "1.54.1"
 features = ["fs", "io-util", "macros", "process"]
 
 
 [package]
 name = "taidan"
-version = "0.2.7"
+version.workspace = true
 edition = "2024"
 description = "Out-Of-Box-Experience (OOBE) and Welcome App"
 license = "GPL-3.0-or-later"
@@ -32,56 +49,40 @@ readme = "README.md"
 keywords = ["oobe", "ultramarine", "linux"]
 
 [dependencies]
-basic-toml = "0.1.10"
 color-eyre = "0.6.5"
-const_format = "0.2.34"
-enum_dispatch = "0.3.13"
+deunicode = "1.6.2"
+fluent = "0.17.0"
 futures = { workspace = true }
-gvdb = "0.9.0"
 i18n-embed = { version = "0.16.0", features = [
-    "desktop-requester",
     "filesystem-assets",
     "fluent-system",
 ] }
-i18n-embed-fl = "0.10.0"
-iso3166 = "1.2.1"
-isolang = { version = "2.4.0", features = ["local_names"] }
+icu = { version = "2.4.0", features = ["unstable", "logging"] }
+jiff = { version = "0.2.38", features = ["tzdb-zoneinfo"] }
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 itertools = { workspace = true }
-kurage = { version = "0.1.4" }
-libc = "0.2.174"
-# libappstream = "0.3.0"
-libhelium = "0.12.0"
-memchr = "2.7.5"
-parking_lot = "0.12.4"
-paste = "1.0.15"
-phf = { version = "0.14.0", features = ["macros"] }
+libc = "0.2.191"
+libtaidan = { workspace = true }
+parking_lot = "0.13.0"
 poly_l10n = "0.0.7"
 regex = { workspace = true }
-relm4 = { version = "0.9.1", default-features = false, features = ["macros"] }
-reqwest = { version = "0.13.4", features = [
-    "http2",
-    "default-tls",
-], default-features = false }
-rust-embed = { version = "8.7.2", features = ["include-exclude"] }
-secrecy = { workspace = true }
-sentry = { version = "0.49.1", features = ["logs", "tracing"] }
-sentry-eyre = "0.3.0"
-serde = "1.0.219"
-serde_json = "1.0.140"
+rust-embed = { version = "8.13.0", features = ["include-exclude"] }
+sentry = { version = "0.49.5", features = ["logs", "tracing"] }
+serde_json = { workspace = true }
+slint = { workspace = true }
 strip-ansi-escapes = "0.2.1"
 taidan_proc_macros = { path = "taidan_proc_macros" }
+taidan_ui = { path = "taidan_ui" }
 tempfile = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
 tracing = { workspace = true }
-tracing-appender = "0.2.3"
-tracing-error = "0.2.1"
-tracing-journald = "0.3.1"
+tracing-appender = "0.2.5"
+tracing-journald = "0.3.2"
 tracing-subscriber = { workspace = true }
-uzers = "0.12.1"
-xcrypt = "0.3.1"
-
-[build-dependencies]
-glib-build-tools = "0.22.8"
+uzers = "0.12.2"
+v4l = "0.14.0"
+zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking-api"] }
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 
 [lints.clippy]
 # cargo = { level = "warn", priority = -1 }
@@ -90,8 +91,8 @@ nursery = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 suspicious = { level = "warn", priority = -1 }
 
-disallowed-macros = "deny"
-excessive-nesting = "warn"
+disallowed_macros = "deny"
+excessive_nesting = "warn"
 
 # arithmetic_side_effects = "warn"
 assertions_on_result_states = "warn"
@@ -126,3 +127,72 @@ unimplemented = "warn"
 unneeded_field_pattern = "warn"
 unwrap_in_result = "warn"
 needless_for_each = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "debuginfo"
+
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.dev.package."i-slint-core"]
+opt-level = 3
+[profile.dev.package."i-slint-backend-winit"]
+opt-level = 3
+[profile.dev.package."i-slint-renderer-femtovg"]
+opt-level = 3
+[profile.dev.package."i-slint-renderer-software"]
+opt-level = 3
+[profile.dev.package.femtovg]
+opt-level = 3
+[profile.dev.package.lyon_geom]
+opt-level = 3
+[profile.dev.package.lyon_path]
+opt-level = 3
+[profile.dev.package.lyon_algorithms]
+opt-level = 3
+[profile.dev.package.kurbo]
+opt-level = 3
+[profile.dev.package.parley]
+opt-level = 3
+[profile.dev.package.fontique]
+opt-level = 3
+[profile.dev.package.harfrust]
+opt-level = 3
+[profile.dev.package.skrifa]
+opt-level = 3
+[profile.dev.package."read-fonts"]
+opt-level = 3
+[profile.dev.package.swash]
+opt-level = 3
+[profile.dev.package.zeno]
+opt-level = 3
+[profile.dev.package."ttf-parser"]
+opt-level = 3
+[profile.dev.package.icu_segmenter]
+opt-level = 3
+[profile.dev.package.resvg]
+opt-level = 3
+[profile.dev.package.usvg]
+opt-level = 3
+[profile.dev.package."tiny-skia"]
+opt-level = 3
+[profile.dev.package."tiny-skia-path"]
+opt-level = 3
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package."zune-jpeg"]
+opt-level = 3

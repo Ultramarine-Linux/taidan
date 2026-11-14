@@ -1,0 +1,69 @@
+export struct FluentArg {
+    key: string,
+    value: string,
+}
+
+export struct Language {
+    locale: string,
+    native_name: string,
+}
+
+export struct KeymapVariant { id: string, name: string }
+
+export struct Keymap {
+    id: string,
+    name: string,
+    variants: [KeymapVariant],
+}
+
+export global Lang {
+    in-out property <Language> current_language;
+    in-out property <bool> rtl;
+    in property <[Language]> languages;
+    callback filter_languages(query: string);
+    public function select(lang: Language) {
+        set_lang(lang);
+        current_language = lang;
+    }
+    public pure function t(id: string, args: [FluentArg]) -> string {
+        _t(id, args, current_language);
+    }
+    pure callback _t(id: string, args: [FluentArg], current_language: Language) -> string;
+    _t(id, args, current_language) => "t(" + id + ")";
+    public pure function place(city: string, region: string) -> string {
+        region == "" ? city : t("page-timezone-place", [{ key: "city", value: city }, { key: "region", value: region }])
+    }
+    callback set_lang(lang: Language);
+    public pure function name(lang: Language) -> string {
+        _name(lang, current_language);
+    }
+    pure callback _name(lang: Language, current_language: Language) -> string;
+    _name(lang, current_language) => "Lang.name(" + lang.locale + ")";
+
+    in property <[Keymap]> keymaps;
+    callback filter_keymaps(query: string);
+    in property <[KeymapVariant]> variants;
+    callback filter_variants(query: string);
+    in property <Keymap> current_keymap;
+    in property <KeymapVariant> current_variant;
+    in property <bool> latin-fallback;
+    in property <bool> keymap-not-saved;
+    callback select_keymap(keymap: Keymap);
+    callback select_variant(variant: KeymapVariant);
+}
+
+// Slint 1.18 has no layout direction, and `horizontal-alignment: start` is always left
+export global Dir {
+    out property <TextHorizontalAlignment> text-start: Lang.rtl ? TextHorizontalAlignment.right : TextHorizontalAlignment.left;
+    out property <TextHorizontalAlignment> text-end: Lang.rtl ? TextHorizontalAlignment.left : TextHorizontalAlignment.right;
+    out property <LayoutAlignment> start: Lang.rtl ? LayoutAlignment.end : LayoutAlignment.start;
+    out property <LayoutAlignment> end: Lang.rtl ? LayoutAlignment.start : LayoutAlignment.end;
+
+    public pure function order(i: int) -> int {
+        Lang.rtl ? -i : i
+    }
+
+    public pure function x(offset: length, width: length, parent-width: length) -> length {
+        Lang.rtl ? parent-width - offset - width : offset
+    }
+}

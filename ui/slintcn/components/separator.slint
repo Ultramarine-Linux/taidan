@@ -1,0 +1,13 @@
+import { Tokens } from "../theme/tokens.slint";
+
+export enum SeparatorOrientation { horizontal, vertical }
+
+export component Separator inherits Rectangle {
+    in property <SeparatorOrientation> orientation: SeparatorOrientation.horizontal;
+    background: Tokens.color-border-hairline;
+
+    min-height: orientation == SeparatorOrientation.horizontal ? 1px : 0px;
+    max-height: orientation == SeparatorOrientation.horizontal ? 1px : 1000000px;
+    min-width:  orientation == SeparatorOrientation.vertical   ? 1px : 0px;
+    max-width:  orientation == SeparatorOrientation.vertical   ? 1px : 1000000px;
+}

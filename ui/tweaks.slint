@@ -1,0 +1,19 @@
+import { Network } from "network.slint";
+
+export struct TweakItem {
+    id: string,
+    name: string,
+    desc: string,
+    on: bool,
+    needs-internet: bool,
+}
+
+export global Tweaks {
+    in property <[TweakItem]> items;
+    in property <[string]> enabled-names-online;
+    in property <[string]> enabled-names-offline;
+    out property <[string]> enabled-names: Network.install-online ? enabled-names-online : enabled-names-offline;
+    in-out property <bool> open;
+
+    callback set(index: int, on: bool);
+}

@@ -1,0 +1,80 @@
+import { TdnPage } from "../page.slint";
+import { Lang } from "../lang.slint";
+import { ListView } from "std-widgets.slint";
+import { TdnSearchInput, TdnListRow, TdnCurrentRow, TdnScroll } from "../components.slint";
+import { Card } from "../slintcn/components/card.slint";
+
+export component LanguagePage inherits TdnPage {
+    pageid: "language";
+    show-steps: false;
+    can-prev: false;
+    forward-focus: search;
+
+    property <length> row-height: 2.25rem;
+    property <int> arrow-key-row: -1;
+    property <int> current-language-row: -1;
+    property <bool> enter-picks-first-match: search.text != "" && arrow-key-row < 0
+        && current-language-row < 0 && Lang.languages.length > 0;
+
+    function start-arrow-keys-at-current-language() {
+        if arrow-key-row < 0 && current-language-row >= 0
+            && current-language-row < Lang.languages.length
+            && Lang.languages[current-language-row].locale == Lang.current_language.locale {
+            arrow-key-row = current-language-row;
+        }
+    }
+
+    function move-arrow-key-row(delta: int) {
+        if Lang.languages.length == 0 { return; }
+        start-arrow-keys-at-current-language();
+        arrow-key-row = max(0, min(Lang.languages.length - 1, arrow-key-row + delta));
+        Lang.select(Lang.languages[arrow-key-row]);
+        list.content-y = TdnScroll.content-y-showing(arrow-key-row, row-height, list.content-y, list.visible-height);
+    }
+
+    Card {
+        vertical-stretch: 1;
+
+        for lang[i] in Lang.languages: TdnCurrentRow {
+            model-row: i;
+            current: lang.locale == Lang.current_language.locale;
+            current-row <=> root.current-language-row;
+        }
+
+        VerticalLayout {
+            padding: 1rem;
+            spacing: 0.75rem;
+
+            search := TdnSearchInput {
+                placeholder: Lang.t("page-language-search-lang", []);
+                description: root.enter-picks-first-match ? Lang.name(Lang.languages[0]) : Lang.name(Lang.current_language);
+                edited(text) => {
+                    arrow-key-row = -1;
+                    // filtering drops rows without running their `changed current`
+                    root.current-language-row = -1;
+                    list.content-y = 0;
+                    Lang.filter_languages(text);
+                }
+                accepted => {
+                    if root.enter-picks-first-match { Lang.select(Lang.languages[0]); }
+                    root.try-next();
+                }
+                move(rows) => { move-arrow-key-row(rows); }
+            }
+
+            list := ListView {
+                for lang[i] in Lang.languages: TdnListRow {
+                    height: row-height;
+                    text: Lang.name(lang);
+                    secondary: lang.native-name;
+                    selected: lang.locale == Lang.current_language.locale;
+                    highlighted: i == 0 && root.enter-picks-first-match;
+                    clicked => {
+                        arrow-key-row = i;
+                        Lang.select(lang);
+                    }
+                }
+            }
+        }
+    }
+}

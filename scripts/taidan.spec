@@ -1,37 +1,75 @@
 Name:           taidan
 Version:        git~%{sub %gitcommit 1 7}
-Release:        1%?dist
+Release:        1%{?dist}
 Summary:        Out-Of-Box-Experience (OOBE) and Welcome App
 SourceLicense:  GPL-3.0-or-later
-License:        (0BSD OR MIT OR Apache-2.0) AND Apache-2.0 AND (Apache-2.0 OR BSL-1.0) AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR MIT) AND (Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT) AND MIT AND (MIT OR Apache-2.0) AND (MIT OR Zlib OR Apache-2.0) AND Unicode-3.0 AND (Unlicense OR MIT) AND Zlib AND GPL-3.0-or-later
+License:        %{sourcelicense} AND (BSD-3-Clause OR MIT OR Apache-2.0) AND Apache-2.0 AND MIT AND (MIT OR Apache-2.0 OR Zlib) AND (0BSD OR MIT OR Apache-2.0) AND BSD-2-Clause AND Zlib AND MIT AND (Apache-2.0 OR GPL-2.0-only) AND ((MIT OR Apache-2.0) AND Unicode-3.0) AND (Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT) AND GPL-3.0-or-later AND Apache-2.0 AND Unicode-3.0 AND (BSD-2-Clause OR Apache-2.0 OR MIT) AND (CC0-1.0 OR Apache-2.0) AND (BSD-3-Clause OR Apache-2.0) AND BSL-1.0 AND ISC AND (GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0) AND BSD-3-Clause AND (MIT OR Apache-2.0 OR LGPL-2.1-or-later) AND (Unlicense OR MIT)
 URL:            https://github.com/Ultramarine-Linux/taidan
 %dnl Source0:        %{url}/archive/%{gitcommit}.tar.gz
+Packager:       Terra Packaging Team <terra@fyralabs.com>
+Requires:       %{name}-configs
+Suggests:       %{name}-default-configs
+# Fedora has no separate kwin-wayland package anymore
+Requires:       kwin
+Requires:       dbus-daemon
+Requires:       swaybg
+# the first polkit to read /run/polkit-1/rules.d
+Requires:       polkit >= 126
 Requires:       (glib2 or (/usr/bin/plasma-apply-colorscheme and kf6-kconfig))
 Requires:       shadow-utils
+Requires:       glibc-common
+Requires:       util-linux
+Requires:       systemd
 Requires:       systemd-udev
+Requires:       kbd
 Requires:       bash
-Requires:       (dnf5 and dnf5-command(copr))
+Requires:       (dnf5 and dnf5-command(copr) and dnf5-command(config-manager))
 Requires:       flatpak
-Requires:       libwebp
-Requires:       webp-pixbuf-loader
-Requires:       xhost
-Requires:       kwin
-Requires:       swaybg
-Requires:       nmgui network-manager-applet
-Requires:       capnet-assist
 # required for running homectl
-Requires:       script
-BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl
-BuildRequires:  pkgconfig(libhelium-1)
+Recommends:     systemd-homed
+Requires:       pciutils
+Requires:       mokutil
+Requires:       dbus-tools
+Requires:       NetworkManager
+Requires:       cog
+Requires:       acl
+Requires:       tzdata
+Recommends:     chrony
+Recommends:     grubby
+Recommends:     xdg-terminal-exec
+Requires:       vercel-geist-fonts
+Requires:       atkinson-hyperlegible-next-fonts
+Requires:       atkinson-hyperlegible-mono-fonts
+Requires:       orca
+Requires:       /usr/bin/kwriteconfig6
+# dlopen()ed by Slint, so not automatic dependencies
+Requires:       libxkbcommon
+Requires:       libwayland-client
+Requires:       libwayland-cursor
+Requires:       libwayland-egl
+Requires:       libglvnd-egl
+BuildRequires:  anda-srpm-macros mold cargo rust-packaging perl systemd-rpm-macros
 BuildRequires:  pkgconfig(openssl)
+BuildRequires:  pkgconfig(fontconfig)
+BuildRequires:  pkgconfig(libxcrypt)
+# read by taidan_proc_macros at build time
+BuildRequires:  glibc-all-langpacks
+BuildRequires:  xkeyboard-config
 BuildRequires:  clang-libs
 BuildRequires:  clang-devel
-BuildRequires:  pkgconfig(libacl)
-BuildRequires:  pkgconfig(libattr)
 
 %description
 Taidan is a GUI Out-Of-Box-Experience (OOBE) and Welcome App for Ultramarine
-Linux, written in Rust and the Helium toolkit.
+Linux, written in Rust and the Slint toolkit.
+
+%package default-configs
+Summary:        Default configurations for Taidan
+Provides:       %{name}-configs
+Requires:       umcli
+BuildArch:      noarch
+
+%description default-configs
+This package contains the default configuration files for Taidan.
 
 %prep
 %dnl %autosetup -n taidan-%gitcommit
@@ -40,24 +78,47 @@ Linux, written in Rust and the Helium toolkit.
 
 %build
 %{cargo_license_online} > LICENSE.dependencies
+%cargo_license_summary_online
+# %%cargo_install skips libtaidan's binaries, and the licenses above already cover the helper
+%{__cargo} build %{__cargo_common_opts} --profile rpm -p libtaidan --bin taidan-helper
 
 %install
 %cargo_install
+install -Dpm755 target/rpm/taidan-helper %{buildroot}%{_libexecdir}/taidan-helper
 DESTDIR=%buildroot ./scripts/install.sh
+install -d %buildroot%{_sharedstatedir}/taidan
+
+%post
+%systemd_post taidan-initial-setup.service taidan-initial-setup-reconfiguration.service
+
+%preun
+%systemd_preun taidan-initial-setup.service taidan-initial-setup-reconfiguration.service
+
+%postun
+%systemd_postun taidan-initial-setup.service taidan-initial-setup-reconfiguration.service
 
 %files
 %doc README.md
 %license LICENSE.md LICENSE.dependencies
-%_bindir/taidan
-%_libexecdir/start-taidan
-%attr(755, root, root) %_sysconfdir/com.fyralabs.Taidan/detect-internet
-%_datadir/polkit-1/rules.d/100-taidan.rules
-%_datadir/taidan
-%_presetdir/95-taidan.preset
-%_sysconfdir/com.fyralabs.Taidan/
-%_sysconfdir/pam.d/taidan
-%_sysusersdir/taidan.conf
-%_unitdir/taidan-initial-setup.service
-%_unitdir/taidan-initial-setup-reconfiguration.service
-%dir %_prefix/lib/taidan/
-%_prefix/lib/taidan/labwc/*
+%{_bindir}/taidan
+%{_libexecdir}/start-taidan
+%{_libexecdir}/taidan-helper
+%{_datadir}/taidan/polkit/
+%{_presetdir}/95-taidan.preset
+%config(noreplace) %{_sysconfdir}/pam.d/taidan
+%{_sysusersdir}/taidan.conf
+%{_unitdir}/taidan-initial-setup.service
+%{_unitdir}/taidan-initial-setup-reconfiguration.service
+%dir %{_prefix}/lib/taidan/
+%dir %{_sharedstatedir}/taidan/
+%dir %{_datadir}/taidan/
+%{_datadir}/taidan/avatars/
+%{_datadir}/taidan/po/
+%{_datadir}/taidan/session-config/
+
+%files default-configs
+%dir %{_datadir}/taidan/
+%{_datadir}/taidan/tweaks/
+
+%changelog
+%autochangelog

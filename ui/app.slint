@@ -1,0 +1,269 @@
+import { AccessibilityPage, AccessibilityDialog, A11yMoreDialog } from "pages/0005_accessibility.slint";
+import { A11y } from "a11y.slint";
+import { WelcomePage } from "pages/0030_welcome.slint";
+import { ThemePage } from "pages/0035_theme.slint";
+import { Lang } from "lang.slint";
+import { Cfg } from "cfg.slint";
+import { Account } from "account.slint";
+import { Pages, Nav } from "page.slint";
+import { LanguagePage } from "pages/0010_language.slint";
+import { Theme, ThemeMode, Tokens } from "slintcn/theme/tokens.slint";
+import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
+import { Camera } from "camera.slint";
+import { KeyboardPage } from "pages/0020_keyboard.slint";
+import { PasswordPage } from "pages/0050_password.slint";
+import { NetworkPage, PasswordDialog, EnterpriseDialog, HiddenDialog, OfflineDialog, ProxyDialog, IpDialog } from "pages/0060_network.slint";
+import { Network } from "network.slint";
+import { TimezonePage } from "pages/0055_timezone.slint";
+import { Tz } from "timezone.slint";
+import { LocationPage } from "pages/0070_location.slint";
+import { DriversPage } from "pages/0100_drivers.slint";
+import { TweaksDialog } from "pages/0110_tweaks.slint";
+import { Tweaks } from "tweaks.slint";
+import { SummaryPage } from "pages/0120_summary.slint";
+import { InstallingPage } from "pages/0130_installing.slint";
+import { DonePage } from "pages/0140_done.slint";
+import { ErrorPage } from "pages/0150_error.slint";
+import { Install, InstallState, Drivers, Location } from "install.slint";
+import { TdnText, TdnBtn, TdnErrorDialog, Modal } from "components.slint";
+import { Actions } from "actions.slint";
+import { Appearance } from "appearance.slint";
+import { Errors } from "errors.slint";
+import { ImsDialog } from "pages/0025_ims.slint";
+import { Ims } from "ims.slint";
+export { Lang, Cfg, Account, Pages, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y, Appearance, Ims, Errors }
+
+export component AppWindow inherits Window {
+    in-out property <int> pagenum <=> Nav.page;
+    title: Lang.t("window-title", [{ key: "distro", value: Cfg.distro }]);
+    in property <bool> framed: false;
+    no-frame: !self.framed;
+    in property <bool> rounded: false;
+    icon: Cfg.distro_icon();
+    background: self.rounded ? transparent : Tokens.color-background;
+    default-font-family: A11y.legible-font ? "Atkinson Hyperlegible Next" : Cfg.get_string("font", "Geist");
+    preferred-width: 600 * Tokens.unit + 2 * self.shadow-margin;
+    preferred-height: 500 * Tokens.unit + 2 * self.shadow-margin;
+    out property <length> shadow-margin: self.rounded ? 32px : 0;
+    // `Tokens` can't be exported since Slint can't export its easing properties
+    in-out property <float> ui-scale <=> Tokens.scale;
+    min-width: self.preferred-width;
+    max-width: self.preferred-width;
+    min-height: self.preferred-height;
+    max-height: self.preferred-height;
+    default-font-size: 14 * Tokens.unit;
+
+    function focus-page() {
+        if Modal.open { return; }
+        if pagenum == Pages.accessibility { accessibility.focus(); }
+        else if pagenum == Pages.language { language.focus(); }
+        else if pagenum == Pages.keyboard { keyboard.focus(); }
+        else if pagenum == Pages.welcome { welcome.focus(); }
+        else if pagenum == Pages.theme { theme.focus-picked(); }
+        else if pagenum == Pages.whoareyou { whoareyou.focus(); }
+        else if pagenum == Pages.password { password.focus(); }
+        else if pagenum == Pages.timezone { timezone.focus(); }
+        else if pagenum == Pages.network { network.focus(); }
+        else if pagenum == Pages.location { location.focus(); }
+        else if pagenum == Pages.drivers { drivers.focus(); }
+        else if pagenum == Pages.summary { summary.focus(); }
+        else if pagenum == Pages.installing { installing.focus(); }
+        else if pagenum == Pages.done { done.focus(); }
+        else if pagenum == Pages.error { error.focus(); }
+    }
+    changed pagenum => {
+        Modal.page = pagenum;
+        Network.page-changed(pagenum == Pages.network);
+        focus-page();
+        if pagenum == Pages.timezone { Tz.refresh(); }
+        if pagenum == Pages.summary && Tz.current.id == "" { Tz.refresh(); }
+        if pagenum == Pages.network { Network.refresh(); }
+    }
+    init => {
+        Modal.page = pagenum;
+        focus-page();
+    }
+
+    property <bool> larger-text: A11y.larger-text;
+    changed larger-text => { Tokens.text-scale = larger-text ? 1.0 : 0.875; }
+    property <bool> reduce-motion: A11y.reduce-motion;
+    changed reduce-motion => { Tokens.reduce-motion = reduce-motion; }
+
+    out property <bool> dark-mode: Theme.mode == ThemeMode.dark;
+    callback dark-mode-changed(bool);
+    changed dark-mode => { root.dark-mode-changed(self.dark-mode); }
+
+    property <bool> dialog-open: Modal.open;
+    changed dialog-open => {
+        if dialog-open {
+            Modal.focus-restored = false;
+        } else {
+            deferred-refocus.running = true;
+        }
+    }
+    deferred-refocus := Timer {
+        interval: 0ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            if !Modal.focus-restored { focus-page(); }
+            Modal.focus-restored = false;
+        }
+    }
+
+    MenuBar {
+        visible: false;
+        Menu {
+            MenuItem {
+                title: Lang.t("menu-open-terminal", []);
+                activated => { Actions.open-terminal(); }
+                shortcut: @keys(Alt + Shift + T);
+            }
+            // Plasma's screen reader shortcut
+            MenuItem {
+                title: Lang.t("menu-toggle-screen-reader", []);
+                activated => {
+                    A11y.screen-reader = !A11y.screen-reader;
+                    A11y.changed();
+                }
+                shortcut: @keys(Meta + Alt + S);
+            }
+        }
+    }
+
+    if root.rounded: Rectangle {
+        x: root.shadow-margin;
+        y: root.shadow-margin;
+        width: root.width - 2 * root.shadow-margin;
+        height: root.height - 2 * root.shadow-margin;
+        border-radius: Tokens.radius-xl;
+        background: Tokens.color-background;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 6px;
+        drop-shadow-color: #0000004d;
+    }
+
+    Rectangle {
+        x: root.shadow-margin;
+        y: root.shadow-margin;
+        width: root.width - 2 * root.shadow-margin;
+        height: root.height - 2 * root.shadow-margin;
+        background: Tokens.color-background;
+        border-radius: root.rounded ? Tokens.radius-xl : 0;
+        clip: true;
+
+        accessibility := AccessibilityPage { index: Pages.accessibility; }
+
+        language := LanguagePage { index: Pages.language; }
+
+        keyboard := KeyboardPage { index: Pages.keyboard; }
+
+        welcome := WelcomePage { index: Pages.welcome; }
+
+        theme := ThemePage { index: Pages.theme; }
+
+        whoareyou := WhoAreYouPage {
+            index: Pages.whoareyou;
+            next_page => {
+                Account.save();
+                pagenum = Cfg.next-page(pagenum);
+            }
+        }
+
+        password := PasswordPage {
+            index: Pages.password;
+            next_page => {
+                Account.save();
+                pagenum = Cfg.next-page(pagenum);
+            }
+        }
+
+        timezone := TimezonePage {
+            index: Pages.timezone;
+            next_page => {
+                Tz.save();
+                pagenum = Cfg.next-page(pagenum);
+            }
+        }
+
+        network := NetworkPage {
+            index: Pages.network;
+            next_page => {
+                Network.offline-chosen = false;
+                Network.save();
+                pagenum = Cfg.next-page(pagenum);
+            }
+        }
+
+        location := LocationPage { index: Pages.location; }
+
+        drivers := DriversPage { index: Pages.drivers; }
+
+        summary := SummaryPage {
+            index: Pages.summary;
+            next_page => {
+                Install.start();
+                pagenum = Pages.installing;
+            }
+        }
+
+        installing := InstallingPage { index: Pages.installing; }
+
+        done := DonePage { index: Pages.done; }
+
+        error := ErrorPage {
+            index: Pages.error;
+            prev_page => {
+                Install.reset();
+                pagenum = Pages.summary;
+            }
+            next_page => {
+                Install.start();
+                pagenum = Pages.installing;
+            }
+        }
+
+        if Camera.open: CameraDialog { }
+
+        if Network.password-ssid != "": PasswordDialog { }
+
+        if Network.hidden-open: HiddenDialog { }
+
+        if Network.enterprise-open: EnterpriseDialog { }
+
+        if Network.proxy-open: ProxyDialog { }
+
+        if Network.ip-open: IpDialog { }
+
+        if Tweaks.open: TweaksDialog { }
+
+        if Ims.open: ImsDialog { }
+
+        if Network.offline-prompt: OfflineDialog {
+            explicit: Network.offline-prompt-explicit;
+            skipped => {
+                Network.offline-prompt = false;
+                Network.offline-chosen = Network.offline-prompt-explicit;
+                Network.save();
+                pagenum = Cfg.next-page(pagenum);
+            }
+        }
+
+        if A11y.open: AccessibilityDialog {
+            width: 100%;
+            height: 100%;
+        }
+
+        if A11y.more-open: A11yMoreDialog { }
+    }
+
+    // immediate errors, e.g. a broken config the distro's maintainers need to see. Last, so it
+    // sits over anything else that was open
+    if Errors.open: TdnErrorDialog {
+        width: 100%;
+        height: 100%;
+        title: Errors.title != "" ? Errors.title : Lang.t("page-error", []);
+        body: Errors.body;
+        dismissed => { Errors.open = false; }
+    }
+}

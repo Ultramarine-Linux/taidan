@@ -1,0 +1,17 @@
+import { Tokens } from "../theme/tokens.slint";
+
+export enum CardRadius { md, lg, xl }
+
+export component Card inherits Rectangle {
+    in property <CardRadius> card-radius: CardRadius.xl;
+
+    background: Tokens.color-card;
+    border-color: Tokens.color-border-hairline;
+    border-width: 1px;
+    border-radius:
+        card-radius == CardRadius.md ? Tokens.radius-md :
+        card-radius == CardRadius.lg ? Tokens.radius-lg :
+        Tokens.radius-xl;
+
+    @children
+}

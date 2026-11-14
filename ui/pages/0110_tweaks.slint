@@ -1,0 +1,25 @@
+import { Lang } from "../lang.slint";
+import { Tweaks } from "../tweaks.slint";
+import { Network } from "../network.slint";
+import { TdnDialog, TdnOptionRow, TdnScrollList } from "../components.slint";
+
+export component TweaksDialog inherits TdnDialog {
+    title: Lang.t("page-tweaks", []);
+    description: Lang.t("page-tweaks-desc", []);
+    done-text: Lang.t("page-tweaks-done", []);
+    dialog-width: 26rem;
+    dismissed => { Tweaks.open = false; }
+
+    scroll := TdnScrollList {
+        for tweak[i] in Tweaks.items: TdnOptionRow {
+            property <bool> unavailable: tweak.needs-internet && !Network.install-online;
+            text: Lang.t(tweak.name, []);
+            description: self.unavailable ? Lang.t("page-tweaks-needs-internet", []) : Lang.t(tweak.desc, []);
+            enabled: !self.unavailable;
+            checked: tweak.on && !self.unavailable;
+            toggled(on) => { Tweaks.set(i, on); }
+            focus-in(y, height) => { scroll.reveal(y, height); }
+            accepted => { root.dismissed(); }
+        }
+    }
+}

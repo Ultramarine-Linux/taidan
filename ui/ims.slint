@@ -1,0 +1,14 @@
+export struct ImItem {
+    name: string,
+    native: string,
+    lang: string,
+    on: bool,
+}
+
+export global Ims {
+    in property <[ImItem]> items;
+    in property <string> enabled;
+    in-out property <bool> open;
+
+    callback set(index: int, on: bool);
+}

@@ -1,0 +1,63 @@
+import { Tokens } from "../slintcn/theme/tokens.slint";
+import { TdnBasePg, TdnHero } from "../page.slint";
+import { Lang, Dir } from "../lang.slint";
+import { TdnPara, TdnBtn } from "../components.slint";
+import { Cfg } from "../cfg.slint";
+
+export component WelcomePage inherits TdnBasePg {
+    property <bool> can-prev: Cfg.prev-page(self.index) != self.index;
+
+    forward-focus: go;
+
+    VerticalLayout {
+        accessible-role: groupbox;
+        accessible-label: Lang.t("page-welcome-hello", []);
+
+        TdnHero {
+            vertical-stretch: 1;
+
+            if root.can-prev: TdnBtn {
+                x: Dir.x(1rem, self.width, parent.width);
+                y: 1rem;
+                width: self.min-width;
+                height: self.min-height;
+                border-radius: self.height / 2;
+                padding-x: 0;
+                icon-size: 1rem;
+                background-color: #000000a0;
+                foreground-color: white;
+                icon: Lang.rtl ? @image-url("../../data/icons/go-previous-symbolic-rtl.svg")
+                    : @image-url("../../data/icons/go-previous-symbolic.svg");
+                accessible-label: Lang.t("prev", []);
+                clicked => { root.prev_page(); }
+            }
+        }
+
+        HorizontalLayout {
+            padding-left: 1.75rem;
+            padding-right: 1.75rem;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+            spacing: 2rem;
+
+            TdnPara {
+                text: Lang.t("page-welcome-hello", []);
+                font-size: 3 * Tokens.text-rem;
+                font-weight: 800;
+                horizontal-stretch: 1;
+            }
+
+            VerticalLayout {
+                layout-order: Dir.order(1);
+                alignment: center;
+                horizontal-stretch: 0;
+
+                go := TdnBtn {
+                    primary: true;
+                    text: Cfg.get_string("welcome.next", Lang.t("page-welcome-go", []));
+                    clicked => root.next_page();
+                }
+            }
+        }
+    }
+}

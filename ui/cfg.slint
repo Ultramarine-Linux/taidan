@@ -1,0 +1,24 @@
+export global Cfg {
+    pure callback get_string(path: string, default: string) -> string;
+    pure callback get_image(path: string, default: image) -> image;
+    pure callback get_brush(path: string, default: brush) -> brush;
+    pure callback get_color(path: string, default: color) -> color;
+    pure callback distro_icon() -> image;
+    distro_icon() => { Cfg.get_image("logo", @image-url("../data/icons/distro-icon.svg")) }
+    get_string(path, default) => default;
+    get_image(path, default) => default;
+    get_brush(path, default) => default;
+    get_color(path, default) => default;
+    in-out property <string> version: "0.0.0";
+    in-out property <string> distro: "Ultramarine Linux";
+    in property <bool> dev-session;
+    in property <image> hero-light: @image-url("../data/icons/background-light.webp");
+    in property <image> hero-dark: @image-url("../data/icons/background-dark.webp");
+    in property <image> hero-light-thumb: @image-url("../data/icons/background-light.webp");
+    in property <image> hero-dark-thumb: @image-url("../data/icons/background-dark.webp");
+    pure callback next-page(page: int) -> int;
+    pure callback prev-page(page: int) -> int;
+    next-page(page) => page + 1;
+    prev-page(page) => page - 1;
+    in property <bool> skip-tweaks;
+}

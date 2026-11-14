@@ -1,56 +1,43 @@
 use crate::prelude::*;
-#[derive(Clone, Copy, Debug, Default)]
-pub struct DnfInstallApps;
-impl super::Step for DnfInstallApps {
-    #[tracing::instrument(skip(sender))]
-    async fn run<C: crate::Callback>(
-        &self,
-        settings: &crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        sender: &C,
-    ) -> Res<()> {
-        if cfg.taidan0.skip_dnf || settings.nointernet {
-            return Ok(());
-        }
-        match (settings.actions[1].is_empty(), settings.actions[2].is_empty()) {
-            (true, true) => {}
-            (true, false) => {
-                super::super::flatpak::handle_flatpak(sender, |flatpak| {
-                    flatpak
-                        .args(["install", "-y", "--noninteractive", "--no-pull"])
-                        .args(&settings.actions[2])
-                })
-                .await?;
-            }
-            (false, true) => {
-                super::super::dnf::handle_dnf(sender, |dnf| {
-                    dnf.args(["in", "-y"]).args(&settings.actions[1])
-                })
-                .await?;
-            }
-            (false, false) => {
-                // run flatpak and dnf in parallel
-                // this should be safe, supposedly they don't affect each other
-                futures::future::try_join(
-                    super::super::flatpak::handle_flatpak(sender, |flatpak| {
-                        flatpak
-                            .args(["install", "-y", "--noninteractive", "--no-pull"])
-                            .args(&settings.actions[2])
-                    }),
-                    super::super::dnf::handle_dnf(sender, |dnf| {
-                        dnf.args(["in", "-y"]).args(&settings.actions[1])
-                    }),
-                )
-                .await?;
-            }
-        }
 
+// RPM Fusion says to swap before installing `@multimedia`, otherwise `--skip-broken` silently
+// drops the codecs (https://rpmfusion.org/Howto/Multimedia). `--allowerasing` doesn't help since
+// libsolv drops weak `--skip-broken` jobs before it tries erasing anything
+async fn swap_ffmpeg(callback: &impl crate::Callback) {
+    let installed = tokio::process::Command::new("rpm")
+        .args(["-q", "--quiet", "ffmpeg-free"])
+        .status()
+        .await
+        .is_ok_and(|s| s.success());
+    if !installed {
+        return;
+    }
+    if let Err(e) = crate::dnf::handle_dnf(callback, crate::Verb::DnfSwapFfmpeg).await {
+        tracing::warn!(?e, "cannot swap ffmpeg-free for ffmpeg, codecs may be left out");
+    }
+}
+
+pub(super) async fn run(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    sender: &impl crate::Callback,
+) -> Res<()> {
+    if settings.nointernet {
+        return Ok(());
+    }
+    let dnf = super::can_use_dnf(cfg).await;
+    let pkgs: &[String] = if dnf { &settings.actions[1] } else { &[] };
+    let codecs = super::_07_drivers_codecs::Codecs::codecs();
+    if pkgs.iter().any(|pkg| codecs.contains(&pkg.as_str())) {
+        swap_ffmpeg(sender).await;
+    }
+    super::flatpaks_and_packages(sender, &settings.actions[2], pkgs, false).await?;
+    if dnf {
         for script in &settings.actions[3] {
-            super::root("sh", &["-c", script])
+            super::root(crate::Verb::RunScript { script: script.clone() })
                 .await
                 .wrap_message(|_| format!("script failed: {script}"))?;
         }
-
-        Ok(())
     }
+    Ok(())
 }

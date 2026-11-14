@@ -1,0 +1,11 @@
+export global Camera {
+    in property <bool> available;
+    in property <bool> open;
+    in property <image> frame;
+    in property <string> error;
+
+    callback start();
+    callback stop();
+    callback capture();
+    callback refresh();
+}

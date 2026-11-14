@@ -1,0 +1,102 @@
+import { TdnBasePg, TdnHeader } from "../page.slint";
+import { Lang, Dir } from "../lang.slint";
+import { Cfg } from "../cfg.slint";
+import { Install } from "../install.slint";
+import { Modal } from "../modal.slint";
+import { TdnText, TdnPara, TdnSpinner, TdnStyle } from "../components.slint";
+import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
+
+export component InstallingPage inherits TdnBasePg {
+    property <string> stage: Install.stage-id == "" ? "" : Lang.t("page-installing-stage", [
+        { key: "stage", value: Lang.t(Install.stage-id, []) },
+        { key: "num", value: Install.stage-num },
+        { key: "count", value: Install.stage-count },
+    ]);
+
+    forward-focus: status;
+
+    VerticalLayout {
+        accessible-role: groupbox;
+        accessible-label: Lang.t("page-installing-configuring", []);
+
+        VerticalLayout {
+            padding-left: 2rem;
+            padding-right: 2rem;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+
+            TdnHeader {
+                step_i: 3;
+            }
+        }
+
+        Image {
+            vertical-stretch: 1;
+            image-fit: cover;
+            source: Theme.mode == ThemeMode.dark ? Cfg.hero-dark : Cfg.hero-light;
+            accessible-role: none;
+        }
+
+        status := FocusScope {
+            enabled: !Modal.open;
+            accessible-role: progress-indicator;
+            accessible-label: Lang.t("page-installing-configuring", []);
+            accessible-value: root.stage;
+            accessible-value-minimum: 0;
+            accessible-value-maximum: Install.stage-count;
+
+            HorizontalLayout {
+                padding-left: 1.75rem;
+                padding-right: 1.75rem;
+                padding-top: 1.25rem;
+                padding-bottom: 1.25rem;
+                spacing: 1rem;
+
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 0;
+
+                    TdnSpinner {
+                        width: 1.6rem;
+                        accessible-role: none;
+                    }
+                }
+
+                VerticalLayout {
+                    layout-order: Dir.order(1);
+                    alignment: center;
+                    spacing: 0.2rem;
+
+                    TdnPara {
+                        text: Lang.t("page-installing-configuring", []);
+                        font-size: 1.5 * Tokens.text-rem;
+                        font-weight: Tokens.typography-weight-medium;
+                    }
+
+                    TdnText {
+                        text: root.stage;
+                        color: Tokens.color-muted-foreground;
+                        font-size: Tokens.typography-body-sm-size;
+                        horizontal-alignment: Dir.text-start;
+                        overflow: elide;
+                    }
+
+                    Rectangle {
+                        visible: Install.stage-progress >= 0;
+                        height: 0.25rem;
+                        border-radius: self.height / 2;
+                        background: Tokens.color-muted;
+                        accessible-role: none;
+
+                        Rectangle {
+                            x: Dir.x(0, self.width, parent.width);
+                            width: parent.width * clamp(Install.stage-progress, 0, 1);
+                            border-radius: parent.border-radius;
+                            background: TdnStyle.accent;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

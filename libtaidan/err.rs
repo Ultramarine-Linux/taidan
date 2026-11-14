@@ -1,19 +1,9 @@
-use std::borrow::Cow;
-
 #[derive(Debug, thiserror::Error)]
 pub enum Err {
     #[error("fail to run program `{0}`: {1}")]
     FailToRunProgram(&'static str, std::io::Error),
-    #[error("program `{name}` failed")]
+    #[error("program `{name}` failed{}", fail_detail(*rc, output))]
     ProgramFail { name: &'static str, output: String, rc: Option<i32> },
-    #[error("fail to read dir `{0}`: {1}")]
-    ReadDir(&'static str, std::io::Error),
-    #[error("fail to read file `{0}`: {1}")]
-    ReadFile(Cow<'static, std::path::Path>, std::io::Error),
-    #[error(
-        "unknown repo `{0}` (this does not seem like a url, and this repo is not installed in /etc/yum.repos.d/)"
-    )]
-    UnknownRepo(String),
     #[error("request error: {0}")]
     Reqwest(#[from] reqwest::Error),
     #[error("{0}: {1}")]
@@ -32,13 +22,23 @@ pub enum Err {
     Serde(#[from] serde_json::Error),
 }
 
+fn fail_detail(rc: Option<i32>, output: &str) -> String {
+    let mut detail = rc.map(|rc| format!(" with exit code {rc}")).unwrap_or_default();
+    if let Some(line) = output.lines().map(str::trim).rfind(|l| !l.is_empty()) {
+        detail.push_str(": ");
+        detail.extend(line.chars().take(300));
+    }
+    detail
+}
+
 impl Err {
-    pub fn _read_dir(dir: &'static str) -> impl FnOnce(std::io::Error) -> Self {
-        move |e| Self::ReadDir(dir, e)
+    #[must_use]
+    pub fn program_fail(name: &'static str, out: &std::process::Output) -> Self {
+        let mut output = String::from_utf8_lossy(&out.stdout).into_owned();
+        output.push_str(&String::from_utf8_lossy(&out.stderr));
+        Self::ProgramFail { name, output, rc: out.status.code() }
     }
-    pub fn _read_file(file: Cow<'static, std::path::Path>) -> impl FnOnce(std::io::Error) -> Self {
-        |e| Self::ReadFile(file, e)
-    }
+
     pub fn _fail_to_run(program: &'static str) -> impl FnOnce(std::io::Error) -> Self {
         move |e| Self::FailToRunProgram(program, e)
     }
