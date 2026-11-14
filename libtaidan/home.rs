@@ -207,6 +207,7 @@ async fn home_of(user: &str) -> Res<PathBuf> {
         .args(["passwd", user])
         .output()
         .await
+        .inspect_err(|e| crate::command::report_spawn_error("getent", e))
         .map_err(|e| Err::FailToRunProgram("getent", e))?;
     String::from_utf8_lossy(&out.stdout)
         .trim()

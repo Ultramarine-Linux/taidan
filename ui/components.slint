@@ -820,6 +820,7 @@ export component TdnDialog inherits Rectangle {
 // see too. Open it with `Errors.show`
 export component TdnErrorDialog inherits TdnDialog {
     in property <string> body;
+    dialog-width: 36rem;
 
     init => { close.focus(); }
 
@@ -834,11 +835,23 @@ export component TdnErrorDialog inherits TdnDialog {
             accessible-role: none;
         }
 
-        TdnText {
-            vertical-alignment: TextVerticalAlignment.top;
-            horizontal-alignment: Dir.text-start;
-            wrap: word-wrap;
-            text: root.body;
+        ScrollView {
+            preferred-height: 18rem;
+            vertical-stretch: 1;
+            horizontal-scrollbar-policy: always-off;
+            content-width: self.visible-width;
+
+            TextInput {
+                width: parent.visible-width;
+                height: self.preferred-height;
+                read-only: true;
+                single-line: false;
+                wrap: word-wrap;
+                text: root.body;
+                font-size: Tokens.typography-body-sm-size;
+                color: Tokens.color-foreground;
+                accessible-label: root.title;
+            }
         }
     }
 

@@ -519,7 +519,14 @@ impl Ctx {
     fn run(cmd: &mut Command, input: Option<&[u8]>) -> Result<i32, String> {
         let name = cmd.get_program().to_string_lossy().into_owned();
         cmd.stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() });
-        let mut child = cmd.spawn().map_err(|e| format!("cannot run {name}: {e}"))?;
+        let mut child = match cmd.spawn() {
+            Ok(child) => child,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!("taidan-helper: missing executable `{name}`: {e}");
+                return Ok(127);
+            }
+            Err(e) => return Err(format!("cannot run {name}: {e}")),
+        };
         if let Some(input) = input
             && let Some(mut stdin) = child.stdin.take()
         {

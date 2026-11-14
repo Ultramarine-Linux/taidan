@@ -8,6 +8,7 @@ async fn swap_ffmpeg(callback: &impl crate::Callback) {
         .args(["-q", "--quiet", "ffmpeg-free"])
         .status()
         .await
+        .inspect_err(|e| crate::command::report_spawn_error("rpm", e))
         .is_ok_and(|s| s.success());
     if !installed {
         return;

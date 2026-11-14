@@ -32,10 +32,24 @@ fn fail_detail(rc: Option<i32>, output: &str) -> String {
 }
 
 impl Err {
+    /// Details for local troubleshooting, including command output omitted by `Display`.
+    #[must_use]
+    pub fn diagnostic(&self) -> String {
+        match self {
+            Self::WrapMsg(message, source) => format!("{message}: {}", source.diagnostic()),
+            Self::WrapMessage(message, source) => format!("{message}: {}", source.diagnostic()),
+            Self::ProgramFail { output, .. } if !output.trim().is_empty() => {
+                format!("{self}\n\nCommand output:\n{output}")
+            }
+            _ => self.to_string(),
+        }
+    }
+
     #[must_use]
     pub fn program_fail(name: &'static str, out: &std::process::Output) -> Self {
         let mut output = String::from_utf8_lossy(&out.stdout).into_owned();
         output.push_str(&String::from_utf8_lossy(&out.stderr));
+        crate::command::report_exit(name, out.status, &output);
         Self::ProgramFail { name, output, rc: out.status.code() }
     }
 
@@ -58,5 +72,29 @@ impl<T> TaidanErrHelper for Result<T, Err> {
 
     fn wrap_message<F: FnOnce(&Err) -> String>(self, msg: F) -> Self {
         self.map_err(|e| Err::WrapMessage(msg(&e), Box::new(e)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diagnostics_keep_wrapped_command_output() {
+        let output = format!("{}important first line\nlast line\n", "x".repeat(400));
+        let error = Err::WrapMsg(
+            "cannot create the user",
+            Box::new(Err::ProgramFail { name: "useradd", output: output.clone(), rc: Some(1) }),
+        );
+        assert!(!error.to_string().contains("important first line"));
+        let detail = error.diagnostic();
+        assert!(detail.starts_with("cannot create the user: program `useradd` failed"));
+        assert!(detail.contains(&output));
+    }
+
+    #[test]
+    fn ordinary_diagnostics_keep_the_error_message() {
+        let error = Err::Msg("refusing to create a user without a password");
+        assert_eq!(error.diagnostic(), error.to_string());
     }
 }

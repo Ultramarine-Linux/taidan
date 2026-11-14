@@ -273,6 +273,7 @@ impl Drivers {
         let out = Command::new("lspci")
             .output()
             .await
+            .inspect_err(|e| crate::command::report_spawn_error("lspci", e))
             .map_err(|e| Err::FailToRunProgram("lspci", e))
             .wrap_msg("cannot detect nvidia chipset")?;
         if !out.status.success() {
@@ -311,6 +312,7 @@ impl Drivers {
             .stderr(std::process::Stdio::null())
             .status()
             .await
+            .inspect_err(|e| crate::command::report_spawn_error("modinfo", e))
             .is_ok_and(|s| s.success()))
     }
 
@@ -331,7 +333,11 @@ impl Drivers {
         if !tokio::fs::try_exists(AKMODS_KEY).await.unwrap_or_default() {
             return false;
         }
-        let out = Command::new("mokutil").args(["--test-key", AKMODS_KEY]).output().await;
+        let out = Command::new("mokutil")
+            .args(["--test-key", AKMODS_KEY])
+            .output()
+            .await
+            .inspect_err(|e| crate::command::report_spawn_error("mokutil", e));
         out.is_ok_and(|out| String::from_utf8_lossy(&out.stdout).contains("already enrolled"))
     }
 

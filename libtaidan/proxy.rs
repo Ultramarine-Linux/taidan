@@ -195,6 +195,7 @@ pub(crate) fn rpm_ostreed_as_root(proxy: Option<&Proxy>) -> Result<(), String> {
         std::process::Command::new("systemctl")
             .args(args)
             .status()
+            .inspect_err(|e| crate::command::report_spawn_error("systemctl", e))
             .map_err(|e| format!("cannot run systemctl: {e}"))
             .and_then(|s| s.success().then_some(()).ok_or(format!("systemctl {args:?}: {s}")))
     };

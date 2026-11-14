@@ -21,6 +21,7 @@ fn spawn_swaybg(dark: bool) -> Option<Child> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
+        .inspect_err(|e| libtaidan::command::report_spawn_error("swaybg", e))
         .inspect_err(|e| tracing::error!(?e, "cannot start swaybg"))
         .ok()
 }

@@ -138,6 +138,7 @@ pub async fn acmd(
         .args(args)
         .output()
         .await
+        .inspect_err(|e| crate::command::report_spawn_error(name, e))
         .map_err(|e| Err::FailToRunProgram(name, e))?;
     if !p.status.success() {
         return Err(Err::program_fail(name, &p));

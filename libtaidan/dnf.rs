@@ -85,7 +85,9 @@ pub(crate) async fn run_logged(
     if status.success() {
         return Ok(());
     }
-    let e = Err::ProgramFail { name, output: Vec::from(tail).join("\n"), rc: status.code() };
+    let output = Vec::from(tail).join("\n");
+    crate::command::report_exit(name, status, &output);
+    let e = Err::ProgramFail { name, output, rc: status.code() };
     tracing::error!(%e, "command failed");
     Err(e)
 }

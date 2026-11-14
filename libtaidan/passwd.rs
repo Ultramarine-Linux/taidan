@@ -15,7 +15,11 @@ pub fn user_already_exists() -> bool {
     }
     let recorded = unused_recorded_user();
     // through NSS, since systemd-homed users aren't in /etc/passwd
-    match std::process::Command::new("getent").arg("passwd").output() {
+    match std::process::Command::new("getent")
+        .arg("passwd")
+        .output()
+        .inspect_err(|e| crate::command::report_spawn_error("getent", e))
+    {
         Ok(out) if out.status.success() => {
             return regular_user_in(out.stdout.as_slice(), recorded.as_deref());
         }
@@ -107,7 +111,11 @@ pub fn created_by_us(username: &str) -> bool {
 pub fn login_state(username: &str) -> Option<bool> {
     // PAM updates lastlog2 for display manager, console and ssh logins, but not `runuser` or
     // `pkexec`. `-a` leaves out users who never logged in
-    match std::process::Command::new("lastlog2").args(["-a", "-u", username]).output() {
+    match std::process::Command::new("lastlog2")
+        .args(["-a", "-u", username])
+        .output()
+        .inspect_err(|e| crate::command::report_spawn_error("lastlog2", e))
+    {
         Ok(out) if out.status.success() => Some(logged_in_from(&out.stdout, username)),
         Ok(out) => {
             tracing::error!(status = ?out.status, stderr = %String::from_utf8_lossy(&out.stderr), "lastlog2 failed");

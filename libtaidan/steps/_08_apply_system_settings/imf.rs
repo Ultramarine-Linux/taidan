@@ -42,7 +42,12 @@ async fn with_installed_ims(
     let mut ims = vec![];
     for name in &settings.ims {
         let Some(pkg) = i18n::find_im(name).and_then(|im| im.pkg(settings.imf)) else { continue };
-        match tokio::process::Command::new("rpm").args(["-q", "--quiet", pkg]).status().await {
+        match tokio::process::Command::new("rpm")
+            .args(["-q", "--quiet", pkg])
+            .status()
+            .await
+            .inspect_err(|e| crate::command::report_spawn_error("rpm", e))
+        {
             Ok(status) if status.success() => ims.push(name.clone()),
             Ok(_) => tracing::info!(name, pkg, "input method isn't installed, not setting it up"),
             Err(e) => tracing::warn!(?e, "cannot run rpm"),

@@ -12,14 +12,6 @@ pub fn is_dev_session() -> bool {
         && uzers::get_current_username().is_none_or(|user| user.as_encoded_bytes() != b"taidan")
 }
 
-fn panic_msg(payload: &(dyn std::any::Any + Send)) -> String {
-    payload
-        .downcast_ref::<&str>()
-        .map(|s| (*s).to_owned())
-        .or_else(|| payload.downcast_ref::<String>().cloned())
-        .unwrap_or_else(|| "unknown panic".to_owned())
-}
-
 fn run_install(
     settings: &mut libtaidan::settings::Settings,
     callback: &(impl libtaidan::Callback + Sync),
@@ -32,15 +24,18 @@ fn run_install(
         crate::RT.block_on(libtaidan::start_install(settings, &crate::CFG, callback)).map_err(|e| {
             // errors go to Sentry and this may name the user
             tracing::debug!(?e, "installation error");
-            e.to_string()
+            e.diagnostic()
         })
     }));
     let msg = match res {
         Ok(Ok(())) => return None,
         Ok(Err(msg)) => msg,
-        Err(payload) => format!("the installation crashed: {}", panic_msg(&*payload)),
+        Err(payload) => {
+            format!("the installation crashed: {}", crate::ui::panic_message(&*payload))
+        }
     };
-    tracing::error!(msg, "installation failed");
+    // Full command output is for the local UI only, not the automatic error reporting.
+    tracing::error!("installation failed");
     Some(strip_ansi_escapes::strip_str(msg))
 }
 
@@ -164,9 +159,17 @@ fn start(ui: &slint::Weak<AppWindow>) {
             // a `changed Install.state` in Slint can coalesce Failed → Running → Failed
             if let Some(error) = error {
                 install.set_used_internet(used_internet);
-                install.set_error(error.into());
+                install.set_error(error.as_str().into());
                 install.set_state(InstallState::Failed);
                 ui.set_pagenum(ui.global::<Pages<'_>>().get_error());
+                let stage_id = install.get_stage_id();
+                let detail = if stage_id.is_empty() {
+                    error
+                } else {
+                    let stage = crate::l10n::PO_LOADER.read().get(&stage_id);
+                    format!("Stage: {stage}\n\n{error}")
+                };
+                crate::ui::show_fatal_error(ui, "error-installation-title", &detail);
             } else {
                 install.set_state(InstallState::Done);
                 ui.set_pagenum(ui.global::<Pages<'_>>().get_done());

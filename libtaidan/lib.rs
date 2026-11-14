@@ -1,6 +1,7 @@
 //! libtaidan: Backend for Taidan (OOBE Application for Ultramarine Linux)
 pub mod a11y;
 pub mod cfg;
+pub mod command;
 pub mod dnf;
 pub mod err;
 pub mod helper;
@@ -124,7 +125,11 @@ async fn spawn(
     use tokio::io::AsyncWriteExt;
     cmd.stdout(stdout).stderr(stderr);
     cmd.stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() });
-    let mut child = cmd.spawn().map_err(Err::_fail_to_run(name))?;
+    let program = cmd.as_std().get_program().to_string_lossy().into_owned();
+    let mut child = cmd
+        .spawn()
+        .inspect_err(|e| crate::command::report_spawn_error(&program, e))
+        .map_err(Err::_fail_to_run(name))?;
     if let Some(input) = input
         && let Some(mut stdin) = child.stdin.take()
         && let Err(e) = stdin.write_all(input).await
@@ -152,6 +157,9 @@ async fn run_cmd(
     use std::process::Stdio;
     let child = spawn(cmd, name, input, Stdio::piped(), Stdio::piped()).await?;
     let p = child.wait_with_output().await.map_err(Err::_fail_to_run(name))?;
+    let output =
+        format!("{}{}", String::from_utf8_lossy(&p.stdout), String::from_utf8_lossy(&p.stderr));
+    crate::command::report_exit(name, p.status, &output);
     if !p.status.success() {
         let e = Err::program_fail(name, &p);
         tracing::debug!(name, %e, "command failed");

@@ -77,7 +77,7 @@ impl Orca {
         if self.shut_down.load(Ordering::SeqCst) {
             return;
         }
-        match cmd.spawn() {
+        match cmd.spawn().inspect_err(|e| libtaidan::command::report_spawn_error("orca", e)) {
             Ok(child) => {
                 let n = self.starts.fetch_add(1, Ordering::SeqCst);
                 *orca = Some((n, child));
@@ -277,7 +277,12 @@ fn write_kwin_config(prev: Option<&Opts>, next: &Opts) {
             continue;
         }
         let mut kwriteconfig = std::process::Command::new("kwriteconfig6");
-        match kwriteconfig.arg("--notify").args(entry.args(entry.file)).status() {
+        match kwriteconfig
+            .arg("--notify")
+            .args(entry.args(entry.file))
+            .status()
+            .inspect_err(|e| libtaidan::command::report_spawn_error("kwriteconfig6", e))
+        {
             Ok(status) if status.success() => {}
             Ok(status) => tracing::warn!(?status, ?entry, "kwriteconfig6 failed"),
             Err(e) => tracing::warn!(?e, ?entry, "cannot run kwriteconfig6"),

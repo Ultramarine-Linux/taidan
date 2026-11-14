@@ -572,7 +572,11 @@ impl Portal {
             return true;
         }
         let Some((mut cmd, request)) = portal_command(proxy, uri) else { return false };
-        let mut child = match cmd.spawn() {
+        let program = cmd.get_program().to_string_lossy().into_owned();
+        let mut child = match cmd
+            .spawn()
+            .inspect_err(|e| libtaidan::command::report_spawn_error(&program, e))
+        {
             Ok(child) => child,
             Err(e) => {
                 tracing::error!(?e, "cannot open {PORTAL_BROWSER} for the captive portal");
@@ -1864,7 +1868,11 @@ fn portal_command(
         return None;
     }
     let acl = format!("u:{PORTAL_USER}:rw");
-    match std::process::Command::new("setfacl").args(["-m", &acl, "--", &socket]).status() {
+    match std::process::Command::new("setfacl")
+        .args(["-m", &acl, "--", &socket])
+        .status()
+        .inspect_err(|e| libtaidan::command::report_spawn_error("setfacl", e))
+    {
         Ok(status) if status.success() => {}
         res => {
             tracing::error!(?res, socket, "cannot let the portal browser use the display");

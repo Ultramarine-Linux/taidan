@@ -43,12 +43,16 @@ pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
             &format!("cannot parse /etc/taidan.toml: {e}"),
             sentry::Level::Error,
         );
+        *CONFIG_ERROR.write() = Some(format!(
+            "Cannot parse /etc/taidan.toml: {e}\n\nTaidan is using the default configuration."
+        ));
         cfg::Config::default()
     });
     cfg::populate(&mut cfg);
     tracing::debug!("Populated cfg::Config (turn on `trace` to see body)");
     cfg
 });
+pub static CONFIG_ERROR: RwLock<Option<String>> = RwLock::new(None);
 pub static SETTINGS: LazyLock<RwLock<libtaidan::settings::Settings>> =
     LazyLock::new(Default::default);
 

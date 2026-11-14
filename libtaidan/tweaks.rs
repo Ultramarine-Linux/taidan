@@ -145,8 +145,19 @@ impl Tweak {
             .stdout(std::process::Stdio::null())
             .kill_on_drop(true);
         match tokio::time::timeout(std::time::Duration::from_secs(5), cmd.status()).await {
-            Ok(Ok(status)) => status.success(),
+            Ok(Ok(status)) => {
+                crate::command::report_exit(
+                    &self.path.join("condition").display().to_string(),
+                    status,
+                    "",
+                );
+                status.success()
+            }
             Ok(Err(err)) => {
+                crate::command::report_spawn_error(
+                    &self.path.join("condition").display().to_string(),
+                    &err,
+                );
                 tracing::warn!(?err, id=?self.id(), "cannot run tweak condition");
                 false
             }
@@ -245,6 +256,7 @@ impl Tweak {
         match cmd.wait().await {
             Ok(x) if x.success() => true,
             Ok(x) => {
+                crate::command::report_exit(&self.path.join("up").display().to_string(), x, "");
                 tracing::error!(rc=?x.code(), "process failed with non-zero exit code");
                 false
             }
