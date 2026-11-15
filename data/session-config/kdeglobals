@@ -1,0 +1,3 @@
+# kwin_rmb is KWin's title bar right-click menu, which can open other apps as the taidan user
+[KDE Action Restrictions][$i]
+action/kwin_rmb=false

@@ -1,0 +1,298 @@
+import { TdnBasePg } from "../page.slint";
+import { Lang, Dir } from "../lang.slint";
+import { A11y } from "../a11y.slint";
+import { Modal } from "../modal.slint";
+import { TdnText, TdnPara, TdnBtn, TdnStyle, TdnTile, TdnOptionRow, TdnDialog, TdnField, TdnSelect, TdnScrollList } from "../components.slint";
+import { Icon } from "../slintcn/components/icon.slint";
+import { Tokens } from "../slintcn/theme/tokens.slint";
+
+// icons from Lucide (https://lucide.dev), ISC license
+global A11yIcons {
+    out property <string> ear: "M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0 M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4";
+    out property <string> zoom-in: "M3 11a8 8 0 1 0 16 0a8 8 0 1 0-16 0 M21 21l-4.35-4.35 M11 8v6 M8 11h6";
+    // dashes for keys instead of Lucide's dots, since `Icon` has no round line caps
+    out property <string> keyboard: "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M5.5 8h1.5 M9.5 8h1.5 M13.5 8h1.5 M17.5 8h1.5 M7.5 12h1.5 M11.5 12h1.5 M15.5 12h1.5 M7 16h10";
+}
+
+component A11yTile inherits TdnTile {
+    in property <string> icon;
+    in property <string> text;
+    callback toggled(bool);
+
+    activated => { root.toggled(!root.checked); }
+    accessible-role: button;
+    accessible-label: root.text;
+
+    width: 10rem;
+    height: self.width;
+
+    VerticalLayout {
+        padding: 0.75rem;
+        spacing: 0.75rem;
+        alignment: center;
+
+        HorizontalLayout {
+            alignment: center;
+
+            Icon {
+                commands: root.icon;
+                width: 4rem;
+                height: self.width;
+                size: self.width;
+                tint: root.checked ? TdnStyle.accent : Tokens.color-foreground;
+                stroke-width: 2px;
+            }
+        }
+
+        TdnText {
+            text: root.text;
+            font-size: 1.2 * Tokens.text-rem;
+            wrap: word-wrap;
+        }
+    }
+}
+
+component A11yContent inherits VerticalLayout {
+    in property <bool> in-dialog;
+    in property <string> next-text;
+    callback next;
+
+    in-out property <bool> more-opened-from-here;
+
+    public function focus-first() {
+        if root.more-opened-from-here { more.focus(); } else { screen-reader.focus(); }
+    }
+
+    property <bool> in-active-dialog: root.in-dialog && !A11y.more-open;
+    property <bool> more-open: A11y.more-open;
+    changed more-open => {
+        if !self.more-open && root.more-opened-from-here { more.focus(); }
+    }
+
+    padding-left: 2rem;
+    padding-right: 2rem;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+    spacing: 1rem;
+
+    TdnText {
+        text: Lang.t("page-accessibility", []);
+        font-size: 2.5 * Tokens.text-rem;
+        font-weight: 500;
+        wrap: word-wrap;
+    }
+
+    Rectangle { vertical-stretch: 1; }
+
+    TdnText {
+        text: Lang.t("page-accessibility-desc", []);
+        font-size: 1.3 * Tokens.text-rem;
+        wrap: word-wrap;
+    }
+
+    HorizontalLayout {
+        spacing: 1.5rem;
+        alignment: center;
+
+        screen-reader := A11yTile {
+            in-dialog: root.in-active-dialog;
+            icon: A11yIcons.ear;
+            text: Lang.t("page-accessibility-screen-reader", []);
+            checked: A11y.screen-reader;
+            toggled(on) => {
+                A11y.screen-reader = on;
+                A11y.changed();
+            }
+        }
+
+        A11yTile {
+            layout-order: Dir.order(1);
+            in-dialog: root.in-active-dialog;
+            icon: A11yIcons.zoom-in;
+            text: Lang.t("page-accessibility-zoom", []);
+            checked: A11y.zoom;
+            toggled(on) => {
+                A11y.zoom = on;
+                A11y.changed();
+            }
+        }
+
+        A11yTile {
+            layout-order: Dir.order(2);
+            in-dialog: root.in-active-dialog;
+            icon: A11yIcons.keyboard;
+            text: Lang.t("page-accessibility-sticky-keys", []);
+            checked: A11y.sticky-keys;
+            toggled(on) => {
+                A11y.sticky-keys = on;
+                A11y.changed();
+            }
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 0.6rem;
+        alignment: center;
+
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+
+            Rectangle {
+                width: 1.75rem * Tokens.text-scale;
+                height: self.width;
+                border-radius: Tokens.radius-md;
+                background: Tokens.color-primary;
+                accessible-role: none;
+
+                Image {
+                    source: @image-url("../../data/icons/settings-accessibility-symbolic.svg");
+                    colorize: Tokens.color-primary-foreground;
+                    width: 1rem * Tokens.text-scale;
+                    accessible-role: none;
+                }
+            }
+        }
+
+        TdnPara {
+            layout-order: Dir.order(1);
+            text: Lang.t("page-accessibility-hint", []);
+            font-size: 1.2 * Tokens.text-rem;
+            min-width: 0;
+        }
+    }
+
+    Rectangle { vertical-stretch: 1; }
+
+    HorizontalLayout {
+        alignment: space-between;
+
+        more := TdnBtn {
+            in-dialog: root.in-active-dialog;
+            outline: true;
+            text: Lang.t("page-accessibility-more", []);
+            clicked => {
+                root.more-opened-from-here = true;
+                A11y.more-open = true;
+            }
+        }
+
+        TdnBtn {
+            layout-order: Dir.order(1);
+            in-dialog: root.in-active-dialog;
+            primary: true;
+            text: root.next-text;
+            clicked => { root.next(); }
+        }
+    }
+}
+
+export component AccessibilityPage inherits TdnBasePg {
+    pageid: "accessibility";
+    forward-focus: focus;
+
+    changed active => {
+        if !self.active { content.more-opened-from-here = false; }
+    }
+
+    focus := FocusScope {
+        enabled: !Modal.open;
+        focus-on-tab-navigation: false;
+        focus-gained(reason) => {
+            if reason == FocusReason.programmatic { content.focus-first(); }
+        }
+        key-pressed(event) => {
+            if event.text == Key.Return && !Modal.open {
+                if !event.repeat { root.next_page(); }
+                return accept;
+            }
+            reject
+        }
+
+        init => { content.focus-first(); }
+
+        content := A11yContent {
+            width: parent.width;
+            height: parent.height;
+            next-text: Lang.t("next", []);
+            next => { root.next_page(); }
+        }
+    }
+}
+
+export component AccessibilityDialog inherits Rectangle {
+    background: Tokens.color-background;
+
+    click-blocker := TouchArea { }
+
+    FocusScope {
+        focus-on-tab-navigation: false;
+        key-pressed(event) => {
+            if event.text == Key.Escape && !A11y.more-open {
+                A11y.open = false;
+                return accept;
+            }
+            reject
+        }
+
+        content := A11yContent {
+            width: parent.width;
+            height: parent.height;
+            in-dialog: true;
+            next-text: Lang.t("page-accessibility-done", []);
+            accessible-role: groupbox;
+            accessible-label: Lang.t("page-accessibility", []);
+            next => { A11y.open = false; }
+        }
+    }
+
+    init => { content.focus-first(); }
+}
+
+export component A11yMoreDialog inherits TdnDialog {
+    title: Lang.t("page-accessibility-more", []);
+    done-text: Lang.t("page-accessibility-done", []);
+    dialog-width: 26rem;
+    dismissed => { A11y.more-open = false; }
+
+    function set-option(index: int, on: bool) {
+        if index == 0 { A11y.larger-text = on; }
+        if index == 1 { A11y.legible-font = on; }
+        if index == 2 { A11y.reduce-motion = on; }
+        if index == 3 { A11y.slow-keys = on; }
+        if index == 4 { A11y.bounce-keys = on; }
+        if index == 5 { A11y.dwell-click = on; }
+        A11y.changed();
+    }
+
+    scroll := TdnScrollList {
+        for option[i] in ["larger-text", "legible-font", "reduce-motion", "slow-keys", "bounce-keys", "dwell-click"]: TdnOptionRow {
+            text: Lang.t("page-accessibility-" + option, []);
+            description: Lang.t("page-accessibility-" + option + "-desc", []);
+            checked: [A11y.larger-text, A11y.legible-font, A11y.reduce-motion, A11y.slow-keys, A11y.bounce-keys, A11y.dwell-click][i];
+            toggled(on) => { root.set-option(i, on); }
+            accepted => { root.dismissed(); }
+            focus-in(y, height) => { scroll.reveal(y, height); }
+        }
+
+        TdnField {
+            label: Lang.t("page-accessibility-color-filter", []);
+            label-clicked => { filter.focus(); }
+
+            filter := TdnSelect {
+                in-dialog: true;
+                focus-in(y, height) => { scroll.reveal(y, height); }
+                label: Lang.t("page-accessibility-color-filter", []);
+                options: [
+                    Lang.t("page-accessibility-color-filter-none", []),
+                    Lang.t("page-accessibility-color-filter-protanopia", []),
+                    Lang.t("page-accessibility-color-filter-deuteranopia", []),
+                    Lang.t("page-accessibility-color-filter-tritanopia", []),
+                    Lang.t("page-accessibility-color-filter-monochrome", []),
+                ];
+                index <=> A11y.color-filter;
+                changed => { A11y.changed(); }
+            }
+        }
+    }
+}

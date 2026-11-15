@@ -1,0 +1,50 @@
+export struct Avatar {
+    id: string,
+    image: image,
+}
+
+export struct AvatarRow {
+    slots: [int],
+}
+
+export global Account {
+    in-out property <string> fullname;
+    in-out property <string> username;
+    in-out property <string> password;
+    in-out property <string> password-repeat;
+    in property <[Avatar]> avatars;
+    in property <[AvatarRow]> avatar-rows: [{ slots: [-1] }];
+    in-out property <string> avatar-id;
+    in-out property <image> avatar;
+    in-out property <bool> username-touched;
+
+    in-out property <string> checked-username;
+    in-out property <bool> checked-taken;
+    out property <string> username-error: username-syntax-error(username) != ""
+        ? username-syntax-error(username)
+        : checked-username == username && checked-taken ? "page-whoareyou-error-taken" : "";
+    out property <bool> username-valid: username-error == "" && checked-username == username;
+    out property <bool> fullname-valid: valid-fullname(fullname);
+    out property <bool> password-too-long: long-password(password);
+    out property <bool> password-valid: password != "" && password == password-repeat && !password-too-long;
+
+    changed username => { check-username(username); }
+
+    pure callback username-syntax-error(username: string) -> string;
+    callback check-username(username: string);
+    pure callback valid-fullname(fullname: string) -> bool;
+    pure callback long-password(password: string) -> bool;
+    pure callback suggest-username(fullname: string, current: string) -> string;
+    pure callback first-name(fullname: string, username: string) -> string;
+    callback save();
+
+    username-syntax-error(username) => username != "" ? "" : "page-whoareyou-error";
+    check-username(username) => {
+        checked-username = username;
+        checked-taken = false;
+    }
+    valid-fullname(fullname) => true;
+    long-password(password) => false;
+    suggest-username(fullname, current) => current;
+    first-name(fullname, username) => fullname != "" ? fullname : username;
+}

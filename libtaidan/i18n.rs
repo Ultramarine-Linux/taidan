@@ -1,5 +1,5 @@
-use super::{pkexec, root};
-use crate::prelude::*;
+use super::root;
+use crate::{cfg::Desktop, home::Home, kconfig::KConfigEntry, prelude::*};
 
 taidan_proc_macros::keymap!(LAYOUTS);
 
@@ -50,7 +50,7 @@ pub const IMS: phf::OrderedMap<&'static str, phf::OrderedMap<&'static str, Input
     },
     "Vietnamese" => phf::phf_ordered_map! {
         "Unikey"            => im!(Unikey       "Unikey"=>"unikey",                             "unikey"),
-        "ViQR"              => im!(ViQR         "table:viqr"=>"table-tv",                       "viqr"=>"m17n"),
+        "ViQR"              => im!(ViQR         "table:viqr"=>"table-tv",                       "m17n_vi_viqr"=>"m17n"),
     },
     "Bengali" => phf::phf_ordered_map! {
         "OpenBangla"        => im!(বাংলা           "openbangla",                                      "openbangla"),
@@ -110,13 +110,47 @@ impl std::fmt::Display for IMELanguages {
     }
 }
 
-/// Turns the IM name written in [`IMS`] to the [`InputMethod`] object.
-///
-/// # Panics
-/// This panics if and only if the IM name is invalid.
 #[must_use]
-pub fn str_to_im(s: &str) -> InputMethod {
-    *IMS.values().find_map(|ims| ims.get(s)).expect("invalid im")
+pub fn find_im(s: &str) -> Option<InputMethod> {
+    IMS.values().find_map(|ims| ims.get(s)).copied()
+}
+
+#[must_use]
+pub fn default_ims(posix_locale: &str, imf: I18nImf) -> Vec<String> {
+    let name = posix_locale.split(['.', '@']).next().unwrap_or_default();
+    let (lang, country) = name.split_once('_').unwrap_or((name, ""));
+    let ims: &[&str] = match (lang, country) {
+        ("zh", "TW") => &["Zhuyin"],
+        ("zh", "HK" | "MO") | ("yue", _) => &["Cangjie 5"],
+        ("zh", _) => &["Pinyin"],
+        ("ja", _) => &["Mozc"],
+        ("ko", _) => &["libhangul"],
+        ("vi", _) => &["Unikey"],
+        ("bn", _) => &["OpenBangla"],
+        ("si", _) => &["Sayura Sinhala"],
+        ("th", _) => &["Thai"],
+        _ => &[],
+    };
+    ims.iter()
+        .filter(|im| find_im(im).is_some_and(|im| im.available(imf)))
+        .map(|&im| im.to_owned())
+        .collect()
+}
+
+pub fn fill_settings(settings: &mut crate::settings::Settings, cfg: &crate::cfg::Config) {
+    settings.imf = cfg.i18n.imf(&cfg.edition);
+    if settings.ims.is_empty() && !settings.ims_picked {
+        settings.ims = default_ims(&settings.locale, settings.imf);
+    }
+    let imf = settings.imf;
+    settings.ims.retain(|name| {
+        let ok = find_im(name).is_some_and(|im| im.available(imf));
+        if !ok {
+            tracing::warn!(name, ?imf, "unknown input method, or not available for the framework");
+        }
+        ok
+    });
+    tracing::info!(?settings.imf, ?settings.ims, "Input methods");
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -140,113 +174,562 @@ impl InputMethod {
             I18nImf::IBus => self.ibus_ref.is_some(),
         }
     }
-    /// Gets the package for the current input method framework
-    ///
-    /// # Panics
-    /// Panics if and only if this IM is not available for the current framework.
     #[must_use]
-    pub fn get_pkg(self, imf: I18nImf) -> &'static str {
+    pub const fn pkg(self, imf: I18nImf) -> Option<&'static str> {
         match imf {
-            I18nImf::Fcitx5 => self.fcitx5_pkg.unwrap(),
-            I18nImf::IBus => self.ibus_pkg.unwrap(),
-        }
-    }
-    /// Gets the internal reference of the IM for the current input method framework
-    ///
-    /// # Panics
-    /// Panics if and only if this IM is not available for the current framework.
-    #[must_use]
-    pub fn get_ref(self, imf: I18nImf) -> &'static str {
-        match imf {
-            I18nImf::Fcitx5 => self.fcitx5_ref.unwrap(),
-            I18nImf::IBus => self.ibus_ref.unwrap(),
+            I18nImf::Fcitx5 => self.fcitx5_pkg,
+            I18nImf::IBus => self.ibus_pkg,
         }
     }
 }
 
+const NON_ASCII_LAYOUTS: &[&str] = &[
+    "af", "am", "ara", "bd", "bg", "brai", "bt", "by", "eg", "et", "ge", "gn", "gr", "il", "in",
+    "iq", "ir", "kg", "kh", "kz", "la", "lk", "ma", "mk", "mm", "mn", "mv", "my", "np", "pk", "rs",
+    "ru", "sy", "th", "tj", "ua", "uz",
+];
+
+const ASCII_VARIANTS: &[(&str, &str)] = &[
+    ("in", "eng"),
+    ("iq", "ku"),
+    ("iq", "ku_alt"),
+    ("iq", "ku_f"),
+    ("ir", "ku"),
+    ("ir", "ku_alt"),
+    ("ir", "ku_f"),
+    ("lk", "us"),
+    ("ma", "french"),
+    ("ma", "rif"),
+    ("ru", "ruchey_en"),
+    ("sy", "ku"),
+    ("sy", "ku_alt"),
+    ("sy", "ku_f"),
+    ("ua", "crh"),
+    ("ua", "crh_alt"),
+    ("ua", "crh_f"),
+];
+
+const NON_ASCII_VARIANT_PATTERNS: &[(&str, &str)] = &[
+    ("al", "veqilharxhi"),
+    ("az", "cyrillic"),
+    ("br", "rus"),
+    ("ca", "ike"),
+    ("cn", "mon_*"),
+    ("cn", "tib"),
+    ("cn", "tib_asciinum"),
+    ("cn", "ug"),
+    ("cz", "rus"),
+    ("de", "ru"),
+    ("de", "ru-recom"),
+    ("de", "ru-translit"),
+    ("dz", "ar"),
+    ("dz", "ber"),
+    ("fr", "geo"),
+    ("id", "melayu-phonetic*"),
+    ("id", "pegon-phonetic"),
+    ("ie", "ogam*"),
+    ("it", "geo"),
+    ("jp", "kana"),
+    ("jp", "kana86"),
+    ("lv", "modern-cyr"),
+    ("me", "cyrillic*"),
+    ("ph", "*-bay"),
+    ("pl", "ru_phonetic_dvorak"),
+    ("se", "rus"),
+    ("us", "chr"),
+    ("us", "rus"),
+];
+
+fn matches_pattern(pattern: &str, variant: &str) -> bool {
+    if let Some(prefix) = pattern.strip_suffix('*') {
+        variant.starts_with(prefix)
+    } else if let Some(suffix) = pattern.strip_prefix('*') {
+        variant.ends_with(suffix)
+    } else {
+        pattern == variant
+    }
+}
+
+fn cannot_type_ascii(layout: &str, variant: &str) -> bool {
+    if NON_ASCII_LAYOUTS.contains(&layout) {
+        return !variant.contains("latin") && !ASCII_VARIANTS.contains(&(layout, variant));
+    }
+    (NON_ASCII_VARIANT_PATTERNS.iter()).any(|&(l, v)| l == layout && matches_pattern(v, variant))
+}
+
+const LAYOUT_SWITCH: &str = "grp:win_space_toggle";
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct XkbKeymap {
+    pub layouts: String,
+    pub variants: String,
+    pub options: String,
+}
+
+impl XkbKeymap {
+    #[must_use]
+    pub fn new(layout: &str, variant: Option<&str>) -> Self {
+        let variant = variant.unwrap_or("");
+        if cannot_type_ascii(layout, variant) {
+            Self {
+                layouts: format!("{layout},us"),
+                variants: format!("{variant},"),
+                options: LAYOUT_SWITCH.to_owned(),
+            }
+        } else {
+            Self {
+                layouts: layout.to_owned(),
+                variants: variant.to_owned(),
+                options: String::new(),
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn has_latin_fallback(&self) -> bool {
+        !self.options.is_empty()
+    }
+
+    fn kxkbrc_entries(&self) -> Vec<KConfigEntry> {
+        let entry = |key, value: &str| KConfigEntry::value("kxkbrc", "Layout", key, Some(value));
+        // KWin ignores `Options` without `ResetOldOptions`, keeping `XKB_DEFAULT_OPTIONS`
+        let mut entries = vec![
+            KConfigEntry::bool("kxkbrc", "Layout", "Use", true),
+            entry("LayoutList", &self.layouts),
+            entry("VariantList", &self.variants),
+            entry("Options", &self.options),
+        ];
+        if !self.options.is_empty() {
+            entries.push(KConfigEntry::bool("kxkbrc", "Layout", "ResetOldOptions", true));
+        }
+        entries
+    }
+
+    fn parse_vconsole(conf: &str) -> Option<Self> {
+        let mut found = false;
+        let mut keymap = Self::default();
+        for line in conf.lines().map(str::trim) {
+            let Some((key, val)) = line.split_once('=') else { continue };
+            let key = key.trim();
+            if line.starts_with('#')
+                || !matches!(key, "XKBLAYOUT" | "XKBMODEL" | "XKBVARIANT" | "XKBOPTIONS")
+            {
+                continue;
+            }
+            let val = crate::cfg::unquote(val.trim());
+            found |= !val.is_empty();
+            match key {
+                "XKBLAYOUT" => val.clone_into(&mut keymap.layouts),
+                "XKBVARIANT" => val.clone_into(&mut keymap.variants),
+                "XKBOPTIONS" => val.clone_into(&mut keymap.options),
+                _ => {}
+            }
+        }
+        found.then_some(keymap)
+    }
+
+    fn parse_xorg(conf: &str) -> Self {
+        let mut keymap = Self::default();
+        let mut in_section = false;
+        for line in conf.lines().map(str::trim).filter(|l| !l.starts_with('#')) {
+            let words = line.split_whitespace().map(|w| w.trim_matches('"')).collect_vec();
+            match words.as_slice() {
+                ["Section", "InputClass"] => in_section = true,
+                ["EndSection", ..] => in_section = false,
+                ["Option", "XkbLayout", val] if in_section => {
+                    (*val).clone_into(&mut keymap.layouts);
+                }
+                ["Option", "XkbVariant", val] if in_section => {
+                    (*val).clone_into(&mut keymap.variants);
+                }
+                ["Option", "XkbOptions", val] if in_section => {
+                    (*val).clone_into(&mut keymap.options);
+                }
+                _ => {}
+            }
+        }
+        keymap
+    }
+
+    pub async fn system() -> Option<Self> {
+        let read = async |path: &str| {
+            tokio::fs::read_to_string(path)
+                .await
+                .inspect_err(|e| tracing::debug!(?e, path, "cannot read the keymap"))
+                .ok()
+        };
+        let keymap =
+            match read("/etc/vconsole.conf").await.as_deref().and_then(Self::parse_vconsole) {
+                Some(keymap) => keymap,
+                None => Self::parse_xorg(&read("/etc/X11/xorg.conf.d/00-keyboard.conf").await?),
+            };
+        (!keymap.layouts.trim_matches(',').trim().is_empty()).then_some(keymap)
+    }
+
+    #[must_use]
+    pub fn gnome_sources(&self) -> Vec<String> {
+        self.layouts
+            .split(',')
+            .zip(self.variants.split(',').chain(std::iter::repeat("")))
+            .map(|(layout, variant)| {
+                let name = if variant.is_empty() {
+                    layout.to_owned()
+                } else {
+                    format!("{layout}+{variant}")
+                };
+                format!("('xkb', '{}')", escape_gvariant_string(&name))
+            })
+            .collect()
+    }
+}
+
+fn escape_gvariant_string(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('\'', "\\'")
+}
+
 async fn set_kde_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<()> {
-    let args = ["--file", "kxkbrc", "--group", "Layout", "--key", "LayoutList", layout];
-    pkexec(user, "kwriteconfig6", &args).await?;
-    let variant = variant.unwrap_or("");
-    let args = ["--file", "kxkbrc", "--group", "Layout", "--key", "VariantList", variant];
-    pkexec(user, "kwriteconfig6", &args).await?;
-    let args = [
-        ["--session", "--type=signal"],
-        ["--reply-timeout=100", "--reply-timeout=100"],
-        ["/Layouts", "org.kde.keyboard.reloadConfig"],
+    for entry in XkbKeymap::new(layout, variant).kxkbrc_entries() {
+        crate::as_user(user, entry.command(None), None).await?;
+    }
+    let argv = [
+        "dbus-send",
+        "--session",
+        "--type=signal",
+        "--reply-timeout=100",
+        "--reply-timeout=100",
+        "/Layouts",
+        "org.kde.keyboard.reloadConfig",
     ];
-    pkexec(user, "dbus-send", &args.concat()).await?;
+    if let Err(e) = crate::as_user(user, argv, None).await {
+        tracing::warn!(?e, "cannot tell KWin to reload the keyboard layout");
+    }
     Ok(())
 }
 async fn set_gsettings_keymap(user: &str, layout: &str, variant: Option<&str>) -> Res<()> {
     // gsettings describe org.gnome.desktop.input-sources sources
     // List of input source identifiers available. Each source is specified as a tuple of 2 strings. The first string is the type and can be one of “xkb” or “ibus”. For “xkb” sources the second string is “xkb_layout+xkb_variant” or just “xkb_layout” if a XKB variant isn’t needed. For “ibus” sources the second string is the IBus engine name. An empty list means that the X server’s current XKB layout and variant won’t be touched and IBus won’t be used.
-    let name = format!("{layout}{}", variant.map(|v| format!("+{v}")).unwrap_or_default());
-    let args = [
-        ["DISPLAY=:0", "gsettings"],
-        ["set", "org.gnome.desktop.input-sources"],
-        ["sources", &format!("[('xkb', '{name}')]")],
-    ];
-    pkexec(user, "env", &args.concat()).await?;
+    let sources = XkbKeymap::new(layout, variant).gnome_sources().join(", ");
+    let sources = format!("[{sources}]");
+    let argv = ["env", "DISPLAY=:0", "gsettings", "set", "org.gnome.desktop.input-sources"];
+    crate::as_user(user, argv.iter().chain(&["sources", &sources]), None).await
+}
+
+pub async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> Res<()> {
+    let xkb = XkbKeymap::new(layout, variant);
+    root(crate::Verb::SetX11Keymap {
+        layouts: xkb.layouts,
+        variants: xkb.variants,
+        options: xkb.options,
+    })
+    .await?;
     Ok(())
 }
 
-async fn set_localectl_keymap(layout: &str, variant: Option<&str>) -> Res<()> {
-    let variant = variant.unwrap_or("");
-    let args = ["set-x11-keymap", layout, "", variant, ""];
-    root("localectl", &args).await?;
-    Ok(())
+async fn system_keymap_to_keep() -> Option<XkbKeymap> {
+    let system = XkbKeymap::system().await?;
+    let several_layouts = system.layouts.contains(',');
+    let needs_latin_fallback =
+        XkbKeymap::new(&system.layouts, Some(&system.variants)).has_latin_fallback();
+    (several_layouts || !needs_latin_fallback).then_some(system)
+}
+
+async fn user_kxkbrc_entries(settings: &crate::settings::Settings) -> Option<Vec<KConfigEntry>> {
+    if !settings.kb_picked
+        && let Some(system) = system_keymap_to_keep().await
+    {
+        return Some(system.kxkbrc_entries());
+    }
+    if settings.kb_layout.is_empty() {
+        return None;
+    }
+    Some(XkbKeymap::new(&settings.kb_layout, settings.kb_variant.as_deref()).kxkbrc_entries())
+}
+
+// KWin on Wayland doesn't fall back to the system's locale1 layout
+pub async fn apply_keymap_to_user(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+) -> Res<()> {
+    if cfg.taidan0.systemd_homed || cfg.desktop() != Desktop::Plasma {
+        return Ok(());
+    }
+    apply_keymap(settings, &Home::user(settings, cfg).await?, Desktop::Plasma).await.map(drop)
+}
+
+pub(crate) async fn apply_keymap(
+    settings: &crate::settings::Settings,
+    home: &Home,
+    desktop: Desktop,
+) -> Res<bool> {
+    if desktop != Desktop::Plasma {
+        return Ok(false);
+    }
+    let Some(entries) = user_kxkbrc_entries(settings).await else { return Ok(false) };
+    home.run(home.kconfig(&entries).collect())
+        .await
+        .wrap_msg("cannot write the keyboard layout")?;
+    Ok(true)
 }
 
 #[allow(clippy::equatable_if_let)]
-#[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-pub async fn set_keymap(user: Option<&str>, layout: &str, variant: Option<&str>) -> Res<()> {
-    let current_user = uzers::get_current_username().expect("can't get current username");
+#[allow(clippy::missing_panics_doc)]
+pub async fn set_keymap(
+    user: Option<&str>,
+    layout: &str,
+    variant: Option<&str>,
+    also_system: bool,
+) -> Res<bool> {
+    let current_user =
+        uzers::get_current_username().ok_or(Err::Msg("can't get current username"))?;
     if current_user.as_encoded_bytes() != b"taidan" && cfg!(debug_assertions) {
         // #74
         tracing::warn!("Skipping set_keymap in debug mode without being `taidan` user");
-        return Ok(());
+        return Ok(true);
     }
-    if let Ok(true) = tokio::fs::try_exists("/usr/bin/localectl").await {
-        set_localectl_keymap(layout, variant).await?;
+    let mut system_saved = true;
+    if also_system
+        && let Ok(true) = tokio::fs::try_exists("/usr/bin/localectl").await
+        && let Err(e) = set_localectl_keymap(layout, variant).await
+    {
+        tracing::error!(?e, layout, ?variant, "cannot set the system keymap");
+        system_saved = false;
     }
 
-    crate::xhost_local().await?;
-    let user = user.unwrap_or_else(|| current_user.to_str().unwrap());
+    let user = match user {
+        Some(user) => user,
+        None => current_user.to_str().ok_or(Err::Msg("current username is not valid UTF-8"))?,
+    };
     if let Ok(true) = tokio::fs::try_exists("/usr/bin/kwriteconfig6").await {
-        set_kde_keymap(user, layout, variant).await
+        set_kde_keymap(user, layout, variant).await?;
     } else {
-        set_gsettings_keymap(user, layout, variant).await
+        set_gsettings_keymap(user, layout, variant).await?;
+    }
+    Ok(system_saved)
+}
+
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+pub struct I18nCfg {
+    #[serde(default)]
+    pub imf: Option<I18nImf>,
+}
+
+impl I18nCfg {
+    #[must_use]
+    pub fn imf(&self, edition: &str) -> I18nImf {
+        self.imf.unwrap_or(match crate::cfg::Desktop::from_edition(edition) {
+            crate::cfg::Desktop::Gnome => I18nImf::IBus,
+            _ => I18nImf::Fcitx5,
+        })
     }
 }
 
-#[derive(Clone, Debug, Default, serde::Deserialize)]
-pub struct I18nCfg {
-    pub imf: I18nImf,
-}
-
-#[derive(Copy, Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum I18nImf {
-    Fcitx5,
     #[default]
+    Fcitx5,
     IBus,
 }
 
 impl I18nImf {
-    /// Returns `true` if the i18n imf is [`Fcitx5`].
-    ///
-    /// [`Fcitx5`]: I18nImf::Fcitx5
-    #[must_use]
-    pub const fn is_fcitx5(&self) -> bool {
-        matches!(self, Self::Fcitx5)
-    }
-
     /// Returns `true` if the i18n imf is [`IBus`].
     ///
     /// [`IBus`]: I18nImf::IBus
     #[must_use]
     pub const fn is_ibus(&self) -> bool {
         matches!(self, Self::IBus)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn system_keymap_files() {
+        let conf = "# Written by systemd-localed(8)\nKEYMAP=de\nXKBLAYOUT=\"de,us\"\nXKBMODEL=pc105\nXKBVARIANT=nodeadkeys,\nXKBOPTIONS=grp:alt_shift_toggle\n";
+        let km = XkbKeymap::parse_vconsole(conf).unwrap();
+        assert_eq!(
+            (km.layouts.as_str(), km.variants.as_str(), km.options.as_str()),
+            ("de,us", "nodeadkeys,", "grp:alt_shift_toggle")
+        );
+        assert!(XkbKeymap::parse_vconsole("KEYMAP=us\n#XKBLAYOUT=de\n").is_none());
+        assert!(XkbKeymap::parse_vconsole("XKBLAYOUT=\n").is_none());
+        let conf = "Section \"InputClass\"\n        Option \"XkbLayout\" \"cz,us\"\n        Option \"XkbVariant\" \"qwerty,\"\n        Option \"XkbOptions\" \"grp:win_space_toggle\"\nEndSection\n";
+        let km = XkbKeymap::parse_xorg(conf);
+        assert_eq!(
+            (km.layouts.as_str(), km.variants.as_str(), km.options.as_str()),
+            ("cz,us", "qwerty,", "grp:win_space_toggle")
+        );
+        let entries = km.kxkbrc_entries();
+        assert!(entries.iter().any(|e| e.key == "ResetOldOptions"));
+        assert!(
+            entries.iter().any(|e| e.key == "LayoutList" && e.value.as_deref() == Some("cz,us"))
+        );
+    }
+
+    #[test]
+    fn latin_fallback() {
+        let ru = XkbKeymap::new("ru", None);
+        assert_eq!((ru.layouts.as_str(), ru.variants.as_str()), ("ru,us", ","));
+        assert_eq!(ru.options, LAYOUT_SWITCH);
+        assert_eq!(ru.gnome_sources(), ["('xkb', 'ru')", "('xkb', 'us')"]);
+        let rs = XkbKeymap::new("rs", Some("latin"));
+        assert_eq!((rs.layouts.as_str(), rs.options.as_str()), ("rs", ""));
+        let de = XkbKeymap::new("de", Some("nodeadkeys"));
+        assert!(!de.has_latin_fallback());
+        assert_eq!(de.gnome_sources(), ["('xkb', 'de+nodeadkeys')"]);
+        assert!(XkbKeymap::new("jp", Some("kana")).has_latin_fallback());
+        assert!(XkbKeymap::new("cn", Some("mon_trad")).has_latin_fallback());
+        assert!(!XkbKeymap::new("jp", None).has_latin_fallback());
+        assert!(!XkbKeymap::new("iq", Some("ku_f")).has_latin_fallback());
+        assert!(XkbKeymap::new("eg", None).has_latin_fallback());
+        let gr = XkbKeymap::new("gr", Some("polytonic"));
+        assert_eq!(gr.gnome_sources(), ["('xkb', 'gr+polytonic')", "('xkb', 'us')"]);
+    }
+
+    #[test]
+    fn non_latin_variants() {
+        for (layout, variant) in [
+            ("brai", None),
+            ("brai", Some("left_hand")),
+            ("dz", Some("ar")),
+            ("dz", Some("ber")),
+            ("ph", Some("qwerty-bay")),
+            ("ph", Some("capewell-qwerf2k6-bay")),
+            ("fr", Some("geo")),
+            ("it", Some("geo")),
+            ("id", Some("melayu-phonetic")),
+            ("id", Some("melayu-phoneticx")),
+            ("id", Some("pegon-phonetic")),
+            ("ie", Some("ogam")),
+            ("ie", Some("ogam_is434")),
+            ("lv", Some("modern-cyr")),
+            ("me", Some("cyrillic")),
+            ("me", Some("cyrillicalternatequotes")),
+            ("al", Some("veqilharxhi")),
+            ("az", Some("cyrillic")),
+        ] {
+            assert!(XkbKeymap::new(layout, variant).has_latin_fallback(), "{layout}({variant:?})");
+        }
+        for (layout, variant) in [
+            ("dz", None),
+            ("dz", Some("azerty-deadkeys")),
+            ("ph", None),
+            ("ph", Some("capewell-dvorak")),
+            ("id", Some("javanese")),
+            ("ie", None),
+            ("lv", Some("modern")),
+            ("me", Some("latinyz")),
+            ("al", Some("plisi")),
+        ] {
+            assert!(!XkbKeymap::new(layout, variant).has_latin_fallback(), "{layout}({variant:?})");
+        }
+    }
+
+    #[test]
+    fn every_non_latin_variant_exists() {
+        let only_in_extras_or_older_xkeyboard_config =
+            [("de", "ru-recom"), ("de", "ru-translit"), ("jp", "kana86")];
+        for &(layout, pattern) in NON_ASCII_VARIANT_PATTERNS {
+            if only_in_extras_or_older_xkeyboard_config.contains(&(layout, pattern)) {
+                continue;
+            }
+            let variants = &LAYOUTS.get(layout).unwrap_or_else(|| panic!("no {layout}")).variants;
+            assert!(
+                variants.keys().any(|v| matches_pattern(pattern, v)),
+                "{layout}({pattern}) matches no variant"
+            );
+        }
+        for layout in NON_ASCII_LAYOUTS {
+            assert!(LAYOUTS.contains_key(layout), "no {layout}");
+        }
+        assert!(!LAYOUTS.contains_key("custom"));
+    }
+
+    #[test]
+    fn kxkbrc_clears_options() {
+        let has = |km: &XkbKeymap, key: &str| {
+            km.kxkbrc_entries().into_iter().find(|e| e.key == key).map(|e| e.value)
+        };
+        let de = XkbKeymap::new("de", None);
+        assert_eq!(has(&de, "Options"), Some(Some(String::new())));
+        assert_eq!(has(&de, "ResetOldOptions"), None);
+        let ru = XkbKeymap::new("ru", None);
+        assert_eq!(has(&ru, "Options"), Some(Some(LAYOUT_SWITCH.to_owned())));
+        assert_eq!(has(&ru, "ResetOldOptions"), Some(Some("true".to_owned())));
+    }
+
+    #[test]
+    fn ims_from_locale() {
+        let f = I18nImf::Fcitx5;
+        assert_eq!(default_ims("zh_CN.UTF-8", f), ["Pinyin"]);
+        assert_eq!(default_ims("zh_SG.UTF-8", f), ["Pinyin"]);
+        assert_eq!(default_ims("zh_TW.UTF-8", f), ["Zhuyin"]);
+        assert_eq!(default_ims("zh_HK.UTF-8", f), ["Cangjie 5"]);
+        assert_eq!(default_ims("yue_HK.UTF-8", f), ["Cangjie 5"]);
+        assert_eq!(default_ims("ja_JP.UTF-8", f), ["Mozc"]);
+        assert_eq!(default_ims("ko_KR.UTF-8", I18nImf::IBus), ["libhangul"]);
+        assert_eq!(default_ims("th_TH.UTF-8", I18nImf::IBus), ["Thai"]);
+        assert!(default_ims("en_US.UTF-8", f).is_empty());
+        assert!(default_ims("", f).is_empty());
+        assert!(default_ims("C.UTF-8", f).is_empty());
+    }
+
+    #[test]
+    fn every_default_im_exists() {
+        for locale in
+            ["zh_CN", "zh_TW", "zh_HK", "ja_JP", "ko_KR", "vi_VN", "bn_IN", "si_LK", "th_TH"]
+        {
+            for imf in [I18nImf::Fcitx5, I18nImf::IBus] {
+                let ims = default_ims(locale, imf);
+                assert_eq!(ims.len(), 1, "{locale} {imf:?}");
+                assert!(find_im(&ims[0]).is_some_and(|im| im.available(imf)));
+            }
+        }
+    }
+
+    #[test]
+    fn imf_default() {
+        let cfg = I18nCfg::default();
+        assert_eq!(cfg.imf("gnome"), I18nImf::IBus);
+        assert_eq!(cfg.imf("atomic-gnome"), I18nImf::IBus);
+        assert_eq!(cfg.imf("plasma"), I18nImf::Fcitx5);
+        assert_eq!(cfg.imf(""), I18nImf::Fcitx5);
+        let cfg = I18nCfg { imf: Some(I18nImf::IBus) };
+        assert_eq!(cfg.imf("plasma"), I18nImf::IBus);
+    }
+
+    #[test]
+    fn fills_settings_from_locale() {
+        let mut settings =
+            crate::settings::Settings { locale: "ja_JP.UTF-8".into(), ..Default::default() };
+        fill_settings(&mut settings, &crate::cfg::Config::default());
+        assert_eq!(settings.imf, I18nImf::Fcitx5);
+        assert_eq!(settings.ims, ["Mozc"]);
+    }
+
+    #[test]
+    fn keeps_picked_ims_the_framework_has() {
+        let mut settings = crate::settings::Settings {
+            locale: "ja_JP.UTF-8".into(),
+            ims: vec!["Shuangpin".into(), "Pinyin".into(), "bogus".into()],
+            ..Default::default()
+        };
+        let cfg =
+            crate::cfg::Config { i18n: I18nCfg { imf: Some(I18nImf::IBus) }, ..Default::default() };
+        fill_settings(&mut settings, &cfg);
+        assert_eq!(settings.ims, ["Pinyin"]);
+    }
+
+    #[test]
+    fn turning_all_ims_off_means_none() {
+        let mut settings = crate::settings::Settings {
+            locale: "ja_JP.UTF-8".into(),
+            ims_picked: true,
+            ..Default::default()
+        };
+        fill_settings(&mut settings, &crate::cfg::Config::default());
+        assert!(settings.ims.is_empty());
     }
 }

@@ -1,0 +1,4 @@
+[Plugins]
+# both put a close button on every window
+overviewEnabled=false
+windowviewEnabled=false

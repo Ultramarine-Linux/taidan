@@ -1,23 +1,31 @@
 #![warn(rust_2018_idioms)]
-pub mod backend;
+pub mod a11y;
+pub mod account;
+pub mod avatar;
 pub mod cfg;
-pub mod macros;
-pub mod pages;
-pub mod prelude;
+pub mod child;
+pub mod ims;
+pub mod install;
+pub mod l10n;
+pub mod network;
+pub mod screen;
+pub mod theme;
+pub mod timezone;
+pub mod tweaks;
 pub mod ui;
+pub mod wallpaper;
 
 use std::sync::LazyLock;
 
-use crate::prelude::*;
-use gtk::glib::translate::FromGlibPtrNone;
 use i18n_embed::LanguageLoader;
 use parking_lot::RwLock;
-use relm4::{
-    Component, ComponentController, ComponentParts, ComponentSender, RelmApp, SimpleComponent,
-};
+use sentry::integrations::tracing::{BreadcrumbLayer, ErrorLayer, SpanLayer};
+use tracing::Level;
+use tracing_subscriber::filter::{LevelFilter, filter_fn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 const APPID: &str = "com.fyralabs.Taidan";
+#[cfg(not(debug_assertions))]
 const SENTRY_LINK: &str =
     "https://26f566a221c052a686581b9170c2c9e6@o271654.ingest.us.sentry.io/4510401485799427";
 static LOCALE_SOLVER: LazyLock<poly_l10n::LocaleFallbackSolver> = LazyLock::new(Default::default);
@@ -29,260 +37,158 @@ static AVAILABLE_LANGS: LazyLock<Vec<i18n_embed::unic_langid::LanguageIdentifier
 /// Configuration of the distro OOBE.
 pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     tracing::debug!("Initializing cfg::Config");
-    let mut cfg = cfg::Config::new().expect("cannot init config");
-    cfg.populate();
+    let mut cfg = cfg::Config::new().unwrap_or_else(|e| {
+        tracing::error!(%e, "cannot parse /etc/taidan.toml, using the defaults");
+        sentry::capture_message(
+            &format!("cannot parse /etc/taidan.toml: {e}"),
+            sentry::Level::Error,
+        );
+        cfg::Config::default()
+    });
+    cfg::populate(&mut cfg);
     tracing::debug!("Populated cfg::Config (turn on `trace` to see body)");
     cfg
 });
-pub static SETTINGS: relm4::SharedState<backend::settings::Settings> = relm4::SharedState::new();
-/// Language Loader
-pub static LL: std::sync::LazyLock<RwLock<i18n_embed::fluent::FluentLanguageLoader>> =
-    std::sync::LazyLock::new(|| RwLock::new(handle_l10n()));
+pub static SETTINGS: LazyLock<RwLock<libtaidan::settings::Settings>> =
+    LazyLock::new(Default::default);
+
+pub static RT: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("cannot create tokio runtime")
+});
 
 #[derive(rust_embed::RustEmbed)]
 #[folder = "po/"]
 #[exclude = "en-owo/*.ftl"]
 struct Localizations;
 
-generate_pages!(Page AppModel AppMsg:
-    00: Language,
-    01: Welcome,
-    02: Keyboard,
-    03: DeviceName,
-    04: WhoAreYou,
-    05: Password,
-    06: Internet,
-    07: Analytics,
-    08: CrashReport,
-    09: Tweaks,
-    10: Codecs,
-    11: InputMethod,
-    12: Theme,
-    13: Installing,
-    14: Finish,
-    15: Error,
-);
-
-#[derive(Debug, Clone)]
-pub enum NavAction {
-    GoTo(Page),
-    Next,
-    Back,
-    Quit,
-}
-
-#[derive(Debug)]
-pub enum AppMsg {
-    Nav(NavAction),
-    InstallError(String),
-    Update,
-    Quit,
-}
-
-#[allow(clippy::str_to_string)]
-#[relm4::component(pub)]
-impl SimpleComponent for AppModel {
-    type Init = ();
-
-    type Input = AppMsg;
-    type Output = ();
-
-    view! {
-        libhelium::ApplicationWindow {
-            set_title: Some(&t!("page-welcome", distro = CFG.distro.clone())),
-            set_default_width: 800,
-            set_default_height: 700,
-            set_vexpand: true,
-            set_align: gtk::Align::Fill,
-
-            #[wrap(Some)]
-            set_child = &gtk::Box {
-                set_vexpand: true,
-                set_align: gtk::Align::Fill,
-                set_orientation: gtk::Orientation::Vertical,
-
-                #[transition = "SlideLeftRight"]
-                #[name = "stack"]
-                match model.page {
-                    Page::Language => *model.language_page.widget(),
-                    Page::Welcome => *model.welcome_page.widget(),
-                    Page::Keyboard => *model.keyboard_page.widget(),
-                    Page::DeviceName => *model.device_name_page.widget(),
-                    Page::WhoAreYou => *model.who_are_you_page.widget(),
-                    Page::Password => *model.password_page.widget(),
-                    Page::Internet => *model.internet_page.widget(),
-                    Page::Analytics => *model.analytics_page.widget(),
-                    Page::CrashReport => *model.crash_report_page.widget(),
-                    Page::Tweaks => *model.tweaks_page.widget(),
-                    Page::Codecs => *model.codecs_page.widget(),
-                    Page::InputMethod => *model.input_method_page.widget(),
-                    Page::Theme => *model.theme_page.widget(),
-                    Page::Installing => *model.installing_page.widget(),
-                    Page::Finish => *model.finish_page.widget(),
-                    Page::Error => *model.error_page.widget(),
-                }
-            }
-        }
-    }
-
-    // Initialize the UI.
-    fn init(
-        (): Self::Init,
-        root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
-        // TODO: make libhelium force this
-        let display = gtk::gdk::Display::default().unwrap();
-        let settings = gtk::Settings::for_display(&display);
-        settings.set_gtk_icon_theme_name(Some("Hydrogen"));
-        let theme = gtk::IconTheme::for_display(&display);
-        theme.add_resource_path("/com/fyralabs/Taidan/icons/symbolic/actions");
-        SETTINGS.subscribe(sender.input_sender(), |_| AppMsg::Update);
-
-        let model = Self::_default(sender);
-
-        let widgets = view_output!();
-
-        widgets.stack.set_vexpand(true);
-
-        ComponentParts { model, widgets }
-    }
-
-    fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>) {
-        tracing::trace!(?message, "AppModel: Received message");
-        match message {
-            AppMsg::Nav(NavAction::Next)
-                if self.page == Page::Password && SETTINGS.read().skipconfig =>
-            {
-                self.page = Page::Installing;
-                self.run_install(sender, backend::start_simple_install);
-            }
-            AppMsg::Nav(NavAction::Next)
-                if self.page == Page::Theme && SETTINGS.read().nointernet =>
-            {
-                self.page = Page::Installing;
-                self.run_install(sender, backend::start_install);
-            }
-            AppMsg::Nav(NavAction::GoTo(page)) => {
-                self.page = page;
-                if page == Page::Installing {
-                    self.run_install(sender, backend::start_install);
-                }
-            }
-            AppMsg::Nav(NavAction::Quit) => {
-                let ss = sender.clone();
-                sender.oneshot_command(async move {
-                    if let Err(e) = backend::pkexec("root", "rm", &["-rf", "/var/.unconfigured", "/.unconfigured"]).await
-                    {
-                        tracing::error!(?e, "cannot remove /var/.unconfigured and/or /.unconfigured; exiting anyway");
-                    } else {
-                        tracing::debug!("removed /var/.unconfigured and/or /.unconfigured");
-                    }
-                    if let Err(e) = backend::pkexec("root", "systemctl", &["disable", "taidan-initial-setup-reconfiguration"]).await
-                    {
-                        tracing::error!(?e, "cannot disable taidan-initial-setup-reconfiguration.service; exiting anyway");
-                    } else {
-                        tracing::debug!("disabled taidan-initial-setup-reconfiguration.service");
-                    }
-
-                    ss.input(AppMsg::Quit);
-                });
-            }
-            AppMsg::Nav(NavAction::Next) => {
-                while {
-                    self.page =
-                        usize::from(self.page).wrapping_add(1).try_into().unwrap_or(self.page);
-                    !self.get_page_widget().is_visible() // hack in generate_pages
-                } {}
-                if self.page == Page::Installing {
-                    self.run_install(sender, backend::start_install);
-                }
-            }
-            AppMsg::Nav(NavAction::Back) => {
-                while {
-                    self.page =
-                        usize::from(self.page).wrapping_sub(1).try_into().unwrap_or(self.page);
-                    !self.get_page_widget().is_visible()
-                } {}
-            }
-            AppMsg::InstallError(msg) => {
-                self.page = Page::Error;
-                self.error_page
-                    .sender()
-                    .send(pages::ErrorPageMsg::Receive(msg))
-                    .expect("sender dropped?");
-            }
-            AppMsg::Update => {}
-            AppMsg::Quit => {
-                relm4::main_application().quit();
-            }
-        }
-        // BUG: labels don't update without this?
-        self.welcome_page.sender().send(pages::_01_welcome::WelcomePageMsg::Update).unwrap();
-    }
-}
-
-type Sd = relm4::Sender<pages::InstallingPageMsg>;
-impl AppModel {
-    #[allow(clippy::needless_pass_by_value)]
-    fn run_install<Fut, F>(&self, sender: ComponentSender<Self>, f: F)
-    where
-        Fut: std::future::Future<Output = color_eyre::Result<()>> + Send,
-        F: Fn(backend::settings::Settings, Sd) -> Fut + Send + 'static,
-    {
-        let inst_sender = self.installing_page.sender().clone();
-        let (ss, sett) = (sender.clone(), SETTINGS.read().clone());
-        sender.oneshot_command(async move {
-            if let Err(e) = f(sett, inst_sender).await {
-                sentry::capture_message(&format!("{e:?}"), sentry::Level::Error);
-                sentry_eyre::capture_report(&e);
-                ss.input(AppMsg::InstallError(strip_ansi_escapes::strip_str(format!("{e:?}"))));
-            }
-        });
-    }
-}
-
-fn handle_l10n() -> i18n_embed::fluent::FluentLanguageLoader {
-    use i18n_embed::{LanguageLoader, fluent::fluent_language_loader};
-    let loader = fluent_language_loader!();
-    let locale_solver = poly_l10n::LocaleFallbackSolver::<poly_l10n::Rulebook>::default();
-    let available_langs = loader.available_languages(&Localizations).unwrap();
-    let mut langs = poly_l10n::system_want_langids()
-        .flat_map(|li| locale_solver.solve_locale(li))
-        .filter(|li| available_langs.contains(li))
-        .collect_vec();
-    if langs.is_empty() {
-        langs = vec![loader.fallback_language().clone()];
-    }
-    loader.load_languages(&Localizations, &langs).unwrap();
-    loader
-}
-
 #[allow(clippy::missing_errors_doc)]
 #[allow(clippy::missing_panics_doc)]
 fn main() {
     let _guard = setup_logs_and_install_panic_hook();
-    std::sync::LazyLock::force(&LL);
-    // FIXME: temp hack to set nointernet to true here (should be default value), please refactor
-    SETTINGS.write().nointernet = true;
+    // return rather than exit so dropping `_guard` flushes the log and Sentry
+    if CFG.should_exit {
+        return;
+    }
+    LazyLock::force(&l10n::PO_LOADER);
 
-    gtk::gio::resources_register_include!("icons.gresource").unwrap();
+    ui::run();
+}
 
-    // SAFETY: placeholder
-    let color =
-        unsafe {
-            libhelium::RGBColor::from_glib_none(std::ptr::from_mut(
-                &mut libhelium::ffi::HeRGBColor { r: 0.0, g: 7.0, b: 143.0 },
-            ))
-        };
-    let app = libhelium::Application::builder()
-        .application_id(APPID)
-        .flags(gtk::gio::ApplicationFlags::default())
-        .default_accent_color(&color)
-        .build();
+#[cfg_attr(debug_assertions, allow(dead_code))]
+const PRIVATE_FIELDS: &[&str] = &[
+    "user", "username", "prev", "ssid", "hostname", "name", "fullname", "path", "home", "dest",
+    "args", "e",
+];
 
-    tracing::debug!("Starting Taidan");
-    RelmApp::from_app(app).run::<AppModel>(());
+static PRIVATE_VALUES: RwLock<Vec<(regex::Regex, &'static str)>> = RwLock::new(Vec::new());
+
+pub fn set_private_values(settings: &libtaidan::settings::Settings) {
+    let values = [
+        (settings.fullname.as_str(), "<fullname>"),
+        (settings.device_name.as_str(), "<hostname>"),
+        (settings.hostname.as_str(), "<hostname>"),
+        (settings.username.as_str(), "<user>"),
+    ];
+    let values = values
+        .into_iter()
+        .filter_map(|(value, placeholder)| Some((whole_word_regex(value.trim())?, placeholder)))
+        .collect();
+    *PRIVATE_VALUES.write() = values;
+}
+
+fn whole_word_regex(value: &str) -> Option<regex::Regex> {
+    let is_word_char = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
+    let first = value.chars().next()?;
+    let last = value.chars().next_back()?;
+    let no_boundary = "()";
+    let before = if is_word_char(first) { r"(^|[^\w-])" } else { no_boundary };
+    let after = if is_word_char(last) { r"($|[^\w-])" } else { no_boundary };
+    regex::RegexBuilder::new(&format!("{before}{}{after}", regex::escape(value)))
+        .case_insensitive(true)
+        .build()
+        .inspect_err(|e| tracing::debug!(?e, "cannot make the regex to scrub a value"))
+        .ok()
+}
+
+#[cfg_attr(debug_assertions, allow(dead_code))]
+fn scrub_str(text: &mut String) {
+    replace_values(text, &PRIVATE_VALUES.read());
+}
+
+#[cfg_attr(debug_assertions, allow(dead_code))]
+const PASSES_FOR_ADJACENT_MATCHES: usize = 2;
+
+#[cfg_attr(debug_assertions, allow(dead_code))]
+fn replace_values(text: &mut String, values: &[(regex::Regex, &str)]) {
+    for (re, placeholder) in values {
+        for _ in 0..PASSES_FOR_ADJACENT_MATCHES {
+            if let std::borrow::Cow::Owned(new) =
+                re.replace_all(text, format!("${{1}}{placeholder}${{2}}"))
+            {
+                *text = new;
+            }
+        }
+    }
+}
+
+#[cfg_attr(debug_assertions, allow(dead_code))]
+fn scrub_value(value: &mut sentry::protocol::Value) {
+    use sentry::protocol::Value;
+    match value {
+        Value::String(s) => scrub_str(s),
+        Value::Array(values) => values.iter_mut().for_each(scrub_value),
+        Value::Object(fields) => fields.values_mut().for_each(scrub_value),
+        Value::Null | Value::Bool(_) | Value::Number(_) => {}
+    }
+}
+
+#[cfg_attr(debug_assertions, allow(dead_code))]
+fn scrub(fields: &mut sentry::protocol::Map<String, sentry::protocol::Value>) {
+    fields.retain(|key, _| !PRIVATE_FIELDS.contains(&key.as_str()));
+    fields.values_mut().for_each(scrub_value);
+}
+
+#[cfg_attr(debug_assertions, allow(dead_code))]
+fn scrub_breadcrumb(crumb: &mut sentry::protocol::Breadcrumb) {
+    if let Some(message) = &mut crumb.message {
+        scrub_str(message);
+    }
+    scrub(&mut crumb.data);
+}
+
+#[cfg_attr(debug_assertions, allow(dead_code))]
+fn scrub_event(event: &mut sentry::protocol::Event<'_>) {
+    if let Some(message) = &mut event.message {
+        scrub_str(message);
+    }
+    if let Some(entry) = &mut event.logentry {
+        scrub_str(&mut entry.message);
+        entry.params.iter_mut().for_each(scrub_value);
+    }
+    for exception in &mut event.exception.values {
+        if let Some(value) = &mut exception.value {
+            scrub_str(value);
+        }
+    }
+    if let Some(server) = &mut event.server_name {
+        let mut name = server.to_string();
+        scrub_str(&mut name);
+        *server = name.into();
+    }
+    for context in event.contexts.values_mut() {
+        if let sentry::protocol::Context::Other(fields) = context {
+            scrub(fields);
+        }
+    }
+    event.tags.retain(|key, _| !PRIVATE_FIELDS.contains(&key.as_str()));
+    event.tags.values_mut().for_each(scrub_str);
+    scrub(&mut event.extra);
+    for crumb in &mut event.breadcrumbs.values {
+        scrub_breadcrumb(crumb);
+    }
 }
 
 pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
@@ -302,38 +208,131 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 /// - cannot create taidan tempdir
 #[allow(clippy::cognitive_complexity)]
 fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
-    let sentry_guard = sentry::init((
-        SENTRY_LINK,
-        sentry::ClientOptions::new()
-            .maybe_release(sentry::release_name!())
-            // Capture user IPs and potentially sensitive headers when using HTTP server integrations
-            // see https://docs.sentry.io/platforms/rust/data-management/data-collected for more info
-            .send_default_pii(true)
-            .enable_logs(true),
-    ));
+    // color_eyre replaces the panic hook and Sentry's chains to it, so it goes first
     color_eyre::install().expect("install color_eyre");
+    #[cfg(not(debug_assertions))]
+    let sentry_guard = sentry::init((SENTRY_LINK, {
+        let mut options = sentry::ClientOptions::new().maybe_release(sentry::release_name!());
+        options.before_send = Some(std::sync::Arc::new(|mut event| {
+            scrub_event(&mut event);
+            Some(event)
+        }));
+        options.before_breadcrumb = Some(std::sync::Arc::new(|mut crumb| {
+            scrub_breadcrumb(&mut crumb);
+            Some(crumb)
+        }));
+        options
+    }));
+    #[cfg(debug_assertions)]
+    let sentry_guard = ();
+    let journald = tracing_journald::layer();
+    let journald_error = journald.as_ref().err().map(ToString::to_string);
+    let journald = journald.ok();
     let file_appender = tracing_appender::rolling::never(&*TEMP_DIR, "taidan.log");
     let (non_blocking, tracing_guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::registry()
         .with(fmt::layer().pretty())
-        .with(sentry::integrations::tracing::layer())
+        .with(SpanLayer::new().with_filter(LevelFilter::INFO))
+        .with(BreadcrumbLayer::new().with_filter(filter_fn(|metadata| {
+            matches!(*metadata.level(), Level::WARN | Level::INFO)
+        })))
+        .with(ErrorLayer::new().with_filter(LevelFilter::ERROR))
         .with(
             EnvFilter::builder()
-                .with_default_directive(tracing::level_filters::LevelFilter::DEBUG.into())
+                .with_default_directive(LevelFilter::DEBUG.into())
                 .with_env_var("TAIDAN_LOG")
                 .from_env_lossy(),
         )
-        .with(tracing_journald::layer().unwrap().with_syslog_identifier("taidan".to_owned()))
+        .with(journald.map(|l| l.with_syslog_identifier("taidan".to_owned())))
         .with(fmt::layer().with_writer(non_blocking).with_ansi(false).compact())
-        .with(tracing_error::ErrorLayer::default())
         .init();
 
     if cfg!(debug_assertions) {
         tracing::info!("Running in debug mode");
     }
     tracing::info!("Taidan {version}", version = env!("CARGO_PKG_VERSION"));
-    tracing::info!("Logging to journald");
+    match journald_error {
+        None => tracing::info!("Logging to journald"),
+        Some(e) => tracing::warn!(e, "cannot log to journald"),
+    }
     tracing::info!("Logging to {}/taidan.log", TEMP_DIR.display());
+    tracing::info!("Installation logs go to {}", libtaidan::TEMP_DIR.display());
     (sentry_guard, tracing_guard)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sentry::protocol::{Breadcrumb, Event, Exception};
+
+    #[test]
+    fn scrub_event_removes_the_user() {
+        set_private_values(&libtaidan::settings::Settings {
+            username: "alice".to_owned(),
+            fullname: "Alice Smith".to_owned(),
+            device_name: "Alice's Laptop".to_owned(),
+            hostname: "alices-laptop".to_owned(),
+            ..Default::default()
+        });
+        let mut event = Event {
+            message: Some("user `alice` already exists".to_owned()),
+            server_name: Some("alices-laptop".into()),
+            exception: vec![Exception {
+                ty: "Error".to_owned(),
+                value: Some("program `runuser` failed: /home/alice/.config: denied".to_owned()),
+                ..Default::default()
+            }]
+            .into(),
+            breadcrumbs: vec![Breadcrumb {
+                message: Some("hello Alice Smith on Alice's Laptop".to_owned()),
+                data: [
+                    ("args".to_owned(), serde_json::json!(["-u", "alice", "--", "true"])),
+                    ("detail".to_owned(), serde_json::json!({ "out": ["ALICE was here"] })),
+                ]
+                .into(),
+                ..Default::default()
+            }]
+            .into(),
+            ..Default::default()
+        };
+        event.extra.insert("args".to_owned(), serde_json::json!(["alice"]));
+        event.tags.insert("host".to_owned(), "alices-laptop".to_owned());
+        scrub_event(&mut event);
+
+        let json = serde_json::to_string(&event).expect("serialize event");
+        assert!(!json.to_lowercase().contains("alice"), "{json}");
+        assert_eq!(event.message.as_deref(), Some("user `<user>` already exists"));
+        assert_eq!(
+            event.exception.values[0].value.as_deref(),
+            Some("program `runuser` failed: /home/<user>/.config: denied")
+        );
+        let crumb = &event.breadcrumbs.values[0];
+        assert_eq!(crumb.message.as_deref(), Some("hello <fullname> on <hostname>"));
+        assert!(!crumb.data.contains_key("args"));
+        assert_eq!(crumb.data["detail"], serde_json::json!({ "out": ["<user> was here"] }));
+        assert!(!event.extra.contains_key("args"));
+        assert_eq!(event.server_name.as_deref(), Some("<hostname>"));
+        assert!(matches!(event.tags.get("host").map(String::as_str), Some("<hostname>")));
+    }
+
+    #[test]
+    fn whole_word_regex_leaves_longer_words_alone() {
+        let re = whole_word_regex("al").expect("regex");
+        assert!(!re.is_match("also"));
+        assert!(re.is_match("user al exists"));
+        assert!(re.is_match("/home/al"));
+        assert!(whole_word_regex("").is_none());
+    }
+
+    #[test]
+    fn replace_values_takes_every_match() {
+        let values = [(whole_word_regex("al").expect("regex"), "<user>")];
+        let mut msg = "user `al` already exists: al al, /home/al".to_owned();
+        replace_values(&mut msg, &values);
+        assert_eq!(msg, "user `<user>` already exists: <user> <user>, /home/<user>");
+        let mut msg = "cannot install alsa-lib".to_owned();
+        replace_values(&mut msg, &values);
+        assert_eq!(msg, "cannot install alsa-lib");
+    }
 }

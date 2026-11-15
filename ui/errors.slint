@@ -1,0 +1,13 @@
+// errors shown in a dialog right away, rather than ending the flow on the error page. A broken
+// `/etc/taidan.toml`, say, which the distro's maintainers need to see too
+export global Errors {
+    in-out property <bool> open;
+    in-out property <string> title;
+    in-out property <string> body;
+
+    public function show(error-title: string, error-body: string) {
+        title = error-title;
+        body = error-body;
+        open = true;
+    }
+}

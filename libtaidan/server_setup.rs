@@ -55,25 +55,40 @@ impl std::fmt::Display for ValidationError {
 
 impl std::error::Error for ValidationError {}
 
+const ANY_STEP_OPERATIONS: &[&str] = &["state.patch", "state.reset"];
+
+fn step_operations(step: &str) -> Option<&'static [&'static str]> {
+    Some(match step {
+        "welcome" => &[],
+        "devicename" => &["hostname.apply", "keyboard.apply"],
+        "whoareyou" => &["user.create"],
+        "password" => &["password.set"],
+        "ssh-key" => &["ssh-key.apply"],
+        "internet" => &[
+            "network.interfaces",
+            "network.scan_wifi",
+            "network.connect_wifi",
+            "network.configure",
+            "network.confirm",
+            "network.check",
+        ],
+        "updates" => &["updates.set_policy"],
+        "remote-access" => &[
+            "remote_access.status",
+            "remote_access.tailscale_up",
+            "remote_access.cloudflared_set_token",
+        ],
+        "dashboard" => &["access.set"],
+        "complete" => &["setup.complete", "system.reboot", "system.poweroff"],
+        _ => return None,
+    })
+}
+
 /// Validate the narrow operation vocabulary exposed by the local OOBE API.
-/// Arbitrary commands, executable paths, and argument vectors are rejected.
 pub fn validate_operation(operation: &SetupOperation) -> Result<(), ValidationError> {
-    const STEPS: &[&str] = &[
-        "welcome", "devicename", "whoareyou", "password", "ssh-key", "internet", "updates",
-        "remote-access", "dashboard", "complete",
-    ];
-    const OPERATIONS: &[&str] = &[
-        "state.patch", "state.reset", "hostname.apply", "keyboard.apply", "user.create",
-        "password.set", "network.interfaces", "network.scan_wifi", "network.connect_wifi",
-        "network.configure", "network.confirm", "network.check", "ssh-key.apply",
-        "updates.set_policy", "remote_access.status", "remote_access.tailscale_up",
-        "remote_access.cloudflared_set_token", "access.set", "system.reboot", "system.poweroff",
-        "setup.complete",
-    ];
-    if !STEPS.contains(&operation.step.as_str()) {
-        return Err(ValidationError::InvalidStep);
-    }
-    if !OPERATIONS.contains(&operation.operation.as_str()) {
+    let allowed = step_operations(&operation.step).ok_or(ValidationError::InvalidStep)?;
+    let op = operation.operation.as_str();
+    if !ANY_STEP_OPERATIONS.contains(&op) && !allowed.contains(&op) {
         return Err(ValidationError::InvalidOperation);
     }
     Ok(())
@@ -158,6 +173,42 @@ mod tests {
             };
             assert_eq!(validate_operation(&operation), Ok(()));
         }
+    }
+
+    fn op(step: &str, operation: &str) -> SetupOperation {
+        SetupOperation {
+            step: step.into(),
+            operation: operation.into(),
+            payload: serde_json::Value::Null,
+        }
+    }
+
+    #[test]
+    fn rejects_operations_from_other_steps() {
+        for (step, operation) in [
+            ("internet", "user.create"),
+            ("welcome", "password.set"),
+            ("dashboard", "system.reboot"),
+            ("updates", "setup.complete"),
+            ("complete", "network.configure"),
+        ] {
+            assert_eq!(
+                validate_operation(&op(step, operation)),
+                Err(ValidationError::InvalidOperation),
+                "{step} {operation}"
+            );
+        }
+    }
+
+    #[test]
+    fn state_operations_work_from_any_step() {
+        for step in ["welcome", "internet", "complete"] {
+            assert_eq!(validate_operation(&op(step, "state.patch")), Ok(()), "{step}");
+        }
+        assert_eq!(
+            validate_operation(&op("nope", "state.patch")),
+            Err(ValidationError::InvalidStep)
+        );
     }
 
     #[test]

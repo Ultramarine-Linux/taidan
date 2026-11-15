@@ -1,0 +1,11 @@
+export struct AccentItem {
+    id: string,
+    color: color,
+    fill: color,
+    check: color,
+}
+
+export global Appearance {
+    in property <[AccentItem]> accents;
+    in-out property <int> accent: -1;
+}

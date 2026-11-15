@@ -1,0 +1,240 @@
+import { TdnText, TdnPara, TdnBtn, TdnStyle } from "components.slint";
+import { Cfg } from "cfg.slint";
+import { Lang, Dir } from "lang.slint";
+import { A11y } from "a11y.slint";
+import { Tokens, Theme, ThemeMode } from "slintcn/theme/tokens.slint";
+
+export global Pages {
+    out property <int> accessibility: 0;
+    out property <int> language: 1;
+    out property <int> keyboard: 2;
+    out property <int> welcome: 3;
+    out property <int> theme: 4;
+    out property <int> whoareyou: 5;
+    out property <int> password: 6;
+    out property <int> timezone: 7;
+    out property <int> network: 8;
+    out property <int> location: 9;
+    out property <int> drivers: 10;
+    out property <int> summary: 11;
+    out property <int> installing: 12;
+    out property <int> done: 13;
+    out property <int> error: 14;
+}
+
+export global Nav {
+    in-out property <int> page;
+}
+
+export component TdnBasePg {
+    in property <string> pageid;
+    in property <int> index;
+    in property <int> current: Nav.page;
+    out property <bool> active: index == current;
+    callback next_page;
+    callback prev_page;
+    next_page => { Nav.page = Cfg.next-page(Nav.page); }
+    prev_page => { Nav.page = Cfg.prev-page(Nav.page); }
+
+    width: 100%;
+    height: 100%;
+    x: index < current ? -self.width : (index > current ? self.width : 0);
+    visible: active || sliding-out;
+
+    property <bool> sliding-out: leaving && self.x > -self.width && self.x < self.width;
+    property <bool> leaving;
+    property <bool> was-active;
+    init => { root.was-active = root.active; }
+    changed current => {
+        root.leaving = root.was-active;
+        root.was-active = root.active;
+    }
+
+    animate x {
+        duration: Tokens.motion-base;
+        easing: ease-out-quad;
+    }
+
+    @children
+
+    if !root.active: inactive-click-blocker := TouchArea {
+        width: 100%;
+        height: 100%;
+    }
+}
+
+export component TdnHero inherits Rectangle {
+    clip: true;
+
+    Image {
+        width: 100%;
+        height: 100%;
+        image-fit: cover;
+        source: Theme.mode == ThemeMode.dark ? Cfg.hero-dark : Cfg.hero-light;
+        accessible-role: none;
+    }
+
+    property <string> caption: Cfg.get_string("welcome.t0", Cfg.dev-session ? "Development Session" : "");
+
+    if root.caption != "" || Cfg.dev-session: VerticalLayout {
+        x: 1rem;
+        y: parent.height - self.height - 1rem;
+        width: self.preferred-width;
+        height: self.preferred-height;
+        spacing: 0.125rem;
+
+        if root.caption != "": Text {
+            font-size: Tokens.typography-body-size;
+            font-weight: 600;
+            text: root.caption;
+            color: Cfg.get_brush("welcome.t0_color", white);
+        }
+
+        if Cfg.dev-session: Text {
+            font-size: Tokens.typography-body-sm-size;
+            text: "Taidan " + Cfg.version;
+            color: Cfg.get_brush("welcome.t1_color", white);
+        }
+    }
+}
+
+export component TdnHeader inherits HorizontalLayout {
+    in property <int> step_i;
+    in property <bool> show-steps: true;
+
+    property <[string]> steps: [
+        "step-account-creation",
+        "step-region-and-connectivity",
+        "step-additional-software",
+        "step-finishing-up",
+    ];
+    property <string> step-label: Lang.t(root.steps[root.step_i], []);
+
+    height: 2.25rem;
+    spacing: 1rem;
+
+    Image {
+        source: Cfg.distro_icon();
+        accessible-label: Cfg.distro;
+        width: self.height;
+    }
+
+    VerticalLayout {
+        layout-order: Dir.order(1);
+        alignment: center;
+        spacing: 0.4rem;
+        visible: root.show-steps;
+
+        HorizontalLayout {
+            spacing: 4 * Tokens.unit;
+            accessible-role: progress-indicator;
+            accessible-label: root.step-label;
+            accessible-value: (root.step_i + 1) + "/" + root.steps.length;
+
+            for step[i] in root.steps: Rectangle {
+                layout-order: Dir.order(i);
+                height: 6 * Tokens.unit;
+                horizontal-stretch: 1;
+                border-radius: self.height / 2;
+                border-width: 1.5px;
+                border-color: TdnStyle.accent;
+                background: i <= root.step_i ? TdnStyle.accent : transparent;
+            }
+        }
+
+        TdnText {
+            color: Tokens.color-muted-foreground;
+            font-size: Tokens.typography-body-sm-size;
+            text: root.step-label;
+            horizontal-alignment: Dir.text-start;
+        }
+    }
+
+    VerticalLayout {
+        layout-order: Dir.order(2);
+        alignment: center;
+        horizontal-stretch: 0;
+        TdnBtn {
+            width: 1.75rem * Tokens.text-scale;
+            max-height: 1.75rem * Tokens.text-scale;
+            accessible-label: Lang.t("page-accessibility", []);
+            clicked => { A11y.open = true; }
+            icon: @image-url("../data/icons/settings-accessibility-symbolic.svg");
+            min-size: 1.75rem;
+            icon-size: 1rem;
+            padding-x: 0.375rem;
+        }
+    }
+}
+
+export component TdnPage inherits TdnBasePg {
+    in property <string> name: Lang.t("page-" + self.pageid, []);
+    in property <int> step_i;
+    in property <bool> can-next: true;
+    in property <bool> can-prev: Cfg.prev-page(self.index) != self.index;
+    in property <bool> show-steps: true;
+    in property <string> next-text: Lang.t("next", []);
+    in property <bool> next-enter-hint: true;
+
+    in property <bool> intercept-next;
+    callback next-intercepted;
+
+    public function try-next() {
+        if !can-next { return; }
+        if intercept-next {
+            root.next-intercepted();
+        } else {
+            root.next_page();
+        }
+    }
+
+    forward-focus: next-btn;
+
+    VerticalLayout {
+        padding-left: 2rem;
+        padding-right: 2rem;
+        padding-top: 1rem;
+        padding-bottom: 1.5rem;
+        spacing: 1.5rem;
+        accessible-role: groupbox;
+        accessible-label: root.name;
+
+        TdnHeader {
+            step_i: root.step_i;
+            show-steps: root.show-steps;
+        }
+
+        TdnPara {
+            font-size: 1.75 * Tokens.text-rem;
+            font-weight: 500;
+            text: root.name;
+        }
+
+        VerticalLayout {
+            vertical-stretch: 1;
+            spacing: 1rem;
+
+            @children
+        }
+
+        HorizontalLayout {
+            alignment: space-between;
+
+            if root.can-prev: TdnBtn {
+                text: Lang.t("prev", []);
+                clicked => { root.prev_page(); }
+            }
+
+            if !root.can-prev: Rectangle { }
+
+            next-btn := TdnBtn {
+                layout-order: Dir.order(1);
+                text: root.next-text;
+                enabled: root.can-next;
+                enter-hint: root.next-enter-hint || self.has-focus;
+                primary: true;
+                clicked => { root.try-next(); }
+            }
+        }
+    }
+}

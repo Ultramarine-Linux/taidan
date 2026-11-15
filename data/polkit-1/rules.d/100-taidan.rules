@@ -1,6 +1,19 @@
 polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.policykit.exec" &&
-        subject.isInGroup("taidan")) {
+    var networkManagerActions = [
+        "org.freedesktop.NetworkManager.settings.modify.system",
+        "org.freedesktop.NetworkManager.network-control",
+        "org.freedesktop.NetworkManager.wifi.scan",
+        "org.freedesktop.NetworkManager.enable-disable-wifi",
+    ];
+
+    if (!subject.isInGroup("taidan") || !subject.local || !subject.active) {
+        return;
+    }
+    if (action.id == "org.freedesktop.policykit.exec") {
+        // pkexec passes `program` as a realpath, so a symlink can't stand in for the helper
+        return action.lookup("program") == "/usr/libexec/taidan-helper" ? polkit.Result.YES : polkit.Result.NO;
+    }
+    if (networkManagerActions.indexOf(action.id) != -1) {
         return polkit.Result.YES;
     }
 });

@@ -1,15 +1,17 @@
-use crate::passwd::user_already_exists;
-
 pub const ACTION_TYPES: usize = 5;
 
 #[allow(clippy::unsafe_derive_deserialize)]
-#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct Config {
     #[serde(skip)]
     pub distro: String,
+    #[serde(skip)]
+    pub should_exit: bool,
     #[serde(default)]
     pub edition: String,
 
+    #[serde(default, deserialize_with = "de_skip_pages")]
+    pub skip_pages: Vec<SkipPage>,
     #[serde(default = "_default_org")]
     pub org: String,
 
@@ -18,24 +20,78 @@ pub struct Config {
 
     #[serde(default)]
     pub taidan0: Taidan0Config,
+
+    #[serde(flatten)]
+    pub ui: serde_json::Map<String, serde_json::Value>,
 }
+
+impl Default for Config {
+    fn default() -> Self {
+        basic_toml::from_str("").expect("an empty config parses")
+    }
+}
+
+const IGNORED_LEGACY_INTERNET_KEYS: [&str; 2] = ["internet_timeout", "internet_retry_interval"];
 
 fn _default_org() -> String {
     "Fyra Labs".into()
 }
 
-const fn _default_internet_retry_interval() -> u64 {
-    5
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SkipPage {
+    Accessibility,
+    Language,
+    Keyboard,
+    Welcome,
+    Theme,
+    Timezone,
+    Network,
+    Location,
+    Drivers,
+    Tweaks,
+    InputMethod,
 }
 
-const fn _default_internet_timeout() -> u64 {
-    20
+impl SkipPage {
+    fn parse(name: &str) -> Result<Self, &'static str> {
+        Ok(match name {
+            "accessibility" => Self::Accessibility,
+            "language" => Self::Language,
+            "keyboard" => Self::Keyboard,
+            "welcome" => Self::Welcome,
+            "theme" => Self::Theme,
+            "timezone" => Self::Timezone,
+            "network" | "internet" => Self::Network,
+            "location" => Self::Location,
+            "drivers" | "codecs" => Self::Drivers,
+            "tweaks" => Self::Tweaks,
+            "inputmethod" | "ims" => Self::InputMethod,
+            "devicename" | "analytics" | "crashreport" => {
+                return Err("this page no longer exists");
+            }
+            "whoareyou" | "password" | "summary" | "installing" | "finish" | "done" | "error" => {
+                return Err("this page can't be skipped");
+            }
+            _ => return Err("unknown page"),
+        })
+    }
+}
+
+fn de_skip_pages<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Vec<SkipPage>, D::Error> {
+    let names = <Vec<String> as serde::Deserialize>::deserialize(de)?;
+    Ok(names
+        .iter()
+        .filter_map(|name| {
+            SkipPage::parse(&name.to_lowercase())
+                .inspect_err(|reason| tracing::warn!(name, reason, "ignoring skip_pages entry"))
+                .ok()
+        })
+        .collect())
 }
 
 impl Config {
     /// Create a new [`Config`] by reading from `/etc/taidan.toml`, else [`Self::default()`].
-    ///
-    /// Remember to [`Self::populate`] afterwards.
     ///
     /// # Errors
     /// Failure to parse `/etc/taidan.toml`.
@@ -45,44 +101,154 @@ impl Config {
         else {
             return Ok(Self::default());
         };
-        basic_toml::from_str(&s)
+        basic_toml::from_str(&s).inspect(Self::warn_ignored_keys)
     }
 
-    /// Populate the [`Config`] struct.
-    ///
-    /// # Panics
-    /// If there are any missing information, the function will immediately panic.
-    #[tracing::instrument]
-    pub fn populate(&mut self) {
-        self.taidan0.check();
-        // distro
-        let file = std::fs::read_to_string("/etc/os-release").expect("Cannot read /etc/os-release");
-        let name = file
-            .split('\n')
-            .find_map(|line| line.strip_prefix("NAME="))
-            .expect("Cannot find NAME=… in /etc/os-release");
-        name.strip_prefix('"')
-            .and_then(|name| name.strip_suffix('"'))
-            .unwrap_or(name)
-            .clone_into(&mut self.distro);
-
-        if self.edition.is_empty() {
-            let edition = file
-                .split('\n')
-                .find_map(|line| line.strip_prefix("VARIANT_ID="))
-                .expect("Cannot find VARIANT_ID=… in /etc/os-release");
-            edition
-                .strip_prefix('"')
-                .and_then(|name| name.strip_suffix('"'))
-                .unwrap_or(edition)
-                .clone_into(&mut self.edition);
+    fn warn_ignored_keys(&self) {
+        for key in IGNORED_LEGACY_INTERNET_KEYS.into_iter().filter(|key| self.ui.contains_key(*key))
+        {
+            tracing::warn!(
+                key,
+                "ignoring /etc/taidan.toml key, online detection uses NetworkManager's connectivity \
+                 check now"
+            );
         }
+    }
 
-        tracing::trace!("Populated config: {self:#?}");
+    #[must_use]
+    pub fn desktop(&self) -> Desktop {
+        Desktop::current(&self.edition)
+    }
+
+    pub fn read_os_release(&mut self) {
+        let (name, variant_id) = os_release();
+        self.distro = name;
+        if self.edition.is_empty() {
+            self.edition = variant_id;
+        }
     }
 }
 
-#[derive(Clone, Debug, Default, serde::Deserialize)]
+fn os_release() -> (String, String) {
+    let file = ["/etc/os-release", "/usr/lib/os-release"]
+        .into_iter()
+        .find_map(|path| std::fs::read_to_string(path).ok())
+        .unwrap_or_else(|| {
+            tracing::warn!("cannot read os-release");
+            String::new()
+        });
+    parse_os_release(&file)
+}
+
+fn parse_os_release(file: &str) -> (String, String) {
+    let get = |key: &str| {
+        let value =
+            file.lines().find_map(|line| line.trim().strip_prefix(key)?.strip_prefix('='))?;
+        Some(unquote(value).to_owned())
+    };
+    let name = get("NAME").unwrap_or_else(|| {
+        tracing::warn!("no NAME= in os-release, using Linux");
+        "Linux".to_owned()
+    });
+    let variant_id = get("VARIANT_ID").unwrap_or_else(|| {
+        tracing::warn!("no VARIANT_ID= in os-release");
+        String::new()
+    });
+    (name, variant_id)
+}
+
+pub(crate) fn unquote(value: &str) -> &str {
+    ['"', '\'']
+        .into_iter()
+        .find_map(|quote| value.strip_prefix(quote)?.strip_suffix(quote))
+        .unwrap_or(value)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Desktop {
+    Gnome,
+    Plasma,
+    Budgie,
+    Xfce,
+    Other,
+}
+
+impl Desktop {
+    #[must_use]
+    pub fn from_edition(edition: &str) -> Self {
+        let edition = edition.to_ascii_lowercase();
+        match edition.strip_prefix("atomic-").unwrap_or(&edition) {
+            "gnome" => Self::Gnome,
+            "budgie" => Self::Budgie,
+            "xfce" => Self::Xfce,
+            _ => Self::Other,
+        }
+    }
+
+    #[must_use]
+    pub fn current(edition: &str) -> Self {
+        if std::path::Path::new("/usr/bin/plasmashell").exists() {
+            return Self::Plasma;
+        }
+        Self::from_edition(edition)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Config, Desktop, IGNORED_LEGACY_INTERNET_KEYS, SkipPage, parse_os_release};
+
+    #[test]
+    fn defaults_are_the_serde_ones() {
+        assert_eq!(Config::default().org, "Fyra Labs");
+    }
+
+    #[test]
+    fn skip_pages_accepts_old_names() {
+        let cfg: Config = basic_toml::from_str(
+            r#"skip_pages = ["codecs", "internet", "Theme", "inputmethod", "nope"]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            cfg.skip_pages,
+            [SkipPage::Drivers, SkipPage::Network, SkipPage::Theme, SkipPage::InputMethod]
+        );
+        assert!(!cfg.ui.contains_key("skip_pages"));
+        assert!(!cfg.ui.contains_key("org"));
+    }
+
+    #[test]
+    fn old_internet_keys_still_parse() {
+        let cfg: Config =
+            basic_toml::from_str("internet_timeout = 20\ninternet_retry_interval = 5").unwrap();
+        assert_eq!(cfg.skip_pages, []);
+        assert!(IGNORED_LEGACY_INTERNET_KEYS.iter().all(|key| cfg.ui.contains_key(*key)));
+    }
+
+    #[test]
+    fn desktops() {
+        assert_eq!(Desktop::from_edition("budgie"), Desktop::Budgie);
+        assert_eq!(Desktop::from_edition("atomic-GNOME"), Desktop::Gnome);
+        assert_eq!(Desktop::from_edition("atomic-xfce"), Desktop::Xfce);
+        assert_eq!(Desktop::from_edition("kde"), Desktop::Other);
+        assert_eq!(Desktop::from_edition(""), Desktop::Other);
+    }
+
+    #[test]
+    fn os_release_fields() {
+        let file = "NAME=\"Ultramarine Linux\"\nPRETTY_NAME=\"x\"\nVARIANT_ID=budgie\n";
+        assert_eq!(parse_os_release(file), ("Ultramarine Linux".into(), "budgie".into()));
+        assert_eq!(parse_os_release("NAME='Arch Linux'\n"), ("Arch Linux".into(), String::new()));
+    }
+
+    #[test]
+    fn os_release_defaults() {
+        assert_eq!(parse_os_release(""), ("Linux".into(), String::new()));
+        assert_eq!(parse_os_release("PRETTY_NAME=x\nVARIANT=y\n"), ("Linux".into(), String::new()));
+    }
+}
+
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
 pub struct Taidan0Config {
     #[serde(default)]
     pub continue_if_user_exists: bool,
@@ -92,15 +258,4 @@ pub struct Taidan0Config {
     pub persist_no_internet_btn: bool,
     #[serde(default)]
     pub systemd_homed: bool,
-}
-
-impl Taidan0Config {
-    pub fn check(&self) {
-        if self.continue_if_user_exists {
-            tracing::info!("taidan0.continue_if_user_exists detected");
-        } else if user_already_exists() {
-            tracing::warn!("taidan0.continue_if_user_exists is false, exiting");
-            std::process::exit(0);
-        }
-    }
 }

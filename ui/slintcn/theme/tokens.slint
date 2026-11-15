@@ -1,0 +1,77 @@
+import { Palette } from "palette.slint";
+import { Palette as StdPalette } from "std-widgets.slint";
+
+export enum ThemeMode { dark, light }
+
+export global Theme {
+    out property <ThemeMode> mode:
+        StdPalette.color-scheme == ColorScheme.dark ? ThemeMode.dark : ThemeMode.light;
+}
+
+export global Tokens {
+    in-out property <float> scale: 1.2;
+    out property <length> unit: 1px * scale;
+    in-out property <float> text-scale: 0.875;
+    out property <length> text-unit: unit * text-scale;
+    out property <length> text-rem: 14 * text-unit;
+
+    out property <color> color-background:
+        Theme.mode == ThemeMode.light ? Palette.neutral-50 : Palette.neutral-950;
+    out property <color> color-foreground:
+        Theme.mode == ThemeMode.light ? Palette.neutral-900 : Palette.neutral-50;
+    out property <color> color-card:
+        Theme.mode == ThemeMode.light ? Palette.neutral-100 : Palette.neutral-900;
+
+    out property <color> color-primary:
+        Theme.mode == ThemeMode.light ? Palette.neutral-900 : Palette.neutral-200;
+    out property <color> color-primary-foreground:
+        Theme.mode == ThemeMode.light ? Palette.neutral-50 : Palette.neutral-900;
+    out property <color> color-secondary:
+        Theme.mode == ThemeMode.light ? Palette.neutral-100 : Palette.neutral-800;
+    out property <color> color-muted:
+        Theme.mode == ThemeMode.light ? Palette.neutral-100 : Palette.neutral-800;
+    out property <color> color-muted-foreground:
+        Theme.mode == ThemeMode.light ? #616161 : Palette.neutral-400;
+    out property <color> color-destructive:
+        Theme.mode == ThemeMode.light ? Palette.red-700 : Palette.red-400;
+    out property <color> color-destructive-tint:
+        Theme.mode == ThemeMode.light
+        ? Palette.red-700.with-alpha(0.1)
+        : Palette.red-400.with-alpha(0.2);
+    out property <color> color-destructive-solid:
+        Theme.mode == ThemeMode.light ? Palette.red-700 : Palette.red-600;
+    out property <color> color-destructive-foreground: #ffffff;
+    out property <color> color-affirm:             Palette.green-400;
+    out property <color> color-accent:
+        Theme.mode == ThemeMode.light ? Palette.alpha-b-08-on-light : Palette.alpha-w-08;
+
+    out property <color> color-ring:
+        Theme.mode == ThemeMode.light ? Palette.neutral-700 : Palette.neutral-500;
+    out property <length> focus-ring-width:  3 * unit;
+    out property <length> focus-ring-offset: 2 * unit;
+
+    out property <color> color-surface-1:
+        Theme.mode == ThemeMode.light ? Palette.alpha-b-04-on-light : Palette.alpha-w-04;
+    out property <color> color-border-hairline:
+        Theme.mode == ThemeMode.light ? Palette.alpha-b-10-on-light : Palette.alpha-w-10;
+    out property <color> color-border-hairline-strong:
+        Theme.mode == ThemeMode.light ? Palette.alpha-b-20-on-light : Palette.alpha-w-20;
+
+    out property <length> radius-sm: 6 * unit;
+    out property <length> radius-md: 8 * unit;
+    out property <length> radius-lg: 10 * unit;
+    out property <length> radius-xl: 16 * unit;
+
+    in-out property <bool> reduce-motion;
+    out property <duration> motion-fast: reduce-motion ? 0ms : 150ms;
+    out property <duration> motion-base: reduce-motion ? 0ms : 200ms;
+    out property <easing> motion-easing-standard:    cubic-bezier(0.4, 0.0, 0.2, 1.0);
+
+    out property <int> typography-weight-medium:     500;
+    out property <length> typography-body-sm-size:      13 * text-unit;
+    out property <length> typography-body-size:         14 * text-unit;
+    out property <length> typography-label-size:        12 * text-unit;
+    out property <length> typography-title-size:        18 * text-unit;
+
+    out property <length> density-input: 36 * unit;
+}

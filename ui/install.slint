@@ -1,0 +1,38 @@
+export enum InstallState { idle, running, done, failed }
+
+export global Install {
+    in property <InstallState> state;
+    in property <string> stage-id;
+    in property <int> stage-num;
+    in property <int> stage-count: 11;
+    in property <float> stage-progress: -1;
+    in property <string> error;
+    in property <bool> needs-reboot;
+    in-out property <bool> download-updates: true;
+    in property <bool> can-download-updates: true;
+    in property <bool> drivers-failed;
+    in property <bool> locale-failed;
+    in property <bool> updates-ready;
+    in property <bool> used-internet;
+    in property <bool> reboot-failed;
+    in property <bool> finishing;
+    in-out property <bool> force-offline;
+
+    callback start();
+    callback reset();
+    callback finish(reboot: bool);
+}
+
+export global Location {
+    in-out property <bool> enabled: true;
+}
+
+export global Drivers {
+    in property <bool> nvidia;
+    in property <bool> broadcom-wifi;
+    in property <bool> secure-boot;
+    in property <image> secure-boot-qr;
+    in property <string> secure-boot-url;
+    in property <bool> codecs: true;
+    in-out property <bool> install: true;
+}

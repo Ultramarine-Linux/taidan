@@ -1,0 +1,41 @@
+# KWin's format is `action=current,default,name`
+[kwin]
+Kill Window=none,Meta+Ctrl+Esc,Kill Window
+Show Desktop=none,Meta+D,Peek at Desktop
+Window Close=none,Alt+F4,Close Window
+Window Minimize=none,Meta+PgDown,Minimize Window
+Window Operations Menu=none,Alt+F3,Window Menu
+
+# `_launch` is the app itself, the other keys are its desktop actions
+[services][org.kde.dolphin.desktop]
+_launch=none
+
+[services][org.kde.konsole.desktop]
+_launch=none
+
+[services][org.kde.kscreen.desktop]
+_launch=none
+ShowOSD=none
+
+[services][org.kde.krunner.desktop]
+_launch=none
+RunClipboard=none
+
+[services][org.kde.plasma-systemmonitor.desktop]
+_launch=none
+
+[services][org.kde.plasma.emojier.desktop]
+_launch=none
+
+[services][org.kde.spectacle.desktop]
+_launch=none
+ActiveWindowScreenShot=none
+FullScreenScreenShot=none
+RecordRegion=none
+RecordScreen=none
+RecordWindow=none
+RectangularRegionScreenShot=none
+WindowUnderCursorScreenShot=none
+
+[services][systemsettings.desktop]
+_launch=none

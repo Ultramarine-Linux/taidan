@@ -1,0 +1,242 @@
+import { Account } from "account.slint";
+
+// `enterprise-tls` is WPA3-Enterprise 192-bit (Suite B), which only works with EAP-TLS
+export enum Security { open, password, enterprise, enterprise-tls, unsupported }
+
+export enum HiddenSecurity { open, wpa, wpa3, enterprise }
+
+export struct WifiNetwork {
+    ssid: string,
+    strength: int,
+    security: Security,
+    known: bool,
+    connected: bool,
+}
+
+export enum NetState { offline, connecting, limited, portal, online }
+
+export enum EapMethod { peap, ttls, tls, fast, pwd, leap, md5 }
+
+export enum CaSource { system, file, none }
+
+export struct FileEntry {
+    name: string,
+    path: string,
+    dir: bool,
+}
+
+export struct IpSettings {
+    manual: bool,
+    address: string,
+    gateway: string,
+    dns: string,
+}
+
+export struct EnterpriseLogin {
+    wired: bool,
+    ssid: string,
+    method: EapMethod,
+    // `mschapv2-plain` is TTLS's "MSCHAPv2 (no EAP)" in NetworkManager
+    inner: string,
+    username: string,
+    password: string,
+    anonymous-identity: string,
+    ca: CaSource,
+    ca-cert: string,
+    domain: string,
+    peap-version: int,
+    client-cert: string,
+    private-key: string,
+    private-key-password: string,
+    fast-provisioning: int,
+    pac-file: string,
+}
+
+export global Network {
+    in property <NetState> state;
+    in property <bool> wifi-available: true;
+    in property <bool> wifi-enabled: true;
+    in property <bool> wifi-hardware-enabled: true;
+    in property <bool> ethernet;
+    in property <bool> wired;
+    in property <[WifiNetwork]> networks;
+    in property <string> connected-ssid;
+    in property <bool> scanning;
+    in-out property <string> connecting-ssid;
+    in-out property <string> error-id;
+    in-out property <string> error-ssid;
+    in-out property <string> focus-ssid;
+    in-out property <bool> focus-ip;
+    in property <bool> persist-offline-btn;
+
+    in-out property <string> password-ssid;
+    in-out property <string> dismissed-ssid;
+    in-out property <bool> enterprise-open;
+    in-out property <string> enterprise-ssid;
+    in-out property <bool> enterprise-wired;
+    in-out property <bool> enterprise-tls-only;
+    in-out property <bool> enterprise-busy;
+    in-out property <int> enterprise-visit;
+    in-out property <string> enterprise-error-id;
+    in-out property <bool> offline-prompt;
+    in-out property <bool> offline-prompt-explicit;
+    in-out property <bool> offline-chosen;
+
+    in-out property <bool> proxy-open;
+    in-out property <int> proxy-visit;
+    in property <string> proxy-url;
+    in property <string> proxy-bypass: "localhost, 127.0.0.1, ::1";
+    in property <string> proxy-public;
+    in-out property <bool> proxy-persist: true;
+    in-out property <bool> proxy-busy;
+    in-out property <string> proxy-error-id;
+    in property <string> primary-connection;
+    in property <string> proxy-checked-on;
+
+    in-out property <bool> ip-open;
+    in-out property <int> ip-visit;
+    in-out property <string> ip-ssid;
+    in-out property <IpSettings> ip;
+    in-out property <bool> ip-loading;
+    in-out property <bool> ip-busy;
+    in-out property <string> ip-error-id;
+
+    in-out property <bool> hidden-open;
+    in-out property <int> hidden-visit;
+    in-out property <string> hidden-ssid;
+
+    // NetworkManager can't check connectivity through a proxy
+    out property <bool> online: state == NetState.online || (proxy-url != "" && proxy-checked-on == primary-connection
+        && state != NetState.offline && state != NetState.connecting);
+    out property <bool> install-online: online && !offline-chosen;
+
+    in-out property <string> device-name;
+    out property <string> hostname: derive-hostname(device-name, Account.username);
+    pure callback derive-hostname(name: string, username: string) -> string;
+    derive-hostname(name, username) => name;
+    pure callback realm(username: string) -> string;
+    realm(username) => "";
+    pure callback is-pkcs12(path: string) -> bool;
+    is-pkcs12(path) => false;
+    pure callback file-name(path: string) -> string;
+    file-name(path) => path;
+    pure callback trim(text: string) -> string;
+    trim(text) => text;
+
+    in property <string> browse-dir;
+    in property <string> browse-parent;
+    in property <[FileEntry]> browse-entries;
+    in property <[FileEntry]> browse-places;
+    callback browse(dir: string, pac: bool, all: bool);
+
+    callback refresh();
+    callback enable-wifi();
+    callback connect(ssid: string, password: string);
+    callback connect-enterprise(login: EnterpriseLogin, tls-only: bool, visit: int);
+    callback connect-hidden(ssid: string, security: HiddenSecurity, password: string, visit: int);
+    in property <bool> portal-open;
+    callback open-portal(proxy-url: string, proxy-bypass: string);
+    callback close-portal();
+    callback set-proxy(url: string, bypass: string, persist: bool, visit: int);
+    callback load-ip(ssid: string, visit: int);
+    callback save-ip(ssid: string, ip: IpSettings, visit: int);
+    callback save();
+    callback page-changed(bool);
+
+    public function connecting(ssid: string) {
+        error-id = "";
+        error-ssid = "";
+        connecting-ssid = ssid;
+    }
+
+    public function start-busy(ssid: string) -> bool {
+        if connecting-ssid != "" { return false; }
+        dismissed-ssid = "";
+        connecting(ssid);
+        true
+    }
+
+    public function try-connect(ssid: string, password: string) {
+        if start-busy(ssid) { connect(ssid, password); }
+    }
+
+    public function connect-finished(ssid: string, error: string, security: Security, page-current: bool) {
+        connecting-ssid = "";
+        if error == "" {
+            password-ssid = "";
+            return;
+        }
+        error-ssid = ssid;
+        error-id = error;
+        let other-dialog = proxy-open || ip-open || hidden-open || enterprise-open || offline-prompt
+            || (password-ssid != "" && password-ssid != ssid);
+        if error != "page-internet-error-password" || !page-current || other-dialog || dismissed-ssid == ssid {
+            return;
+        }
+        if security == Security.enterprise || security == Security.enterprise-tls {
+            open-enterprise(ssid, false, security == Security.enterprise-tls);
+            enterprise-error-id = error;
+        } else {
+            password-ssid = ssid;
+        }
+    }
+
+    public function open-hidden() {
+        error-id = "";
+        error-ssid = "";
+        hidden-ssid = "";
+        hidden-open = true;
+    }
+
+    public function try-connect-hidden(ssid: string, security: HiddenSecurity, password: string) {
+        hidden-ssid = trim(ssid);
+        if start-busy(hidden-ssid) { connect-hidden(hidden-ssid, security, password, hidden-visit); }
+    }
+
+    public function open-enterprise(ssid: string, wired: bool, tls-only: bool) {
+        enterprise-ssid = ssid;
+        enterprise-wired = wired;
+        enterprise-tls-only = tls-only;
+        enterprise-error-id = "";
+        enterprise-open = true;
+    }
+
+    public function try-connect-enterprise(login: EnterpriseLogin) {
+        if enterprise-busy { return; }
+        enterprise-busy = true;
+        enterprise-error-id = "";
+        connect-enterprise(login, enterprise-tls-only, enterprise-visit);
+    }
+
+    public function toggle-portal() {
+        if portal-open {
+            close-portal();
+        } else {
+            open-portal(proxy-url, proxy-bypass);
+        }
+    }
+
+    public function try-set-proxy(url: string, bypass: string, persist: bool) {
+        proxy-busy = true;
+        proxy-error-id = "";
+        set-proxy(url, bypass, persist, proxy-visit);
+    }
+
+    public function open-ip(ssid: string) {
+        ip-ssid = ssid;
+        ip = { manual: false, address: "", gateway: "", dns: "" };
+        ip-error-id = "";
+        ip-busy = false;
+        ip-loading = true;
+        ip-visit += 1;
+        ip-open = true;
+        load-ip(ssid, ip-visit);
+    }
+
+    public function try-save-ip() {
+        if ip-busy || ip-loading { return; }
+        ip-busy = true;
+        ip-error-id = "";
+        save-ip(ip-ssid, ip, ip-visit);
+    }
+}
