@@ -1,6 +1,6 @@
 const ENDPOINT: &str = "https://plausible.fyralabs.com/api/event";
 const DOMAIN: &str = "taidan";
-const DETECT_INTERNET_URL_PREFIX: &str = "app://internet/v1.0";
+const URL_PREFIX: &str = "app://internet/v1.0";
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -69,7 +69,7 @@ impl Sample {
         let flag = |device| if self.device == device { "1" } else { "0" };
         serde_json::json!({
             "name": "pageview",
-            "url": format!("{DETECT_INTERNET_URL_PREFIX}/{}", self.version),
+            "url": format!("{URL_PREFIX}/{}", self.version),
             "domain": DOMAIN,
             "props": {
                 "arch": self.arch,
@@ -120,13 +120,13 @@ mod tests {
     }
 
     #[test]
-    fn event_matches_detect_internet() {
+    fn event_shape() {
         let sample = Sample::new(
             "NAME=\"Ultramarine Linux\"\nVERSION_ID=43\nVARIANT_ID=kde\n",
             Device::RaspberryPi,
         );
         let ev = sample.event();
-        assert_eq!(ev["url"], "app://internet/v0.2/43");
+        assert_eq!(ev["url"], "app://internet/v1.0/43");
         assert_eq!(ev["domain"], "taidan");
         assert_eq!(ev["props"]["edition"], "kde");
         assert_eq!(ev["props"]["rpi"], "1");
