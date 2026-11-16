@@ -4,6 +4,7 @@ steps-dnfdownloadupdate = Téléchargement de la mise à jour du système…
 steps-dnfinstallupdate = Installation de la mise à jour du système…
 page-keyboard = Disposition du clavier
 page-internet-skip = Je n'ai pas Internet
+page-analytics = Statistiques
 page-tweaks = Personnalisations du système
 page-password-pw = Mot de passe
 page-password-rp = Répéter le mot de passe

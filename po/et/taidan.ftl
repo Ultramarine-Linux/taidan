@@ -78,3 +78,4 @@ page-internet = Saame ühendatud internetiga
 page-internet-desc = Ühenda internetiga et saada uusim ja parim.
 page-internet-skip = Mul pole internetiühendust
 page-internet-portal = Logi sisse veebibrauseriga
+page-analytics = Analüütika

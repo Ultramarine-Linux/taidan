@@ -27,6 +27,7 @@ page-language = Ngôn ngữ
 page-language-search-lang = Tìm ngôn ngữ/địa phương…
 flatpakening-name = Dùng Flatpak thay vì RPM
 flatpakening-desc = Giúp hệ thống của bạn thêm bảo mật khi các ứng dụng lựa chọn được cách ly.
+page-analytics-desc2 = Mọi dữ liệu thu thập đều ẩn danh và được mã hóa.
 page-tweaks = Tinh chỉnh hệ thống
 skip = Bỏ qua
 page-internet-portal = Đăng nhập bằng trình duyệt

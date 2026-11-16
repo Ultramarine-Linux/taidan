@@ -75,6 +75,7 @@ page-internet = चलिए ऑनलाइन जाते हैं
 page-internet-desc = इंटरनेट से जुड़कर सबसे नया और अच्छा पाए।
 page-internet-skip = मेरे पास इंटरनेट नहीं हैं
 page-internet-portal = वेब ब्राउजर से लॉगिन करें
+page-analytics = एनालिटिक्स
 page-tweaks = सिस्टम ट्वीक्स
 page-error = एरर
 page-error-retry = फिर कोशिश करें

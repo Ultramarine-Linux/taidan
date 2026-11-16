@@ -1,5 +1,16 @@
+export enum AnalyticsDevice { other, chromebook, surface, raspberry-pi }
+
+export struct AnalyticsSample {
+    version: string,
+    edition: string,
+    arch: string,
+    device: AnalyticsDevice,
+}
+
 export global Analytics {
-    in-out property <bool> enabled: true;
-    in property <string> sample;
+    in-out property <bool> enabled;
+    in-out property <bool> chosen;
+    in property <AnalyticsSample> sample;
+    in property <bool> sample-ready;
     in-out property <bool> sample-open;
 }

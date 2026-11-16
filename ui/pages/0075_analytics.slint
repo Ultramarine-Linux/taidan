@@ -1,16 +1,18 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir, FluentArg } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
-import { Analytics } from "../analytics.slint";
-import { TdnPara, TdnBtn, TdnDialog, TdnToggleRow, TdnFormColumn, TdnSideCard } from "../components.slint";
+import { Analytics, AnalyticsDevice } from "../analytics.slint";
+import { TdnText, TdnPara, TdnBtn, TdnDialog, TdnToggleRow, TdnFormColumn, TdnSideCard } from "../components.slint";
 import { Icon } from "../slintcn/components/icon.slint";
-import { ScrollView } from "std-widgets.slint";
+import { Card } from "../slintcn/components/card.slint";
+import { Separator } from "../slintcn/components/separator.slint";
 import { Tokens } from "../slintcn/theme/tokens.slint";
 
 export component AnalyticsPage inherits TdnPage {
     pageid: "analytics";
     step_i: 1;
     forward-focus: toggle;
+    can-next: Analytics.chosen;
 
     property <[FluentArg]> args: [
         { key: "org", value: Cfg.get_string("org", "Fyra Labs") },
@@ -43,7 +45,11 @@ export component AnalyticsPage inherits TdnPage {
                 toggle := TdnToggleRow {
                     text: Lang.t("page-analytics-switch", []);
                     checked: Analytics.enabled;
-                    toggled(on) => { Analytics.enabled = on; }
+                    undecided: !Analytics.chosen;
+                    toggled(on) => {
+                        Analytics.enabled = on;
+                        Analytics.chosen = true;
+                    }
                     accepted => { root.try-next(); }
                 }
 
@@ -52,7 +58,7 @@ export component AnalyticsPage inherits TdnPage {
 
                     TdnBtn {
                         outline: true;
-                        enabled: Analytics.sample != "";
+                        enabled: Analytics.sample-ready;
                         text: Lang.t("page-analytics-sample", []);
                         icon: @image-url("../../data/icons/clipboard-symbolic.svg");
                         icon-size: 1rem;
@@ -95,33 +101,74 @@ export component AnalyticsPage inherits TdnPage {
     }
 }
 
+component SampleRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+    spacing: 1rem;
+
+    TdnText {
+        text: root.label;
+        color: Tokens.color-muted-foreground;
+        horizontal-alignment: Dir.text-start;
+    }
+
+    TdnText {
+        layout-order: Dir.order(1);
+        text: root.value != "" ? root.value : Lang.t("page-analytics-unknown", []);
+        font-weight: Tokens.typography-weight-medium;
+        horizontal-alignment: Dir.text-end;
+        horizontal-stretch: 1;
+        overflow: elide;
+    }
+}
+
 export component AnalyticsSampleDialog inherits TdnDialog {
     title: Lang.t("page-analytics-sample", []);
-    description: Lang.t("page-analytics-sample-desc", []);
     done-text: Lang.t("done", []);
-    dialog-width: 26rem;
+    dialog-width: 24rem;
     dismissed => { Analytics.sample-open = false; }
 
-    Rectangle {
-        border-radius: Tokens.radius-md;
-        border-width: 1px;
-        border-color: Tokens.color-border-hairline;
-        background: Tokens.color-card;
-        height: min(sample.preferred-height + 1.5rem, 14rem);
+    property <string> device-id: Analytics.sample.device == AnalyticsDevice.chromebook ? "page-analytics-device-chromebook"
+        : Analytics.sample.device == AnalyticsDevice.surface ? "page-analytics-device-surface"
+        : Analytics.sample.device == AnalyticsDevice.raspberry-pi ? "page-analytics-device-raspberry-pi"
+        : "page-analytics-device-other";
 
-        ScrollView {
-            sample := TextInput {
-                x: 0.75rem;
-                y: 0.75rem;
-                width: parent.width - 1.5rem;
-                read-only: true;
-                single-line: false;
-                wrap: word-wrap;
-                text: Analytics.sample;
-                font-family: "monospace";
-                accessible-label: Lang.t("page-analytics-sample", []);
-                font-size: Tokens.typography-body-sm-size;
-                color: Tokens.color-foreground;
+    Card {
+        card-radius: md;
+
+        VerticalLayout {
+            padding-left: 0.85rem;
+            padding-right: 0.85rem;
+            padding-top: 0.15rem;
+            padding-bottom: 0.15rem;
+
+            SampleRow {
+                label: Lang.t("page-analytics-field-version", []);
+                value: Analytics.sample.version;
+            }
+
+            Separator { }
+
+            SampleRow {
+                label: Lang.t("page-analytics-field-edition", []);
+                value: Analytics.sample.edition;
+            }
+
+            Separator { }
+
+            SampleRow {
+                label: Lang.t("page-analytics-field-arch", []);
+                value: Analytics.sample.arch;
+            }
+
+            Separator { }
+
+            SampleRow {
+                label: Lang.t("page-analytics-field-device", []);
+                value: Lang.t(root.device-id, []);
             }
         }
     }

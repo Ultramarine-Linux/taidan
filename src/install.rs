@@ -2,8 +2,8 @@ use libtaidan::{InstallMsg, steps::Stage};
 use slint::ComponentHandle;
 
 use crate::ui::{
-    Analytics, AppWindow, Drivers, Install, InstallState, Location, Network, Pages, Theme,
-    ThemeMode,
+    Analytics, AnalyticsDevice, AnalyticsSample, AppWindow, Drivers, Install, InstallState,
+    Location, Network, Pages, Theme, ThemeMode,
 };
 use crate::ui::{block_on_thread, on_ui, spawn_then};
 
@@ -297,12 +297,31 @@ pub(crate) fn can_use_dnf() -> bool {
     !crate::CFG.taidan0.skip_dnf && !std::path::Path::new("/ostree").exists()
 }
 
+fn analytics_sample(sample: &libtaidan::analytics::Sample) -> AnalyticsSample {
+    use libtaidan::analytics::Device;
+    AnalyticsSample {
+        version: sample.version.as_str().into(),
+        edition: sample.edition.as_str().into(),
+        arch: sample.arch.into(),
+        device: match sample.device {
+            Device::Other => AnalyticsDevice::Other,
+            Device::Chromebook => AnalyticsDevice::Chromebook,
+            Device::Surface => AnalyticsDevice::Surface,
+            Device::RaspberryPi => AnalyticsDevice::RaspberryPi,
+        },
+    }
+}
+
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
     install.set_can_download_updates(can_use_dnf());
     spawn_then(
         ui.clone(),
-        || crate::RT.block_on(libtaidan::analytics::sample()),
-        |app, sample| app.global::<Analytics<'_>>().set_sample(sample.into()),
+        || crate::RT.block_on(libtaidan::analytics::Sample::detect()),
+        |app, sample| {
+            let analytics = app.global::<Analytics<'_>>();
+            analytics.set_sample(analytics_sample(&sample));
+            analytics.set_sample_ready(true);
+        },
     );
     install.on_start({
         let ui = ui.clone();

@@ -25,6 +25,7 @@ page-error-desc = 我們遇到了問題。
 page-error-retry = 重試
 skip = 跳過
 page-internet-portal = 以瀏覽器登入
+page-analytics = 分析
 page-tweaks = 系統調整
 page-language = 語言
 page-language-search-lang = 搜尋語言……

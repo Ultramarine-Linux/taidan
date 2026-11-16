@@ -340,7 +340,15 @@ page-analytics-desc2 = All data is anonymous and encrypted.
 page-analytics-switch = Data Collection
 # btn, opens a dialog showing exactly what would be sent
 page-analytics-sample = View Sample
-page-analytics-sample-desc = This is sent once, when setup finishes. It's counted with Plausible, which doesn't use cookies or keep your IP address.
+page-analytics-field-version = Version
+page-analytics-field-edition = Edition
+page-analytics-field-arch = Processor
+page-analytics-field-device = Device
+page-analytics-device-other = Other
+page-analytics-device-chromebook = Chromebook
+page-analytics-device-surface = Microsoft Surface
+page-analytics-device-raspberry-pi = Raspberry Pi
+page-analytics-unknown = Unknown
 page-analytics-tip-title = Who did what?
 page-analytics-tip = No idea. Data collected from this feature is anonymous, and only tells { $org } which editions and devices { $distro } runs on.
 page-analytics-tip-once = It's only sent once, when setup finishes.
