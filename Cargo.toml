@@ -131,7 +131,7 @@ missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 
 [profile.release]
-lto = "fat"
+lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
 

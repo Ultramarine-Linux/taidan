@@ -210,15 +210,31 @@ impl Tweak {
     /// Obtain a list of tweaks from the directory containing different tweaks.
     /// See the struct docs for more information.
     ///
+    /// A missing [`TWEAKS_DIR`] means the distro ships no tweaks, so it gives an empty list.
+    ///
     /// # Errors
     ///
-    /// See [`Self::from_dir()`].
+    /// Failure to read [`TWEAKS_DIR`] for any other reason.
     #[tracing::instrument]
     pub fn list() -> std::io::Result<Box<[Self]>> {
-        let mut tweaks = std::fs::read_dir(TWEAKS_DIR)?
+        Self::list_in(Path::new(TWEAKS_DIR))
+    }
+
+    fn list_in(dir: &Path) -> std::io::Result<Box<[Self]>> {
+        let entries = match std::fs::read_dir(dir) {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                tracing::info!(?dir, "no tweaks directory, so no tweaks");
+                return Ok(Box::default());
+            }
+            Err(err) => return Err(err),
+        };
+        let mut tweaks = entries
             .filter_map(|dir_entry| {
                 dir_entry
-                    .inspect_err(|err| tracing::error!(?err, "cannot read file in {TWEAKS_DIR}"))
+                    .inspect_err(|err| {
+                        tracing::error!(?err, ?dir, "cannot read tweaks directory entry")
+                    })
                     .ok()
                     .filter(|entry| entry.path().is_dir())
             })
@@ -354,6 +370,12 @@ pub fn is_executable(f: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_tweaks_dir_is_empty() {
+        let tweaks = Tweak::list_in(Path::new("/nonexistent/taidan/tweaks")).unwrap();
+        assert!(tweaks.is_empty());
+    }
 
     #[test]
     fn settings_json_hides_proxy_credentials() {
