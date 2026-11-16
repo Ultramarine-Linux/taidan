@@ -6157,7 +6157,7 @@ dependencies = [
 
 [[package]]
 name = "taidan"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "color-eyre",
  "deunicode",
@@ -6203,7 +6203,7 @@ dependencies = [
 
 [[package]]
 name = "taidan_ui"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "slint",
  "slint-build",
