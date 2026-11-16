@@ -65,6 +65,7 @@ page-internet = Mennään verkkoon
 page-internet-desc = Yhdistä internetiin saadaksesi uusimmat ja parhaat palvelut.
 page-internet-skip = Minulle ei ole Internettiä
 page-internet-portal = Kirjaudu sisään verkkoselaimella
+page-analytics = Analytiikka
 page-tweaks = Järjestelmän hienosäädöt
 page-error = Virhe
 page-error-desc = Törmäsimme esteeseen.

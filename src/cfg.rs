@@ -28,6 +28,7 @@ impl PageNav {
                     SkipPage::Timezone => pages.get_timezone(),
                     SkipPage::Network => pages.get_network(),
                     SkipPage::Location => pages.get_location(),
+                    SkipPage::Analytics => pages.get_analytics(),
                     SkipPage::Drivers => pages.get_drivers(),
                     SkipPage::Tweaks | SkipPage::InputMethod => return None,
                 })

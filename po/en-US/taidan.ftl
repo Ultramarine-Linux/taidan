@@ -331,8 +331,27 @@ page-internet-offline-choose = Set Up Offline
 page-internet-offline-choose-title = Set Up Without Internet?
 page-internet-offline-choose-desc = Drivers, codecs, and updates won't be installed, even if this device connects to the internet before setup finishes.
 
-## [Analytics and Crash Reporting]
-## this page is currently not in use, we recommend skipping
+## [Analytics]
+# page title
+page-analytics = Analytics
+page-analytics-desc = Allow { $org } to collect usage data to better serve you.
+page-analytics-desc2 = All data is anonymous and encrypted.
+# toggle
+page-analytics-switch = Data Collection
+# btn, opens a dialog showing exactly what would be sent
+page-analytics-sample = View Sample
+page-analytics-field-version = Version
+page-analytics-field-edition = Edition
+page-analytics-field-arch = Processor
+page-analytics-field-device = Device
+page-analytics-device-other = Other
+page-analytics-device-chromebook = Chromebook
+page-analytics-device-surface = Microsoft Surface
+page-analytics-device-raspberry-pi = Raspberry Pi
+page-analytics-unknown = Unknown
+page-analytics-tip-title = Who did what?
+page-analytics-tip = No idea. Data collected from this feature is anonymous, and only tells { $org } which editions and devices { $distro } runs on.
+page-analytics-tip-once = It's only sent once, when setup finishes.
 
 ## [Tweaks]
 page-tweaks = System Tweaks

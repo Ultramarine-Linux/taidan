@@ -84,3 +84,4 @@ flatpakening-name = استخدام آر بي إم بدلاً من فلاتباك
 flatpakening-desc = الفلاتباكات توفر اماناً افضل بشكل افتراضي. حزم آر بي إم توفر بعض المساحة.
 cachyos-kernel-name = نواة CachyOS
 cachyos-kernel-desc = تنصيب نواة CachyOS. هذا يمكن ان يقدم فرقاً ملحوظاً في الآداء, يمكن التراجع عن ذلك لاحقًا.
+page-analytics = التحليلات

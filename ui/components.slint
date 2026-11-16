@@ -56,6 +56,8 @@ export component TdnPressable inherits Rectangle {
     out property <bool> has-hover: area.has-hover;
     out property <bool> pressed: area.pressed;
     out property <bool> active: root.enabled && !root.busy;
+    out property <bool> pressed-by-pointer;
+    out property <length> pointer-x: area.pressed-x;
     callback activated;
     callback key(KeyEvent) -> EventResult;
     key(event) => { reject }
@@ -75,13 +77,14 @@ export component TdnPressable inherits Rectangle {
     @children
 
     focus := FocusScope {
-        enabled: root.focusable && Modal.open == root.in-dialog;
+        enabled: root.focusable && (Modal.open == root.in-dialog || self.has-focus);
         focus-on-tab-navigation: root.tab-focusable;
         focus-gained(reason) => {
             if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
         }
         focus-lost(reason) => { root.blurred(reason); }
         key-pressed(event) => {
+            if Modal.open != root.in-dialog { return reject; }
             root.pointer-focus = false;
             if root.key(event) == EventResult.accept { return accept; }
             if event.text == Key.Return || event.text == " " {
@@ -104,7 +107,9 @@ export component TdnPressable inherits Rectangle {
         }
         clicked => {
             if !root.active { return; }
+            root.pressed-by-pointer = true;
             root.press();
+            root.pressed-by-pointer = false;
             if root.click-focuses { focus.focus(); }
         }
     }
@@ -636,6 +641,7 @@ export component TdnTextField inherits TdnField {
 export component TdnToggleRow inherits TdnPressable {
     in property <string> text;
     in property <bool> checked;
+    in property <bool> undecided;
     callback toggled(bool);
     callback accepted();
     callback focus-in(y: length, height: length);
@@ -646,9 +652,24 @@ export component TdnToggleRow inherits TdnPressable {
 
     property <float> disabled-fade: root.enabled ? 0 : 0.5;
 
+    property <length> track-center: track.absolute-position.x - root.absolute-position.x + track.width / 2;
+    property <bool> pointer-on-track: abs(root.pointer-x - root.track-center) <= track.width;
+    property <bool> pointer-on-end-side: Lang.rtl ? root.pointer-x < root.track-center : root.pointer-x > root.track-center;
+
     focusable: true;
-    activated => { root.toggled(!root.checked); }
+    activated => {
+        if !root.undecided {
+            root.toggled(!root.checked);
+        } else if root.pressed-by-pointer && root.pointer-on-track {
+            root.toggled(root.pointer-on-end-side);
+        }
+    }
     key(event) => {
+        if event.text == Key.RightArrow || event.text == Key.LeftArrow {
+            root.toggled((event.text == Key.RightArrow) != Lang.rtl);
+            return accept;
+        }
+        if event.text == " " && root.undecided { return accept; }
         if event.text != Key.Return { return reject; }
         if !event.repeat { root.accepted(); }
         accept
@@ -656,7 +677,9 @@ export component TdnToggleRow inherits TdnPressable {
     accessible-role: switch;
     accessible-label: root.text;
     accessible-checkable: true;
-    accessible-checked: root.checked;
+    accessible-checked: root.checked && !root.undecided;
+    accessible-action-increment => { root.toggled(true); }
+    accessible-action-decrement => { root.toggled(false); }
     ring-radius: Tokens.radius-lg + self.ring-offset;
 
     min-height: 3rem;
@@ -683,7 +706,7 @@ export component TdnToggleRow inherits TdnPressable {
             layout-order: Dir.order(1);
             alignment: center;
 
-            Rectangle {
+            track := Rectangle {
                 width: 2.4rem;
                 height: 1.3rem;
                 border-radius: self.height / 2;
@@ -696,7 +719,8 @@ export component TdnToggleRow inherits TdnPressable {
                     width: parent.height - 0.3rem;
                     height: self.width;
                     y: 0.15rem;
-                    x: Dir.x(root.checked ? parent.width - self.width - 0.15rem : 0.15rem, self.width, parent.width);
+                    x: root.undecided ? (parent.width - self.width) / 2
+                        : Dir.x(root.checked ? parent.width - self.width - 0.15rem : 0.15rem, self.width, parent.width);
                     border-radius: self.width / 2;
                     background: root.checked ? Tokens.color-primary-foreground : Tokens.color-muted-foreground.transparentize(root.disabled-fade);
                     animate background { duration: Tokens.motion-fast; }

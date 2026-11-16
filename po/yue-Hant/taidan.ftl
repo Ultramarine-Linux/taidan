@@ -72,6 +72,7 @@ page-internet = 一齊連上網啦
 page-internet-desc = 連上網，攞到最新、最好嘅。
 page-internet-skip = 我上唔到網
 page-internet-portal = 用瀏覽器簽到
+page-analytics = 分析
 page-tweaks = 系統調整
 page-error = 錯誤
 page-error-retry = 重試

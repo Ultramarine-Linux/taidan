@@ -27,6 +27,7 @@ skip = Přeskočit
 page-language = Jazyk
 page-language-search-lang = Hledat Jazyk…
 page-internet-portal = Přihlásit se přes Webový Prohlížeč
+page-analytics = Analýza
 page-tweaks = Úprava Systému
 flatpakening-name = Použít balíčky RPM namísto Flatpaků
 flatpakening-desc = Flatpaky nabízí vyšší bezpečnost, RPM ušetří trochu místa.

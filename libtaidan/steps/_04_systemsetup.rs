@@ -7,6 +7,9 @@ pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::
         tracing::warn!("the settings don't say which tweaks to turn on, leaving them as they are");
     }
     apply_location(settings).await;
+    if settings.analytics == Some(true) && !settings.nointernet {
+        crate::analytics::send(settings).await;
+    }
     if let Err(e) = crate::i18n::apply_keymap_to_user(settings, cfg).await {
         tracing::warn!(?e, "cannot carry over the keyboard layout");
     }

@@ -24,5 +24,6 @@ page-error = Error
 page-error-desc = Lo sentimos, pero hay un problema inesperado.
 page-error-retry = Reintentar
 skip = Saltar
+page-analytics = Analíticos
 page-tweaks = Modificaciones del sistema
 page-language = Idioma

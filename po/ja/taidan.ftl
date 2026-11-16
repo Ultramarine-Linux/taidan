@@ -76,6 +76,7 @@ skip = スキップ
 page-language = 言語
 page-language-search-lang = 言語検索…
 page-internet-portal = ウェブブラウザでログイン
+page-analytics = 分析
 page-tweaks = システム微調整
 flatpakening-name = Flatpakの代わりにRPMをインストール
 flatpakening-desc = Flatpakは安全性が高い一方、RPMはスペースを節約できます。

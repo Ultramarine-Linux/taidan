@@ -75,6 +75,7 @@ page-internet = Połączmy cię z internetem
 page-internet-desc = Połącz się z internetem, aby uzyskać wszystko co najnowsze i najlepsze.
 page-internet-skip = Nie mam internetu
 page-internet-portal = Zaloguj się przy pomocy przeglądarki
+page-analytics = Analityka
 page-tweaks = Dostosowywanie systemu
 page-error = Błąd
 page-error-desc = Napotkaliśmy przeszkodę.

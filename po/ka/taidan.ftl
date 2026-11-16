@@ -68,6 +68,7 @@ page-welcome-go = წავედით
 page-keyboard = კლავიატურის განლაგება
 page-whoareyou-fullname = სრული სახელი
 page-password-rp = გაიმეორეთ პაროლი
+page-analytics = ანალიტიკა
 page-tweaks = სისტემის მორგება
 mtu-probing-name = MTU-ის ზონდირება
 cachyos-kernel-name = CachyOS-ის ბირთვი

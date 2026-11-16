@@ -1,5 +1,6 @@
 //! libtaidan: Backend for Taidan (OOBE Application for Ultramarine Linux)
 pub mod a11y;
+pub mod analytics;
 pub mod cfg;
 pub mod command;
 pub mod dnf;
