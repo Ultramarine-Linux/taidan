@@ -2,7 +2,7 @@
 members = ["taidan_proc_macros", "taidan_ui", "libtaidan", "tdnx"]
 
 [workspace.package]
-version = "1.0.0"
+version = "1.0.1"
 
 [workspace.dependencies]
 futures = "0.3.34"
@@ -131,7 +131,7 @@ missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 
 [profile.release]
-lto = "fat"
+lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
 
