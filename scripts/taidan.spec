@@ -104,7 +104,6 @@ install -d %buildroot%{_sharedstatedir}/taidan
 %{_libexecdir}/start-taidan
 %{_libexecdir}/taidan-helper
 %{_datadir}/taidan/polkit/
-%{_presetdir}/95-taidan.preset
 %config(noreplace) %{_sysconfdir}/pam.d/taidan
 %{_sysusersdir}/taidan.conf
 %{_unitdir}/taidan-initial-setup.service

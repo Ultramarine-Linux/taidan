@@ -135,6 +135,10 @@ Changes from the GTK version of Taidan:
   `/etc/com.fyralabs.Taidan/detect-internet` isn't run anymore. Connectivity comes from
   NetworkManager.
 - `/usr/share/taidan/oobe.sh` isn't run anymore. Use a tweak instead.
+- The analytics page sends the Plausible pageview `detect-internet` used to send, once, at the end
+  of setup, and only if the user leaves it on. Skip `analytics` to never send it.
+- Taidan doesn't ship a systemd preset anymore. The distro's presets need to
+  `enable taidan-initial-setup-reconfiguration.service`.
 
 ### Tweaks
 
@@ -167,6 +171,7 @@ The tweak is enabled if the exit code is 0; nonzero, failure to run, or a five-s
   "install_codecs_drivers": true,
   "download_updates": true,
   "location": true,               // null when the location page was skipped
+  "analytics": true,              // null when the analytics page was skipped
   "a11y": { "screen_reader": false, "zoom": false, "larger_text": false, ... },
   "dark_mode": true,              // null to keep the distro's default
   "accent": "blue",               // or teal, green, yellow, orange, red, pink, purple, slate, or null

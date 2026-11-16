@@ -4,9 +4,10 @@ import { Tweaks } from "tweaks.slint";
 import { A11y } from "a11y.slint";
 import { Errors } from "errors.slint";
 import { Ims } from "ims.slint";
+import { Analytics } from "analytics.slint";
 
 export global Modal {
-    out property <bool> open: Camera.open || Network.password-ssid != "" || Network.hidden-open || Network.enterprise-open || Network.offline-prompt || Network.proxy-open || Network.ip-open || Tweaks.open || Ims.open || A11y.open || A11y.more-open || Errors.open;
+    out property <bool> open: Camera.open || Network.password-ssid != "" || Network.hidden-open || Network.enterprise-open || Network.offline-prompt || Network.proxy-open || Network.ip-open || Tweaks.open || Ims.open || A11y.open || A11y.more-open || Analytics.sample-open || Errors.open;
     // the page being shown, kept in sync by `AppWindow`, so an opener only takes the focus back
     // on the page it opened the dialog from
     in-out property <int> page;

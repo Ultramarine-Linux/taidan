@@ -28,6 +28,7 @@ pub struct Settings {
     #[serde(default = "yes")]
     pub download_updates: bool,
     pub location: Option<bool>,
+    pub analytics: Option<bool>,
     pub a11y: crate::a11y::A11y,
 
     pub dark_mode: Option<bool>,

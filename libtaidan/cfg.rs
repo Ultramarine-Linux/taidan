@@ -48,6 +48,7 @@ pub enum SkipPage {
     Timezone,
     Network,
     Location,
+    Analytics,
     Drivers,
     Tweaks,
     InputMethod,
@@ -64,10 +65,11 @@ impl SkipPage {
             "timezone" => Self::Timezone,
             "network" | "internet" => Self::Network,
             "location" => Self::Location,
+            "analytics" => Self::Analytics,
             "drivers" | "codecs" => Self::Drivers,
             "tweaks" => Self::Tweaks,
             "inputmethod" | "ims" => Self::InputMethod,
-            "devicename" | "analytics" | "crashreport" => {
+            "devicename" | "crashreport" => {
                 return Err("this page no longer exists");
             }
             "whoareyou" | "password" | "summary" | "installing" | "finish" | "done" | "error" => {
@@ -129,23 +131,27 @@ impl Config {
     }
 }
 
-fn os_release() -> (String, String) {
-    let file = ["/etc/os-release", "/usr/lib/os-release"]
+pub(crate) fn read_os_release() -> String {
+    ["/etc/os-release", "/usr/lib/os-release"]
         .into_iter()
         .find_map(|path| std::fs::read_to_string(path).ok())
         .unwrap_or_else(|| {
             tracing::warn!("cannot read os-release");
             String::new()
-        });
-    parse_os_release(&file)
+        })
+}
+
+fn os_release() -> (String, String) {
+    parse_os_release(&read_os_release())
+}
+
+pub(crate) fn os_release_field(file: &str, key: &str) -> Option<String> {
+    let value = file.lines().find_map(|line| line.trim().strip_prefix(key)?.strip_prefix('='))?;
+    Some(unquote(value).to_owned())
 }
 
 fn parse_os_release(file: &str) -> (String, String) {
-    let get = |key: &str| {
-        let value =
-            file.lines().find_map(|line| line.trim().strip_prefix(key)?.strip_prefix('='))?;
-        Some(unquote(value).to_owned())
-    };
+    let get = |key: &str| os_release_field(file, key);
     let name = get("NAME").unwrap_or_else(|| {
         tracing::warn!("no NAME= in os-release, using Linux");
         "Linux".to_owned()

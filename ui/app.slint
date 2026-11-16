@@ -17,6 +17,8 @@ import { Network } from "network.slint";
 import { TimezonePage } from "pages/0055_timezone.slint";
 import { Tz } from "timezone.slint";
 import { LocationPage } from "pages/0070_location.slint";
+import { AnalyticsPage, AnalyticsSampleDialog } from "pages/0075_analytics.slint";
+import { Analytics } from "analytics.slint";
 import { DriversPage } from "pages/0100_drivers.slint";
 import { TweaksDialog } from "pages/0110_tweaks.slint";
 import { Tweaks } from "tweaks.slint";
@@ -31,7 +33,7 @@ import { Appearance } from "appearance.slint";
 import { Errors } from "errors.slint";
 import { ImsDialog } from "pages/0025_ims.slint";
 import { Ims } from "ims.slint";
-export { Lang, Cfg, Account, Pages, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, A11y, Appearance, Ims, Errors }
+export { Lang, Cfg, Account, Pages, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, Analytics, A11y, Appearance, Ims, Errors }
 
 export component AppWindow inherits Window {
     in-out property <int> pagenum <=> Nav.page;
@@ -65,6 +67,7 @@ export component AppWindow inherits Window {
         else if pagenum == Pages.timezone { timezone.focus(); }
         else if pagenum == Pages.network { network.focus(); }
         else if pagenum == Pages.location { location.focus(); }
+        else if pagenum == Pages.analytics { analytics.focus(); }
         else if pagenum == Pages.drivers { drivers.focus(); }
         else if pagenum == Pages.summary { summary.focus(); }
         else if pagenum == Pages.installing { installing.focus(); }
@@ -197,6 +200,8 @@ export component AppWindow inherits Window {
 
         location := LocationPage { index: Pages.location; }
 
+        analytics := AnalyticsPage { index: Pages.analytics; }
+
         drivers := DriversPage { index: Pages.drivers; }
 
         summary := SummaryPage {
@@ -238,6 +243,8 @@ export component AppWindow inherits Window {
         if Tweaks.open: TweaksDialog { }
 
         if Ims.open: ImsDialog { }
+
+        if Analytics.sample-open: AnalyticsSampleDialog { }
 
         if Network.offline-prompt: OfflineDialog {
             explicit: Network.offline-prompt-explicit;

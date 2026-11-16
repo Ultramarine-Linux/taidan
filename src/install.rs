@@ -2,7 +2,8 @@ use libtaidan::{InstallMsg, steps::Stage};
 use slint::ComponentHandle;
 
 use crate::ui::{
-    AppWindow, Drivers, Install, InstallState, Location, Network, Pages, Theme, ThemeMode,
+    Analytics, AppWindow, Drivers, Install, InstallState, Location, Network, Pages, Theme,
+    ThemeMode,
 };
 use crate::ui::{block_on_thread, on_ui, spawn_then};
 
@@ -182,6 +183,8 @@ fn save_page_choices(app: &AppWindow, install: &Install<'_>) {
     let install_codecs_drivers = app.global::<Drivers<'_>>().get_install();
     let location = crate::cfg::shows_page(crate::cfg::SkipPage::Location)
         .then(|| app.global::<Location<'_>>().get_enabled());
+    let analytics = crate::cfg::shows_page(crate::cfg::SkipPage::Analytics)
+        .then(|| app.global::<Analytics<'_>>().get_enabled());
     let download_updates = install.get_download_updates();
     let proxy_persist = app.global::<Network<'_>>().get_proxy_persist();
     let dark_mode = crate::cfg::shows_page(crate::cfg::SkipPage::Theme)
@@ -192,6 +195,7 @@ fn save_page_choices(app: &AppWindow, install: &Install<'_>) {
     settings.tweaks = tweaks;
     settings.install_codecs_drivers = install_codecs_drivers;
     settings.location = location;
+    settings.analytics = analytics;
     settings.download_updates = download_updates;
     settings.proxy_persist = proxy_persist;
     settings.dark_mode = dark_mode;
@@ -295,6 +299,11 @@ pub(crate) fn can_use_dnf() -> bool {
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
     install.set_can_download_updates(can_use_dnf());
+    spawn_then(
+        ui.clone(),
+        || crate::RT.block_on(libtaidan::analytics::sample()),
+        |app, sample| app.global::<Analytics<'_>>().set_sample(sample.into()),
+    );
     install.on_start({
         let ui = ui.clone();
         move || start(&ui)

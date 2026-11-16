@@ -75,13 +75,14 @@ export component TdnPressable inherits Rectangle {
     @children
 
     focus := FocusScope {
-        enabled: root.focusable && Modal.open == root.in-dialog;
+        enabled: root.focusable && (Modal.open == root.in-dialog || self.has-focus);
         focus-on-tab-navigation: root.tab-focusable;
         focus-gained(reason) => {
             if reason == FocusReason.tab-navigation { root.pointer-focus = false; }
         }
         focus-lost(reason) => { root.blurred(reason); }
         key-pressed(event) => {
+            if Modal.open != root.in-dialog { return reject; }
             root.pointer-focus = false;
             if root.key(event) == EventResult.accept { return accept; }
             if event.text == Key.Return || event.text == " " {
