@@ -75,7 +75,6 @@ install -Dpm755 target/rpm/taidan-helper %{buildroot}%{_libexecdir}/taidan-helpe
 DESTDIR=%buildroot ./scripts/install.sh
 rm -rf %buildroot%{_datadir}/taidan/tweaks
 install -d %buildroot%{_sharedstatedir}/taidan
-mv data/avatars/LICENSE.unsplash LICENSE.unsplash
 
 %post
 %systemd_post taidan-initial-setup.service taidan-initial-setup-reconfiguration.service
@@ -88,7 +87,7 @@ mv data/avatars/LICENSE.unsplash LICENSE.unsplash
 
 %files
 %doc README.md
-%license LICENSE.md LICENSE-GPL-2.0-or-later.md LICENSE.dependencies LICENSE.unsplash
+%license LICENSE.md LICENSE-GPL-2.0-or-later.md LICENSE.dependencies data/avatars/LICENSE.unsplash
 %{_bindir}/taidan
 %{_libexecdir}/start-taidan
 %{_libexecdir}/taidan-helper
