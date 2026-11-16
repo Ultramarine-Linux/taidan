@@ -1,10 +1,6 @@
-//! The anonymous Plausible pageview sent when the user leaves analytics on.
-//!
-//! This is the same event `detect-internet` from taidan-ultramarine-configs used to send, so the
-//! existing Plausible dashboards keep working.
-
 const ENDPOINT: &str = "https://plausible.fyralabs.com/api/event";
 const DOMAIN: &str = "taidan";
+const DETECT_INTERNET_URL_PREFIX: &str = "app://internet/v0.2";
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -46,7 +42,7 @@ fn event(os_release: &str, hw: &Hardware) -> serde_json::Value {
     let flag = |on: bool| if on { "1" } else { "0" };
     serde_json::json!({
         "name": "pageview",
-        "url": format!("app://internet/v0.2/{}", field("VERSION_ID")),
+        "url": format!("{DETECT_INTERNET_URL_PREFIX}/{}", field("VERSION_ID")),
         "domain": DOMAIN,
         "props": {
             "arch": std::env::consts::ARCH,
@@ -62,12 +58,10 @@ async fn current_event() -> serde_json::Value {
     event(&crate::cfg::read_os_release(), &Hardware::detect().await)
 }
 
-/// The event [`send`] would send, pretty-printed for the user to look at.
 pub async fn sample() -> String {
     serde_json::to_string_pretty(&current_event().await).unwrap_or_default()
 }
 
-/// Send the pageview. Failures are only logged, analytics never stops the install.
 pub async fn send(settings: &crate::settings::Settings) {
     let body = current_event().await.to_string();
     let client = match settings.proxy.as_ref().map(crate::proxy::Proxy::client) {
