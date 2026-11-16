@@ -1,6 +1,6 @@
 const ENDPOINT: &str = "https://plausible.fyralabs.com/api/event";
 const DOMAIN: &str = "taidan";
-const DETECT_INTERNET_URL_PREFIX: &str = "app://internet/v0.2";
+const DETECT_INTERNET_URL_PREFIX: &str = "app://internet/v1.0";
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
