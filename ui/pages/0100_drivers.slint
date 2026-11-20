@@ -85,6 +85,10 @@ export component DriversPage inherits TdnPage {
                 font-size: 1.1 * Tokens.text-rem;
             }
 
+            if Drivers.codecs: TdnNote {
+                text: Lang.t("page-drivers-patented-codecs", []);
+            }
+
             toggle := TdnToggleRow {
                 text: Lang.t(Drivers.codecs ? "page-drivers-install-codecs" : "page-drivers-install", []);
                 checked: Drivers.install;

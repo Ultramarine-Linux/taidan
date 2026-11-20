@@ -418,6 +418,8 @@ page-location-tip-control = You're in control, disable anytime in settings.
 page-drivers = Drivers
 page-drivers-desc = Install additional drivers, codecs, and tools to support hardware detected in this device.
 page-drivers-proprietary = Some drivers may be proprietary.
+# shown when codecs are installed along with the drivers
+page-drivers-patented-codecs = Some codecs, like H.264, H.265, and AAC, are patented in some countries. Only install them if you're allowed to use them where you live.
 # toggle
 page-drivers-install = Install Drivers
 # toggle, the same as page-drivers-install, when codecs are installed along with the drivers

@@ -7,14 +7,12 @@ enum NvidiaBranch {
     Latest,
 }
 
-const TERRA_NVIDIA_RELEASE: &str = "terra-release-nvidia";
 const NVIDIA_COMMON_PACKAGES: [&str; 2] = ["nvidia-gpu-firmware", "libva-nvidia-driver"];
 const BROADCOM_PACKAGES: [&str; 2] = ["broadcom-wl", "akmod-wl"];
 
 pub(crate) fn driver_packages() -> Vec<&'static str> {
     [
-        &[TERRA_NVIDIA_RELEASE][..],
-        &NVIDIA_COMMON_PACKAGES,
+        &NVIDIA_COMMON_PACKAGES[..],
         &NvidiaBranch::R580.packages(),
         &NvidiaBranch::Latest.packages(),
         &BROADCOM_PACKAGES,
@@ -25,8 +23,12 @@ pub(crate) fn driver_packages() -> Vec<&'static str> {
 impl NvidiaBranch {
     fn packages(self) -> [&'static str; 3] {
         match self {
-            Self::R580 => ["akmod-nvidia-580xx", "nvidia-driver-580xx", "nvidia-driver-580xx-cuda"],
-            Self::Latest => ["akmod-nvidia", "nvidia-driver", "nvidia-driver-cuda"],
+            Self::R580 => [
+                "akmod-nvidia-580xx",
+                "xorg-x11-drv-nvidia-580xx",
+                "xorg-x11-drv-nvidia-580xx-cuda",
+            ],
+            Self::Latest => ["akmod-nvidia", "xorg-x11-drv-nvidia", "xorg-x11-drv-nvidia-cuda"],
         }
     }
 }
@@ -243,7 +245,12 @@ fn has_wl_only_wifi(pci: &[PciDevice]) -> bool {
 // NOTE: added during `_05_dnfdownloadapps.rs`
 impl Codecs {
     pub const fn codecs() -> &'static [&'static str] {
-        &["@multimedia"]
+        &[
+            "@multimedia",
+            "gstreamer1-plugins-bad-freeworld",
+            "gstreamer1-plugins-ugly",
+            "pipewire-codec-aptx",
+        ]
     }
 }
 
@@ -373,11 +380,10 @@ impl Drivers {
                 return Ok(Setup::default());
             }
         };
-        if install_pkgs(cfg, &[TERRA_NVIDIA_RELEASE]).await? == Installed::Skipped {
+        let pkgs = [&NVIDIA_COMMON_PACKAGES[..], &branch.packages()].concat();
+        if install_pkgs(cfg, &pkgs).await? == Installed::Skipped {
             return Ok(Setup::default());
         }
-        let pkgs = [&NVIDIA_COMMON_PACKAGES[..], &branch.packages()].concat();
-        install_pkgs(cfg, &pkgs).await?;
         let primary_gpu = std::env::var("STELLAR_OPTION").is_ok_and(|x| x == "1");
         let mut primary_failed = false;
         if primary_gpu && let Err(e) = root(Verb::NvidiaPrimaryGpu).await {
@@ -529,8 +535,8 @@ mod tests {
     fn nvidia_branch_packages() {
         assert_eq!(NvidiaBranch::Latest.packages()[0], "akmod-nvidia");
         assert!(NvidiaBranch::R580.packages().iter().all(|p| p.contains("-580xx")));
-        assert!(driver_packages().contains(&TERRA_NVIDIA_RELEASE));
-        assert!(!driver_packages().iter().any(|p| p.starts_with("xorg-x11-drv-nvidia")));
+        assert!(driver_packages().contains(&"xorg-x11-drv-nvidia-cuda"));
+        assert!(!driver_packages().iter().any(|p| p.starts_with("terra-release")));
     }
 
     const fn dev(vendor: u16, device: u16, class_code: u32) -> PciDevice {

@@ -1349,7 +1349,7 @@ mod tests {
             Verb::DnfDrivers { pkgs: pkgs.iter().map(|p| s(p)).collect() }.validate(root)
         };
         assert!(
-            drivers(&["terra-release-nvidia", "nvidia-driver-580xx", "broadcom-wl"], false).is_ok()
+            drivers(&["xorg-x11-drv-nvidia-580xx", "akmod-nvidia", "broadcom-wl"], false).is_ok()
         );
         assert!(drivers(&["@multimedia"], false).is_err());
         let ostree = Verb::RpmOstreeInstall { pkgs: vec![s("akmod-wl"), s("broadcom-wl")] };
