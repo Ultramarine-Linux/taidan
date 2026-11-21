@@ -1,4 +1,7 @@
-use libtaidan::{InstallMsg, steps::Stage};
+use libtaidan::{
+    InstallMsg,
+    steps::{Stage, Step},
+};
 use slint::ComponentHandle;
 
 use crate::ui::{
@@ -20,7 +23,9 @@ fn run_install(
     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         if is_dev_session() {
             tracing::warn!("Dev session: simulating the installation instead");
-            return crate::RT.block_on(simulate_install(callback)).map_err(|e| e.to_string());
+            return crate::RT
+                .block_on(simulate_install(settings, callback))
+                .map_err(|e| e.to_string());
         }
         crate::RT.block_on(libtaidan::start_install(settings, &crate::CFG, callback)).map_err(|e| {
             // errors go to Sentry and this may name the user
@@ -61,12 +66,23 @@ fn simulated_hw(name: &str) -> bool {
         .is_ok_and(|sim| sim.split(',').any(|s| s.trim() == name || s.trim() == "all"))
 }
 
+const SIMULATED_LOG_LINES: usize = 8;
+
 async fn simulate_install(
+    settings: &libtaidan::settings::Settings,
     callback: &(impl libtaidan::Callback + Sync),
 ) -> libtaidan::prelude::Res<()> {
-    for stage in Stage::all() {
-        callback.send(InstallMsg::UpdStage(*stage));
-        tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+    let plan = libtaidan::steps::plan(settings, &crate::CFG).await;
+    let mut shown = None;
+    for (stage, step) in Stage::all().iter().zip(plan) {
+        if shown != Some(step) {
+            callback.send(InstallMsg::UpdStep(step));
+            shown = Some(step);
+        }
+        for line in 0..SIMULATED_LOG_LINES {
+            callback.send(InstallMsg::Log(format!("simulated: {stage:?} line {line}")));
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
         if *stage == SIMULATED_ERROR_AFTER_STAGE
             && std::env::var_os("TAIDAN_SIMULATE_ERROR").is_some()
         {
@@ -90,11 +106,7 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
     on_ui(ui, move |ui| {
         let install = ui.global::<Install<'_>>();
         match msg {
-            InstallMsg::UpdStage(stage) => {
-                install.set_stage_id(stage.l10n_id().into());
-                install.set_stage_num(i32::from(u8::from(stage)) + 1);
-                install.set_stage_progress(-1.0);
-            }
+            InstallMsg::UpdStep(step) => show_step(&install, step),
             InstallMsg::StageProgress(frac) => {
                 install.set_stage_progress(furthest_stage_progress(
                     install.get_stage_progress(),
@@ -105,9 +117,18 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
             InstallMsg::DriversFailed => install.set_drivers_failed(true),
             InstallMsg::LocaleFailed => install.set_locale_failed(true),
             InstallMsg::UpdatesReady => install.set_updates_ready(true),
+            InstallMsg::Log(line) => crate::install_log::push(&line),
             InstallMsg::Finish => {}
         }
     });
+}
+
+fn show_step(install: &Install<'_>, step: Step) {
+    let int = |n: usize| i32::try_from(n).unwrap_or(i32::MAX);
+    install.set_stage_id(step.stage.l10n_id().into());
+    install.set_stage_num(int(step.num));
+    install.set_stage_count(int(step.count));
+    install.set_stage_progress(-1.0);
 }
 
 #[expect(clippy::cast_possible_truncation, reason = "a fraction, for display")]
@@ -125,7 +146,7 @@ fn start(ui: &slint::Weak<AppWindow>) {
     install.set_error("".into());
     clear_outcomes_except_needs_reboot(&install);
     clear_stage(&install);
-    install.set_stage_count(i32::try_from(Stage::all().len()).expect("too many stages"));
+    crate::install_log::begin();
     save_page_choices(&app, &install);
     let net = app.global::<Network<'_>>();
     let online = net.get_install_online();
@@ -153,6 +174,7 @@ fn start(ui: &slint::Weak<AppWindow>) {
                 *A11Y_APPLIED_AT_INSTALL.lock() =
                     Some(AppliedA11y { username: settings.username.clone(), a11y: settings.a11y });
             }
+            crate::install_log::end();
             (error, !settings.nointernet)
         },
         |ui, (error, used_internet)| {
@@ -214,6 +236,7 @@ fn clear_outcomes_except_needs_reboot(install: &Install<'_>) {
 fn clear_stage(install: &Install<'_>) {
     install.set_stage_id("".into());
     install.set_stage_num(0);
+    install.set_stage_count(0);
     install.set_stage_progress(-1.0);
 }
 
@@ -313,6 +336,7 @@ fn analytics_sample(sample: &libtaidan::analytics::Sample) -> AnalyticsSample {
 }
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, install: &Install<'_>) {
+    crate::install_log::initialize_ui(ui.clone());
     install.set_can_download_updates(can_use_dnf());
     spawn_then(
         ui.clone(),
@@ -407,22 +431,22 @@ mod tests {
     }
 
     #[test]
-    fn simulated_install_reports_every_stage() {
+    fn simulated_install_numbers_its_steps() {
         let msgs = std::sync::Mutex::new(vec![]);
         let callback = |msg| msgs.lock().unwrap().push(msg);
+        let settings = libtaidan::settings::Settings { nointernet: true, ..Default::default() };
         let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        rt.block_on(simulate_install(&callback)).unwrap();
+        rt.block_on(simulate_install(&settings, &callback)).unwrap();
         let msgs = msgs.into_inner().unwrap();
-        assert_eq!(msgs.len(), Stage::all().len() + 1);
-        let stages = msgs
+        let steps = msgs
             .iter()
             .filter_map(|msg| match msg {
-                InstallMsg::UpdStage(stage) => Some(*stage),
+                InstallMsg::UpdStep(step) => Some(*step),
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(stages, Stage::all());
-        assert_eq!(stages.iter().filter(|stage| **stage == Stage::ApplySystemSettings).count(), 1);
+        assert_eq!(steps, [Step { stage: Stage::SystemSetup, num: 1, count: 1 }]);
+        assert!(msgs.iter().any(|msg| matches!(msg, InstallMsg::Log(_))));
         assert!(matches!(msgs.last(), Some(InstallMsg::Finish)));
     }
 }

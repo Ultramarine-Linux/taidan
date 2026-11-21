@@ -6,6 +6,7 @@ pub mod cfg;
 pub mod child;
 pub mod ims;
 pub mod install;
+pub mod install_log;
 pub mod l10n;
 pub mod network;
 pub mod screen;
@@ -250,6 +251,7 @@ fn setup_logs_and_install_panic_hook() -> impl std::any::Any {
         )
         .with(journald.map(|l| l.with_syslog_identifier("taidan".to_owned())))
         .with(fmt::layer().with_writer(non_blocking).with_ansi(false).compact())
+        .with(install_log::Layer)
         .init();
 
     if cfg!(debug_assertions) {

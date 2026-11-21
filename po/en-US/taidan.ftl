@@ -402,6 +402,9 @@ page-theme-accent-slate = Slate
 page-installing-configuring = Configuring your Device
 # the step being done, and which one it is out of how many, e.g. "Creating Your Account…  (1/11)"
 page-installing-stage = { $stage }  ({ $num }/{ $count })
+page-installing-show-log = Show Logs
+page-installing-hide-log = Hide Logs
+page-installing-log = Installation Logs
 ## [Finish]
 
 ## [Location]

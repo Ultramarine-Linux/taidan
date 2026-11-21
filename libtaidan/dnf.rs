@@ -13,6 +13,7 @@ const DRAIN_LINE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1
 const DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 pub(crate) async fn run_logged(
+    callback: &impl crate::Callback,
     name: &'static str,
     verb: &crate::Verb,
     mut on_line: impl FnMut(&str),
@@ -70,6 +71,7 @@ pub(crate) async fn run_logged(
             log = None;
         }
         println!("{name}: {line}");
+        callback.send(crate::InstallMsg::Log(format!("{name}: {line}")));
         if !line.trim().is_empty() {
             if tail.len() == ERROR_TAIL_LINES {
                 tail.pop_front();
@@ -93,7 +95,7 @@ pub(crate) async fn run_logged(
 }
 
 pub(crate) async fn handle_dnf(callback: &impl crate::Callback, verb: crate::Verb) -> Res<()> {
-    run_logged("dnf5", &verb, |line| {
+    run_logged(callback, "dnf5", &verb, |line| {
         if let Some(m) = PROGRESS_REGEX.captures(line)
             && let (Ok(num), Ok(den)) = (m[1].parse::<u32>(), m[2].parse::<u32>())
             && den != 0

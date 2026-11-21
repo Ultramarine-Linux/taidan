@@ -36,7 +36,7 @@ async fn flatpaks_and_packages<C: crate::Callback>(
             return Ok(());
         }
         let verb = crate::Verb::FlatpakInstall { refs: refs.to_vec(), download_only };
-        crate::dnf::run_logged("flatpak", &verb, |_| {}).await
+        crate::dnf::run_logged(callback, "flatpak", &verb, |_| {}).await
     };
     let packages = async {
         if pkgs.is_empty() {
@@ -124,6 +124,72 @@ impl Stage {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Step {
+    pub stage: Stage,
+    pub num: usize,
+    pub count: usize,
+}
+
+impl Stage {
+    async fn is_lengthy(
+        self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+    ) -> bool {
+        let online = !settings.nointernet;
+        let dnf = can_use_dnf(cfg).await;
+        let [repos, pkgs, flatpaks, scripts, coprs] = &settings.actions;
+        match self {
+            Self::SystemSetup => true,
+            Self::UserAdd | Self::ApplySystemSettings => false,
+            Self::DnfDownloadApps => {
+                online
+                    && (!flatpaks.is_empty()
+                        || dnf && [repos, pkgs, coprs].iter().any(|a| !a.is_empty()))
+            }
+            Self::DnfInstallApps => {
+                online
+                    && (!flatpaks.is_empty()
+                        || dnf && [pkgs, scripts].iter().any(|a| !a.is_empty()))
+            }
+            Self::DriversCodecs => {
+                settings.install_codecs_drivers && online && {
+                    let hw = detect_hardware().await;
+                    (hw.nvidia || hw.broadcom_wifi) && !hw.secure_boot_blocks
+                }
+            }
+            Self::DownloadUpdates => dnf && online && settings.download_updates,
+        }
+    }
+}
+
+pub async fn plan(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Vec<Step> {
+    let mut stages = Vec::with_capacity(Stage::all().len());
+    for stage in Stage::all() {
+        stages.push((*stage, stage.is_lengthy(settings, cfg).await));
+    }
+    group_quick_stages(&stages)
+}
+
+#[must_use]
+pub fn group_quick_stages(stages: &[(Stage, bool)]) -> Vec<Step> {
+    let count = stages.iter().filter(|(_, lengthy)| *lengthy).count();
+    let first = stages.iter().find(|(_, lengthy)| *lengthy).map_or(Stage::SystemSetup, |s| s.0);
+    let mut step = Step { stage: first, num: 1, count: count.max(1) };
+    let mut seen = 0;
+    stages
+        .iter()
+        .map(|&(stage, lengthy)| {
+            if lengthy {
+                seen += 1;
+                step = Step { stage, num: seen, ..step };
+            }
+            step
+        })
+        .collect()
+}
+
 impl From<Stage> for u8 {
     fn from(stage: Stage) -> Self {
         stage as Self
@@ -157,5 +223,39 @@ mod tests {
         for (index, stage) in Stage::all().iter().enumerate() {
             assert_eq!(usize::from(u8::from(*stage)), index);
         }
+    }
+
+    #[test]
+    fn quick_stages_join_a_lengthy_one() {
+        use Stage::*;
+        let steps = group_quick_stages(&[
+            (UserAdd, false),
+            (SystemSetup, true),
+            (DnfDownloadApps, true),
+            (DnfInstallApps, true),
+            (DriversCodecs, false),
+            (ApplySystemSettings, false),
+            (DownloadUpdates, true),
+        ]);
+        let shown = steps.iter().map(|s| (s.stage, s.num, s.count)).collect::<Vec<_>>();
+        assert_eq!(
+            shown,
+            [
+                (SystemSetup, 1, 4),
+                (SystemSetup, 1, 4),
+                (DnfDownloadApps, 2, 4),
+                (DnfInstallApps, 3, 4),
+                (DnfInstallApps, 3, 4),
+                (DnfInstallApps, 3, 4),
+                (DownloadUpdates, 4, 4),
+            ]
+        );
+    }
+
+    #[test]
+    fn nothing_lengthy_is_one_step() {
+        let steps =
+            group_quick_stages(&[(Stage::UserAdd, false), (Stage::ApplySystemSettings, false)]);
+        assert!(steps.iter().all(|s| *s == Step { stage: Stage::SystemSetup, num: 1, count: 1 }));
     }
 }
