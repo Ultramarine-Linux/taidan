@@ -190,6 +190,7 @@ fn save_page_choices(app: &AppWindow, install: &Install<'_>) {
     let dark_mode = crate::cfg::shows_page(crate::cfg::SkipPage::Theme)
         .then(|| app.global::<Theme<'_>>().get_mode() == ThemeMode::Dark);
     let accent = dark_mode.and_then(|_| crate::theme::picked(&app.global()));
+    let breeze_dark = dark_mode == Some(true) && crate::theme::breeze_dark(&app.global());
     let tweaks = crate::tweaks::enabled(&app.global());
     let mut settings = crate::SETTINGS.write();
     settings.tweaks = tweaks;
@@ -200,6 +201,7 @@ fn save_page_choices(app: &AppWindow, install: &Install<'_>) {
     settings.proxy_persist = proxy_persist;
     settings.dark_mode = dark_mode;
     settings.accent = accent;
+    settings.breeze_dark = breeze_dark;
     if !crate::cfg::shows_page(crate::cfg::SkipPage::Language) {
         settings.locale.clear();
     }

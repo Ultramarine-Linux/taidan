@@ -1,3 +1,4 @@
+mod grub;
 mod hostname;
 mod imf;
 mod locale;
@@ -20,6 +21,7 @@ pub(super) async fn run(
     hostname::run(settings).await?;
     timezone::run(settings).await?;
     theme::run(settings, cfg).await?;
+    grub::run(settings, cfg).await?;
     imf::run(settings, cfg).await?;
     locale::run(settings, callback).await
 }

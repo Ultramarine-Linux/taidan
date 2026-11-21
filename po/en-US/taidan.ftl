@@ -385,6 +385,8 @@ page-theme-accent-red = Red
 page-theme-accent-pink = Pink
 page-theme-accent-purple = Purple
 page-theme-accent-slate = Slate
+page-theme-advanced = Advanced
+page-theme-breeze-dark = Use the standard Breeze Dark colors
 
 ## [Browser Selection]
 

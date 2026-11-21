@@ -14,6 +14,8 @@ pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::
 const GSETTINGS: &str = "/usr/bin/gsettings";
 const XFCONF: &str = "/usr/bin/xfconf-query";
 const HEADLESS_QT_PLATFORM: &str = "QT_QPA_PLATFORM=offscreen";
+const PLASMA_DARK: &str = "org.ultramarine-linux.ultramarine.desktop";
+const PLASMA_LIGHT: &str = "org.ultramarine-linux.ultramarinelight.desktop";
 
 fn gsettings(key: &str, value: &str) -> Vec<String> {
     crate::home::gsettings("org.gnome.desktop.interface", key, Some(value))
@@ -23,20 +25,29 @@ fn xfconf(channel: &str, property: &str, value: &str) -> Vec<String> {
     crate::home::xfconf(channel, property, "string", Some(value))
 }
 
-fn plasma_commands(dark: bool, accent: Option<Accent>) -> Vec<Vec<String>> {
-    let scheme = if dark { "BreezeDark" } else { "BreezeLight" };
-    let apply_colorscheme = |args: &[&str]| {
-        [HEADLESS_QT_PLATFORM, "plasma-apply-colorscheme"]
-            .iter()
-            .chain(args)
-            .map(|&s| s.to_owned())
-            .collect()
+fn plasma_look(dark: bool, breeze_dark: bool) -> (&'static str, &'static str) {
+    match (dark, breeze_dark) {
+        (false, _) => (PLASMA_LIGHT, "BreezeLight"),
+        (true, false) => (PLASMA_DARK, "UltramarineDark"),
+        (true, true) => (PLASMA_DARK, "BreezeDark"),
+    }
+}
+
+fn plasma_commands(dark: bool, breeze_dark: bool, accent: Option<Accent>) -> Vec<Vec<String>> {
+    let (lookandfeel, scheme) = plasma_look(dark, breeze_dark);
+    let headless = |program: &str, args: &[&str]| {
+        [HEADLESS_QT_PLATFORM, program].iter().chain(args).map(|&s| s.to_owned()).collect()
     };
+    let apply_colorscheme = |args: &[&str]| headless("plasma-apply-colorscheme", args);
     let kdeglobals =
         |key, value| KConfigEntry::value("kdeglobals", "General", key, Some(value)).command(None);
     // plasma-apply-colorscheme skips a scheme that's already the default, which the look and
     // feel may still override
-    let mut cmds = vec![apply_colorscheme(&[scheme]), kdeglobals("ColorScheme", scheme)];
+    let mut cmds = vec![
+        headless("plasma-apply-lookandfeel", &["--apply", lookandfeel]),
+        apply_colorscheme(&[scheme]),
+        kdeglobals("ColorScheme", scheme),
+    ];
     if let Some(accent) = accent {
         // with `--accent-color` it reapplies the saved scheme and doesn't save the accent
         cmds.push(apply_colorscheme(&["--accent-color", accent.hex()]));
@@ -45,12 +56,17 @@ fn plasma_commands(dark: bool, accent: Option<Accent>) -> Vec<Vec<String>> {
     cmds
 }
 
-fn theme_commands(dark: bool, accent: Option<Accent>, desktop: Desktop) -> Vec<Vec<String>> {
+fn theme_commands(
+    dark: bool,
+    breeze_dark: bool,
+    accent: Option<Accent>,
+    desktop: Desktop,
+) -> Vec<Vec<String>> {
     let accent = accent.filter(|_| desktop.supports_accent());
     let themes = desktop.themes(dark);
     let mut cmds = vec![];
     if desktop == Desktop::Plasma {
-        cmds.extend(plasma_commands(dark, accent));
+        cmds.extend(plasma_commands(dark, breeze_dark, accent));
     } else if std::path::Path::new(GSETTINGS).exists() {
         cmds.push(gsettings("color-scheme", if dark { "prefer-dark" } else { "default" }));
         if let Some(accent) = accent {
@@ -83,7 +99,9 @@ pub(in crate::steps) async fn apply(
     desktop: Desktop,
 ) -> Res<bool> {
     let Some(dark) = settings.dark_mode else { return Ok(false) };
-    let Some(cmd) = home.session(theme_commands(dark, settings.accent, desktop)) else {
+    let Some(cmd) =
+        home.session(theme_commands(dark, settings.breeze_dark, settings.accent, desktop))
+    else {
         tracing::info!("neither plasma-apply-colorscheme nor gsettings found; skipping the theme");
         return Ok(false);
     };
@@ -105,12 +123,21 @@ mod tests {
 
     #[test]
     fn retry_uses_the_new_theme_and_accent() {
-        let first = theme_commands(true, Some(Accent::Blue), Desktop::Plasma);
-        let retry = theme_commands(false, Some(Accent::Green), Desktop::Plasma);
-        assert!(first.iter().flatten().any(|arg| arg == "BreezeDark"));
+        let first = theme_commands(true, false, Some(Accent::Blue), Desktop::Plasma);
+        let retry = theme_commands(false, false, Some(Accent::Green), Desktop::Plasma);
+        assert!(first.iter().flatten().any(|arg| arg == "UltramarineDark"));
+        assert!(first.iter().flatten().any(|arg| arg == PLASMA_DARK));
         assert!(retry.iter().flatten().any(|arg| arg == "BreezeLight"));
-        assert!(!retry.iter().flatten().any(|arg| arg == "BreezeDark"));
+        assert!(retry.iter().flatten().any(|arg| arg == PLASMA_LIGHT));
+        assert!(!retry.iter().flatten().any(|arg| arg == "UltramarineDark"));
         assert!(retry.iter().flatten().any(|arg| arg == Accent::Green.hex()));
         assert!(!retry.iter().flatten().any(|arg| arg == Accent::Blue.hex()));
+    }
+
+    #[test]
+    fn breeze_dark_keeps_the_ultramarine_look_and_feel() {
+        assert_eq!(plasma_look(true, true), (PLASMA_DARK, "BreezeDark"));
+        assert_eq!(plasma_look(true, false), (PLASMA_DARK, "UltramarineDark"));
+        assert_eq!(plasma_look(false, true), (PLASMA_LIGHT, "BreezeLight"));
     }
 }
