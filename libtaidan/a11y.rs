@@ -245,8 +245,6 @@ impl A11y {
         let (sans, mono) = (font(LEGIBLE_SANS), font(LEGIBLE_MONO));
         vec![
             gsettings(apps, "screen-reader-enabled", flag(self.screen_reader)),
-            // Budgie apps only talk to Orca with this on
-            gsettings(interface, "toolkit-accessibility", flag(self.screen_reader)),
             gsettings(apps, "screen-magnifier-enabled", flag(self.zoom)),
             gsettings(
                 "org.gnome.desktop.a11y.magnifier",
@@ -499,7 +497,7 @@ mod tests {
             skel.kconfig(&a11y.user_entries()).map(HomeCmd::best_effort).collect_vec()
         );
         let orca = skel.write_file(ORCA_AUTOSTART_OVERRIDE_PATH, ORCA_AUTOSTART);
-        assert!(a11y.home_cmds(&skel, Desktop::Budgie, None).contains(&orca));
+        assert!(a11y.home_cmds(&skel, Desktop::Xfce, None).contains(&orca));
         assert!(!a11y.home_cmds(&skel, Desktop::Gnome, None).contains(&orca));
         let off = A11y::default().home_cmds(&skel, Desktop::Xfce, Some(a11y));
         assert!(off.contains(&skel.remove_file(ORCA_AUTOSTART_OVERRIDE_PATH).best_effort()));
@@ -509,9 +507,7 @@ mod tests {
     fn orca_autostart_outside_gnome() {
         let a11y = A11y { screen_reader: true, ..A11y::default() };
         assert!(!a11y.needs_orca_autostart(Desktop::Gnome));
-        assert!(
-            a11y.needs_orca_autostart(Desktop::Budgie) && a11y.needs_orca_autostart(Desktop::Xfce)
-        );
+        assert!(a11y.needs_orca_autostart(Desktop::Xfce));
         assert!(!A11y::default().needs_orca_autostart(Desktop::Xfce));
     }
 }

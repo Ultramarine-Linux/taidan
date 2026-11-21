@@ -174,7 +174,6 @@ pub(crate) fn unquote(value: &str) -> &str {
 pub enum Desktop {
     Gnome,
     Plasma,
-    Budgie,
     Xfce,
     Other,
 }
@@ -185,7 +184,6 @@ impl Desktop {
         let edition = edition.to_ascii_lowercase();
         match edition.strip_prefix("atomic-").unwrap_or(&edition) {
             "gnome" => Self::Gnome,
-            "budgie" => Self::Budgie,
             "xfce" => Self::Xfce,
             _ => Self::Other,
         }
@@ -233,7 +231,7 @@ mod tests {
 
     #[test]
     fn desktops() {
-        assert_eq!(Desktop::from_edition("budgie"), Desktop::Budgie);
+        assert_eq!(Desktop::from_edition("budgie"), Desktop::Other);
         assert_eq!(Desktop::from_edition("atomic-GNOME"), Desktop::Gnome);
         assert_eq!(Desktop::from_edition("atomic-xfce"), Desktop::Xfce);
         assert_eq!(Desktop::from_edition("kde"), Desktop::Other);
