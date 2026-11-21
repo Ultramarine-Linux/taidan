@@ -25,33 +25,48 @@ fn xfconf(channel: &str, property: &str, value: &str) -> Vec<String> {
     crate::home::xfconf(channel, property, "string", Some(value))
 }
 
-fn plasma_look(dark: bool, breeze_dark: bool) -> (&'static str, &'static str) {
+#[derive(Debug, PartialEq, Eq)]
+struct PlasmaLook {
+    lookandfeel: &'static str,
+    colors: &'static str,
+    icons: &'static str,
+}
+
+const fn plasma_look(dark: bool, breeze_dark: bool) -> PlasmaLook {
     match (dark, breeze_dark) {
-        (false, _) => (PLASMA_LIGHT, "BreezeLight"),
-        (true, false) => (PLASMA_DARK, "UltramarineDark"),
-        (true, true) => (PLASMA_DARK, "BreezeDark"),
+        (false, _) => {
+            PlasmaLook { lookandfeel: PLASMA_LIGHT, colors: "BreezeLight", icons: "breeze" }
+        }
+        (true, false) => {
+            PlasmaLook { lookandfeel: PLASMA_DARK, colors: "UltramarineDark", icons: "breeze-dark" }
+        }
+        (true, true) => {
+            PlasmaLook { lookandfeel: PLASMA_DARK, colors: "BreezeDark", icons: "breeze-dark" }
+        }
     }
 }
 
 fn plasma_commands(dark: bool, breeze_dark: bool, accent: Option<Accent>) -> Vec<Vec<String>> {
-    let (lookandfeel, scheme) = plasma_look(dark, breeze_dark);
+    let look = plasma_look(dark, breeze_dark);
     let headless = |program: &str, args: &[&str]| {
         [HEADLESS_QT_PLATFORM, program].iter().chain(args).map(|&s| s.to_owned()).collect()
     };
     let apply_colorscheme = |args: &[&str]| headless("plasma-apply-colorscheme", args);
-    let kdeglobals =
-        |key, value| KConfigEntry::value("kdeglobals", "General", key, Some(value)).command(None);
+    let kdeglobals = |group, key, value| {
+        KConfigEntry::value("kdeglobals", group, key, Some(value)).command(None)
+    };
     // plasma-apply-colorscheme skips a scheme that's already the default, which the look and
     // feel may still override
     let mut cmds = vec![
-        headless("plasma-apply-lookandfeel", &["--apply", lookandfeel]),
-        apply_colorscheme(&[scheme]),
-        kdeglobals("ColorScheme", scheme),
+        headless("plasma-apply-lookandfeel", &["--apply", look.lookandfeel]),
+        apply_colorscheme(&[look.colors]),
+        kdeglobals("General", "ColorScheme", look.colors),
+        kdeglobals("Icons", "Theme", look.icons),
     ];
     if let Some(accent) = accent {
         // with `--accent-color` it reapplies the saved scheme and doesn't save the accent
         cmds.push(apply_colorscheme(&["--accent-color", accent.hex()]));
-        cmds.push(kdeglobals("AccentColor", accent.hex()));
+        cmds.push(kdeglobals("General", "AccentColor", accent.hex()));
     }
     cmds
 }
@@ -136,8 +151,28 @@ mod tests {
 
     #[test]
     fn breeze_dark_keeps_the_ultramarine_look_and_feel() {
-        assert_eq!(plasma_look(true, true), (PLASMA_DARK, "BreezeDark"));
-        assert_eq!(plasma_look(true, false), (PLASMA_DARK, "UltramarineDark"));
-        assert_eq!(plasma_look(false, true), (PLASMA_LIGHT, "BreezeLight"));
+        let look = |dark, breeze_dark| {
+            let look = plasma_look(dark, breeze_dark);
+            (look.lookandfeel, look.colors, look.icons)
+        };
+        assert_eq!(look(true, true), (PLASMA_DARK, "BreezeDark", "breeze-dark"));
+        assert_eq!(look(true, false), (PLASMA_DARK, "UltramarineDark", "breeze-dark"));
+        assert_eq!(look(false, true), (PLASMA_LIGHT, "BreezeLight", "breeze"));
+    }
+
+    #[test]
+    fn every_desktop_sets_icons_for_the_mode() {
+        let icons = |dark, desktop| {
+            let cmds = theme_commands(dark, false, None, desktop);
+            cmds.into_iter().flatten().collect::<Vec<_>>()
+        };
+        assert!(icons(true, Desktop::Plasma).iter().any(|arg| arg == "breeze-dark"));
+        assert!(icons(false, Desktop::Plasma).iter().any(|arg| arg == "breeze"));
+        assert!(!icons(false, Desktop::Plasma).iter().any(|arg| arg == "breeze-dark"));
+        for desktop in [Desktop::Budgie, Desktop::Xfce] {
+            for dark in [false, true] {
+                assert!(desktop.themes(dark).unwrap().icons.is_some(), "{desktop:?} {dark}");
+            }
+        }
     }
 }
