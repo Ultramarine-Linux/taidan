@@ -35,6 +35,9 @@ const LOCATION_OFF_KEYFILE: &str = "# written by Taidan, location services were 
 enabled=false
 ";
 
+const GRUB_DEFAULTS: &str = "/etc/default/grub";
+const GRUB_CFG: &str = "/boot/grub2/grub.cfg";
+
 const PORTAL_UNIT: &str = "taidan-portal.service";
 const PORTAL_USER: &str = "taidan-portal";
 const PORTAL_DISPLAY: &str = "wayland-0";
@@ -96,6 +99,7 @@ pub enum Verb {
     DnfOfflineArm,
     NvidiaPrimaryGpu,
     DefaultKernel,
+    SetGrubTheme { theme: crate::theme::GrubTheme },
     Akmods { kernel: String },
     InstallCert { network: String, attempt: String, file: String },
     PruneCerts { network: String, keep: Option<String> },
@@ -151,6 +155,7 @@ impl Verb {
                 | Self::RunScript { .. }
                 | Self::DnfUpgradeOffline
                 | Self::DnfOfflineArm
+                | Self::SetGrubTheme { .. }
         )
     }
 
@@ -180,7 +185,8 @@ impl Verb {
             | Self::DnfOfflineClean
             | Self::DnfOfflineArm
             | Self::NvidiaPrimaryGpu
-            | Self::DefaultKernel => Ok(()),
+            | Self::DefaultKernel
+            | Self::SetGrubTheme { .. } => Ok(()),
             Self::DebugShell { wayland_display } => {
                 check(word(wayland_display, "._-"), "display", wayland_display)
             }
@@ -325,6 +331,29 @@ impl Verb {
             }
         }
     }
+}
+
+fn gfxterm_grub_defaults(defaults: &str) -> String {
+    const GFXTERM: &str = "GRUB_TERMINAL_OUTPUT=\"gfxterm\"";
+    let mut has_output = false;
+    let mut lines = defaults
+        .lines()
+        .map(|line| {
+            if line.trim_start_matches('#').starts_with("GRUB_TERMINAL_OUTPUT=") {
+                has_output = true;
+                GFXTERM.to_owned()
+            } else if line.starts_with("GRUB_THEME=") {
+                format!("#{line}")
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect::<Vec<_>>();
+    if !has_output {
+        lines.push(GFXTERM.to_owned());
+    }
+    lines.push(String::new());
+    lines.join("\n")
 }
 
 fn check(ok: bool, what: &str, value: &str) -> Result<(), String> {
@@ -775,6 +804,7 @@ impl Ctx {
                 exited_0(write_atomic(Path::new(DEST), conf, 0o644), DEST)
             }
             Verb::DefaultKernel => self.exec("grubby", &["--default-kernel"]),
+            Verb::SetGrubTheme { theme } => self.set_grub_theme(*theme),
             Verb::Akmods { kernel } => self.exec("akmods", &["--kernels", kernel]),
             Verb::InstallCert { network, attempt, file } => {
                 let dest = Path::new(CERT_DIR).join(network).join(attempt).join(file);
@@ -802,6 +832,36 @@ impl Ctx {
                 exited_0(remove_any(&dir), &dir.to_string_lossy())
             }
         }
+    }
+
+    fn set_grub_theme(&self, theme: crate::theme::GrubTheme) -> Result<i32, String> {
+        let pkg = theme.package();
+        let installed = self.exec("rpm", &["-q", "--quiet", pkg])? == 0;
+        let install = || {
+            if installed {
+                return Ok(0);
+            }
+            self.exec("dnf5", &["install", "-y", "--allowerasing", pkg])
+        };
+        install()
+            .then_on_success(|| {
+                let defaults = match std::fs::read_to_string(GRUB_DEFAULTS) {
+                    Ok(defaults) => defaults,
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+                    Err(e) => return Err(format!("{GRUB_DEFAULTS}: {e}")),
+                };
+                let themed = gfxterm_grub_defaults(&defaults);
+                exited_0(
+                    write_atomic(Path::new(GRUB_DEFAULTS), themed.as_bytes(), 0o644),
+                    GRUB_DEFAULTS,
+                )
+            })
+            .then_on_success(|| {
+                if !Path::new(GRUB_CFG).exists() {
+                    return Ok(0);
+                }
+                self.exec("grub2-mkconfig", &["-o", GRUB_CFG])
+            })
     }
 
     fn dconf_keyfile(&self, path: &str, content: Option<&str>) -> Result<i32, String> {
@@ -1229,6 +1289,7 @@ mod tests {
             Verb::DnfOfflineArm,
             Verb::NvidiaPrimaryGpu,
             Verb::DefaultKernel,
+            Verb::SetGrubTheme { theme: crate::theme::GrubTheme::Darker },
             Verb::Akmods { kernel: s("6.17.1-300.fc43.x86_64") },
             Verb::InstallCert {
                 network: s("corp-wifi-436f7270"),
@@ -1254,6 +1315,25 @@ mod tests {
         for verb in every_verb() {
             assert_eq!(verb.validate(true), Ok(()), "{verb:?}");
         }
+    }
+
+    #[test]
+    fn grub_defaults_switch_to_gfxterm() {
+        let fedora =
+            "GRUB_TIMEOUT=5\nGRUB_TERMINAL_OUTPUT=\"console\"\nGRUB_THEME=/boot/x/theme.txt\n";
+        assert_eq!(
+            gfxterm_grub_defaults(fedora),
+            "GRUB_TIMEOUT=5\nGRUB_TERMINAL_OUTPUT=\"gfxterm\"\n#GRUB_THEME=/boot/x/theme.txt\n"
+        );
+        assert_eq!(
+            gfxterm_grub_defaults(&gfxterm_grub_defaults(fedora)),
+            gfxterm_grub_defaults(fedora)
+        );
+        assert_eq!(gfxterm_grub_defaults(""), "GRUB_TERMINAL_OUTPUT=\"gfxterm\"\n");
+        assert_eq!(
+            gfxterm_grub_defaults("#GRUB_TERMINAL_OUTPUT=console\n"),
+            "GRUB_TERMINAL_OUTPUT=\"gfxterm\"\n"
+        );
     }
 
     #[test]
