@@ -210,7 +210,7 @@ fn ibus_dconf_writes(
         write("/desktop/ibus/general/use-system-keyboard-layout", "true".to_owned()),
         write("/desktop/ibus/general/engines-order", order.clone()),
         write("/desktop/ibus/general/preload-engines", order),
-        // GNOME and Budgie ignore `preload-engines` and drive IBus from `input-sources`
+        // GNOME ignores `preload-engines` and drive IBus from `input-sources`
         write("/org/gnome/desktop/input-sources/sources", format!("[{sources}]")),
     ]
 }

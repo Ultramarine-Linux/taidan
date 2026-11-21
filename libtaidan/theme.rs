@@ -80,13 +80,8 @@ impl Desktop {
             Self::Gnome => {
                 Themes { gtk: if dark { "Adwaita-dark" } else { "Adwaita" }, icons: None, wm: None }
             }
-            // budgie and xfce panels stay dark in either mode, so light mode keeps the icon themes
-            // with light panel icons
-            Self::Budgie => Themes {
-                gtk: if dark { "Fluent-round-Dark" } else { "Fluent-round-Light" },
-                icons: Some(if dark { "Fluent-dark" } else { "Fluent" }),
-                wm: None,
-            },
+            // xfce panels stay dark in either mode, so light mode keeps the icon themes with light
+            // panel icons
             Self::Xfce => Themes {
                 gtk: if dark { "Orchis-Dark" } else { "Orchis-Light" },
                 icons: Some(if dark { "Papirus-Dark" } else { "Papirus" }),
@@ -124,7 +119,6 @@ mod tests {
         assert!(Desktop::from_edition("atomic-gnome").supports_accent());
         assert!(Desktop::Plasma.supports_accent());
         assert!(!Desktop::from_edition("kde").supports_accent());
-        assert!(!Desktop::Budgie.supports_accent());
         assert!(!Desktop::Xfce.supports_accent());
         assert!(!Desktop::from_edition("").supports_accent());
     }
@@ -132,10 +126,7 @@ mod tests {
     #[test]
     fn themes_per_edition() {
         let themes = |edition, dark| Desktop::from_edition(edition).themes(dark);
-        let budgie = themes("atomic-budgie", true).unwrap();
-        assert_eq!((budgie.gtk, budgie.icons), ("Fluent-round-Dark", Some("Fluent-dark")));
-        let budgie = themes("budgie", false).unwrap();
-        assert_eq!((budgie.gtk, budgie.icons), ("Fluent-round-Light", Some("Fluent")));
+        assert_eq!(themes("atomic-budgie", true), None);
         let xfce = themes("xfce", false).unwrap();
         assert_eq!(
             (xfce.gtk, xfce.icons, xfce.wm),
