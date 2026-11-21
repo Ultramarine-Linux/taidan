@@ -1,7 +1,7 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
-import { TdnText, TdnTile, TdnPressable } from "../components.slint";
+import { TdnText, TdnTile, TdnPressable, TdnToggleRow } from "../components.slint";
 import { Icon } from "../slintcn/components/icon.slint";
 import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
 import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
@@ -227,6 +227,18 @@ export component ThemePage inherits TdnPage {
             }
 
             AccentRow {
+                accepted => { root.try-next(); }
+            }
+        }
+
+        if Appearance.plasma && root.dark: HorizontalLayout {
+            alignment: center;
+
+            TdnToggleRow {
+                width: 25.5rem;
+                text: Lang.t("page-theme-breeze-dark", []);
+                checked: Appearance.breeze-dark;
+                toggled(on) => { Appearance.breeze-dark = on; }
                 accepted => { root.try-next(); }
             }
         }
