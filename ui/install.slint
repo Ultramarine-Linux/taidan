@@ -4,9 +4,11 @@ export global Install {
     in property <InstallState> state;
     in property <string> stage-id;
     in property <int> stage-num;
-    in property <int> stage-count: 11;
+    in property <int> stage-count;
     in property <float> stage-progress: -1;
     in property <string> error;
+    in property <string> log;
+    in-out property <bool> show-log;
     in property <bool> needs-reboot;
     in-out property <bool> download-updates: true;
     in property <bool> can-download-updates: true;
