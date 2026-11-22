@@ -326,6 +326,16 @@ export component NetworkPage inherits TdnPage {
             horizontal-stretch: 1;
             spacing: 1rem;
 
+            device-name := TdnTextField {
+                vertical-stretch: 0;
+                label: Lang.t("page-internet-devicename", []);
+                help: Network.hostname != ""
+                    ? Lang.t("page-internet-hostname", [{ key: "hostname", value: Network.hostname }])
+                    : Lang.t("page-internet-devicename-desc", []);
+                text <=> Network.device-name;
+                accepted => { root.try-next(); }
+            }
+
             Card {
                 vertical-stretch: 1;
                 card-radius: md;
@@ -406,16 +416,6 @@ export component NetworkPage inherits TdnPage {
                         }
                     }
                 }
-            }
-
-            device-name := TdnTextField {
-                vertical-stretch: 0;
-                label: Lang.t("page-internet-devicename", []);
-                help: Network.hostname != ""
-                    ? Lang.t("page-internet-hostname", [{ key: "hostname", value: Network.hostname }])
-                    : Lang.t("page-internet-devicename-desc", []);
-                text <=> Network.device-name;
-                accepted => { root.try-next(); }
             }
         }
     }
