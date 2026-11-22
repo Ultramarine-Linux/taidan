@@ -1,7 +1,7 @@
 import { AccessibilityPage, AccessibilityDialog, A11yMoreDialog } from "pages/0005_accessibility.slint";
 import { A11y } from "a11y.slint";
 import { WelcomePage } from "pages/0030_welcome.slint";
-import { ThemePage } from "pages/0035_theme.slint";
+import { ThemePage, ThemeAdvancedDialog } from "pages/0035_theme.slint";
 import { Lang } from "lang.slint";
 import { Cfg } from "cfg.slint";
 import { Account } from "account.slint";
@@ -245,6 +245,8 @@ export component AppWindow inherits Window {
         if Ims.open: ImsDialog { }
 
         if Analytics.sample-open: AnalyticsSampleDialog { }
+
+        if Appearance.advanced-open: ThemeAdvancedDialog { }
 
         if Network.offline-prompt: OfflineDialog {
             explicit: Network.offline-prompt-explicit;

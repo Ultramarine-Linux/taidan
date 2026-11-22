@@ -1,7 +1,7 @@
 import { TdnPage } from "../page.slint";
 import { Lang, Dir } from "../lang.slint";
 import { Cfg } from "../cfg.slint";
-import { TdnText, TdnTile, TdnPressable, TdnToggleRow } from "../components.slint";
+import { TdnText, TdnTile, TdnPressable, TdnBtn, TdnDialog, TdnOptionRow } from "../components.slint";
 import { Icon } from "../slintcn/components/icon.slint";
 import { LucidePaths } from "../slintcn/components/lucide-paths.slint";
 import { Tokens, Theme, ThemeMode } from "../slintcn/theme/tokens.slint";
@@ -231,16 +231,39 @@ export component ThemePage inherits TdnPage {
             }
         }
 
-        if Appearance.plasma && root.dark: HorizontalLayout {
+        HorizontalLayout {
             alignment: center;
 
-            TdnToggleRow {
-                width: 25.5rem;
-                text: Lang.t("page-theme-breeze-dark", []);
-                checked: Appearance.breeze-dark;
-                toggled(on) => { Appearance.breeze-dark = on; }
-                accepted => { root.try-next(); }
+            TdnBtn {
+                outline: true;
+                text: Lang.t("page-theme-advanced", []);
+                icon: @image-url("../../data/icons/systemsettings-symbolic.svg");
+                icon-size: 1rem;
+                clicked => { Appearance.advanced-open = true; }
             }
         }
+    }
+}
+
+export component ThemeAdvancedDialog inherits TdnDialog {
+    title: Lang.t("page-theme-advanced", []);
+    done-text: Lang.t("done", []);
+    dialog-width: 26rem;
+    dismissed => { Appearance.advanced-open = false; }
+
+    if Appearance.plasma && Theme.mode == ThemeMode.dark: TdnOptionRow {
+        text: Lang.t("page-theme-breeze-dark", []);
+        description: Lang.t("page-theme-breeze-dark-desc", []);
+        checked: Appearance.breeze-dark;
+        toggled(on) => { Appearance.breeze-dark = on; }
+        accepted => { root.dismissed(); }
+    }
+
+    TdnOptionRow {
+        text: Lang.t("page-theme-grub", []);
+        description: Lang.t("page-theme-grub-desc", []);
+        checked: Appearance.grub-theme;
+        toggled(on) => { Appearance.grub-theme = on; }
+        accepted => { root.dismissed(); }
     }
 }

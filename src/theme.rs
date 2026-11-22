@@ -64,6 +64,11 @@ pub fn breeze_dark(appearance: &Appearance<'_>) -> bool {
 }
 
 #[must_use]
+pub fn skip_grub_theme(appearance: &Appearance<'_>) -> bool {
+    !appearance.get_grub_theme()
+}
+
+#[must_use]
 pub fn picked(appearance: &Appearance<'_>) -> Option<libtaidan::theme::Accent> {
     let i = usize::try_from(appearance.get_accent()).ok()?;
     libtaidan::theme::Accent::ALL
