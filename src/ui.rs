@@ -72,7 +72,7 @@ pub fn show_fatal_error(ui: &AppWindow, title_id: &str, detail: &str) {
     show_error(ui, &title, &body);
 }
 
-fn diagnostic_body(detail: &str) -> String {
+pub(crate) fn diagnostic_body(detail: &str) -> String {
     format!(
         "{}\n\nTaidan {}\nUI log: {}/taidan.log\nInstallation logs: {}\n\n{}",
         strip_ansi_escapes::strip_str(detail),
