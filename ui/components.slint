@@ -258,6 +258,7 @@ export component TdnInput inherits Rectangle {
     in property <string> description;
     in property <bool> enabled: true;
     in property <bool> password;
+    in property <bool> revealable: true;
     in property <bool> auto-focus;
     in property <image> icon;
     in property <bool> in-dialog;
@@ -272,6 +273,7 @@ export component TdnInput inherits Rectangle {
     in property <bool> page-active: true;
     changed page-active => { if !self.page-active { root.revealed = false; } }
     property <bool> has-icon: root.icon.width > 0;
+    property <bool> show-reveal: root.password && root.revealable;
 
     // the focused `TextInput` has no accessible role, so screen readers read this wrapper like the
     // std-widgets `LineEdit`
@@ -358,13 +360,13 @@ export component TdnInput inherits Rectangle {
         }
 
         reveal := TdnPressable {
-            visible: root.password;
-            width: root.password ? parent.height : 0;
+            visible: root.show-reveal;
+            width: root.show-reveal ? parent.height : 0;
             height: parent.height;
             x: Dir.x(parent.width - self.width, self.width, parent.width);
             border-radius: Tokens.radius-md;
             enabled: root.enabled;
-            focusable: root.password && root.enabled;
+            focusable: root.show-reveal && root.enabled;
             in-dialog: root.in-dialog;
             ring-inset: true;
             ring-offset: 3px;
@@ -376,7 +378,9 @@ export component TdnInput inherits Rectangle {
             accessible-checked: root.revealed;
 
             Image {
-                source: @image-url("../data/icons/eye-open-negative-filled-symbolic.svg");
+                source: root.revealed
+                    ? @image-url("../data/icons/eye-not-looking-symbolic.svg")
+                    : @image-url("../data/icons/eye-open-negative-filled-symbolic.svg");
                 width: 1.1rem;
                 height: self.width;
                 colorize: root.revealed ? Tokens.color-foreground : Tokens.color-muted-foreground;
@@ -610,6 +614,7 @@ export component TdnTextField inherits TdnField {
     in property <string> placeholder;
     in property <string> input-description: root.description;
     in property <bool> password;
+    in property <bool> revealable: true;
     in property <bool> invalid: root.error != "";
     in property <bool> enabled: true;
     in property <bool> in-dialog;
@@ -628,6 +633,7 @@ export component TdnTextField inherits TdnField {
         placeholder: root.placeholder;
         text <=> root.text;
         password: root.password;
+        revealable: root.revealable;
         invalid: root.invalid;
         enabled: root.enabled;
         in-dialog: root.in-dialog;
