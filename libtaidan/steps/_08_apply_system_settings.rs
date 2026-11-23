@@ -126,7 +126,7 @@ mod tests {
         }))
         .unwrap();
         let configured = settings.configured_settings();
-        assert_eq!(configured.len(), 5);
+        assert_eq!(configured.len(), 6);
         assert!(matches!(configured[0], SystemSetting::Hostname(_)));
         assert!(matches!(configured[1], SystemSetting::Timezone(_)));
         assert!(matches!(configured[2], SystemSetting::Theme(_)));
