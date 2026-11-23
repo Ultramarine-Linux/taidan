@@ -53,7 +53,7 @@ impl PageNav {
 
 #[tracing::instrument(skip_all)]
 pub fn populate(cfg: &mut Config) {
-    cfg.should_exit = !should_run(&cfg.taidan0);
+    cfg.should_exit = !should_run(cfg);
     cfg.read_os_release();
     tracing::trace!("Populated config: {cfg:#?}");
 }
@@ -69,14 +69,14 @@ fn finish_interrupted_install() {
     }
 }
 
-fn should_run(taidan0: &libtaidan::cfg::Taidan0Config) -> bool {
-    if taidan0.continue_if_user_exists {
-        tracing::info!("taidan0.continue_if_user_exists detected");
+fn should_run(cfg: &Config) -> bool {
+    if cfg.continue_if_user_exists() {
+        tracing::info!("continue_if_user_exists is enabled");
     } else if user_already_exists() {
         if libtaidan::marked_unconfigured() {
             finish_interrupted_install();
         }
-        tracing::warn!("taidan0.continue_if_user_exists is false, exiting");
+        tracing::warn!("continue_if_user_exists is false, exiting");
         return false;
     }
     true

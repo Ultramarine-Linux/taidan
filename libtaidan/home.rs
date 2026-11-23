@@ -33,7 +33,7 @@ impl Home {
         Ok(Self::User {
             name: settings.username.clone(),
             home: home_of(&settings.username).await?,
-            homed: cfg.taidan0.systemd_homed.then(|| settings.passwd.clone()),
+            homed: cfg.systemd_homed().then(|| settings.passwd.clone()),
         })
     }
 

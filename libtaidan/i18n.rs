@@ -138,7 +138,7 @@ pub fn default_ims(posix_locale: &str, imf: I18nImf) -> Vec<String> {
 }
 
 pub fn fill_settings(settings: &mut crate::settings::Settings, cfg: &crate::cfg::Config) {
-    settings.imf = cfg.i18n.imf(&cfg.edition);
+    settings.imf = cfg.imf();
     if settings.ims.is_empty() && !settings.ims_picked {
         settings.ims = default_ims(&settings.locale, settings.imf);
     }
@@ -450,7 +450,7 @@ pub async fn apply_keymap_to_user(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
 ) -> Res<()> {
-    if cfg.taidan0.systemd_homed || cfg.desktop() != Desktop::Plasma {
+    if cfg.systemd_homed() || cfg.desktop() != Desktop::Plasma {
         return Ok(());
     }
     apply_keymap(settings, &Home::user(settings, cfg).await?, Desktop::Plasma).await.map(drop)
@@ -515,8 +515,8 @@ pub struct I18nCfg {
 
 impl I18nCfg {
     #[must_use]
-    pub fn imf(&self, edition: &str) -> I18nImf {
-        self.imf.unwrap_or(match crate::cfg::Desktop::from_edition(edition) {
+    pub fn imf(&self, desktop: crate::cfg::Desktop) -> I18nImf {
+        self.imf.unwrap_or(match desktop {
             crate::cfg::Desktop::Gnome => I18nImf::IBus,
             _ => I18nImf::Fcitx5,
         })
@@ -692,12 +692,11 @@ mod tests {
     #[test]
     fn imf_default() {
         let cfg = I18nCfg::default();
-        assert_eq!(cfg.imf("gnome"), I18nImf::IBus);
-        assert_eq!(cfg.imf("atomic-gnome"), I18nImf::IBus);
-        assert_eq!(cfg.imf("plasma"), I18nImf::Fcitx5);
-        assert_eq!(cfg.imf(""), I18nImf::Fcitx5);
+        assert_eq!(cfg.imf(Desktop::Gnome), I18nImf::IBus);
+        assert_eq!(cfg.imf(Desktop::Plasma), I18nImf::Fcitx5);
+        assert_eq!(cfg.imf(Desktop::Other), I18nImf::Fcitx5);
         let cfg = I18nCfg { imf: Some(I18nImf::IBus) };
-        assert_eq!(cfg.imf("plasma"), I18nImf::IBus);
+        assert_eq!(cfg.imf(Desktop::Plasma), I18nImf::IBus);
     }
 
     #[test]
@@ -716,8 +715,17 @@ mod tests {
             ims: vec!["Shuangpin".into(), "Pinyin".into(), "bogus".into()],
             ..Default::default()
         };
-        let cfg =
-            crate::cfg::Config { i18n: I18nCfg { imf: Some(I18nImf::IBus) }, ..Default::default() };
+        let cfg = crate::cfg::Config {
+            steps: vec![
+                crate::steps::ApplySystemSettings {
+                    apply_system_settings: vec![
+                        crate::steps::Imf { imf: Some(I18nImf::IBus), ..Default::default() }.into(),
+                    ],
+                }
+                .into(),
+            ],
+            ..Default::default()
+        };
         fill_settings(&mut settings, &cfg);
         assert_eq!(settings.ims, ["Pinyin"]);
     }

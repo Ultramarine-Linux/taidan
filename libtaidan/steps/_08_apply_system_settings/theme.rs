@@ -1,7 +1,26 @@
 use crate::{cfg::Desktop, home::Home, kconfig::KConfigEntry, prelude::*, theme::Accent};
 
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Theme {}
+
+impl crate::steps::InstallStep for Theme {
+    fn stage(&self) -> crate::steps::Stage {
+        crate::steps::Stage::ApplySystemSettings
+    }
+
+    async fn run(
+        &self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        _callback: &impl crate::Callback,
+    ) -> Res<()> {
+        run(settings, cfg).await
+    }
+}
+
 pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
-    if settings.dark_mode.is_none() || cfg.taidan0.systemd_homed {
+    if settings.dark_mode.is_none() || cfg.systemd_homed() {
         return Ok(());
     }
     let res = async { apply(settings, &Home::user(settings, cfg).await?, cfg.desktop()).await };

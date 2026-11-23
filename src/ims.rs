@@ -5,7 +5,7 @@ use slint::{ComponentHandle, Model, VecModel};
 use crate::ui::{AppWindow, ImItem, Ims};
 
 fn imf() -> libtaidan::i18n::I18nImf {
-    crate::CFG.i18n.imf(&crate::CFG.edition)
+    crate::CFG.imf()
 }
 
 fn items() -> Vec<ImItem> {

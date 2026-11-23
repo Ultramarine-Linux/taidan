@@ -1,5 +1,49 @@
 use crate::prelude::*;
 
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SystemSetup {
+    /// Installation-wide DNF policy, shared by all package stages.
+    pub skip_dnf: Option<bool>,
+    /// Whether the network page keeps the offline continuation button available.
+    pub persist_no_internet_btn: Option<bool>,
+}
+
+impl SystemSetup {
+    #[must_use]
+    pub fn skip_dnf(&self, cfg: &crate::cfg::Config) -> bool {
+        self.skip_dnf.unwrap_or(cfg.legacy_taidan0().skip_dnf)
+    }
+
+    #[must_use]
+    pub fn persist_no_internet_btn(&self, cfg: &crate::cfg::Config) -> bool {
+        self.persist_no_internet_btn.unwrap_or(cfg.legacy_taidan0().persist_no_internet_btn)
+    }
+}
+
+impl super::InstallStep for SystemSetup {
+    fn stage(&self) -> super::Stage {
+        super::Stage::SystemSetup
+    }
+
+    async fn pre(
+        &self,
+        settings: &mut crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+    ) -> Res<()> {
+        pre(settings, cfg).await
+    }
+
+    async fn run(
+        &self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        _callback: &impl crate::Callback,
+    ) -> Res<()> {
+        run(settings, cfg).await
+    }
+}
+
 pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
     if let Some(ids) = settings.tweaks.ids() {
         apply_tweaks(settings, cfg, ids).await?;
@@ -16,7 +60,7 @@ pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::
     if let Err(e) = crate::a11y::apply_to_user(settings, cfg).await {
         tracing::warn!(?e, "cannot carry over the accessibility settings");
     }
-    if !cfg.taidan0.systemd_homed
+    if !cfg.systemd_homed()
         && video_group_exists().await
         && let Err(e) =
             crate::root(crate::Verb::AddToVideo { user: settings.username.clone() }).await

@@ -361,7 +361,7 @@ pub async fn apply_to_user(
     cfg: &crate::cfg::Config,
 ) -> Res<()> {
     apply_to_gdm_greeter(settings.a11y.screen_reader).await;
-    if cfg.taidan0.systemd_homed || settings.a11y == A11y::default() {
+    if cfg.systemd_homed() || settings.a11y == A11y::default() {
         return Ok(());
     }
     settings.a11y.apply(&Home::user(settings, cfg).await?, cfg.desktop(), None).await

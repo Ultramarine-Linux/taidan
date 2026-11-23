@@ -317,7 +317,7 @@ fn reset(ui: &slint::Weak<AppWindow>) {
 }
 
 pub(crate) fn can_use_dnf() -> bool {
-    !crate::CFG.taidan0.skip_dnf && !std::path::Path::new("/ostree").exists()
+    !crate::CFG.skip_dnf() && !std::path::Path::new("/ostree").exists()
 }
 
 fn analytics_sample(sample: &libtaidan::analytics::Sample) -> AnalyticsSample {

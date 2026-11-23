@@ -1,5 +1,24 @@
 use crate::prelude::*;
 
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Locale {}
+
+impl crate::steps::InstallStep for Locale {
+    fn stage(&self) -> crate::steps::Stage {
+        crate::steps::Stage::ApplySystemSettings
+    }
+
+    async fn run(
+        &self,
+        settings: &crate::settings::Settings,
+        _cfg: &crate::cfg::Config,
+        callback: &impl crate::Callback,
+    ) -> Res<()> {
+        run(settings, callback).await
+    }
+}
+
 pub(super) async fn run(
     settings: &crate::settings::Settings,
     sender: &impl crate::Callback,

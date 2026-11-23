@@ -6,18 +6,102 @@ use crate::{
     prelude::*,
 };
 
-pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
-    if cfg.taidan0.systemd_homed {
+#[derive(Clone, Copy, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Imf {
+    pub imf: Option<i18n::I18nImf>,
+    pub start: Option<ImfStart>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImfStart {
+    Kwinrc,
+    XdgAutostart,
+}
+
+impl Imf {
+    #[must_use]
+    pub fn framework(self, cfg: &crate::cfg::Config) -> i18n::I18nImf {
+        self.imf.or(cfg.legacy_imf()).unwrap_or(match cfg.desktop() {
+            Desktop::Gnome => i18n::I18nImf::IBus,
+            _ => i18n::I18nImf::Fcitx5,
+        })
+    }
+
+    #[must_use]
+    pub fn start(self, desktop: Desktop) -> ImfStart {
+        self.start.unwrap_or(match desktop {
+            Desktop::Plasma => ImfStart::Kwinrc,
+            _ => ImfStart::XdgAutostart,
+        })
+    }
+
+    pub async fn apply_to_skel(
+        &self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        skel: &Home,
+    ) -> Res<bool> {
+        match &with_installed_ims(settings, cfg, InstallPhase::Before).await {
+            Some(installed) => apply(installed, skel, self.start(cfg.desktop())).await,
+            None => Ok(false),
+        }
+    }
+
+    pub async fn fix_homed(&self, settings: &crate::settings::Settings, cfg: &crate::cfg::Config) {
+        if !cfg.systemd_homed() || settings.ims.is_empty() {
+            return;
+        }
+        let in_skel = with_installed_ims(settings, cfg, InstallPhase::Before).await;
+        let installed = with_installed_ims(settings, cfg, InstallPhase::After).await;
+        if in_skel.as_ref().map(|s| &s.ims) == installed.as_ref().map(|s| &s.ims) {
+            return;
+        }
+        tracing::info!(?installed, "some input methods didn't install, fixing the home");
+        let settings = &installed
+            .unwrap_or_else(|| crate::settings::Settings { ims: vec![], ..settings.clone() });
+        let res = async {
+            apply(settings, &Home::user(settings, cfg).await?, self.start(cfg.desktop())).await
+        };
+        if let Err(e) = res.await {
+            tracing::warn!(?e, "cannot fix the input methods in the systemd-homed home");
+        }
+    }
+}
+
+impl crate::steps::InstallStep for Imf {
+    fn stage(&self) -> crate::steps::Stage {
+        crate::steps::Stage::ApplySystemSettings
+    }
+
+    async fn run(
+        &self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        _callback: &impl crate::Callback,
+    ) -> Res<()> {
+        run(*self, settings, cfg).await
+    }
+}
+
+async fn run(imf: Imf, settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
+    if cfg.systemd_homed() {
         return Ok(());
     }
-    let desktop = cfg.desktop();
     let Some(installed) = &with_installed_ims(settings, cfg, InstallPhase::After).await else {
-        if let Err(e) = remove_stale_fcitx5_config(settings, cfg, desktop).await {
+        let res = async {
+            let home = Home::user(settings, cfg).await?;
+            home.run(vec![remove_stale_fcitx5_config(&home)]).await
+        };
+        if let Err(e) = res.await {
             tracing::warn!(?e, "cannot remove the Fcitx5 config of an earlier attempt");
         }
         return Ok(());
     };
-    let res = async { apply(installed, &Home::user(settings, cfg).await?, desktop).await };
+    let res = async {
+        apply(installed, &Home::user(settings, cfg).await?, imf.start(cfg.desktop())).await
+    };
     if let Err(e) = res.await {
         tracing::warn!(?e, "cannot setup IMFs");
     }
@@ -59,6 +143,7 @@ async fn with_installed_ims(
 const FCITX5_LAUNCHER: &str = "/usr/share/applications/fcitx5-wayland-launcher.desktop";
 
 const FCITX5_PROFILE: &str = ".config/fcitx5/profile";
+const FCITX5_AUTOSTART: &str = ".config/autostart/fcitx5.desktop";
 
 // https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg
 fn kwinrc_select_fcitx5() -> [KConfigEntry; 2] {
@@ -70,27 +155,38 @@ fn kwinrc_select_fcitx5() -> [KConfigEntry; 2] {
 
 const FCITX5_PROFILE_MARKER: &str = "# written by Taidan";
 
-async fn remove_stale_fcitx5_config(
-    settings: &crate::settings::Settings,
-    cfg: &crate::cfg::Config,
-    desktop: Desktop,
-) -> Res<()> {
+fn fcitx5_autostart() -> String {
+    format!(
+        "{FCITX5_PROFILE_MARKER}\n\
+         [Desktop Entry]\n\
+         Type=Application\n\
+         Name=Fcitx 5\n\
+         Exec=fcitx5 -d\n\
+         TryExec=fcitx5\n\
+         Terminal=false\n"
+    )
+}
+
+fn remove_stale_fcitx5_config(home: &Home) -> HomeCmd {
     const SCRIPT: &str = r#"
         profile="$1/fcitx5/profile"
-        [ "$(head -n 1 -- "$profile" 2>/dev/null)" = "$2" ] || exit 0
-        rm -f -- "$profile"
-        if [ "$3" = plasma ] && [ -e "$1/kwinrc" ] \
-            && [ "$(kreadconfig6 --file "$1/kwinrc" --group Wayland --key InputMethod)" = "$4" ]; then
-            kwriteconfig6 --file "$1/kwinrc" --group Wayland --key InputMethod --delete
-            kwriteconfig6 --file "$1/kwinrc" --group Wayland --key VirtualKeyboardEnabled --delete
+        if [ "$(head -n 1 -- "$profile" 2>/dev/null)" = "$2" ]; then
+            if [ -e "$1/kwinrc" ] && command -v kreadconfig6 >/dev/null 2>&1 \
+                && [ "$(kreadconfig6 --file "$1/kwinrc" --group Wayland --key InputMethod)" = "$3" ]; then
+                kwriteconfig6 --file "$1/kwinrc" --group Wayland --key InputMethod --delete || exit
+                kwriteconfig6 --file "$1/kwinrc" --group Wayland --key VirtualKeyboardEnabled --delete || exit
+            fi
+            rm -f -- "$profile" || exit
         fi
+        autostart="$1/autostart/fcitx5.desktop"
+        if [ "$(head -n 1 -- "$autostart" 2>/dev/null)" = "$2" ]; then
+            rm -f -- "$autostart" || exit
+        fi
+        exit 0
     "#;
-    let home = Home::user(settings, cfg).await?;
-    let plasma = if desktop == Desktop::Plasma { "plasma" } else { "" };
     let config = home.config();
     let config = config.to_string_lossy();
-    let argv = ["sh", "-c", SCRIPT, "sh", &config, FCITX5_PROFILE_MARKER, plasma, FCITX5_LAUNCHER];
-    home.run(vec![HomeCmd::new(argv)]).await
+    HomeCmd::new(["sh", "-c", SCRIPT, "sh", &config, FCITX5_PROFILE_MARKER, FCITX5_LAUNCHER])
 }
 
 fn fcitx5_profile(
@@ -138,27 +234,32 @@ fn fcitx5_profile(
     buf
 }
 
-fn im_cmds(settings: &crate::settings::Settings, home: &Home, desktop: Desktop) -> Vec<HomeCmd> {
+fn im_cmds(settings: &crate::settings::Settings, home: &Home, start: ImfStart) -> Vec<HomeCmd> {
+    if settings.imf == i18n::I18nImf::IBus && !settings.ims.is_empty() && !has_ibus_engine(settings)
+    {
+        return vec![];
+    }
+    let mut cmds = vec![remove_stale_fcitx5_config(home)];
     match settings.imf {
-        i18n::I18nImf::IBus if !settings.ims.is_empty() && !has_ibus_engine(settings) => vec![],
-        i18n::I18nImf::IBus => home
-            .session(ibus_dconf_writes(settings))
-            .map(HomeCmd::best_effort)
-            .into_iter()
-            .collect(),
-        i18n::I18nImf::Fcitx5 if settings.ims.is_empty() => vec![home.remove_file(FCITX5_PROFILE)],
+        i18n::I18nImf::IBus => {
+            cmds.extend(home.session(ibus_dconf_writes(settings)).map(HomeCmd::best_effort));
+        }
+        i18n::I18nImf::Fcitx5 if settings.ims.is_empty() => {}
         i18n::I18nImf::Fcitx5 => {
-            let mut cmds = vec![home.write_file(FCITX5_PROFILE, fcitx5_profile(settings))];
-            if desktop == Desktop::Plasma {
-                cmds.extend(home.kconfig(&kwinrc_select_fcitx5()));
+            cmds.push(home.write_file(FCITX5_PROFILE, fcitx5_profile(settings)));
+            match start {
+                ImfStart::Kwinrc => cmds.extend(home.kconfig(&kwinrc_select_fcitx5())),
+                ImfStart::XdgAutostart => {
+                    cmds.push(home.write_file(FCITX5_AUTOSTART, fcitx5_autostart()));
+                }
             }
-            cmds
         }
     }
+    cmds
 }
 
-async fn apply(settings: &crate::settings::Settings, home: &Home, desktop: Desktop) -> Res<bool> {
-    let cmds = im_cmds(settings, home, desktop);
+async fn apply(settings: &crate::settings::Settings, home: &Home, start: ImfStart) -> Res<bool> {
+    let cmds = im_cmds(settings, home, start);
     let wrote = !cmds.is_empty();
     home.run(cmds).await?;
     Ok(wrote)
@@ -169,10 +270,7 @@ pub(in crate::steps) async fn apply_to_skel(
     cfg: &crate::cfg::Config,
     skel: &Home,
 ) -> Res<bool> {
-    match &with_installed_ims(settings, cfg, InstallPhase::Before).await {
-        Some(installed) => apply(installed, skel, cfg.desktop()).await,
-        None => Ok(false),
-    }
+    cfg.imf_config().apply_to_skel(settings, cfg, skel).await
 }
 
 const EMPTY_STRING_ARRAY_GVARIANT: &str = "@as []";
@@ -216,21 +314,7 @@ fn ibus_dconf_writes(
 }
 
 pub async fn fix_homed(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) {
-    if !cfg.taidan0.systemd_homed || settings.ims.is_empty() {
-        return;
-    }
-    let in_skel = with_installed_ims(settings, cfg, InstallPhase::Before).await;
-    let installed = with_installed_ims(settings, cfg, InstallPhase::After).await;
-    if in_skel.as_ref().map(|s| &s.ims) == installed.as_ref().map(|s| &s.ims) {
-        return;
-    }
-    tracing::info!(?installed, "some input methods didn't install, fixing the home");
-    let settings =
-        &installed.unwrap_or_else(|| crate::settings::Settings { ims: vec![], ..settings.clone() });
-    let res = async { apply(settings, &Home::user(settings, cfg).await?, cfg.desktop()).await };
-    if let Err(e) = res.await {
-        tracing::warn!(?e, "cannot fix the input methods in the systemd-homed home");
-    }
+    cfg.imf_config().fix_homed(settings, cfg).await;
 }
 
 #[cfg(test)]
@@ -312,9 +396,9 @@ mod tests {
             imf: i18n::I18nImf::IBus,
             ..Default::default()
         };
-        assert!(im_cmds(&settings, &skel, Desktop::Gnome).is_empty());
+        assert!(im_cmds(&settings, &skel, ImfStart::XdgAutostart).is_empty());
         let none = crate::settings::Settings { ims: vec![], ..settings };
-        assert_eq!(im_cmds(&none, &skel, Desktop::Gnome).len(), 1);
+        assert_eq!(im_cmds(&none, &skel, ImfStart::XdgAutostart).len(), 2);
     }
 
     #[test]
@@ -325,9 +409,121 @@ mod tests {
             ims: vec!["Mozc".into()],
             ..Default::default()
         };
-        assert_eq!(im_cmds(&settings, &skel, Desktop::Plasma).len(), 3);
-        assert_eq!(im_cmds(&settings, &skel, Desktop::Gnome).len(), 1);
+        let kwin_cmds = im_cmds(&settings, &skel, ImfStart::Kwinrc);
+        assert_eq!(kwin_cmds.len(), 4);
+        assert_eq!(kwin_cmds[2..], skel.kconfig(&kwinrc_select_fcitx5()).collect::<Vec<_>>());
+        assert_eq!(im_cmds(&settings, &skel, ImfStart::XdgAutostart).len(), 3);
         let none = crate::settings::Settings { ims: vec![], ..settings };
-        assert_eq!(im_cmds(&none, &skel, Desktop::Plasma), [skel.remove_file(FCITX5_PROFILE)]);
+        assert_eq!(im_cmds(&none, &skel, ImfStart::Kwinrc), [remove_stale_fcitx5_config(&skel)]);
+    }
+
+    #[tokio::test]
+    async fn niri_and_noctalia_write_the_same_profile_and_autostart() {
+        for gui_env in ["niri", "noctalia", "unknown"] {
+            let cfg = crate::cfg::Config { gui_env: Some(gui_env.into()), ..Default::default() };
+            let dir = tempfile::tempdir().unwrap();
+            let skel = Home::Skel(dir.path().to_path_buf());
+            let settings = crate::settings::Settings {
+                kb_layout: "us".into(),
+                ims: vec!["Mozc".into()],
+                ..Default::default()
+            };
+            assert!(apply(&settings, &skel, cfg.imf_config().start(cfg.desktop())).await.unwrap());
+            assert_eq!(
+                std::fs::read_to_string(dir.path().join(FCITX5_PROFILE)).unwrap(),
+                fcitx5_profile(&settings)
+            );
+            let autostart = std::fs::read_to_string(dir.path().join(FCITX5_AUTOSTART)).unwrap();
+            assert!(autostart.contains("[Desktop Entry]\nType=Application\n"));
+            assert!(autostart.contains("Exec=fcitx5 -d\n"));
+            assert!(!dir.path().join(".config/kwinrc").exists());
+
+            let none = crate::settings::Settings { ims: vec![], ..settings };
+            apply(&none, &skel, cfg.imf_config().start(cfg.desktop())).await.unwrap();
+            assert!(!dir.path().join(FCITX5_PROFILE).exists());
+            assert!(!dir.path().join(FCITX5_AUTOSTART).exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn cleanup_preserves_unmarked_files_and_removes_orphaned_autostart() {
+        let dir = tempfile::tempdir().unwrap();
+        let skel = Home::Skel(dir.path().to_path_buf());
+        skel.run(vec![
+            skel.write_file(FCITX5_PROFILE, "user profile\n"),
+            skel.write_file(FCITX5_AUTOSTART, "[Desktop Entry]\nExec=user-command\n"),
+        ])
+        .await
+        .unwrap();
+        skel.run(vec![remove_stale_fcitx5_config(&skel)]).await.unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(FCITX5_PROFILE)).unwrap(),
+            "user profile\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(FCITX5_AUTOSTART)).unwrap(),
+            "[Desktop Entry]\nExec=user-command\n"
+        );
+        skel.run(vec![
+            skel.remove_file(FCITX5_PROFILE),
+            skel.write_file(FCITX5_AUTOSTART, fcitx5_autostart()),
+        ])
+        .await
+        .unwrap();
+        skel.run(vec![remove_stale_fcitx5_config(&skel)]).await.unwrap();
+        assert!(!dir.path().join(FCITX5_AUTOSTART).exists());
+    }
+
+    #[tokio::test]
+    async fn skeleton_uses_the_configured_start_method() {
+        let cfg: crate::cfg::Config = basic_toml::from_str(
+            r#"
+                gui_env = "plasma"
+                [[steps]]
+                stage = "apply_system_settings"
+                [[steps.apply_system_settings]]
+                [steps.apply_system_settings.imf]
+                start = "xdg_autostart"
+            "#,
+        )
+        .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let skel = Home::Skel(dir.path().to_path_buf());
+        let settings = crate::settings::Settings { ims: vec!["Mozc".into()], ..Default::default() };
+        assert!(apply_to_skel(&settings, &cfg, &skel).await.unwrap());
+        assert!(dir.path().join(FCITX5_AUTOSTART).exists());
+        assert!(!dir.path().join(".config/kwinrc").exists());
+    }
+
+    #[tokio::test]
+    async fn imf_object_owns_its_startup_options() {
+        let cfg = crate::cfg::Config { gui_env: Some("plasma".into()), ..Default::default() };
+        assert_eq!(cfg.imf_config().start(cfg.desktop()), ImfStart::Kwinrc);
+        let imf = Imf { start: Some(ImfStart::XdgAutostart), ..Default::default() };
+        let dir = tempfile::tempdir().unwrap();
+        let skel = Home::Skel(dir.path().to_path_buf());
+        let settings = crate::settings::Settings { ims: vec!["Mozc".into()], ..Default::default() };
+        assert!(imf.apply_to_skel(&settings, &cfg, &skel).await.unwrap());
+        assert!(dir.path().join(FCITX5_AUTOSTART).exists());
+        assert!(!dir.path().join(".config/kwinrc").exists());
+    }
+
+    #[test]
+    fn start_does_not_change_ibus_setup() {
+        let skel = Home::Skel("/skel".into());
+        let settings = crate::settings::Settings {
+            ims: vec!["Pinyin".into()],
+            imf: i18n::I18nImf::IBus,
+            ..Default::default()
+        };
+        let cmds = im_cmds(&settings, &skel, ImfStart::Kwinrc);
+        assert_eq!(cmds, im_cmds(&settings, &skel, ImfStart::XdgAutostart));
+        assert_eq!(
+            cmds,
+            [
+                remove_stale_fcitx5_config(&skel),
+                skel.session(ibus_dconf_writes(&settings)).unwrap().best_effort(),
+            ]
+        );
     }
 }

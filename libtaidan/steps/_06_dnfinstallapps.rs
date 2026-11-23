@@ -18,6 +18,25 @@ async fn swap_ffmpeg(callback: &impl crate::Callback) {
     }
 }
 
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DnfInstallApps {}
+
+impl super::InstallStep for DnfInstallApps {
+    fn stage(&self) -> super::Stage {
+        super::Stage::DnfInstallApps
+    }
+
+    async fn run(
+        &self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        callback: &impl crate::Callback,
+    ) -> Res<()> {
+        run(settings, cfg, callback).await
+    }
+}
+
 pub(super) async fn run(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,

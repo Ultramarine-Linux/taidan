@@ -2,6 +2,40 @@ use secrecy::ExposeSecret;
 
 use crate::prelude::*;
 
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct UserAdd {
+    pub continue_if_user_exists: Option<bool>,
+    pub systemd_homed: Option<bool>,
+}
+
+impl UserAdd {
+    #[must_use]
+    pub fn continue_if_user_exists(&self, cfg: &crate::cfg::Config) -> bool {
+        self.continue_if_user_exists.unwrap_or(cfg.legacy_taidan0().continue_if_user_exists)
+    }
+
+    #[must_use]
+    pub fn systemd_homed(&self, cfg: &crate::cfg::Config) -> bool {
+        self.systemd_homed.unwrap_or(cfg.legacy_taidan0().systemd_homed)
+    }
+}
+
+impl super::InstallStep for UserAdd {
+    fn stage(&self) -> super::Stage {
+        super::Stage::UserAdd
+    }
+
+    async fn run(
+        &self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        _callback: &impl crate::Callback,
+    ) -> Res<()> {
+        run(settings, cfg).await
+    }
+}
+
 pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
     if let Some(problem) = crate::passwd::username_problem(&settings.username) {
         return Err(Err::Message(format!(
@@ -22,7 +56,7 @@ pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::
         return Err(exists_err());
     }
     // `useradd -m` takes over an existing home, homectl refuses to
-    let keep_home = !cfg.taidan0.systemd_homed && home_exists(&settings.username);
+    let keep_home = !cfg.systemd_homed() && home_exists(&settings.username);
     if keep_home {
         tracing::info!(user = settings.username, "home is already there, keeping it");
         if previous_uid(&settings.username).is_none() {
@@ -34,7 +68,7 @@ pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::
         }
     }
     crate::passwd::record_created(&settings.username, keep_home).await?;
-    if cfg.taidan0.systemd_homed {
+    if cfg.systemd_homed() {
         homed(settings, cfg).await?;
     } else {
         useradd(settings).await?;
@@ -73,7 +107,7 @@ async fn useradd(settings: &crate::settings::Settings) -> Res<()> {
 
 pub async fn unlock(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
     let user = settings.username.as_str();
-    if !cfg.taidan0.systemd_homed {
+    if !cfg.systemd_homed() {
         return super::root(crate::Verb::UnlockUser { user: user.to_owned() })
             .await
             .wrap_msg("cannot unlock the user");

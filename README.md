@@ -113,32 +113,86 @@ Debug builds run the root helper from `TAIDAN_HELPER` if it's set.
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+`GPL-2.0-or-later` applies to portions borrowed from / referencing [_Initial
+Setup_ from Red Hat](https://github.com/rhinstaller/initial-setup), including
+but not limited to the systemd service files.
+
 ## 🕶️ Hacking
 
 Taidan reads an optional configuration file at `/etc/taidan.toml`:
 
 ```toml
 edition = "plasma"
-skip_pages = ["location", "drivers"] # hide pages you don't want, see `SkipPage` in src/cfg.rs for the names
+gui_env = "plasma"
+skip_pages = ["location", "drivers"] # see `SkipPage` in libtaidan/cfg.rs for the names
 org = "Fyra Labs"
 ```
 
-Changes from the GTK version of Taidan:
+`gui_env` specifies the **target** desktop/window manager (`gnome`, `plasma`, `budgie`,
+`xfce`, or any other name, e.g. `niri`). Desktop behavior is selected by `gui_env`;
+`edition` is distribution metadata.
+Distribution maintainers should ship `gui_env`; an unset or unrecognized value uses generic
+desktop behavior.
 
-- `skip_pages = ["devicename"]` is ignored with a warning, the device name is on the network page
-  now. Skipping `network` keeps the system's hostname.
-- `skip_pages = ["keyboard"]` also hides the input method picker, which moved onto the keyboard
-  page. Input methods are then picked from the locale. To set up none, skip `inputmethod`.
-- Codecs follow the drivers toggle. `skip_pages = ["codecs"]` is the same as `drivers`, which hides
-  the page but still installs drivers and codecs.
-- `internet_timeout` and `internet_retry_interval` are ignored with a warning, and
-  `/etc/com.fyralabs.Taidan/detect-internet` isn't run anymore. Connectivity comes from
-  NetworkManager.
-- `/usr/share/taidan/oobe.sh` isn't run anymore. Use a tweak instead.
-- The analytics page sends the Plausible pageview `detect-internet` used to send, once, at the end
-  of setup, and only if the user leaves it on. Skip `analytics` to never send it.
-- Taidan doesn't ship a systemd preset anymore. The distro's presets need to
-  `enable taidan-initial-setup-reconfiguration.service`.
+Installation stages always run in their fixed order. Optional `steps` entries configure
+individual stages, without enabling, disabling, or reordering them. For niri/Noctalia:
+
+```toml
+gui_env = "niri"
+
+[[steps]]
+stage = "apply_system_settings"
+
+[[steps.apply_system_settings]]
+[steps.apply_system_settings.imf]
+imf = "fcitx5"          # or "ibus"; omit to use the default
+start = "xdg_autostart" # or "kwinrc"; omit to use the default
+```
+
+The default IMF is IBus for GNOME, Fcitx5 otherwise. The default Fcitx5 startup method is
+`kwinrc` for Plasma, XDG autostart otherwise; `start` does not change IBus setup.
+XDG autostart writes `~/.config/autostart/fcitx5.desktop`, and requires the target session
+to process XDG autostart entries. Both Fcitx5 startup methods use the same input-method
+profile, including in systemd-homed skeletons. Retries clean up Taidan-owned stale files.
+IMF selection uses the step's `imf` option or the desktop default.
+Omitted configurations use defaults; duplicate stage or system-setting entries are rejected.
+
+Each stage owns its configuration and implements `InstallStep`, with static dispatch through
+the Serde-tagged `steps::Module` enum (`enum_dispatch`). `Stage` is the lightweight progress
+identity. `ApplySystemSettings` owns a `SystemSetting` enum for its sub-steps; the IMF options and
+default selection live alongside IMF setup in `libtaidan/steps/_08_apply_system_settings/imf.rs`.
+Both levels fill omitted operations with defaults and retain their fixed execution order.
+
+Account and installation policy are configured on their owning stages:
+
+```toml
+[[steps]]
+stage = "user_add"
+continue_if_user_exists = false
+systemd_homed = false
+
+[[steps]]
+stage = "system_setup"
+skip_dnf = false
+persist_no_internet_btn = false
+```
+
+`skip_dnf` is installation-wide and applies to all DNF stages. `persist_no_internet_btn`
+controls the network page's offline continuation button. These policies are available to the
+UI before any stage executes. Omitted options default to `false`.
+
+### Page configuration
+
+- Skipping `network` keeps the system's hostname.
+- Skipping `keyboard` hides the input method picker; input methods are picked from the locale.
+  Skip `inputmethod` to set up none.
+- Codecs follow the drivers toggle. Skipping `drivers` hides the page but still installs drivers
+  and codecs.
+- Skip `analytics` to disable analytics.
+
+Distribution presets must enable `taidan-initial-setup-reconfiguration.service`.
+
+For migration notes, see [CHANGELOG.md](CHANGELOG.md).
 
 ### Tweaks
 

@@ -7,6 +7,72 @@ mod _08_apply_system_settings;
 mod _12_downloadupdates;
 
 use crate::prelude::*;
+use enum_dispatch::enum_dispatch;
+
+pub use _00_useradd::UserAdd;
+pub use _04_systemsetup::SystemSetup;
+pub use _05_dnfdownloadapps::DnfDownloadApps;
+pub use _06_dnfinstallapps::DnfInstallApps;
+pub use _07_drivers_codecs::DriversCodecs;
+pub use _08_apply_system_settings::{
+    ApplySystemSettings, Hostname, Imf, ImfStart, Locale, SystemSetting, Theme, Timezone,
+};
+pub use _12_downloadupdates::DownloadUpdates;
+
+/// A configured installation operation. Dispatch stays static, including async methods.
+#[enum_dispatch]
+#[allow(async_fn_in_trait)]
+pub trait InstallStep {
+    fn stage(&self) -> Stage;
+
+    async fn pre(
+        &self,
+        _settings: &mut crate::settings::Settings,
+        _cfg: &crate::cfg::Config,
+    ) -> Res<()> {
+        Ok(())
+    }
+
+    async fn run(
+        &self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        callback: &impl crate::Callback,
+    ) -> Res<()>;
+}
+
+/// Serde-tagged step objects; configuration does not determine execution order.
+#[enum_dispatch(InstallStep)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "stage", rename_all = "snake_case")]
+pub enum Module {
+    UserAdd,
+    SystemSetup,
+    DnfDownloadApps,
+    DnfInstallApps,
+    DriversCodecs,
+    ApplySystemSettings,
+    DownloadUpdates,
+}
+
+pub(crate) fn deserialize_modules<'de, D: serde::Deserializer<'de>>(
+    de: D,
+) -> Result<Vec<Module>, D::Error> {
+    use serde::de::Error as _;
+    let modules = <Vec<Module> as serde::Deserialize>::deserialize(de)?;
+    for (index, module) in modules.iter().enumerate() {
+        if modules[..index].iter().any(|other| other.stage() == module.stage()) {
+            return Err(D::Error::custom("duplicate stage configuration"));
+        }
+    }
+    Ok(modules)
+}
+
+/// Fill omitted stages with default objects and retain the dependency-safe order.
+#[must_use]
+pub fn configured_steps(cfg: &crate::cfg::Config) -> Vec<Module> {
+    Stage::all().iter().map(|stage| stage.configured(cfg)).collect()
+}
 
 pub(crate) use _00_useradd::previous_uid;
 pub use _00_useradd::unlock as unlock_user;
@@ -22,7 +88,7 @@ pub(crate) async fn is_ostree() -> bool {
 }
 
 pub(crate) async fn can_use_dnf(cfg: &crate::cfg::Config) -> bool {
-    !cfg.taidan0.skip_dnf && !is_ostree().await
+    !cfg.skip_dnf() && !is_ostree().await
 }
 
 async fn flatpaks_and_packages<C: crate::Callback>(
@@ -51,7 +117,8 @@ async fn flatpaks_and_packages<C: crate::Callback>(
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Stage {
     #[default]
     UserAdd,
@@ -96,11 +163,7 @@ impl Stage {
         settings: &mut crate::settings::Settings,
         cfg: &crate::cfg::Config,
     ) -> Res<()> {
-        match self {
-            Self::SystemSetup => _04_systemsetup::pre(settings, cfg).await,
-            Self::DnfDownloadApps => _05_dnfdownloadapps::pre(settings, cfg).await,
-            _ => Ok(()),
-        }
+        self.configured(cfg).pre(settings, cfg).await
     }
 
     #[tracing::instrument(skip(settings, callback))]
@@ -110,17 +173,22 @@ impl Stage {
         cfg: &crate::cfg::Config,
         callback: &impl crate::Callback,
     ) -> Res<()> {
-        match self {
-            Self::UserAdd => _00_useradd::run(settings, cfg).await,
-            Self::SystemSetup => _04_systemsetup::run(settings, cfg).await,
-            Self::DnfDownloadApps => _05_dnfdownloadapps::run(settings, cfg, callback).await,
-            Self::DnfInstallApps => _06_dnfinstallapps::run(settings, cfg, callback).await,
-            Self::DriversCodecs => _07_drivers_codecs::run(settings, cfg, callback).await,
-            Self::ApplySystemSettings => {
-                _08_apply_system_settings::run(settings, cfg, callback).await
-            }
-            Self::DownloadUpdates => _12_downloadupdates::run(settings, cfg, callback).await,
-        }
+        self.configured(cfg).run(settings, cfg, callback).await
+    }
+
+    #[must_use]
+    pub fn configured(self, cfg: &crate::cfg::Config) -> Module {
+        cfg.steps.iter().find(|module| module.stage() == self).cloned().unwrap_or_else(
+            || match self {
+                Self::UserAdd => UserAdd::default().into(),
+                Self::SystemSetup => SystemSetup::default().into(),
+                Self::DnfDownloadApps => DnfDownloadApps::default().into(),
+                Self::DnfInstallApps => DnfInstallApps::default().into(),
+                Self::DriversCodecs => DriversCodecs::default().into(),
+                Self::ApplySystemSettings => ApplySystemSettings::default().into(),
+                Self::DownloadUpdates => DownloadUpdates::default().into(),
+            },
+        )
     }
 }
 
@@ -223,6 +291,61 @@ mod tests {
         for (index, stage) in Stage::all().iter().enumerate() {
             assert_eq!(usize::from(u8::from(*stage)), index);
         }
+    }
+
+    #[test]
+    fn stage_config_names_round_trip() {
+        for stage in Stage::all() {
+            let value = serde_json::to_value(stage).unwrap();
+            let restored: Stage = serde_json::from_value(value).unwrap();
+            assert_eq!(restored, *stage);
+        }
+        assert_eq!(
+            serde_json::to_value(Stage::ApplySystemSettings).unwrap(),
+            "apply_system_settings"
+        );
+    }
+
+    #[test]
+    fn configured_modules_fill_defaults_and_keep_stage_order() {
+        let cfg: crate::cfg::Config = basic_toml::from_str(
+            r#"
+                [[steps]]
+                stage = "download_updates"
+                [[steps]]
+                stage = "apply_system_settings"
+                [[steps.apply_system_settings]]
+                [steps.apply_system_settings.imf]
+                start = "xdg_autostart"
+                [[steps]]
+                stage = "user_add"
+            "#,
+        )
+        .unwrap();
+        let modules = configured_steps(&cfg);
+        assert_eq!(modules.iter().map(InstallStep::stage).collect::<Vec<_>>(), Stage::all());
+        let Module::ApplySystemSettings(settings) = &modules[5] else {
+            panic!("expected apply-system-settings module");
+        };
+        assert_eq!(settings.imf().start, Some(ImfStart::XdgAutostart));
+
+        for module in modules {
+            let value = serde_json::to_value(&module).unwrap();
+            let restored: Module = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(restored.stage(), module.stage());
+            assert_eq!(serde_json::to_value(restored).unwrap(), value);
+        }
+    }
+
+    #[tokio::test]
+    async fn enum_dispatch_forwards_async_pre_and_run_with_generic_callback() {
+        // Offline download-updates is a safe no-op; unexpected callback calls fail the test.
+        let settings = crate::settings::Settings { nointernet: true, ..Default::default() };
+        let cfg = crate::cfg::Config::default();
+        let module: Module = DownloadUpdates::default().into();
+        let mut prepared = settings.clone();
+        module.pre(&mut prepared, &cfg).await.unwrap();
+        module.run(&prepared, &cfg, &|_| panic!("offline step sent a message")).await.unwrap();
     }
 
     #[test]
