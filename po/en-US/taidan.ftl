@@ -385,6 +385,11 @@ page-theme-accent-red = Red
 page-theme-accent-pink = Pink
 page-theme-accent-purple = Purple
 page-theme-accent-slate = Slate
+page-theme-advanced = Advanced
+page-theme-breeze-dark = Use the standard Breeze Dark colors
+page-theme-breeze-dark-desc = Swap the Ultramarine dark colors for KDE's stock Breeze Dark.
+page-theme-grub = Install the boot menu theme
+page-theme-grub-desc = Style the GRUB boot menu to match your theme. Turn this off to keep the default look.
 
 ## [Browser Selection]
 
