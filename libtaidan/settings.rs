@@ -33,6 +33,8 @@ pub struct Settings {
 
     pub dark_mode: Option<bool>,
     pub accent: Option<crate::theme::Accent>,
+    pub breeze_dark: bool,
+    pub skip_grub_theme: bool,
 
     pub proxy: Option<crate::proxy::Proxy>,
     #[serde(default = "yes")]

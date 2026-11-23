@@ -181,10 +181,6 @@ fn start(ui: &slint::Weak<AppWindow>) {
             let install = ui.global::<Install<'_>>();
             // a `changed Install.state` in Slint can coalesce Failed → Running → Failed
             if let Some(error) = error {
-                install.set_used_internet(used_internet);
-                install.set_error(error.as_str().into());
-                install.set_state(InstallState::Failed);
-                ui.set_pagenum(ui.global::<Pages<'_>>().get_error());
                 let stage_id = install.get_stage_id();
                 let detail = if stage_id.is_empty() {
                     error
@@ -192,7 +188,10 @@ fn start(ui: &slint::Weak<AppWindow>) {
                     let stage = crate::l10n::PO_LOADER.read().get(&stage_id);
                     format!("Stage: {stage}\n\n{error}")
                 };
-                crate::ui::show_fatal_error(ui, "error-installation-title", &detail);
+                install.set_used_internet(used_internet);
+                install.set_error(crate::ui::diagnostic_body(&detail).into());
+                install.set_state(InstallState::Failed);
+                ui.set_pagenum(ui.global::<Pages<'_>>().get_error());
             } else {
                 install.set_state(InstallState::Done);
                 ui.set_pagenum(ui.global::<Pages<'_>>().get_done());
@@ -212,6 +211,8 @@ fn save_page_choices(app: &AppWindow, install: &Install<'_>) {
     let dark_mode = crate::cfg::shows_page(crate::cfg::SkipPage::Theme)
         .then(|| app.global::<Theme<'_>>().get_mode() == ThemeMode::Dark);
     let accent = dark_mode.and_then(|_| crate::theme::picked(&app.global()));
+    let breeze_dark = dark_mode == Some(true) && crate::theme::breeze_dark(&app.global());
+    let skip_grub_theme = crate::theme::skip_grub_theme(&app.global());
     let tweaks = crate::tweaks::enabled(&app.global());
     let mut settings = crate::SETTINGS.write();
     settings.tweaks = tweaks;
@@ -222,6 +223,8 @@ fn save_page_choices(app: &AppWindow, install: &Install<'_>) {
     settings.proxy_persist = proxy_persist;
     settings.dark_mode = dark_mode;
     settings.accent = accent;
+    settings.breeze_dark = breeze_dark;
+    settings.skip_grub_theme = skip_grub_theme;
     if !crate::cfg::shows_page(crate::cfg::SkipPage::Language) {
         settings.locale.clear();
     }

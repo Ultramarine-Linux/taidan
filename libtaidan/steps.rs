@@ -15,7 +15,7 @@ pub use _05_dnfdownloadapps::DnfDownloadApps;
 pub use _06_dnfinstallapps::DnfInstallApps;
 pub use _07_drivers_codecs::DriversCodecs;
 pub use _08_apply_system_settings::{
-    ApplySystemSettings, Hostname, Imf, ImfStart, Locale, SystemSetting, Theme, Timezone,
+    ApplySystemSettings, Grub, Hostname, Imf, ImfStart, Locale, SystemSetting, Theme, Timezone,
 };
 pub use _12_downloadupdates::DownloadUpdates;
 

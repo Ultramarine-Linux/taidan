@@ -63,6 +63,34 @@ impl Accent {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GrubTheme {
+    Light,
+    Dark,
+    Darker,
+}
+
+impl GrubTheme {
+    #[must_use]
+    pub const fn new(dark: bool, breeze_dark: bool) -> Self {
+        match (dark, breeze_dark) {
+            (false, _) => Self::Light,
+            (true, true) => Self::Dark,
+            (true, false) => Self::Darker,
+        }
+    }
+
+    #[must_use]
+    pub const fn package(self) -> &'static str {
+        match self {
+            Self::Light => "ultramarine-grub-theme-light",
+            Self::Dark => "ultramarine-grub-theme-dark",
+            Self::Darker => "ultramarine-grub-theme-darker",
+        }
+    }
+}
+
 #[must_use]
 pub fn accent_supported(gui_env: &str) -> bool {
     Desktop::from_gui_env(gui_env).supports_accent()
@@ -127,6 +155,14 @@ mod tests {
         assert!(!Desktop::Budgie.supports_accent());
         assert!(!Desktop::Xfce.supports_accent());
         assert!(!Desktop::from_gui_env("").supports_accent());
+    }
+
+    #[test]
+    fn grub_theme_follows_the_dark_style() {
+        assert_eq!(GrubTheme::new(false, true), GrubTheme::Light);
+        assert_eq!(GrubTheme::new(true, false), GrubTheme::Darker);
+        assert_eq!(GrubTheme::new(true, true), GrubTheme::Dark);
+        assert_eq!(GrubTheme::Darker.package(), "ultramarine-grub-theme-darker");
     }
 
     #[test]

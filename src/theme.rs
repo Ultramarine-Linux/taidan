@@ -38,6 +38,7 @@ fn check_mark_color(c: Color) -> Color {
 }
 
 pub fn initialize_ui(appearance: &Appearance<'_>) {
+    appearance.set_plasma(crate::CFG.desktop() == libtaidan::cfg::Desktop::Plasma);
     if !crate::CFG.desktop().supports_accent() {
         return;
     }
@@ -53,6 +54,16 @@ pub fn initialize_ui(appearance: &Appearance<'_>) {
         })
         .collect::<Vec<_>>();
     appearance.set_accents(ModelRc::new(VecModel::from(accents)));
+}
+
+#[must_use]
+pub fn breeze_dark(appearance: &Appearance<'_>) -> bool {
+    appearance.get_plasma() && appearance.get_breeze_dark()
+}
+
+#[must_use]
+pub fn skip_grub_theme(appearance: &Appearance<'_>) -> bool {
+    !appearance.get_grub_theme()
 }
 
 #[must_use]

@@ -1,3 +1,4 @@
+mod grub;
 mod hostname;
 mod imf;
 mod locale;
@@ -8,6 +9,7 @@ use super::InstallStep;
 use crate::prelude::*;
 use enum_dispatch::enum_dispatch;
 
+pub use grub::Grub;
 pub use hostname::Hostname;
 pub use imf::{Imf, ImfStart};
 pub use locale::Locale;
@@ -26,6 +28,7 @@ pub enum SystemSetting {
     Hostname,
     Timezone,
     Theme,
+    Grub,
     Imf,
     Locale,
 }
@@ -72,6 +75,7 @@ impl ApplySystemSettings {
             Hostname::default().into(),
             Timezone::default().into(),
             Theme::default().into(),
+            Grub::default().into(),
             Imf::default().into(),
             Locale::default().into(),
         ]
@@ -126,16 +130,17 @@ mod tests {
         assert!(matches!(configured[0], SystemSetting::Hostname(_)));
         assert!(matches!(configured[1], SystemSetting::Timezone(_)));
         assert!(matches!(configured[2], SystemSetting::Theme(_)));
-        let SystemSetting::Imf(imf) = configured[3] else {
+        assert!(matches!(configured[3], SystemSetting::Grub(_)));
+        let SystemSetting::Imf(imf) = configured[4] else {
             panic!("expected IMF sub-step");
         };
         assert_eq!(imf.start, Some(ImfStart::XdgAutostart));
-        assert!(matches!(configured[4], SystemSetting::Locale(_)));
+        assert!(matches!(configured[5], SystemSetting::Locale(_)));
     }
 
     #[test]
     fn duplicate_sub_steps_are_rejected() {
-        for setting in ["imf", "hostname", "timezone", "theme", "locale"] {
+        for setting in ["imf", "hostname", "timezone", "theme", "grub", "locale"] {
             let single = serde_json::json!({
                 "apply_system_settings": [{ setting: {} }]
             });
