@@ -31,6 +31,7 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 pub enum InstallMsg {
     UpdStep(steps::Step),
     Log(String),
+    Warning(String),
     NeedsReboot,
     DriversFailed,
     LocaleFailed,

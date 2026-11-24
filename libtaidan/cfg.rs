@@ -181,6 +181,12 @@ impl Config {
         self.imf_config().framework(self)
     }
 
+    /// Non-fatal configuration issues suitable for a warning dialog.
+    #[must_use]
+    pub fn warnings(&self) -> Vec<String> {
+        self.imf_config().configuration_warning(self).into_iter().collect()
+    }
+
     #[must_use]
     pub fn user_add_config(&self) -> crate::steps::UserAdd {
         self.steps
@@ -294,7 +300,8 @@ pub enum Desktop {
 impl Desktop {
     #[must_use]
     pub fn from_gui_env(gui_env: &str) -> Self {
-        match gui_env.to_ascii_lowercase().as_str() {
+        let gui_env = gui_env.to_ascii_lowercase();
+        match gui_env.strip_prefix("atomic-").unwrap_or(&gui_env) {
             "gnome" => Self::Gnome,
             "plasma" => Self::Plasma,
             "budgie" => Self::Budgie,
@@ -339,6 +346,8 @@ mod tests {
     fn desktops() {
         assert_eq!(Desktop::from_gui_env("budgie"), Desktop::Budgie);
         assert_eq!(Desktop::from_gui_env("GNOME"), Desktop::Gnome);
+        assert_eq!(Desktop::from_gui_env("atomic-GNOME"), Desktop::Gnome);
+        assert_eq!(Desktop::from_gui_env("atomic-plasma"), Desktop::Plasma);
         assert_eq!(Desktop::from_gui_env("xfce"), Desktop::Xfce);
         assert_eq!(Desktop::from_gui_env("plasma"), Desktop::Plasma);
         assert_eq!(Desktop::from_gui_env("niri"), Desktop::Other);
@@ -365,6 +374,17 @@ mod tests {
             assert_eq!(cfg.imf(), imf);
             assert_eq!(cfg.imf_config().start(cfg.desktop()), start);
         }
+    }
+
+    #[test]
+    fn atomic_gui_env_normalizes_without_using_edition() {
+        let cfg = Config {
+            gui_env: Some("atomic-gnome".into()),
+            edition: "atomic-plasma".into(),
+            ..Default::default()
+        };
+        assert_eq!(cfg.desktop(), Desktop::Gnome);
+        assert_eq!(cfg.imf(), crate::i18n::I18nImf::IBus);
     }
 
     #[test]
@@ -539,8 +559,27 @@ mod tests {
 
     #[test]
     fn only_explicit_legacy_tables_warn_during_deserialization() {
+        // Tracing's process-wide callsite cache can race other tests without subscribers.
+        // Run this capture assertion in its own test process instead of changing global logging.
+        const ISOLATED: &str = "TAIDAN_TEST_ISOLATED_DEPRECATION_WARNINGS";
+        if std::env::var_os(ISOLATED).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "cfg::tests::only_explicit_legacy_tables_warn_during_deserialization",
+                ])
+                .env(ISOLATED, "1")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
         use std::sync::{Arc, Mutex};
-        use tracing_subscriber::{Layer as _, layer::SubscriberExt as _};
 
         #[derive(Clone)]
         struct Writer(Arc<Mutex<Vec<u8>>>);
@@ -556,15 +595,12 @@ mod tests {
 
         let output = Arc::new(Mutex::new(Vec::new()));
         let writer = Writer(output.clone());
-        let layer = tracing_subscriber::fmt::layer()
+        let subscriber = tracing_subscriber::fmt()
             .with_ansi(false)
             .without_time()
+            .with_max_level(tracing::Level::WARN)
             .with_writer(move || writer.clone())
-            // Dynamic interest avoids callsite caching against other test threads' dispatchers.
-            .with_filter(tracing_subscriber::filter::dynamic_filter_fn(|metadata, _| {
-                *metadata.level() <= tracing::Level::WARN
-            }));
-        let subscriber = tracing_subscriber::registry().with(layer);
+            .finish();
         tracing::subscriber::with_default(subscriber, || {
             tracing::callsite::rebuild_interest_cache();
             let _: Config =

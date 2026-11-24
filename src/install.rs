@@ -118,6 +118,10 @@ fn on_install_msg(ui: &slint::Weak<AppWindow>, msg: InstallMsg) {
             InstallMsg::LocaleFailed => install.set_locale_failed(true),
             InstallMsg::UpdatesReady => install.set_updates_ready(true),
             InstallMsg::Log(line) => crate::install_log::push(&line),
+            InstallMsg::Warning(detail) => {
+                tracing::warn!(%detail, "installation warning");
+                crate::ui::show_diagnostic_warning(&ui, &detail);
+            }
             InstallMsg::Finish => {}
         }
     });
@@ -450,6 +454,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(steps, [Step { stage: Stage::SystemSetup, num: 1, count: 1 }]);
         assert!(msgs.iter().any(|msg| matches!(msg, InstallMsg::Log(_))));
+        assert!(!msgs.iter().any(|msg| matches!(msg, InstallMsg::Warning(_))));
         assert!(matches!(msgs.last(), Some(InstallMsg::Finish)));
     }
 }

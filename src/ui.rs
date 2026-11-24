@@ -36,6 +36,13 @@ pub fn run() {
     if let Some(error) = config_error {
         show_fatal_error(&ui, "error-config-title", &error);
     }
+    for warning in crate::CFG.warnings() {
+        tracing::warn!(%warning, "configuration warning");
+        show_diagnostic_warning(&ui, &warning);
+    }
+    if std::env::var_os("TAIDAN_SIMULATE_WARNING").is_some() {
+        show_simulated_warning(&ui);
+    }
     ui.window().on_close_requested(|| {
         if crate::install::is_dev_session() {
             slint::CloseRequestResponse::HideWindow
@@ -54,15 +61,40 @@ pub fn run() {
 /// problems the OOBE can't fix itself, like a broken config, that the distro's maintainers need to
 /// see too
 pub fn show_error(ui: &AppWindow, title: &str, body: &str) {
+    show_dialog(ui, title, body, false);
+}
+
+/// Show a dismissible warning without turning installation into a failure.
+pub fn show_warning(ui: &AppWindow, title: &str, body: &str) {
+    show_dialog(ui, title, body, true);
+}
+
+fn show_dialog(ui: &AppWindow, title: &str, body: &str, warning: bool) {
     let errors = ui.global::<Errors<'_>>();
     // Keep an earlier startup/worker error visible if another arrives before dismissal.
     if errors.get_open() {
         errors.set_body(format!("{}\n\n{title}\n{body}", errors.get_body()).into());
+        // A fatal error supersedes a warning; warnings never downgrade a visible error.
+        if !warning && errors.get_warn() {
+            errors.set_title(title.into());
+            errors.set_warn(false);
+        }
         return;
     }
-    errors.set_title(title.into());
-    errors.set_body(body.into());
-    errors.set_open(true);
+    if warning {
+        errors.invoke_show_warn(title.into(), body.into());
+    } else {
+        errors.invoke_show(title.into(), body.into());
+    }
+}
+
+pub fn show_diagnostic_warning(ui: &AppWindow, detail: &str) {
+    let title = crate::l10n::PO_LOADER.read().get("warning-title");
+    show_warning(ui, &title, &diagnostic_body(detail));
+}
+
+fn show_simulated_warning(ui: &AppWindow) {
+    show_diagnostic_warning(ui, "Simulated warning (TAIDAN_SIMULATE_WARNING).");
 }
 
 /// Include local diagnostics without sending potentially sensitive command output to Sentry.
@@ -183,24 +215,85 @@ where
 mod tests {
     use super::*;
 
-    #[test]
-    fn fatal_dialog_opens_and_preserves_an_earlier_error() {
-        struct HeadlessPlatform;
-        impl slint::platform::Platform for HeadlessPlatform {
-            fn create_window_adapter(
-                &self,
-            ) -> Result<std::rc::Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError>
-            {
-                Ok(slint::platform::software_renderer::MinimalSoftwareWindow::new(
-                    slint::platform::software_renderer::RepaintBufferType::ReusedBuffer,
-                ))
+    slint::slint! {
+        import { TdnDialog, TdnErrorDialog, TdnPara } from "ui/components.slint";
+
+        export component DialogLayoutTest inherits Window {
+            width: 600px;
+            height: 500px;
+            in property <string> body;
+            in property <string> heading: "Dialog";
+            out property <length> base-height: base.dialog-height;
+            out property <length> error-height: error.dialog-height;
+            out property <length> body-content-height: error.body-content-height;
+            out property <length> body-visible-height: error.body-visible-height;
+
+            base := TdnDialog {
+                title: root.heading;
+                dialog-width: 30rem;
+                TdnPara { text: root.body; }
+            }
+            error := TdnErrorDialog {
+                title: root.heading;
+                body: root.body;
             }
         }
+    }
+
+    struct HeadlessPlatform;
+    impl slint::platform::Platform for HeadlessPlatform {
+        fn create_window_adapter(
+            &self,
+        ) -> Result<std::rc::Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError> {
+            Ok(slint::platform::software_renderer::MinimalSoftwareWindow::new(
+                slint::platform::software_renderer::RepaintBufferType::ReusedBuffer,
+            ))
+        }
+    }
+
+    #[test]
+    fn dialogs_grow_for_wrapped_text_and_scroll_at_the_window_limit() {
+        slint::platform::set_platform(Box::new(HeadlessPlatform)).unwrap();
+        let ui = DialogLayoutTest::new().unwrap();
+        ui.window().set_size(slint::LogicalSize::new(600.0, 500.0));
+        ui.set_body("Short text".into());
+        let short_base = ui.get_base_height();
+        let short_error = ui.get_error_height();
+        ui.set_heading("A long dialog heading that wraps across multiple lines. ".repeat(6).into());
+        assert!(ui.get_base_height() > short_base, "wrapped heading did not grow the dialog");
+        ui.set_heading("Dialog".into());
+        ui.set_body("This is a wrapped line of diagnostic information. ".repeat(12).into());
+        assert!(ui.get_base_height() > short_base, "base dialog did not grow");
+        assert!(
+            ui.get_error_height() > short_error,
+            "error dialog did not grow: short={short_error}, current={}, content={}, visible={}",
+            ui.get_error_height(),
+            ui.get_body_content_height(),
+            ui.get_body_visible_height()
+        );
+        assert!(
+            ui.get_body_content_height() <= ui.get_body_visible_height() + 1.0,
+            "dialog should fit medium text before scrolling: content={}, visible={}",
+            ui.get_body_content_height(),
+            ui.get_body_visible_height()
+        );
+        let wide_content_height = ui.get_body_content_height();
+        ui.window().set_size(slint::LogicalSize::new(400.0, 500.0));
+        assert!(ui.get_body_content_height() >= wide_content_height);
+        ui.set_body("Long diagnostic line.\n".repeat(100).into());
+        assert!(ui.get_error_height() <= 500.0);
+        assert!(ui.get_body_visible_height() > 0.0);
+        assert!(ui.get_body_content_height() > ui.get_body_visible_height());
+    }
+
+    #[test]
+    fn fatal_dialog_opens_and_preserves_an_earlier_error() {
         slint::platform::set_platform(Box::new(HeadlessPlatform)).unwrap();
         let ui = AppWindow::new().unwrap();
         show_fatal_error(&ui, "error-config-title", "invalid TOML");
         let errors = ui.global::<Errors<'_>>();
         assert!(errors.get_open());
+        assert!(!errors.get_warn());
         assert!(errors.get_body().contains("invalid TOML"));
         show_fatal_error(&ui, "error-installation-title", "useradd failed");
         assert!(errors.get_body().contains("invalid TOML"));
@@ -210,6 +303,39 @@ mod tests {
         assert!(errors.get_open());
         assert!(errors.get_body().contains("worker crashed"));
         assert!(!errors.get_body().contains("invalid TOML"));
+
+        errors.set_open(false);
+        show_diagnostic_warning(&ui, "non-fatal warning");
+        assert!(errors.get_open());
+        assert!(errors.get_warn());
+        show_warning(&ui, "Another warning", "second warning");
+        assert!(errors.get_warn());
+        assert!(errors.get_body().contains("non-fatal warning"));
+        assert!(errors.get_body().contains("second warning"));
+        show_fatal_error(&ui, "error-config-title", "invalid steps");
+        assert!(!errors.get_warn());
+        assert!(errors.get_body().contains("invalid steps"));
+        show_warning(&ui, "Warning", "later warning");
+        assert!(!errors.get_warn());
+        assert!(errors.get_body().contains("invalid steps"));
+        assert!(errors.get_body().contains("later warning"));
+
+        errors.set_open(false);
+        let (fallback, error) =
+            crate::cfg::prepare_config(serde_json::from_value::<crate::cfg::Config>(
+                serde_json::json!({"steps": [{"stage": "invalid_stage"}]}),
+            ));
+        assert!(!fallback.should_exit);
+        show_fatal_error(&ui, "error-config-title", &error.unwrap());
+        assert!(errors.get_open());
+        assert!(!errors.get_warn());
+        assert!(errors.get_body().contains("invalid_stage"));
+
+        errors.set_open(false);
+        show_simulated_warning(&ui);
+        assert!(errors.get_open());
+        assert!(errors.get_warn());
+        assert!(errors.get_body().contains("TAIDAN_SIMULATE_WARNING"));
     }
 
     #[test]

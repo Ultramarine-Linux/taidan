@@ -58,6 +58,26 @@ pub fn populate(cfg: &mut Config) {
     tracing::trace!("Populated config: {cfg:#?}");
 }
 
+/// Do not run normal startup/account checks when configuration parsing failed.
+/// The fallback must reach the UI so maintainers can see the configuration error.
+pub fn prepare_config<E: std::fmt::Display>(result: Result<Config, E>) -> (Config, Option<String>) {
+    match result {
+        Ok(mut cfg) => {
+            populate(&mut cfg);
+            (cfg, None)
+        }
+        Err(error) => {
+            let detail = format!(
+                "Cannot parse /etc/taidan.toml: {error}\n\n\
+                 Taidan is using the default configuration."
+            );
+            let mut cfg = Config::default();
+            cfg.read_os_release();
+            (cfg, Some(detail))
+        }
+    }
+}
+
 fn finish_interrupted_install() {
     use crate::ui::block_on_thread;
     tracing::warn!("the system has a user but is still marked unconfigured, fixing");

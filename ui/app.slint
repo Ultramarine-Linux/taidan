@@ -1,4 +1,8 @@
-import { AccessibilityPage, AccessibilityDialog, A11yMoreDialog } from "pages/0005_accessibility.slint";
+import {
+    AccessibilityPage,
+    AccessibilityDialog,
+    A11yMoreDialog,
+} from "pages/0005_accessibility.slint";
 import { A11y } from "a11y.slint";
 import { WelcomePage } from "pages/0030_welcome.slint";
 import { ThemePage, ThemeAdvancedDialog } from "pages/0035_theme.slint";
@@ -12,12 +16,23 @@ import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
 import { Camera } from "camera.slint";
 import { KeyboardPage } from "pages/0020_keyboard.slint";
 import { PasswordPage } from "pages/0050_password.slint";
-import { NetworkPage, PasswordDialog, EnterpriseDialog, HiddenDialog, OfflineDialog, ProxyDialog, IpDialog } from "pages/0060_network.slint";
+import {
+    NetworkPage,
+    PasswordDialog,
+    EnterpriseDialog,
+    HiddenDialog,
+    OfflineDialog,
+    ProxyDialog,
+    IpDialog,
+} from "pages/0060_network.slint";
 import { Network } from "network.slint";
 import { TimezonePage } from "pages/0055_timezone.slint";
 import { Tz } from "timezone.slint";
 import { LocationPage } from "pages/0070_location.slint";
-import { AnalyticsPage, AnalyticsSampleDialog } from "pages/0075_analytics.slint";
+import {
+    AnalyticsPage,
+    AnalyticsSampleDialog,
+} from "pages/0075_analytics.slint";
 import { Analytics } from "analytics.slint";
 import { DriversPage } from "pages/0100_drivers.slint";
 import { TweaksDialog } from "pages/0110_tweaks.slint";
@@ -33,8 +48,27 @@ import { Appearance } from "appearance.slint";
 import { Errors } from "errors.slint";
 import { ImsDialog } from "pages/0025_ims.slint";
 import { Ims } from "ims.slint";
-export { Lang, Cfg, Account, Pages, Theme, Actions, Install, InstallState, Drivers, Camera, Network, Tz, Tweaks, Location, Analytics, A11y, Appearance, Ims, Errors }
-
+export {
+    Lang,
+    Cfg,
+    Account,
+    Pages,
+    Theme,
+    Actions,
+    Install,
+    InstallState,
+    Drivers,
+    Camera,
+    Network,
+    Tz,
+    Tweaks,
+    Location,
+    Analytics,
+    A11y,
+    Appearance,
+    Ims,
+    Errors,
+}
 export component AppWindow inherits Window {
     in-out property <int> pagenum <=> Nav.page;
     title: Lang.t("window-title", [{ key: "distro", value: Cfg.distro }]);
@@ -155,15 +189,25 @@ export component AppWindow inherits Window {
         border-radius: root.rounded ? Tokens.radius-xl : 0;
         clip: true;
 
-        accessibility := AccessibilityPage { index: Pages.accessibility; }
+        accessibility := AccessibilityPage {
+            index: Pages.accessibility;
+        }
 
-        language := LanguagePage { index: Pages.language; }
+        language := LanguagePage {
+            index: Pages.language;
+        }
 
-        keyboard := KeyboardPage { index: Pages.keyboard; }
+        keyboard := KeyboardPage {
+            index: Pages.keyboard;
+        }
 
-        welcome := WelcomePage { index: Pages.welcome; }
+        welcome := WelcomePage {
+            index: Pages.welcome;
+        }
 
-        theme := ThemePage { index: Pages.theme; }
+        theme := ThemePage {
+            index: Pages.theme;
+        }
 
         whoareyou := WhoAreYouPage {
             index: Pages.whoareyou;
@@ -198,11 +242,17 @@ export component AppWindow inherits Window {
             }
         }
 
-        location := LocationPage { index: Pages.location; }
+        location := LocationPage {
+            index: Pages.location;
+        }
 
-        analytics := AnalyticsPage { index: Pages.analytics; }
+        analytics := AnalyticsPage {
+            index: Pages.analytics;
+        }
 
-        drivers := DriversPage { index: Pages.drivers; }
+        drivers := DriversPage {
+            index: Pages.drivers;
+        }
 
         summary := SummaryPage {
             index: Pages.summary;
@@ -212,9 +262,13 @@ export component AppWindow inherits Window {
             }
         }
 
-        installing := InstallingPage { index: Pages.installing; }
+        installing := InstallingPage {
+            index: Pages.installing;
+        }
 
-        done := DonePage { index: Pages.done; }
+        done := DonePage {
+            index: Pages.done;
+        }
 
         error := ErrorPage {
             index: Pages.error;
@@ -273,6 +327,7 @@ export component AppWindow inherits Window {
         height: 100%;
         title: Errors.title != "" ? Errors.title : Lang.t("page-error", []);
         body: Errors.body;
+        warn: Errors.warn;
         dismissed => { Errors.open = false; }
     }
 }

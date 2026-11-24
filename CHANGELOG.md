@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Fixed automatic dialog sizing using laid-out content in `TdnDialog`. Warning/error
+  bodies grow to fit wrapped text and scroll only when the window's available height is exceeded.
+- Added Rust warning-dialog support and `TAIDAN_SIMULATE_WARNING` at application startup. A non-Plasma
+  `gui_env` with explicit IMF `start = "kwinrc"` produces a configuration warning.
+- Added a Fcitx5 environment.d drop-in for input-method environment variables, including
+  skeleton setup and marker-based cleanup.
+- Accept an `atomic-` prefix in `gui_env`, independently of edition metadata.
+- Configuration parse failures now bypass normal startup/account checks so the error
+  dialog can open even on an already-configured system.
 - Added Fcitx5 XDG autostart setup for niri/Noctalia and other non-Plasma sessions,
   including systemd-homed skeleton setup and marker-based retry cleanup.
 - Added optional `gui_env` to select the target desktop/window manager. Desktop behavior

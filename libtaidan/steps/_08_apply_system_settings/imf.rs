@@ -37,6 +37,20 @@ impl Imf {
         })
     }
 
+    #[must_use]
+    pub fn configuration_warning(self, cfg: &crate::cfg::Config) -> Option<String> {
+        (self.start == Some(ImfStart::Kwinrc) && cfg.desktop() != Desktop::Plasma).then(|| {
+            format!(
+                "The IMF configuration specifies start = \"kwinrc\", but gui_env is {}.\n\n\
+                 The kwinrc startup method requires Plasma. Set gui_env = \"plasma\" for a \
+                 Plasma session, or use start = \"xdg_autostart\" for another session.",
+                cfg.gui_env
+                    .as_deref()
+                    .map_or_else(|| "unset".to_owned(), |env| format!("\"{env}\"")),
+            )
+        })
+    }
+
     pub async fn apply_to_skel(
         &self,
         settings: &crate::settings::Settings,
@@ -144,6 +158,7 @@ const FCITX5_LAUNCHER: &str = "/usr/share/applications/fcitx5-wayland-launcher.d
 
 const FCITX5_PROFILE: &str = ".config/fcitx5/profile";
 const FCITX5_AUTOSTART: &str = ".config/autostart/org.fcitx.Fcitx5.desktop";
+const FCITX5_ENVIRONMENT: &str = ".config/environment.d/90-taidan-fcitx5.conf";
 
 // https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg
 fn kwinrc_select_fcitx5() -> [KConfigEntry; 2] {
@@ -154,6 +169,16 @@ fn kwinrc_select_fcitx5() -> [KConfigEntry; 2] {
 }
 
 const FCITX5_PROFILE_MARKER: &str = "# written by Taidan";
+
+fn fcitx5_environment() -> String {
+    format!(
+        "{FCITX5_PROFILE_MARKER}\n\
+         INPUT_METHOD=fcitx\n\
+         GTK_IM_MODULE=fcitx\n\
+         QT_IM_MODULE=fcitx\n\
+         XMODIFIERS=@im=fcitx\n"
+    )
+}
 
 fn fcitx5_autostart() -> String {
     format!(
@@ -181,6 +206,10 @@ fn remove_stale_fcitx5_config(home: &Home) -> HomeCmd {
         autostart="$1/autostart/fcitx5.desktop"
         if [ "$(head -n 1 -- "$autostart" 2>/dev/null)" = "$2" ]; then
             rm -f -- "$autostart" || exit
+        fi
+        environment="$1/environment.d/90-taidan-fcitx5.conf"
+        if [ "$(head -n 1 -- "$environment" 2>/dev/null)" = "$2" ]; then
+            rm -f -- "$environment" || exit
         fi
         exit 0
     "#;
@@ -247,6 +276,7 @@ fn im_cmds(settings: &crate::settings::Settings, home: &Home, start: ImfStart) -
         i18n::I18nImf::Fcitx5 if settings.ims.is_empty() => {}
         i18n::I18nImf::Fcitx5 => {
             cmds.push(home.write_file(FCITX5_PROFILE, fcitx5_profile(settings)));
+            cmds.push(home.write_file(FCITX5_ENVIRONMENT, fcitx5_environment()));
             match start {
                 ImfStart::Kwinrc => cmds.extend(home.kconfig(&kwinrc_select_fcitx5())),
                 ImfStart::XdgAutostart => {
@@ -410,9 +440,9 @@ mod tests {
             ..Default::default()
         };
         let kwin_cmds = im_cmds(&settings, &skel, ImfStart::Kwinrc);
-        assert_eq!(kwin_cmds.len(), 4);
-        assert_eq!(kwin_cmds[2..], skel.kconfig(&kwinrc_select_fcitx5()).collect::<Vec<_>>());
-        assert_eq!(im_cmds(&settings, &skel, ImfStart::XdgAutostart).len(), 3);
+        assert_eq!(kwin_cmds.len(), 5);
+        assert_eq!(kwin_cmds[3..], skel.kconfig(&kwinrc_select_fcitx5()).collect::<Vec<_>>());
+        assert_eq!(im_cmds(&settings, &skel, ImfStart::XdgAutostart).len(), 4);
         let none = crate::settings::Settings { ims: vec![], ..settings };
         assert_eq!(im_cmds(&none, &skel, ImfStart::Kwinrc), [remove_stale_fcitx5_config(&skel)]);
     }
@@ -437,11 +467,16 @@ mod tests {
             assert!(autostart.contains("[Desktop Entry]\nType=Application\n"));
             assert!(autostart.contains("Exec=fcitx5 -d\n"));
             assert!(!dir.path().join(".config/kwinrc").exists());
+            assert_eq!(
+                std::fs::read_to_string(dir.path().join(FCITX5_ENVIRONMENT)).unwrap(),
+                fcitx5_environment()
+            );
 
             let none = crate::settings::Settings { ims: vec![], ..settings };
             apply(&none, &skel, cfg.imf_config().start(cfg.desktop())).await.unwrap();
             assert!(!dir.path().join(FCITX5_PROFILE).exists());
             assert!(!dir.path().join(FCITX5_AUTOSTART).exists());
+            assert!(!dir.path().join(FCITX5_ENVIRONMENT).exists());
         }
     }
 
@@ -452,6 +487,7 @@ mod tests {
         skel.run(vec![
             skel.write_file(FCITX5_PROFILE, "user profile\n"),
             skel.write_file(FCITX5_AUTOSTART, "[Desktop Entry]\nExec=user-command\n"),
+            skel.write_file(FCITX5_ENVIRONMENT, "QT_IM_MODULE=user-choice\n"),
         ])
         .await
         .unwrap();
@@ -464,14 +500,20 @@ mod tests {
             std::fs::read_to_string(dir.path().join(FCITX5_AUTOSTART)).unwrap(),
             "[Desktop Entry]\nExec=user-command\n"
         );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(FCITX5_ENVIRONMENT)).unwrap(),
+            "QT_IM_MODULE=user-choice\n"
+        );
         skel.run(vec![
             skel.remove_file(FCITX5_PROFILE),
             skel.write_file(FCITX5_AUTOSTART, fcitx5_autostart()),
+            skel.write_file(FCITX5_ENVIRONMENT, fcitx5_environment()),
         ])
         .await
         .unwrap();
         skel.run(vec![remove_stale_fcitx5_config(&skel)]).await.unwrap();
         assert!(!dir.path().join(FCITX5_AUTOSTART).exists());
+        assert!(!dir.path().join(FCITX5_ENVIRONMENT).exists());
     }
 
     #[tokio::test]
@@ -492,6 +534,7 @@ mod tests {
         let settings = crate::settings::Settings { ims: vec!["Mozc".into()], ..Default::default() };
         assert!(apply_to_skel(&settings, &cfg, &skel).await.unwrap());
         assert!(dir.path().join(FCITX5_AUTOSTART).exists());
+        assert!(dir.path().join(FCITX5_ENVIRONMENT).exists());
         assert!(!dir.path().join(".config/kwinrc").exists());
     }
 
@@ -525,5 +568,43 @@ mod tests {
                 skel.session(ibus_dconf_writes(&settings)).unwrap().best_effort(),
             ]
         );
+    }
+
+    #[test]
+    fn kwinrc_warns_only_for_explicit_non_plasma_configuration() {
+        let imf = Imf { start: Some(ImfStart::Kwinrc), ..Default::default() };
+        for gui_env in [None, Some("niri"), Some("atomic-gnome")] {
+            let cfg =
+                crate::cfg::Config { gui_env: gui_env.map(str::to_owned), ..Default::default() };
+            assert!(imf.configuration_warning(&cfg).unwrap().contains("xdg_autostart"));
+            assert!(Imf::default().configuration_warning(&cfg).is_none());
+            let cfg = crate::cfg::Config {
+                steps: vec![
+                    crate::steps::ApplySystemSettings { apply_system_settings: vec![imf.into()] }
+                        .into(),
+                ],
+                ..cfg
+            };
+            assert_eq!(cfg.warnings().len(), 1);
+        }
+        for gui_env in ["plasma", "atomic-plasma", "PLASMA"] {
+            let cfg = crate::cfg::Config { gui_env: Some(gui_env.into()), ..Default::default() };
+            assert!(imf.configuration_warning(&cfg).is_none());
+        }
+    }
+
+    #[test]
+    fn environment_drop_in_uses_environment_d_not_shell_syntax() {
+        let environment = fcitx5_environment();
+        assert_eq!(
+            environment.lines().skip(1).collect::<Vec<_>>(),
+            [
+                "INPUT_METHOD=fcitx",
+                "GTK_IM_MODULE=fcitx",
+                "QT_IM_MODULE=fcitx",
+                "XMODIFIERS=@im=fcitx",
+            ]
+        );
+        assert!(!environment.contains("export "));
     }
 }

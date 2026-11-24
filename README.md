@@ -85,6 +85,7 @@ TAIDAN_LOG=trace cargo r
 - `TAIDAN_SIMULATE_HW=nvidia,broadcom-wifi` (or `all`) fakes that hardware for the drivers list
   (with `nvidia`, the simulated install asks for a reboot)
 - `TAIDAN_SIMULATE_ERROR=1` makes the simulated install fail halfway
+- `TAIDAN_SIMULATE_WARNING=1` opens a non-fatal warning dialog at application startup
 - `TAIDAN_SIMULATE_UPDATES=1` fakes downloaded updates, for the done page's restart button
 - `TAIDAN_SIMULATE_DRIVER_ERROR=1` fakes a failed driver install, for the done page's note about it
 
@@ -131,6 +132,8 @@ org = "Fyra Labs"
 `gui_env` specifies the **target** desktop/window manager (`gnome`, `plasma`, `budgie`,
 `xfce`, or any other name, e.g. `niri`). Desktop behavior is selected by `gui_env`;
 `edition` is distribution metadata.
+An `atomic-` prefix in `gui_env` is accepted, e.g. `atomic-gnome` selects GNOME.
+An `edition` such as `atomic-gnome` does not select the GUI environment.
 Distribution maintainers should ship `gui_env`; an unset or unrecognized value uses generic
 desktop behavior.
 
@@ -154,7 +157,12 @@ The default IMF is IBus for GNOME, Fcitx5 otherwise. The default Fcitx5 startup 
 XDG autostart writes `~/.config/autostart/fcitx5.desktop`, and requires the target session
 to process XDG autostart entries. Both Fcitx5 startup methods use the same input-method
 profile, including in systemd-homed skeletons. Retries clean up Taidan-owned stale files.
-IMF selection uses the step's `imf` option or the desktop default.
+Fcitx5 also writes `~/.config/environment.d/90-taidan-fcitx5.conf` with `INPUT_METHOD`,
+`GTK_IM_MODULE`, and `QT_IM_MODULE` set to `fcitx`, and `XMODIFIERS` set to `@im=fcitx`.
+The file uses environment.d assignments, not shell `export` commands.
+Explicit `start = "kwinrc"` outside Plasma opens a configuration warning dialog.
+IMF selection uses the step's `imf`, then `[i18n].imf` as a compatibility fallback,
+then the desktop default.
 Omitted configurations use defaults; duplicate stage or system-setting entries are rejected.
 
 Each stage owns its configuration and implements `InstallStep`, with static dispatch through
@@ -179,7 +187,9 @@ persist_no_internet_btn = false
 
 `skip_dnf` is installation-wide and applies to all DNF stages. `persist_no_internet_btn`
 controls the network page's offline continuation button. These policies are available to the
-UI before any stage executes. Omitted options default to `false`.
+UI before any stage executes. Resolution is per field: explicit step option, then the
+corresponding `[taidan0]` value, then `false`. Explicit `false` overrides a legacy `true`.
+The compatibility table and its deprecation are described in [CHANGELOG.md](CHANGELOG.md).
 
 ### Page configuration
 

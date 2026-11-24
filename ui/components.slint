@@ -148,7 +148,10 @@ export component TdnTile inherits TdnPressable {
         border-radius: root.border-radius;
         background: Tokens.color-foreground;
         opacity: root.pressed ? 0.1 : root.has-hover ? 0.05 : 0;
-        animate opacity { duration: Tokens.motion-fast; easing: ease-out; }
+        animate opacity {
+            duration: Tokens.motion-fast;
+            easing: ease-out;
+        }
     }
 
     @children
@@ -783,6 +786,13 @@ export component TdnDialog inherits Rectangle {
     in property <string> description;
     in property <string> done-text;
     in property <length> dialog-width: 22rem;
+    out property <length> dialog-height: panel.height;
+    // Reserve the title, description, actions, padding, and spacing before sizing a body.
+    out property <length> available-content-height: max(0px,
+        root.height - 2rem - title-label.preferred-height
+        - (root.description != "" ? description-size.preferred-height + content.spacing : 0px)
+        - (root.done-text != "" ? done-size.preferred-height + content.spacing : 0px)
+        - content.padding-top - content.padding-bottom - 2 * content.spacing);
     callback dismissed;
 
     width: 100%;
@@ -802,22 +812,40 @@ export component TdnDialog inherits Rectangle {
             reject
         }
 
-        Card {
+        description-size := TdnNote {
+            visible: false;
+            width: panel.width - 2.5rem;
+            text: root.description;
+        }
+
+        done-size := TdnBtn {
+            visible: false;
+            width: panel.width - 2.5rem;
+            primary: true;
+            text: root.done-text;
+        }
+
+        panel := Card {
             x: (root.width - self.width) / 2;
             y: (root.height - self.height) / 2;
             width: min(root.dialog-width, root.width - 2rem);
-            height: min(content.preferred-height, root.height - 2rem);
+            // Layout preferred-height can underestimate wrapped children. The end marker
+            // measures their allocated heights at the real dialog width instead.
+            height: min(content-end.y + content.padding-bottom, root.height - 2rem);
             background: Tokens.color-background;
             card-radius: lg;
 
             content := VerticalLayout {
+                width: parent.width;
+                // Keep this independent of panel.height to avoid feedback from the end marker.
+                height: min(self.preferred-height, root.height - 2rem);
                 padding: 1.25rem;
                 spacing: 1rem;
                 // Slint has no dialog role
                 accessible-role: groupbox;
                 accessible-label: root.title;
 
-                TdnPara {
+                title-label := TdnPara {
                     text: root.title;
                     font-size: 1.4 * Tokens.text-rem;
                     font-weight: 500;
@@ -840,6 +868,10 @@ export component TdnDialog inherits Rectangle {
                         init => { self.focus(); }
                     }
                 }
+
+                content-end := Rectangle {
+                    height: 0px;
+                }
             }
         }
     }
@@ -850,30 +882,48 @@ export component TdnDialog inherits Rectangle {
 // see too. Open it with `Errors.show`
 export component TdnErrorDialog inherits TdnDialog {
     in property <string> body;
+    in property <bool> warn: false;
+    out property <length> body-content-height: body-scroll.content-height;
+    out property <length> body-visible-height: body-scroll.visible-height;
     dialog-width: 36rem;
 
     init => { close.focus(); }
 
-    HorizontalLayout {
+    body-row := HorizontalLayout {
         spacing: 1rem;
+        vertical-stretch: 1;
+        height: min(max(2.5rem, body-size.height + 0.5rem),
+            max(0px, root.available-content-height - close.preferred-height - 1rem));
 
         Image {
-            source: @image-url("../data/icons/dialog-error-symbolic.svg");
-            colorize: Tokens.color-destructive;
+            source: warn ? @image-url("../data/icons/dialog-warning-symbolic.svg") : @image-url("../data/icons/dialog-error-symbolic.svg");
+            // colorize: Tokens.color-destructive;
             width: 2.5rem;
             height: self.width;
             accessible-role: none;
         }
 
-        ScrollView {
-            preferred-height: 18rem;
-            vertical-stretch: 1;
+        body-scroll := ScrollView {
+            height: body-row.height;
+            vertical-scrollbar-policy: as-needed;
             horizontal-scrollbar-policy: always-off;
             content-width: self.visible-width;
+            content-height: body-size.height + 0.5rem;
+
+            // TextInput's preferred height doesn't account for every wrapped line.
+            // Measure at the actual viewport width, leaving room for the scrollbar.
+            body-size := Text {
+                visible: false;
+                width: max(1px, body-scroll.visible-width - 1rem);
+                height: self.preferred-height;
+                wrap: word-wrap;
+                text: root.body;
+                font-size: Tokens.typography-body-sm-size;
+            }
 
             TextInput {
-                width: parent.visible-width;
-                height: self.preferred-height;
+                width: body-size.width;
+                height: body-size.height + 0.5rem;
                 read-only: true;
                 single-line: false;
                 wrap: word-wrap;
@@ -887,6 +937,7 @@ export component TdnErrorDialog inherits TdnDialog {
 
     HorizontalLayout {
         alignment: Dir.end;
+        vertical-stretch: 0;
 
         close := TdnBtn {
             in-dialog: true;
@@ -933,7 +984,9 @@ export component TdnScrollList inherits ScrollView {
 
         @children
 
-        list-end := Rectangle { height: 0; }
+        list-end := Rectangle {
+            height: 0;
+        }
     }
 }
 
@@ -968,7 +1021,9 @@ export component TdnDialogActions inherits HorizontalLayout {
 
         if root.busy: VerticalLayout {
             alignment: center;
-            TdnSpinner { width: 1.1rem; }
+            TdnSpinner {
+                width: 1.1rem;
+            }
         }
 
         submit-btn := TdnBtn {
