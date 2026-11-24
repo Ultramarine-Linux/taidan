@@ -26,7 +26,7 @@ pub fn run() {
     crate::theme::initialize_ui(&ui.global());
     crate::ims::initialize_ui(&ui.as_weak(), &ui.global());
     crate::a11y::initialize_ui(&ui.as_weak(), &ui.global());
-    crate::wallpaper::initialize_ui(&ui);
+    crate::wallpaper::initialize();
     init_actions(&ui.global());
     ui.set_pagenum(first_page);
     ui.set_framed(crate::install::is_dev_session());
