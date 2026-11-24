@@ -566,6 +566,7 @@ mod tests {
             }));
         let subscriber = tracing_subscriber::registry().with(layer);
         tracing::subscriber::with_default(subscriber, || {
+            tracing::callsite::rebuild_interest_cache();
             let _: Config =
                 basic_toml::from_str("[[steps]]\nstage = 'user_add'\nsystemd_homed = true")
                     .unwrap();
