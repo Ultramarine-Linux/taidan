@@ -143,7 +143,7 @@ async fn with_installed_ims(
 const FCITX5_LAUNCHER: &str = "/usr/share/applications/fcitx5-wayland-launcher.desktop";
 
 const FCITX5_PROFILE: &str = ".config/fcitx5/profile";
-const FCITX5_AUTOSTART: &str = ".config/autostart/fcitx5.desktop";
+const FCITX5_AUTOSTART: &str = ".config/autostart/org.fcitx.Fcitx5.desktop";
 
 // https://invent.kde.org/plasma/kwin/-/blob/master/src/kcms/virtualkeyboard/virtualkeyboardsettings.kcfg
 fn kwinrc_select_fcitx5() -> [KConfigEntry; 2] {
