@@ -38,10 +38,8 @@ fn check_mark_color(c: Color) -> Color {
 }
 
 pub fn initialize_ui(appearance: &Appearance<'_>) {
-    appearance.set_plasma(
-        libtaidan::cfg::Desktop::current(&crate::CFG.edition) == libtaidan::cfg::Desktop::Plasma,
-    );
-    if !libtaidan::theme::accent_supported(&crate::CFG.edition) {
+    appearance.set_plasma(crate::CFG.desktop() == libtaidan::cfg::Desktop::Plasma);
+    if !crate::CFG.desktop().supports_accent() {
         return;
     }
     let accents = (libtaidan::theme::Accent::ALL.iter())
@@ -71,10 +69,7 @@ pub fn skip_grub_theme(appearance: &Appearance<'_>) -> bool {
 #[must_use]
 pub fn picked(appearance: &Appearance<'_>) -> Option<libtaidan::theme::Accent> {
     let i = usize::try_from(appearance.get_accent()).ok()?;
-    libtaidan::theme::Accent::ALL
-        .get(i)
-        .copied()
-        .filter(|_| libtaidan::theme::accent_supported(&crate::CFG.edition))
+    libtaidan::theme::Accent::ALL.get(i).copied().filter(|_| crate::CFG.desktop().supports_accent())
 }
 
 #[cfg(test)]

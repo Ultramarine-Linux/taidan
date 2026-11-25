@@ -105,6 +105,25 @@ EndSection
 pub struct Drivers;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Codecs;
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DriversCodecs {}
+
+impl super::InstallStep for DriversCodecs {
+    fn stage(&self) -> super::Stage {
+        super::Stage::DriversCodecs
+    }
+
+    async fn run(
+        &self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        callback: &impl crate::Callback,
+    ) -> Res<()> {
+        run(settings, cfg, callback).await
+    }
+}
+
 pub(super) async fn run(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
@@ -258,7 +277,7 @@ async fn install_pkgs(cfg: &crate::cfg::Config, pkgs: &[&str]) -> Res<Installed>
     let owned = pkgs.iter().map(|&p| p.to_owned()).collect();
     let (verb, installed) = if super::is_ostree().await {
         (Verb::RpmOstreeInstall { pkgs: owned }, Installed::Ostree)
-    } else if cfg.taidan0.skip_dnf {
+    } else if cfg.skip_dnf() {
         tracing::info!(?pkgs, "skip_dnf is set, not installing driver packages");
         return Ok(Installed::Skipped);
     } else {

@@ -2112,7 +2112,7 @@ fn init_helpers(net: &Network<'_>) {
 
 pub fn initialize_ui(ui: &slint::Weak<AppWindow>, net: &Network<'_>) {
     let worker = Worker::spawn(ui);
-    net.set_persist_offline_btn(crate::CFG.taidan0.persist_no_internet_btn);
+    net.set_persist_offline_btn(crate::CFG.persist_no_internet_btn());
     init_helpers(net);
     net.on_browse({
         let ui = ui.clone();

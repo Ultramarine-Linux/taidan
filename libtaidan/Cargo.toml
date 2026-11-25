@@ -16,6 +16,7 @@ path = "./bin/taidan-helper.rs"
 
 [dependencies]
 basic-toml = "0.1.10"
+enum_dispatch = "0.3.13"
 const_format = "0.2.37"
 futures = { workspace = true }
 itertools = { workspace = true }
@@ -39,3 +40,4 @@ xcrypt = "0.3.2"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["net", "rt"] }
+tracing-subscriber = { workspace = true }

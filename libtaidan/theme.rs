@@ -91,11 +91,6 @@ impl GrubTheme {
     }
 }
 
-#[must_use]
-pub fn accent_supported(edition: &str) -> bool {
-    Desktop::current(edition).supports_accent()
-}
-
 impl Desktop {
     #[must_use]
     pub fn supports_accent(self) -> bool {
@@ -149,12 +144,12 @@ mod tests {
     #[test]
     fn accent_only_where_it_works() {
         assert!(Desktop::Gnome.supports_accent());
-        assert!(Desktop::from_edition("atomic-gnome").supports_accent());
+        assert!(Desktop::from_gui_env("gnome").supports_accent());
         assert!(Desktop::Plasma.supports_accent());
-        assert!(!Desktop::from_edition("kde").supports_accent());
+        assert!(!Desktop::from_gui_env("unknown").supports_accent());
         assert!(!Desktop::Budgie.supports_accent());
         assert!(!Desktop::Xfce.supports_accent());
-        assert!(!Desktop::from_edition("").supports_accent());
+        assert!(!Desktop::from_gui_env("").supports_accent());
     }
 
     #[test]
@@ -166,9 +161,9 @@ mod tests {
     }
 
     #[test]
-    fn themes_per_edition() {
-        let themes = |edition, dark| Desktop::from_edition(edition).themes(dark);
-        let budgie = themes("atomic-budgie", true).unwrap();
+    fn themes_per_gui_env() {
+        let themes = |gui_env, dark| Desktop::from_gui_env(gui_env).themes(dark);
+        let budgie = themes("budgie", true).unwrap();
         assert_eq!((budgie.gtk, budgie.icons), ("Fluent-round-Dark", Some("Fluent-dark")));
         let budgie = themes("budgie", false).unwrap();
         assert_eq!((budgie.gtk, budgie.icons), ("Fluent-round-Light", Some("Fluent")));

@@ -13,3 +13,22 @@ pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::
     }
     Ok(())
 }
+
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Grub {}
+
+impl crate::steps::InstallStep for Grub {
+    fn stage(&self) -> crate::steps::Stage {
+        crate::steps::Stage::ApplySystemSettings
+    }
+
+    async fn run(
+        &self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        _callback: &impl crate::Callback,
+    ) -> Res<()> {
+        run(settings, cfg).await
+    }
+}

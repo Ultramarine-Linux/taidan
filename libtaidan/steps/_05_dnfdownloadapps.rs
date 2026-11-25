@@ -18,6 +18,33 @@ pub(crate) const fn imf_packages(imf: I18nImf) -> &'static [&'static str] {
     }
 }
 
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DnfDownloadApps {}
+
+impl super::InstallStep for DnfDownloadApps {
+    fn stage(&self) -> super::Stage {
+        super::Stage::DnfDownloadApps
+    }
+
+    async fn pre(
+        &self,
+        settings: &mut crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+    ) -> Res<()> {
+        pre(settings, cfg).await
+    }
+
+    async fn run(
+        &self,
+        settings: &crate::settings::Settings,
+        cfg: &crate::cfg::Config,
+        callback: &impl crate::Callback,
+    ) -> Res<()> {
+        run(settings, cfg, callback).await
+    }
+}
+
 pub(super) async fn run(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,

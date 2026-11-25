@@ -38,18 +38,12 @@ static AVAILABLE_LANGS: LazyLock<Vec<i18n_embed::unic_langid::LanguageIdentifier
 /// Configuration of the distro OOBE.
 pub static CFG: LazyLock<cfg::Config> = LazyLock::new(|| {
     tracing::debug!("Initializing cfg::Config");
-    let mut cfg = cfg::Config::new().unwrap_or_else(|e| {
-        tracing::error!(%e, "cannot parse /etc/taidan.toml, using the defaults");
-        sentry::capture_message(
-            &format!("cannot parse /etc/taidan.toml: {e}"),
-            sentry::Level::Error,
-        );
-        *CONFIG_ERROR.write() = Some(format!(
-            "Cannot parse /etc/taidan.toml: {e}\n\nTaidan is using the default configuration."
-        ));
-        cfg::Config::default()
-    });
-    cfg::populate(&mut cfg);
+    let (cfg, error) = cfg::prepare_config(cfg::Config::new());
+    if let Some(error) = error {
+        tracing::error!(%error, "cannot parse /etc/taidan.toml, using the defaults");
+        sentry::capture_message(&error, sentry::Level::Error);
+        *CONFIG_ERROR.write() = Some(error);
+    }
     tracing::debug!("Populated cfg::Config (turn on `trace` to see body)");
     cfg
 });

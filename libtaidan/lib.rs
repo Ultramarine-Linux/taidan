@@ -31,6 +31,7 @@ pub static TEMP_DIR: LazyLock<std::path::PathBuf> = LazyLock::new(|| {
 pub enum InstallMsg {
     UpdStep(steps::Step),
     Log(String),
+    Warning(String),
     NeedsReboot,
     DriversFailed,
     LocaleFailed,
@@ -68,19 +69,23 @@ pub async fn start_install(
     proxy::set(settings.proxy.clone());
     persist_proxy(settings).await;
     i18n::fill_settings(settings, cfg);
-    for stage in steps::Stage::all() {
+    use steps::InstallStep as _;
+    let modules = steps::configured_steps(cfg);
+    for module in &modules {
+        let stage = module.stage();
         tracing::debug!(?stage, "Running pre()");
-        stage.pre(settings, cfg).await?;
+        module.pre(settings, cfg).await?;
     }
     let plan = steps::plan(settings, cfg).await;
     let mut shown = None;
-    for (stage, step) in steps::Stage::all().iter().zip(plan) {
+    for (module, step) in modules.iter().zip(plan) {
         if shown != Some(step) {
             callback.send(InstallMsg::UpdStep(step));
             shown = Some(step);
         }
+        let stage = module.stage();
         tracing::info!(?stage, "Running stage");
-        stage.run(settings, cfg, callback).await?;
+        module.run(settings, cfg, callback).await?;
     }
     write_proxy_repo_overrides(settings).await;
     steps::unlock_user(settings, cfg).await?;
