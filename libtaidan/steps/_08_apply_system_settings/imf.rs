@@ -170,14 +170,14 @@ fn kwinrc_select_fcitx5() -> [KConfigEntry; 2] {
 
 const FCITX5_PROFILE_MARKER: &str = "# written by Taidan";
 
-fn fcitx5_environment() -> String {
-    format!(
-        "{FCITX5_PROFILE_MARKER}\n\
-         INPUT_METHOD=fcitx\n\
-         GTK_IM_MODULE=fcitx\n\
-         QT_IM_MODULE=fcitx\n\
-         XMODIFIERS=@im=fcitx\n"
-    )
+fn fcitx5_environment(start: ImfStart) -> String {
+    let vars = match start {
+        ImfStart::Kwinrc => "XMODIFIERS=@im=fcitx\n",
+        ImfStart::XdgAutostart => {
+            "INPUT_METHOD=fcitx\nGTK_IM_MODULE=fcitx\nQT_IM_MODULE=fcitx\nXMODIFIERS=@im=fcitx\n"
+        }
+    };
+    format!("{FCITX5_PROFILE_MARKER}\n{vars}")
 }
 
 fn fcitx5_autostart() -> String {
