@@ -130,12 +130,11 @@ org = "Fyra Labs"
 ```
 
 `gui_env` specifies the **target** desktop/window manager (`gnome`, `plasma`, `budgie`,
-`xfce`, or any other name, e.g. `niri`). Desktop behavior is selected by `gui_env`;
-`edition` is distribution metadata.
+`xfce`, or any other name, e.g. `niri`). Desktop behavior is selected by `gui_env`.
 An `atomic-` prefix in `gui_env` is accepted, e.g. `atomic-gnome` selects GNOME.
-An `edition` such as `atomic-gnome` does not select the GUI environment.
-Distribution maintainers should ship `gui_env`; an unset or unrecognized value uses generic
-desktop behavior.
+When `gui_env` is unset, Taidan picks Plasma if `/usr/bin/plasmashell` exists, and otherwise
+falls back to `edition` (`VARIANT_ID` from os-release by default). An unrecognized `gui_env`
+uses generic desktop behavior.
 
 Installation stages always run in their fixed order. Optional `steps` entries configure
 individual stages, without enabling, disabling, or reordering them. For niri/Noctalia:
@@ -154,11 +153,12 @@ start = "xdg_autostart" # or "kwinrc"; omit to use the default
 
 The default IMF is IBus for GNOME, Fcitx5 otherwise. The default Fcitx5 startup method is
 `kwinrc` for Plasma, XDG autostart otherwise; `start` does not change IBus setup.
-XDG autostart writes `~/.config/autostart/fcitx5.desktop`, and requires the target session
+XDG autostart writes `~/.config/autostart/org.fcitx.Fcitx5.desktop`, and requires the target session
 to process XDG autostart entries. Both Fcitx5 startup methods use the same input-method
 profile, including in systemd-homed skeletons. Retries clean up Taidan-owned stale files.
-Fcitx5 also writes `~/.config/environment.d/90-taidan-fcitx5.conf` with `INPUT_METHOD`,
-`GTK_IM_MODULE`, and `QT_IM_MODULE` set to `fcitx`, and `XMODIFIERS` set to `@im=fcitx`.
+Fcitx5 also writes `~/.config/environment.d/90-taidan-fcitx5.conf`. With `kwinrc` it only sets
+`XMODIFIERS` to `@im=fcitx` for XWayland, since Plasma apps use the Wayland text-input protocol.
+With XDG autostart it also sets `INPUT_METHOD`, `GTK_IM_MODULE`, and `QT_IM_MODULE` to `fcitx`.
 The file uses environment.d assignments, not shell `export` commands.
 Explicit `start = "kwinrc"` outside Plasma opens a configuration warning dialog.
 IMF selection uses the step's `imf`, then `[i18n].imf` as a compatibility fallback,

@@ -162,7 +162,10 @@ impl Config {
 
     #[must_use]
     pub fn desktop(&self) -> Desktop {
-        Desktop::from_gui_env(self.gui_env.as_deref().unwrap_or_default())
+        match self.gui_env.as_deref() {
+            Some(gui_env) => Desktop::from_gui_env(gui_env),
+            None => Desktop::detect(&self.edition),
+        }
     }
 
     #[must_use]
@@ -309,6 +312,16 @@ impl Desktop {
             _ => Self::Other,
         }
     }
+
+    #[must_use]
+    pub fn detect(edition: &str) -> Self {
+        Self::from_edition(edition, std::path::Path::new("/usr/bin/plasmashell").exists())
+    }
+
+    #[must_use]
+    pub fn from_edition(edition: &str, has_plasmashell: bool) -> Self {
+        if has_plasmashell { Self::Plasma } else { Self::from_gui_env(edition) }
+    }
 }
 
 #[cfg(test)]
@@ -355,11 +368,21 @@ mod tests {
     }
 
     #[test]
+    fn unset_gui_env_falls_back_to_edition() {
+        assert_eq!(Desktop::from_edition("atomic-gnome", false), Desktop::Gnome);
+        assert_eq!(Desktop::from_edition("budgie", false), Desktop::Budgie);
+        assert_eq!(Desktop::from_edition("xfce", false), Desktop::Xfce);
+        assert_eq!(Desktop::from_edition("", false), Desktop::Other);
+        assert_eq!(Desktop::from_edition("gnome", true), Desktop::Plasma);
+        let cfg = Config { edition: "atomic-plasma".into(), ..Default::default() };
+        assert_eq!(cfg.desktop(), Desktop::detect("atomic-plasma"));
+    }
+
+    #[test]
     fn gui_env_not_edition_selects_desktop_and_imf_defaults() {
         use crate::i18n::I18nImf;
         use crate::steps::ImfStart;
         for (gui_env, desktop, imf, start) in [
-            (None, Desktop::Other, I18nImf::Fcitx5, ImfStart::XdgAutostart),
             (Some("gnome"), Desktop::Gnome, I18nImf::IBus, ImfStart::XdgAutostart),
             (Some("plasma"), Desktop::Plasma, I18nImf::Fcitx5, ImfStart::Kwinrc),
             (Some("niri"), Desktop::Other, I18nImf::Fcitx5, ImfStart::XdgAutostart),

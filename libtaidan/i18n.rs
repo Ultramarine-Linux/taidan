@@ -513,15 +513,6 @@ pub struct I18nCfg {
     pub imf: Option<I18nImf>,
 }
 
-impl I18nCfg {
-    #[must_use]
-    pub fn imf(&self, desktop: crate::cfg::Desktop) -> I18nImf {
-        self.imf.unwrap_or(match desktop {
-            crate::cfg::Desktop::Gnome => I18nImf::IBus,
-            _ => I18nImf::Fcitx5,
-        })
-    }
-}
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -689,15 +680,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn imf_default() {
-        let cfg = I18nCfg::default();
-        assert_eq!(cfg.imf(Desktop::Gnome), I18nImf::IBus);
-        assert_eq!(cfg.imf(Desktop::Plasma), I18nImf::Fcitx5);
-        assert_eq!(cfg.imf(Desktop::Other), I18nImf::Fcitx5);
-        let cfg = I18nCfg { imf: Some(I18nImf::IBus) };
-        assert_eq!(cfg.imf(Desktop::Plasma), I18nImf::IBus);
-    }
 
     #[test]
     fn fills_settings_from_locale() {

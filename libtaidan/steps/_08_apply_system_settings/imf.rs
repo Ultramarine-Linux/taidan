@@ -276,7 +276,7 @@ fn im_cmds(settings: &crate::settings::Settings, home: &Home, start: ImfStart) -
         i18n::I18nImf::Fcitx5 if settings.ims.is_empty() => {}
         i18n::I18nImf::Fcitx5 => {
             cmds.push(home.write_file(FCITX5_PROFILE, fcitx5_profile(settings)));
-            cmds.push(home.write_file(FCITX5_ENVIRONMENT, fcitx5_environment()));
+            cmds.push(home.write_file(FCITX5_ENVIRONMENT, fcitx5_environment(start)));
             match start {
                 ImfStart::Kwinrc => cmds.extend(home.kconfig(&kwinrc_select_fcitx5())),
                 ImfStart::XdgAutostart => {
@@ -469,7 +469,7 @@ mod tests {
             assert!(!dir.path().join(".config/kwinrc").exists());
             assert_eq!(
                 std::fs::read_to_string(dir.path().join(FCITX5_ENVIRONMENT)).unwrap(),
-                fcitx5_environment()
+                fcitx5_environment(ImfStart::XdgAutostart)
             );
 
             let none = crate::settings::Settings { ims: vec![], ..settings };
@@ -507,7 +507,7 @@ mod tests {
         skel.run(vec![
             skel.remove_file(FCITX5_PROFILE),
             skel.write_file(FCITX5_AUTOSTART, fcitx5_autostart()),
-            skel.write_file(FCITX5_ENVIRONMENT, fcitx5_environment()),
+            skel.write_file(FCITX5_ENVIRONMENT, fcitx5_environment(ImfStart::XdgAutostart)),
         ])
         .await
         .unwrap();
@@ -573,7 +573,7 @@ mod tests {
     #[test]
     fn kwinrc_warns_only_for_explicit_non_plasma_configuration() {
         let imf = Imf { start: Some(ImfStart::Kwinrc), ..Default::default() };
-        for gui_env in [None, Some("niri"), Some("atomic-gnome")] {
+        for gui_env in [Some("niri"), Some("atomic-gnome")] {
             let cfg =
                 crate::cfg::Config { gui_env: gui_env.map(str::to_owned), ..Default::default() };
             assert!(imf.configuration_warning(&cfg).unwrap().contains("xdg_autostart"));
@@ -595,7 +595,7 @@ mod tests {
 
     #[test]
     fn environment_drop_in_uses_environment_d_not_shell_syntax() {
-        let environment = fcitx5_environment();
+        let environment = fcitx5_environment(ImfStart::XdgAutostart);
         assert_eq!(
             environment.lines().skip(1).collect::<Vec<_>>(),
             [
@@ -606,5 +606,9 @@ mod tests {
             ]
         );
         assert!(!environment.contains("export "));
+        assert_eq!(
+            fcitx5_environment(ImfStart::Kwinrc).lines().skip(1).collect::<Vec<_>>(),
+            ["XMODIFIERS=@im=fcitx"]
+        );
     }
 }

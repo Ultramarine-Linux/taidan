@@ -157,25 +157,6 @@ impl Stage {
         }
     }
 
-    #[tracing::instrument(skip(settings))]
-    pub async fn pre(
-        self,
-        settings: &mut crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-    ) -> Res<()> {
-        self.configured(cfg).pre(settings, cfg).await
-    }
-
-    #[tracing::instrument(skip(settings, callback))]
-    pub async fn run(
-        self,
-        settings: &crate::settings::Settings,
-        cfg: &crate::cfg::Config,
-        callback: &impl crate::Callback,
-    ) -> Res<()> {
-        self.configured(cfg).run(settings, cfg, callback).await
-    }
-
     #[must_use]
     pub fn configured(self, cfg: &crate::cfg::Config) -> Module {
         cfg.steps.iter().find(|module| module.stage() == self).cloned().unwrap_or_else(

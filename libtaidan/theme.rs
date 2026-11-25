@@ -91,11 +91,6 @@ impl GrubTheme {
     }
 }
 
-#[must_use]
-pub fn accent_supported(gui_env: &str) -> bool {
-    Desktop::from_gui_env(gui_env).supports_accent()
-}
-
 impl Desktop {
     #[must_use]
     pub fn supports_accent(self) -> bool {
