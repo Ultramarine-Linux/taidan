@@ -203,7 +203,7 @@ fn remove_stale_fcitx5_config(home: &Home) -> HomeCmd {
             fi
             rm -f -- "$profile" || exit
         fi
-        autostart="$1/autostart/fcitx5.desktop"
+        autostart="$1/autostart/org.fcitx.Fcitx5.desktop"
         if [ "$(head -n 1 -- "$autostart" 2>/dev/null)" = "$2" ]; then
             rm -f -- "$autostart" || exit
         fi
