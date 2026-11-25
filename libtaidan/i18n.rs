@@ -513,7 +513,6 @@ pub struct I18nCfg {
     pub imf: Option<I18nImf>,
 }
 
-
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum I18nImf {
@@ -679,7 +678,6 @@ mod tests {
             }
         }
     }
-
 
     #[test]
     fn fills_settings_from_locale() {
