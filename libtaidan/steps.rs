@@ -320,9 +320,12 @@ mod tests {
 
     #[tokio::test]
     async fn enum_dispatch_forwards_async_pre_and_run_with_generic_callback() {
-        // Offline download-updates is a safe no-op; unexpected callback calls fail the test.
+        // download-updates is a no-op without dnf. Unexpected callback calls fail the test.
         let settings = crate::settings::Settings { nointernet: true, ..Default::default() };
-        let cfg = crate::cfg::Config::default();
+        let cfg = crate::cfg::Config {
+            steps: vec![SystemSetup { skip_dnf: Some(true), ..Default::default() }.into()],
+            ..Default::default()
+        };
         let module: Module = DownloadUpdates::default().into();
         let mut prepared = settings.clone();
         module.pre(&mut prepared, &cfg).await.unwrap();
