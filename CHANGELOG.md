@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.0.4
+
 - Fixed automatic dialog sizing using laid-out content in `TdnDialog`. Warning/error
   bodies grow to fit wrapped text and scroll only when the window's available height is exceeded.
 - Added Rust warning-dialog support and `TAIDAN_SIMULATE_WARNING` at application startup. A non-Plasma

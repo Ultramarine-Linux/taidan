@@ -2,7 +2,7 @@
 members = ["taidan_proc_macros", "taidan_ui", "libtaidan", "tdnx"]
 
 [workspace.package]
-version = "1.0.3"
+version = "1.0.4"
 
 [workspace.dependencies]
 futures = "0.3.34"
@@ -59,7 +59,11 @@ i18n-embed = { version = "0.16.0", features = [
 ] }
 icu = { version = "2.4.0", features = ["unstable", "logging"] }
 jiff = { version = "0.2.38", features = ["tzdb-zoneinfo"] }
-image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
+image = { version = "0.25.10", default-features = false, features = [
+    "jpeg",
+    "png",
+    "webp",
+] }
 itertools = { workspace = true }
 libc = "0.2.191"
 libtaidan = { workspace = true }
@@ -81,7 +85,10 @@ tracing-journald = "0.3.2"
 tracing-subscriber = { workspace = true }
 uzers = "0.12.2"
 v4l = "0.14.0"
-zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking-api"] }
+zbus = { version = "5.19.0", default-features = false, features = [
+    "async-io",
+    "blocking-api",
+] }
 qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 
 [lints.clippy]
