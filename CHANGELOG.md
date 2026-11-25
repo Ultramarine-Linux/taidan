@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 1.0.4
+## 1.0.5
 
 - Fixed automatic dialog sizing using laid-out content in `TdnDialog`. Warning/error
   bodies grow to fit wrapped text and scroll only when the window's available height is exceeded.
