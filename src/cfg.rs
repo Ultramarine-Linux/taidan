@@ -94,6 +94,9 @@ pub fn get_val(id: &str) -> Option<&'static serde_json::Value> {
     })
 }
 
+const DISTRO_WALLPAPER_LIGHT: &str = "/usr/share/backgrounds/default.png";
+const DISTRO_WALLPAPER_DARK: &str = "/usr/share/backgrounds/default-dark.png";
+
 type HeroBuffer = slint::SharedPixelBuffer<slint::Rgba8Pixel>;
 
 const THEME_CARD_WIDTH_REM: f32 = 12.;
@@ -122,13 +125,13 @@ fn decode_hero(dark: bool) -> image::DynamicImage {
     let (key, wallpaper, bundled): (_, _, &[u8]) = if dark {
         (
             "welcome.hero_image_dark",
-            crate::wallpaper::DARK,
+            DISTRO_WALLPAPER_DARK,
             include_bytes!("../data/icons/background-dark.webp"),
         )
     } else {
         (
             "welcome.hero_image",
-            crate::wallpaper::LIGHT,
+            DISTRO_WALLPAPER_LIGHT,
             include_bytes!("../data/icons/background-light.webp"),
         )
     };

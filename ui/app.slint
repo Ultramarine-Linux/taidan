@@ -7,7 +7,7 @@ import { Cfg } from "cfg.slint";
 import { Account } from "account.slint";
 import { Pages, Nav } from "page.slint";
 import { LanguagePage } from "pages/0010_language.slint";
-import { Theme, ThemeMode, Tokens } from "slintcn/theme/tokens.slint";
+import { Theme, Tokens } from "slintcn/theme/tokens.slint";
 import { WhoAreYouPage, CameraDialog } from "pages/0040_whoareyou.slint";
 import { Camera } from "camera.slint";
 import { KeyboardPage } from "pages/0020_keyboard.slint";
@@ -91,10 +91,6 @@ export component AppWindow inherits Window {
     changed larger-text => { Tokens.text-scale = larger-text ? 1.0 : 0.875; }
     property <bool> reduce-motion: A11y.reduce-motion;
     changed reduce-motion => { Tokens.reduce-motion = reduce-motion; }
-
-    out property <bool> dark-mode: Theme.mode == ThemeMode.dark;
-    callback dark-mode-changed(bool);
-    changed dark-mode => { root.dark-mode-changed(self.dark-mode); }
 
     property <bool> dialog-open: Modal.open;
     changed dialog-open => {

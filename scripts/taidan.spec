@@ -102,6 +102,7 @@ install -d %buildroot%{_sharedstatedir}/taidan
 %{_datadir}/taidan/avatars/
 %{_datadir}/taidan/po/
 %{_datadir}/taidan/session-config/
+%{_datadir}/taidan/wallpaper.png
 
 %changelog
 %autochangelog

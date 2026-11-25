@@ -4,6 +4,7 @@ taidan_data=$DESTDIR/usr/share/taidan
 
 mkdir -p $taidan_data
 cp -r data/tweaks/ data/avatars/ data/session-config/ po/ $taidan_data/
+install -Dpm644 data/taidan-wp.png                      $taidan_data/wallpaper.png
 
 install -Dpm644 data/sysusers.d/taidan.conf             -t $DESTDIR/usr/lib/sysusers.d/
 install -Dpm644 data/systemd/*.service                  -t $DESTDIR/usr/lib/systemd/system/
