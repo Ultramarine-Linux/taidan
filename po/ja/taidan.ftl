@@ -6,14 +6,15 @@ prev = 前
 next = 次
 # shown on the progress bar
 steps-dnfdownloadupdate = システムアップデートをダウンロード中…
-steps-dnfinstallupdate = システムアップデートをインストール中…
 steps-dnfdownloadapps = アプリをダウンロード中…
 steps-dnfinstallapps = アプリをインストール中…
 steps-driverscodecs = ドライバーとコーデックをインストール中…
+
 ## page: Welcome
 
 # page title
 page-welcome-go = 次
+
 ## page: Keyboard Layout
 
 # page title
@@ -44,18 +45,27 @@ page-password-rp = 確認
 # page title
 page-internet = インターネット接続
 page-internet-desc = インターネットに接続すると、最新ソフトをダウンロードできるようになります。
-page-internet-skip = スキップ
+
 ## page: Codecs and Drivers
+
 
 ## page: Input Method
 
+
 # page title
+
+
 ## page: Choose Your Theme
 
+
 # page title
+
+
 ## page: Browser Selection
 
+
 ## page: Categories
+
 
 # category names
 # you should use a selector; e.g.
@@ -63,9 +73,13 @@ page-internet-skip = スキップ
 #   [Productivity] -> projdsalkaj;cjzkpqi
 #   [...]
 # }
+
+
 ## page: Installing
 
+
 ## page: Finish
+
 
 ## page: Error
 
@@ -78,5 +92,3 @@ page-language-search-lang = 言語検索…
 page-internet-portal = ウェブブラウザでログイン
 page-analytics = 分析
 page-tweaks = システム微調整
-flatpakening-name = Flatpakの代わりにRPMをインストール
-flatpakening-desc = Flatpakは安全性が高い一方、RPMはスペースを節約できます。
