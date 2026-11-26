@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.0.6
+
+- Updated password length copy
+- Fix window scaling
+- More verbose logs
+- Fix plasma dark theme application
+
 ## 1.0.5
 
 - Fixed automatic dialog sizing using laid-out content in `TdnDialog`. Warning/error
