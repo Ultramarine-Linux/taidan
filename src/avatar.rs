@@ -6,8 +6,6 @@ use parking_lot::Mutex;
 use slint::ComponentHandle;
 
 use crate::ui::{on_ui, spawn_then};
-use v4l::io::traits::CaptureStream;
-use v4l::video::Capture;
 
 use crate::ui::{Account, AppWindow, Avatar, AvatarRow, Camera};
 
@@ -18,8 +16,6 @@ const AVATARS_DIR: &str = "data/avatars";
 
 const PHOTO_SIZE: u32 = 512;
 const PREVIEW_SIZE: u32 = 320;
-const FIRST_FRAME_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
-const STOP_CHECK_INTERVAL_MS: i32 = 100;
 
 type Buffer = slint::SharedPixelBuffer<slint::Rgba8Pixel>;
 
@@ -70,56 +66,6 @@ fn load_presets() -> Vec<(PathBuf, Buffer)> {
         .collect()
 }
 
-fn decode_frame(fmt: &v4l::Format, data: &[u8]) -> Option<image::RgbImage> {
-    match &fmt.fourcc.repr {
-        b"MJPG" => image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)
-            .inspect_err(|e| tracing::debug!(?e, "bad MJPEG frame"))
-            .ok()
-            .map(image::DynamicImage::into_rgb8),
-        b"YUYV" => bt601_yuyv_to_rgb(fmt.width, fmt.height, fmt.stride, data),
-        _ => None,
-    }
-}
-
-fn bt601_yuyv_to_rgb(width: u32, height: u32, stride: u32, data: &[u8]) -> Option<image::RgbImage> {
-    let row_len = usize::try_from(width).ok()? * 2;
-    let stride = usize::try_from(stride).ok()?.max(row_len);
-    let rows = usize::try_from(height).ok()?;
-    let mut out = Vec::with_capacity(row_len / 2 * 3 * rows);
-    for row in 0..rows {
-        let start = row * stride;
-        let line = data.get(start..start + row_len)?;
-        for &[y0, u, y1, v] in line.as_chunks::<4>().0 {
-            let (u, v) = (f32::from(u) - 128.0, f32::from(v) - 128.0);
-            for y in [f32::from(y0), f32::from(y1)] {
-                #[expect(
-                    clippy::cast_possible_truncation,
-                    clippy::cast_sign_loss,
-                    reason = "clamped"
-                )]
-                let c = |x: f32| x.clamp(0.0, 255.0) as u8;
-                out.extend([
-                    c(1.402f32.mul_add(v, y)),
-                    c(0.714f32.mul_add(-v, 0.344f32.mul_add(-u, y))),
-                    c(1.772f32.mul_add(u, y)),
-                ]);
-            }
-        }
-    }
-    image::RgbImage::from_raw(width, height, out)
-}
-
-fn find_camera() -> Option<v4l::Device> {
-    v4l::context::enum_devices().into_iter().find_map(|node| {
-        let dev = v4l::Device::with_path(node.path()).ok()?;
-        let caps = dev.query_caps().ok()?;
-        let formats = dev.enum_formats().ok()?;
-        (caps.capabilities.contains(v4l::capability::Flags::VIDEO_CAPTURE)
-            && formats.iter().any(|f| matches!(&f.fourcc.repr, b"MJPG" | b"YUYV")))
-        .then_some(dev)
-    })
-}
-
 struct Running {
     stop: Arc<AtomicBool>,
     latest_frame: Arc<Mutex<Option<image::RgbImage>>>,
@@ -128,8 +74,6 @@ struct Running {
 thread_local! {
     static RUNNING: std::cell::RefCell<Option<Running>> = const { std::cell::RefCell::new(None) };
 }
-
-static STREAM_THREAD: Mutex<Option<std::thread::JoinHandle<()>>> = Mutex::new(None);
 
 fn show_error(ui: &slint::Weak<AppWindow>, stop: Arc<AtomicBool>, error: String) {
     tracing::error!(error, "camera error");
@@ -145,61 +89,32 @@ fn stream(
     stop: &Arc<AtomicBool>,
     latest_frame: &Mutex<Option<image::RgbImage>>,
 ) -> std::io::Result<()> {
-    let dev = find_camera().ok_or_else(|| std::io::Error::other("no camera found"))?;
-    let formats = dev.enum_formats()?;
-    let fourcc = [b"MJPG", b"YUYV"]
-        .into_iter()
-        .map(v4l::FourCC::new)
-        .find(|cc| formats.iter().any(|f| f.fourcc == *cc))
-        .ok_or_else(|| std::io::Error::other("unsupported camera format"))?;
-    let mut fmt = dev.format()?;
-    (fmt.width, fmt.height, fmt.fourcc) = (640, 480, fourcc);
-    let fmt = dev.set_format(&fmt)?;
-    tracing::debug!(?fmt, "Camera started");
-    let handle = dev.handle();
-    let mut stream = v4l::io::mmap::Stream::with_buffers(&dev, v4l::buffer::Type::VideoCapture, 4)?;
-    // a timed out `next()` leaves its buffer queued and can't be called again, so only the first
-    // frame uses it and the rest wait in `poll`
-    stream.set_timeout(FIRST_FRAME_TIMEOUT);
-    let mut started = false;
     let preview_pending = Arc::new(AtomicBool::new(false));
-    while !stop.load(Ordering::Relaxed) {
-        if started && handle.poll(libc::POLLIN, STOP_CHECK_INTERVAL_MS)? == 0 {
-            continue;
-        }
-        let (buf, meta) = stream.next()?;
-        started = true;
-        let data = buf.get(..usize::try_from(meta.bytesused).unwrap_or(buf.len())).unwrap_or(buf);
-        let Some(frame) = decode_frame(&fmt, data) else { continue };
-        let preview = (!preview_pending.load(Ordering::Acquire)).then(|| mirrored_preview(&frame));
-        *latest_frame.lock() = Some(frame);
-        let Some(preview) = preview else { continue };
-        preview_pending.store(true, Ordering::Release);
-        let done = Arc::clone(&preview_pending);
-        let stopped = Arc::clone(stop);
-        let sent = ui.upgrade_in_event_loop(move |ui| {
-            if !stopped.load(Ordering::Relaxed) {
-                ui.global::<Camera<'_>>().set_frame(slint::Image::from_rgba8(preview));
+    crate::camera::stream(
+        || !stop.load(Ordering::Relaxed),
+        |frame| {
+            let preview =
+                (!preview_pending.load(Ordering::Acquire)).then(|| mirrored_preview(&frame));
+            *latest_frame.lock() = Some(frame);
+            let Some(preview) = preview else { return };
+            preview_pending.store(true, Ordering::Release);
+            let done = Arc::clone(&preview_pending);
+            let stopped = Arc::clone(stop);
+            let sent = ui.upgrade_in_event_loop(move |ui| {
+                if !stopped.load(Ordering::Relaxed) {
+                    ui.global::<Camera<'_>>().set_frame(slint::Image::from_rgba8(preview));
+                }
+                done.store(false, Ordering::Release);
+            });
+            if sent.is_err() {
+                preview_pending.store(false, Ordering::Release);
             }
-            done.store(false, Ordering::Release);
-        });
-        if sent.is_err() {
-            preview_pending.store(false, Ordering::Release);
-        }
-    }
-    Ok(())
+        },
+    )
 }
 
 fn mirrored_preview(frame: &image::RgbImage) -> Buffer {
     to_round_buffer(&image::imageops::flip_horizontal(&center_square_scaled(frame, PREVIEW_SIZE)))
-}
-
-fn wait_for_release(previous: &std::thread::JoinHandle<()>) {
-    let deadline =
-        std::time::Instant::now() + FIRST_FRAME_TIMEOUT + std::time::Duration::from_secs(1);
-    while !previous.is_finished() && std::time::Instant::now() < deadline {
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
 }
 
 fn start(ui: &slint::Weak<AppWindow>) {
@@ -217,30 +132,21 @@ fn start(ui: &slint::Weak<AppWindow>) {
         old.stop.store(true, Ordering::Relaxed);
     }
     let ui = ui.clone();
-    let mut stream_thread = STREAM_THREAD.lock();
-    let previous = stream_thread.take();
-    *stream_thread = Some(std::thread::spawn(move || {
-        if let Some(previous) = previous {
-            wait_for_release(&previous);
-        }
+    std::thread::spawn(move || {
         if let Err(e) = stream(&ui, &stop, &latest_frame) {
             show_error(&ui, stop, e.to_string());
         }
-    }));
+    });
 }
 
 fn refresh(ui: &slint::Weak<AppWindow>) {
     if RUNNING.with_borrow(Option::is_some) {
         return;
     }
-    spawn_then(
-        ui.clone(),
-        || find_camera().is_some(),
-        |ui, available| {
-            tracing::debug!(available, "Checked for a camera");
-            ui.global::<Camera<'_>>().set_available(available);
-        },
-    );
+    spawn_then(ui.clone(), crate::camera::available, |ui, available| {
+        tracing::debug!(available, "Checked for a camera");
+        ui.global::<Camera<'_>>().set_available(available);
+    });
 }
 
 fn stop(ui: &slint::Weak<AppWindow>) {
@@ -308,7 +214,7 @@ pub fn initialize_ui(ui: &slint::Weak<AppWindow>, camera: &Camera<'_>) {
         ui.clone(),
         || {
             let presets = load_presets();
-            let available = find_camera().is_some();
+            let available = crate::camera::available();
             tracing::debug!(presets = presets.len(), available, "Loaded user icons");
             (presets, available)
         },
@@ -370,23 +276,6 @@ mod tests {
             picker_rows(12),
             [vec![0, 1, 2], vec![3, 4], vec![5, -1, 6], vec![7, 8], vec![9, 10, 11]]
         );
-    }
-
-    #[test]
-    fn yuyv_grey_stays_grey() {
-        let mid_grey_pair = [128, 128, 128, 128];
-        let rgb = bt601_yuyv_to_rgb(2, 1, 0, &mid_grey_pair).unwrap();
-        assert_eq!(rgb.as_raw(), &[128, 128, 128, 128, 128, 128]);
-    }
-
-    #[test]
-    fn yuyv_skips_line_padding() {
-        let two_lines_padded_with_white =
-            [16, 128, 16, 128, 255, 255, 255, 255, 235, 128, 235, 128, 255, 255, 255, 255];
-        let rgb = bt601_yuyv_to_rgb(2, 2, 8, &two_lines_padded_with_white).unwrap();
-        assert_eq!(rgb.as_raw(), &[16, 16, 16, 16, 16, 16, 235, 235, 235, 235, 235, 235]);
-        let cut_off_in_last_line = &two_lines_padded_with_white[..9];
-        assert!(bt601_yuyv_to_rgb(2, 2, 8, cut_off_in_last_line).is_none());
     }
 
     #[test]
