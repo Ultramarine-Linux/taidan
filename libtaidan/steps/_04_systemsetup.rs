@@ -38,34 +38,44 @@ impl super::InstallStep for SystemSetup {
         &self,
         settings: &crate::settings::Settings,
         cfg: &crate::cfg::Config,
-        _callback: &impl crate::Callback,
+        callback: &impl crate::Callback,
     ) -> Res<()> {
-        run(settings, cfg).await
+        run(settings, cfg, callback).await
     }
 }
 
-pub(super) async fn run(settings: &crate::settings::Settings, cfg: &crate::cfg::Config) -> Res<()> {
+pub(super) async fn run(
+    settings: &crate::settings::Settings,
+    cfg: &crate::cfg::Config,
+    callback: &impl crate::Callback,
+) -> Res<()> {
     if let Some(ids) = settings.tweaks.ids() {
-        apply_tweaks(settings, cfg, ids).await?;
+        tracing::info!(?ids, "Applying tweaks");
+        apply_tweaks(settings, cfg, ids, callback).await?;
     } else {
         tracing::warn!("the settings don't say which tweaks to turn on, leaving them as they are");
     }
+    tracing::info!(location = ?settings.location, "Applying location services");
     apply_location(settings).await;
     if settings.analytics == Some(true) && !settings.nointernet {
+        tracing::info!("Sending the analytics event");
         crate::analytics::send(settings).await;
     }
+    tracing::info!("Carrying over the keyboard layout");
     if let Err(e) = crate::i18n::apply_keymap_to_user(settings, cfg).await {
         tracing::warn!(?e, "cannot carry over the keyboard layout");
     }
+    tracing::info!("Carrying over the accessibility settings");
     if let Err(e) = crate::a11y::apply_to_user(settings, cfg).await {
         tracing::warn!(?e, "cannot carry over the accessibility settings");
     }
-    if !cfg.systemd_homed()
-        && video_group_exists().await
-        && let Err(e) =
+    if !cfg.systemd_homed() && video_group_exists().await {
+        tracing::info!("Adding the user to the video group");
+        if let Err(e) =
             crate::root(crate::Verb::AddToVideo { user: settings.username.clone() }).await
-    {
-        tracing::warn!(?e, "cannot add the user to the video group");
+        {
+            tracing::warn!(?e, "cannot add the user to the video group");
+        }
     }
     Ok(())
 }
@@ -96,21 +106,24 @@ async fn apply_tweaks(
     settings: &crate::settings::Settings,
     cfg: &crate::cfg::Config,
     wanted_on: &[String],
+    callback: &impl crate::Callback,
 ) -> Res<()> {
     let sett = crate::tweaks::settings_json(settings)?;
     let mut recorded = crate::tweaks::recorded_on();
     let tweaks = crate::tweaks::available(super::can_use_dnf(cfg).await).await;
+    tracing::debug!(?recorded, available = tweaks.len(), "Tweaks state");
     for tweak in tweaks {
         let id = tweak.id().to_string_lossy().into_owned();
         let started = format!("{}{id}", crate::tweaks::STARTED);
         let on = wanted_on.contains(&id);
         let partly_applied = recorded.contains(&started);
         if !partly_applied && on == recorded.contains(&id) {
+            tracing::debug!(id, on, "tweak already in the wanted state");
             continue;
         }
         if on && settings.nointernet && tweak.needs_internet {
             tracing::info!(id, "skipping tweak that needs the internet");
-            if partly_applied && tweak.run(&sett, false).await {
+            if partly_applied && tweak.run(&sett, false, callback).await {
                 recorded.retain(|r| *r != started);
                 persist_record(&recorded).await;
             }
@@ -120,7 +133,7 @@ async fn apply_tweaks(
         if on {
             persist_record(&[recorded.as_slice(), std::slice::from_ref(&started)].concat()).await;
         }
-        if !tweak.run(&sett, on).await {
+        if !tweak.run(&sett, on, callback).await {
             recorded.push(started);
         } else if on {
             recorded.push(id);

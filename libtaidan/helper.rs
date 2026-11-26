@@ -698,7 +698,10 @@ impl Ctx {
                     .map_err(|e| format!("invalid tweak `{id}`: {e}"))?;
                 let up = tweak.path.join("up");
                 let up = up.to_str().ok_or("invalid tweak path")?;
-                Self::run(self.cmd(up).arg(if *on { "1" } else { "0" }), Some(&self.input))
+                Self::run(
+                    self.cmd(up).env("PYTHONUNBUFFERED", "1").arg(if *on { "1" } else { "0" }),
+                    Some(&self.input),
+                )
             }
             Verb::RecordTweaks { ids } => {
                 exited_0(crate::tweaks::write_on_record(ids), "cannot write the tweaks record")

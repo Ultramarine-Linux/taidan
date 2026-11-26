@@ -16,12 +16,15 @@ pub(crate) async fn run_logged(
     callback: &impl crate::Callback,
     name: &'static str,
     verb: &crate::Verb,
+    input: &[u8],
     mut on_line: impl FnMut(&str),
 ) -> Res<()> {
     let (writer, reader) = tokio::net::unix::pipe::pipe().map_err(Err::_fail_to_run(name))?;
     let writer = writer.into_blocking_fd().map_err(Err::_fail_to_run(name))?;
     let stdout = writer.try_clone().map_err(Err::_fail_to_run(name))?;
-    let mut child = crate::spawn_helper(verb, &[], stdout, writer).await?;
+    tracing::info!(verb = verb.name(), "Running command with live output");
+    let started = std::time::Instant::now();
+    let mut child = crate::spawn_helper(verb, input, stdout, writer).await?;
 
     let log_path = crate::TEMP_DIR.join(format!("{name}.stdout.log"));
     let mut log =
@@ -84,9 +87,12 @@ pub(crate) async fn run_logged(
         Some(status) => status,
         None => child.wait().await.map_err(Err::_fail_to_run(name))?,
     };
+    let elapsed = started.elapsed();
     if status.success() {
+        tracing::info!(verb = verb.name(), ?elapsed, "Command finished");
         return Ok(());
     }
+    tracing::warn!(verb = verb.name(), rc = ?status.code(), ?elapsed, "Command failed");
     let output = Vec::from(tail).join("\n");
     crate::command::report_exit(name, status, &output);
     let e = Err::ProgramFail { name, output, rc: status.code() };
@@ -95,7 +101,7 @@ pub(crate) async fn run_logged(
 }
 
 pub(crate) async fn handle_dnf(callback: &impl crate::Callback, verb: crate::Verb) -> Res<()> {
-    run_logged(callback, "dnf5", &verb, |line| {
+    run_logged(callback, "dnf5", &verb, &[], |line| {
         if let Some(m) = PROGRESS_REGEX.captures(line)
             && let (Ok(num), Ok(den)) = (m[1].parse::<u32>(), m[2].parse::<u32>())
             && den != 0

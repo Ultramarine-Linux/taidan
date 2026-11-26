@@ -10,7 +10,7 @@ use tracing_subscriber::layer::Context;
 
 use crate::ui::{AppWindow, Install};
 
-const MAX_LINES: usize = 500;
+const MAX_LINES: usize = 3000;
 
 static UI: OnceLock<slint::Weak<AppWindow>> = OnceLock::new();
 static LINES: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
@@ -74,7 +74,7 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Layer {
 }
 
 fn is_shown(metadata: &tracing::Metadata<'_>) -> bool {
-    *metadata.level() <= tracing::Level::INFO
+    *metadata.level() <= tracing::Level::DEBUG
         && ["libtaidan", "taidan::install"].iter().any(|t| metadata.target().starts_with(t))
 }
 
