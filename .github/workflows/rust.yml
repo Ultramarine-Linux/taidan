@@ -14,11 +14,13 @@ jobs:
     uses: FyraLabs/actions/.github/workflows/rust.yml@main
     with:
       clippy-pre: |
-        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel glibc-all-langpacks xkeyboard-config clang-devel perl-FindBin gcc make clang
+        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libcamera-devel glibc-all-langpacks xkeyboard-config clang-devel perl-FindBin gcc make 
+        clang
       clippy-cargo-flags: --workspace --exclude tdnx --all-targets
       clippy-cache: true
       test-pre: |
-        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel glibc-all-langpacks xkeyboard-config clang-devel perl-FindBin gcc make clang
+        dnf install -y openssl-devel fontconfig-devel libxcrypt-devel libcamera-devel glibc-all-langpacks xkeyboard-config clang-devel perl-FindBin gcc make 
+        clang
       test-cargo-flags: --workspace
       test-cache: true
 
