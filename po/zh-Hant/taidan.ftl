@@ -28,3 +28,5 @@ page-tweaks = 系統調整
 page-language = 語言
 page-language-search-lang = 搜尋語言……
 cancel = 取消
+done = 完成
+close = 關閉
