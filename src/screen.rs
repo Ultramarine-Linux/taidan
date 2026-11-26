@@ -13,7 +13,7 @@ const DESIGN_SIZE: (f64, f64) = (600., 500.);
 const SMALL_SCREEN_HEIGHT: f64 = 720.;
 const WINDOW_HEIGHT_ON_SMALL_SCREEN: f64 = 620.;
 const LARGE_SCREEN_HEIGHT: f64 = 1440.;
-const WINDOW_HEIGHT_ON_LARGE_SCREEN: f64 = 680.;
+const WINDOW_HEIGHT_ON_LARGE_SCREEN: f64 = 860.;
 const MAX_SCREEN_SHARE: f64 = 0.9;
 const ROUNDING_SLACK: f64 = 1e-6;
 
@@ -129,9 +129,9 @@ mod tests {
     #[test]
     fn scales() {
         let close = |a: f64, b: f64| (a - b).abs() < 1e-9;
-        assert!(close(scale_for((2560., 1440.)), 1.36));
-        assert!(close(scale_for((1920., 1080.)), 1.3));
-        assert!(close(scale_for((1366., 768.)), 1.24));
+        assert!(close(scale_for((2560., 1440.)), 1.72));
+        assert!(close(scale_for((1920., 1080.)), 1.48));
+        assert!(close(scale_for((1366., 768.)), 1.27));
         assert!(scale_for((3840., 2160.)) > scale_for((2560., 1440.)));
         assert!(close(scale_for((800., 1280.)), 1.2));
         assert!(close(scale_for((1024., 540.)), 0.97));
