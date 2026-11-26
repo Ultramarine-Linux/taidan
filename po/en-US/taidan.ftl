@@ -169,7 +169,7 @@ page-password-tip-good = if-it-fits-i-sits
 page-password-tip-good-desc = This takes centuries to crack, and you can remember it!
 # an example of a bad password, keep it as is
 page-password-tip-bad = Ds9Csga*XB
-page-password-tip-bad-desc = Much harder to remember, and cracks in 12 days!
+page-password-tip-bad-desc = Much harder to remember, and quick to crack!
 
 ## [Time Zone]
 
