@@ -102,7 +102,7 @@ async fn flatpaks_and_packages<C: crate::Callback>(
             return Ok(());
         }
         let verb = crate::Verb::FlatpakInstall { refs: refs.to_vec(), download_only };
-        crate::dnf::run_logged(callback, "flatpak", &verb, |_| {}).await
+        crate::dnf::run_logged(callback, "flatpak", &verb, &[], |_| {}).await
     };
     let packages = async {
         if pkgs.is_empty() {

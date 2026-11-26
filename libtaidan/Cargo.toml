@@ -20,6 +20,7 @@ enum_dispatch = "0.3.13"
 const_format = "0.2.37"
 futures = { workspace = true }
 itertools = { workspace = true }
+jiff = { version = "0.2.38", default-features = false, features = ["std"] }
 phf = { version = "0.14.0", features = ["macros", "phf_macros"] }
 regex = { workspace = true }
 reqwest = { version = "0.13.5", features = [

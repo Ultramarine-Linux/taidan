@@ -258,26 +258,15 @@ impl Tweak {
         self.path.file_name().unwrap()
     }
 
-    #[tracing::instrument(skip(settings))]
-    pub async fn run(&self, settings: &[u8], on: bool) -> bool {
-        let verb = crate::Verb::RunTweak { id: self.id().to_string_lossy().into_owned(), on };
-        let inherit = std::process::Stdio::inherit;
-        let mut cmd = match crate::spawn_helper(&verb, settings, inherit(), inherit()).await {
-            Ok(cmd) => cmd,
+    #[tracing::instrument(skip(settings, callback))]
+    pub async fn run(&self, settings: &[u8], on: bool, callback: &impl crate::Callback) -> bool {
+        let id = self.id().to_string_lossy().into_owned();
+        tracing::info!(id, on, "Running tweak");
+        let verb = crate::Verb::RunTweak { id, on };
+        match crate::dnf::run_logged(callback, "tweak", &verb, settings, |_| {}).await {
+            Ok(()) => true,
             Err(err) => {
-                tracing::error!(?err, "cannot run pkexec");
-                return false;
-            }
-        };
-        match cmd.wait().await {
-            Ok(x) if x.success() => true,
-            Ok(x) => {
-                crate::command::report_exit(&self.path.join("up").display().to_string(), x, "");
-                tracing::error!(rc=?x.code(), "process failed with non-zero exit code");
-                false
-            }
-            Err(err) => {
-                tracing::error!(?err, "waiting for the `up` process failed");
+                tracing::error!(?err, "tweak failed");
                 false
             }
         }

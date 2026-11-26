@@ -13,7 +13,7 @@ const DESIGN_SIZE: (f64, f64) = (600., 500.);
 const SMALL_SCREEN_HEIGHT: f64 = 720.;
 const WINDOW_HEIGHT_ON_SMALL_SCREEN: f64 = 620.;
 const LARGE_SCREEN_HEIGHT: f64 = 1440.;
-const WINDOW_HEIGHT_ON_LARGE_SCREEN: f64 = 680.;
+const WINDOW_HEIGHT_ON_LARGE_SCREEN: f64 = 860.;
 const MAX_SCREEN_SHARE: f64 = 0.9;
 const ROUNDING_SLACK: f64 = 1e-6;
 
@@ -32,8 +32,9 @@ fn scale_for(screen: (f64, f64)) -> f64 {
     let height = unfitted_window_height(screen.1).min(MAX_SCREEN_SHARE * screen.1);
     let fill = (height / DESIGN_SIZE.1).min(MAX_SCREEN_SHARE * screen.0 / DESIGN_SIZE.0);
     // Wayland gives a rotated panel's size before the rotation, which only ever errs smaller
-    let fit_whole_screen = (screen.0 / DESIGN_SIZE.0).min(screen.1 / DESIGN_SIZE.1);
-    floor_to_hundredths(fill.max(1.).min(fit_whole_screen))
+    let fit_with_room_for_panels =
+        MAX_SCREEN_SHARE * (screen.0 / DESIGN_SIZE.0).min(screen.1 / DESIGN_SIZE.1);
+    floor_to_hundredths(fill.max(1.).min(fit_with_room_for_panels))
 }
 
 fn screen_override() -> Option<(f64, f64)> {
@@ -128,12 +129,13 @@ mod tests {
     #[test]
     fn scales() {
         let close = |a: f64, b: f64| (a - b).abs() < 1e-9;
-        assert!(close(scale_for((2560., 1440.)), 1.36));
-        assert!(close(scale_for((1920., 1080.)), 1.3));
-        assert!(close(scale_for((1366., 768.)), 1.24));
+        assert!(close(scale_for((2560., 1440.)), 1.72));
+        assert!(close(scale_for((1920., 1080.)), 1.48));
+        assert!(close(scale_for((1366., 768.)), 1.27));
         assert!(scale_for((3840., 2160.)) > scale_for((2560., 1440.)));
         assert!(close(scale_for((800., 1280.)), 1.2));
-        assert!(close(scale_for((1024., 540.)), 1.));
-        assert!(close(scale_for((800., 480.)), 0.96));
+        assert!(close(scale_for((1024., 540.)), 0.97));
+        assert!(close(scale_for((800., 480.)), 0.86));
+        assert!(close(scale_for((640., 400.)), 0.72));
     }
 }

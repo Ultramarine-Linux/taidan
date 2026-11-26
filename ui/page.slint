@@ -211,11 +211,20 @@ export component TdnPage inherits TdnBasePg {
             text: root.name;
         }
 
-        VerticalLayout {
+        content-scroll := Flickable {
             vertical-stretch: 1;
-            spacing: 1rem;
+            min-height: 0;
+            content-width: self.width;
+            content-height: max(self.height, content.min-height);
+            interactive: self.content-height > self.height;
 
-            @children
+            content := VerticalLayout {
+                width: content-scroll.width;
+                height: content-scroll.content-height;
+                spacing: 1rem;
+
+                @children
+            }
         }
 
         HorizontalLayout {

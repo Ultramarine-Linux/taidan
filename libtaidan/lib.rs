@@ -69,14 +69,21 @@ pub async fn start_install(
     proxy::set(settings.proxy.clone());
     persist_proxy(settings).await;
     i18n::fill_settings(settings, cfg);
+    if !settings.nointernet {
+        sync_clock().await;
+    }
     use steps::InstallStep as _;
     let modules = steps::configured_steps(cfg);
     for module in &modules {
         let stage = module.stage();
-        tracing::debug!(?stage, "Running pre()");
+        tracing::info!(?stage, "Preparing stage");
+        let started = std::time::Instant::now();
         module.pre(settings, cfg).await?;
+        tracing::debug!(?stage, elapsed = ?started.elapsed(), "Prepared stage");
     }
+    tracing::info!(actions = ?settings.actions, "Planning the stages");
     let plan = steps::plan(settings, cfg).await;
+    tracing::debug!(?plan, "Planned the stages");
     let mut shown = None;
     for (module, step) in modules.iter().zip(plan) {
         if shown != Some(step) {
@@ -85,8 +92,14 @@ pub async fn start_install(
         }
         let stage = module.stage();
         tracing::info!(?stage, "Running stage");
-        module.run(settings, cfg, callback).await?;
+        let started = std::time::Instant::now();
+        module
+            .run(settings, cfg, callback)
+            .await
+            .inspect_err(|e| tracing::error!(?stage, %e, "Stage failed"))?;
+        tracing::info!(?stage, elapsed = ?started.elapsed(), "Finished stage");
     }
+    tracing::info!("Finishing up");
     write_proxy_repo_overrides(settings).await;
     steps::unlock_user(settings, cfg).await?;
     steps::fix_homed_ims(settings, cfg).await;
@@ -97,6 +110,39 @@ pub async fn start_install(
     mark_configured().await;
     callback.send(InstallMsg::Finish);
     Ok(())
+}
+
+const CLOCK_SYNC_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+const CLOCK_SYNC_POLL: std::time::Duration = std::time::Duration::from_secs(1);
+
+async fn sync_clock() {
+    tracing::info!(clock = %jiff::Timestamp::now(), "Turning on network time sync");
+    if let Err(e) = root(Verb::EnableNtp).await {
+        tracing::warn!(?e, "cannot turn on network time sync");
+        return;
+    }
+    let deadline = tokio::time::Instant::now() + CLOCK_SYNC_WAIT;
+    while tokio::time::Instant::now() < deadline {
+        if clock_synchronized().await {
+            tracing::info!(clock = %jiff::Timestamp::now(), "The clock is synchronized");
+            return;
+        }
+        tokio::time::sleep(CLOCK_SYNC_POLL).await;
+    }
+    tracing::warn!(
+        clock = %jiff::Timestamp::now(),
+        "the clock isn't synchronized yet, downloads may fail if it's far off"
+    );
+}
+
+async fn clock_synchronized() -> bool {
+    tokio::process::Command::new("timedatectl")
+        .args(["show", "--property=NTPSynchronized", "--value"])
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .await
+        .is_ok_and(|out| out.stdout.trim_ascii() == b"yes")
 }
 
 async fn persist_proxy(settings: &settings::Settings) {
@@ -169,20 +215,28 @@ async fn run_cmd(
     input: Option<&[u8]>,
 ) -> Res<Vec<u8>> {
     use std::process::Stdio;
+    let started = std::time::Instant::now();
     let child = spawn(cmd, name, input, Stdio::piped(), Stdio::piped()).await?;
     let p = child.wait_with_output().await.map_err(Err::_fail_to_run(name))?;
+    let elapsed = started.elapsed();
     let output =
         format!("{}{}", String::from_utf8_lossy(&p.stdout), String::from_utf8_lossy(&p.stderr));
     crate::command::report_exit(name, p.status, &output);
+    log_output(name, "stdout", &p.stdout);
+    log_output(name, "stderr", &p.stderr);
     if !p.status.success() {
         let e = Err::program_fail(name, &p);
-        tracing::debug!(name, %e, "command failed");
+        tracing::warn!(name, rc = ?p.status.code(), ?elapsed, "command failed");
         return Err(e);
     }
-    if !p.stderr.is_empty() {
-        tracing::debug!(name, stderr = %String::from_utf8_lossy(&p.stderr), "command succeeded");
-    }
+    tracing::debug!(name, ?elapsed, "command succeeded");
     Ok(p.stdout)
+}
+
+fn log_output(name: &str, stream: &str, output: &[u8]) {
+    for line in String::from_utf8_lossy(output).lines().filter(|l| !l.trim().is_empty()) {
+        tracing::debug!("{name} {stream}: {line}");
+    }
 }
 
 pub use helper::Verb;
@@ -205,7 +259,8 @@ const PKEXEC_RETRY_BACKOFF: [std::time::Duration; 2] =
     [std::time::Duration::from_secs(2), std::time::Duration::from_secs(4)];
 
 async fn run_helper(verb: &Verb, input: &[u8]) -> Res<Vec<u8>> {
-    tracing::debug!(?verb, "running taidan-helper");
+    tracing::info!(verb = verb.name(), "Running taidan-helper");
+    tracing::debug!(?verb, "taidan-helper request");
     let request = helper::stdin(verb, input);
     let run = || run_cmd(helper::command(verb), verb.name(), Some(&request));
     for (attempt, backoff) in PKEXEC_RETRY_BACKOFF.into_iter().enumerate() {
