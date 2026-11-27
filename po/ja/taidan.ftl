@@ -146,3 +146,4 @@ page-whoareyou-username-desc = ホームフォルダの名前。
 page-whoareyou-icon = ユーザーアイコン
 page-whoareyou-icon-n = ユーザーアイコン { $n }
 page-analytics-field-device = デバイス
+page-internet-files-home = ホーム
