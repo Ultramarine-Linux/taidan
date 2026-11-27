@@ -99,3 +99,25 @@
 
 ## [Tweaks in Ultramarine]
 
+default = Standard
+prev = Zurück
+next = Weiter
+cancel = Abbrechen
+skip = Überspringen
+done = Fertig
+close = Schließen
+window-title = { $distro } Einrichtung
+menu-open-terminal = Terminal öffnen
+steps-useradd = Dein Konto wird erstellt…
+steps-dnfdownloadupdate = System Aktualisierungen werden heruntergeladen…
+error-installation-title = Installation ist fehlgeschlagen
+page-accessibility-more = Mehr Optionen
+page-accessibility-done = Fertig
+page-accessibility-larger-text = Größerer Text
+page-accessibility-larger-text-desc = Vergrößert Text und Knöpfe.
+page-accessibility-reduce-motion = Bewegungen reduzieren
+page-accessibility-reduce-motion-desc = Schaltet Animationen aus.
+steps-dnfdownloadapps = Programme werden heruntergeladen…
+steps-dnfinstallapps = Programme werden installiert…
+steps-driverscodecs = Treiber und Codecs werden installiert…
+error-config-title = Ungültige Systemkonfiguration
