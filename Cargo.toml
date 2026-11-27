@@ -17,7 +17,7 @@ tracing = "0.1.44"
 
 # `unstable-winit-030` is for the monitor size, and it also pulls winit's X11 support back in
 [workspace.dependencies.slint]
-version = "1.18.1"
+version = "1.19.1"
 default-features = false
 features = [
     "std",

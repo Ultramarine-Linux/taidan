@@ -215,7 +215,7 @@ fn save_page_choices(app: &AppWindow, install: &Install<'_>) {
     let dark_mode = crate::cfg::shows_page(crate::cfg::SkipPage::Theme)
         .then(|| app.global::<Theme<'_>>().get_mode() == ThemeMode::Dark);
     let accent = dark_mode.and_then(|_| crate::theme::picked(&app.global()));
-    let breeze_dark = dark_mode == Some(true) && crate::theme::breeze_dark(&app.global());
+    let breeze_dark = dark_mode.is_some() && crate::theme::breeze_dark(&app.global());
     let skip_grub_theme = crate::theme::skip_grub_theme(&app.global());
     let tweaks = crate::tweaks::enabled(&app.global());
     let mut settings = crate::SETTINGS.write();

@@ -216,6 +216,7 @@ mod tests {
     use super::*;
 
     slint::slint! {
+        #[edition = "1.19"]
         import { TdnDialog, TdnErrorDialog, TdnPara } from "ui/components.slint";
 
         export component DialogLayoutTest inherits Window {
