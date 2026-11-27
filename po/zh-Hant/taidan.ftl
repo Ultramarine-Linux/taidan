@@ -31,3 +31,4 @@ cancel = 取消
 done = 完成
 close = 關閉
 window-title = { $distro } 初始化設定
+menu-open-terminal = 開啟端末器
