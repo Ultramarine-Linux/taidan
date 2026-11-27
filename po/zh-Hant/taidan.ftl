@@ -72,3 +72,6 @@ page-welcome-hello = 歡迎！
 page-keyboard-ims-desc = 適用於需要比鍵盤配置更多功能的輸入語言，例如中文、日文或韓文。您隨時可在「設定」中變更這些選項。
 page-whoareyou-fullname-desc = 您的姓名，將顯示於登入畫面。
 page-whoareyou-username-desc = 您的主資料夾名稱。
+page-whoareyou-icon = 使用者圖示
+page-whoareyou-icon-n = 使用者圖示 { $n }
+page-whoareyou-icon-desc = 您可選其中一張照片，或自拍一張。
