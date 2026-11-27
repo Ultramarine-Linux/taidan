@@ -3572,7 +3572,7 @@ dependencies = [
 
 [[package]]
 name = "libtaidan"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "basic-toml",
  "const_format",
@@ -6154,7 +6154,7 @@ dependencies = [
 
 [[package]]
 name = "taidan"
-version = "1.0.6"
+version = "1.0.7"
 dependencies = [
  "color-eyre",
  "deunicode",
@@ -6200,7 +6200,7 @@ dependencies = [
 
 [[package]]
 name = "taidan_ui"
-version = "1.0.6"
+version = "1.0.7"
 dependencies = [
  "slint",
  "slint-build",
