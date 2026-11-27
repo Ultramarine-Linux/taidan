@@ -49,6 +49,7 @@ fn xfconf(channel: &str, property: &str, value: &str) -> Vec<String> {
 const LOOKANDFEEL_DIR: &str = "/usr/share/plasma/look-and-feel";
 const COLOR_SCHEMES_DIR: &str = "/usr/share/color-schemes";
 const ULTRAMARINE_DARK: &str = "UltramarineDark";
+const ULTRAMARINE_LIGHT: &str = "UltramarineLight";
 
 #[derive(Debug, PartialEq, Eq)]
 struct PlasmaLook {
@@ -62,6 +63,7 @@ struct PlasmaInstalled {
     lookandfeel_dark: bool,
     lookandfeel_light: bool,
     ultramarine_dark: bool,
+    ultramarine_light: bool,
 }
 
 impl PlasmaInstalled {
@@ -69,33 +71,39 @@ impl PlasmaInstalled {
         let installed = Self {
             lookandfeel_dark: Path::new(LOOKANDFEEL_DIR).join(PLASMA_DARK).is_dir(),
             lookandfeel_light: Path::new(LOOKANDFEEL_DIR).join(PLASMA_LIGHT).is_dir(),
-            ultramarine_dark: Path::new(COLOR_SCHEMES_DIR)
-                .join(format!("{ULTRAMARINE_DARK}.colors"))
-                .is_file(),
+            ultramarine_dark: scheme_installed(ULTRAMARINE_DARK),
+            ultramarine_light: scheme_installed(ULTRAMARINE_LIGHT),
         };
         tracing::debug!(?installed, "Plasma themes found");
         installed
     }
 }
 
-const fn plasma_look(dark: bool, breeze_dark: bool, installed: PlasmaInstalled) -> PlasmaLook {
-    let ultramarine_dark = !breeze_dark && installed.ultramarine_dark;
-    match (dark, ultramarine_dark) {
-        (false, _) => PlasmaLook {
+fn scheme_installed(name: &str) -> bool {
+    Path::new(COLOR_SCHEMES_DIR).join(format!("{name}.colors")).is_file()
+}
+
+const fn plasma_look(dark: bool, stock_breeze: bool, installed: PlasmaInstalled) -> PlasmaLook {
+    if dark {
+        PlasmaLook {
+            lookandfeel: if installed.lookandfeel_dark { Some(PLASMA_DARK) } else { None },
+            colors: if !stock_breeze && installed.ultramarine_dark {
+                ULTRAMARINE_DARK
+            } else {
+                "BreezeDark"
+            },
+            icons: "breeze-dark",
+        }
+    } else {
+        PlasmaLook {
             lookandfeel: if installed.lookandfeel_light { Some(PLASMA_LIGHT) } else { None },
-            colors: "BreezeLight",
+            colors: if !stock_breeze && installed.ultramarine_light {
+                ULTRAMARINE_LIGHT
+            } else {
+                "BreezeLight"
+            },
             icons: "breeze",
-        },
-        (true, true) => PlasmaLook {
-            lookandfeel: if installed.lookandfeel_dark { Some(PLASMA_DARK) } else { None },
-            colors: ULTRAMARINE_DARK,
-            icons: "breeze-dark",
-        },
-        (true, false) => PlasmaLook {
-            lookandfeel: if installed.lookandfeel_dark { Some(PLASMA_DARK) } else { None },
-            colors: "BreezeDark",
-            icons: "breeze-dark",
-        },
+        }
     }
 }
 
@@ -196,12 +204,17 @@ pub(in crate::steps) async fn apply(
 mod tests {
     use super::*;
 
-    const ALL_INSTALLED: PlasmaInstalled =
-        PlasmaInstalled { lookandfeel_dark: true, lookandfeel_light: true, ultramarine_dark: true };
+    const ALL_INSTALLED: PlasmaInstalled = PlasmaInstalled {
+        lookandfeel_dark: true,
+        lookandfeel_light: true,
+        ultramarine_dark: true,
+        ultramarine_light: true,
+    };
     const ONLY_BREEZE: PlasmaInstalled = PlasmaInstalled {
         lookandfeel_dark: true,
         lookandfeel_light: false,
         ultramarine_dark: false,
+        ultramarine_light: false,
     };
 
     #[tokio::test]
@@ -219,7 +232,7 @@ mod tests {
             theme_commands(false, false, Some(Accent::Green), Desktop::Plasma, ALL_INSTALLED);
         assert!(first.iter().flatten().any(|arg| arg == "UltramarineDark"));
         assert!(first.iter().flatten().any(|arg| arg == PLASMA_DARK));
-        assert!(retry.iter().flatten().any(|arg| arg == "BreezeLight"));
+        assert!(retry.iter().flatten().any(|arg| arg == "UltramarineLight"));
         assert!(retry.iter().flatten().any(|arg| arg == PLASMA_LIGHT));
         assert!(!retry.iter().flatten().any(|arg| arg == "UltramarineDark"));
         assert!(retry.iter().flatten().any(|arg| arg == Accent::Green.hex()));
@@ -228,13 +241,14 @@ mod tests {
 
     #[test]
     fn breeze_dark_keeps_the_ultramarine_look_and_feel() {
-        let look = |dark, breeze_dark| {
-            let look = plasma_look(dark, breeze_dark, ALL_INSTALLED);
+        let look = |dark, stock_breeze| {
+            let look = plasma_look(dark, stock_breeze, ALL_INSTALLED);
             (look.lookandfeel, look.colors, look.icons)
         };
         assert_eq!(look(true, true), (Some(PLASMA_DARK), "BreezeDark", "breeze-dark"));
         assert_eq!(look(true, false), (Some(PLASMA_DARK), ULTRAMARINE_DARK, "breeze-dark"));
         assert_eq!(look(false, true), (Some(PLASMA_LIGHT), "BreezeLight", "breeze"));
+        assert_eq!(look(false, false), (Some(PLASMA_LIGHT), ULTRAMARINE_LIGHT, "breeze"));
     }
 
     #[test]

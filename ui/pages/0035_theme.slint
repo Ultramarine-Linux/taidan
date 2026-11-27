@@ -251,12 +251,9 @@ export component ThemeAdvancedDialog inherits TdnDialog {
     dialog-width: 26rem;
     dismissed => { Appearance.advanced-open = false; }
 
-    if Appearance.plasma && Theme.mode == ThemeMode.dark: TdnOptionRow {
-        text: Lang.t("page-theme-breeze-dark", []);
-        description: Lang.t("page-theme-breeze-dark-desc", []);
-        checked: Appearance.breeze-dark;
-        toggled(on) => { Appearance.breeze-dark = on; }
-        accepted => { root.dismissed(); }
+    if Appearance.plasma: TdnOptionRow {
+        text: Lang.t("page-theme-breeze", []);
+        description: Lang.t("page-theme-breeze-desc", []);
     }
 
     TdnOptionRow {

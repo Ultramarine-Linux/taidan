@@ -10,4 +10,4 @@ publish = false
 slint = { workspace = true }
 
 [build-dependencies]
-slint-build = "1.18.1"
+slint-build = "1.19.1"
