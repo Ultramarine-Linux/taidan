@@ -30,3 +30,4 @@ page-language-search-lang = 搜尋語言……
 cancel = 取消
 done = 完成
 close = 關閉
+window-title = { $distro }
