@@ -69,4 +69,4 @@ step-region-and-connectivity = 地區與網絡
 step-additional-software = 其他軟體
 step-finishing-up = 收尾工作
 page-welcome-hello = 歡迎！
-page-keyboard-ims-desc = 適用於需要比鍵盤佈局更多功能的輸入語言，例如中文、日文或韓文。您隨時可在「設定」中變更這些選項。
+page-keyboard-ims-desc = 適用於需要比鍵盤配置更多功能的輸入語言，例如中文、日文或韓文。您隨時可在「設定」中變更這些選項。
