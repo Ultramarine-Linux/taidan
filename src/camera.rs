@@ -259,12 +259,16 @@ fn configure(cam: &Camera<'_>) -> Option<(CameraConfiguration, Encoding)> {
     Some((cfgs, encoding))
 }
 
+const LIBCAMERA_LOCATION_FRONT: i32 = 0;
+const LIBCAMERA_LOCATION_BACK: i32 = 1;
+const LIBCAMERA_LOCATION_EXTERNAL: i32 = 2;
+
 fn preference(cam: &Camera<'_>) -> u8 {
-    match cam.properties().get::<Location>() {
-        Ok(Location::CameraFront) => 0,
-        Ok(Location::CameraExternal) => 1,
-        Err(_) => 2,
-        Ok(Location::CameraBack) => 3,
+    match cam.properties().get::<Location>().map(i32::from) {
+        Ok(LIBCAMERA_LOCATION_FRONT) => 0,
+        Ok(LIBCAMERA_LOCATION_EXTERNAL) => 1,
+        Ok(LIBCAMERA_LOCATION_BACK) => 3,
+        Ok(_) | Err(_) => 2,
     }
 }
 
