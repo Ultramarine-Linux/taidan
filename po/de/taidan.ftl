@@ -139,3 +139,4 @@ page-whoareyou-icon = Nutzersymbol
 page-whoareyou-icon-n = Nutzersymbol { $n }
 page-whoareyou-icon-desc = Wähle eins aus oder mache ein Foto.
 page-whoareyou-camera = Mache ein Foto
+page-whoareyou-camera-take = Foto aufnehmen
