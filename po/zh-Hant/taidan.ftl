@@ -68,3 +68,4 @@ step-account-creation = 建立帳戶
 step-region-and-connectivity = 地區與網絡
 step-additional-software = 其他軟體
 step-finishing-up = 收尾工作
+page-welcome-hello = 歡迎！
