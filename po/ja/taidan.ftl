@@ -147,3 +147,4 @@ page-whoareyou-icon = ユーザーアイコン
 page-whoareyou-icon-n = ユーザーアイコン { $n }
 page-analytics-field-device = デバイス
 page-internet-files-home = ホーム
+page-keyboard-latin-fallback = 名前やパスワードを入力するために、英語（米国）も追加されています。Superキーとスペースキーを同時に押すと、言語を切り替えることができます。
