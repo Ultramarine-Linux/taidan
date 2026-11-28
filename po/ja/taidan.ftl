@@ -183,3 +183,6 @@ page-internet-security-unsupported = サポートされていない旧式のWEP�
 page-internet-network-info = { $security }、信号強度 3 分の { $bars }
 page-internet-wired = 有線接続
 page-internet-unplugged = 接続されていません
+page-internet-proxy = プロキシ
+page-internet-proxy-on = プロキシ ◯
+page-internet-proxy-server = プロキシサーバー
