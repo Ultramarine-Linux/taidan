@@ -182,3 +182,4 @@ page-internet-security-enterprise = 組織のログインで保護されてい�
 page-internet-security-unsupported = サポートされていない旧式のWEPセキュリティを使用しています
 page-internet-network-info = { $security }、信号強度 3 分の { $bars }
 page-internet-wired = 有線接続
+page-internet-unplugged = 接続されていません
