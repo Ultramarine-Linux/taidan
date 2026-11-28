@@ -29,7 +29,7 @@ page-keyboard-search-variant = キーバリエーションを検索…
 page-whoareyou = 誰ですか？
 page-whoareyou-fullname = 名前
 page-whoareyou-username = ユーザー名
-page-whoareyou-error = ユーザー名は、英小文字で始まり、英小文字・数字・アンダースコア(<tt>_</tt>)・ハイフン(<tt>-</tt>)のみを含むようにする必要があります。
+page-whoareyou-error = ユーザー名は、英小文字で始まり、英小文字・数字・アンダースコア「_」・ハイフン「-」のみを含む必要があります。
 
 ## page: Create a Password
 
@@ -43,8 +43,8 @@ page-password-rp = 確認
 ## page: Internet
 
 # page title
-page-internet = インターネット接続
-page-internet-desc = インターネットに接続すると、最新ソフトをダウンロードできるようになります。
+page-internet = オンライン接続
+page-internet-desc = インターネットに接続して、コーデック、ドライバー、アプリをインストールすることができます。
 
 ## page: Codecs and Drivers
 
@@ -89,7 +89,7 @@ page-error-retry = リトライ
 skip = スキップ
 page-language = 言語
 page-language-search-lang = 言語検索…
-page-internet-portal = ウェブブラウザでログイン
+page-internet-portal = ウェブブラウザでログイン（キャプティブポータル）
 page-analytics = 分析
 page-tweaks = システム微調整
 cancel = キャンセル
@@ -147,4 +147,38 @@ page-whoareyou-icon = ユーザーアイコン
 page-whoareyou-icon-n = ユーザーアイコン { $n }
 page-analytics-field-device = デバイス
 page-internet-files-home = ホーム
-page-keyboard-latin-fallback = 名前やパスワードを入力するために、英語（米国）も追加されています。Superキーとスペースキーを同時に押すと、言語を切り替えることができます。
+page-keyboard-latin-fallback = 名前やパスワードを入力するために、英語（米国）も追加されています。Super+Spaceを押して言語を切り替えることができます。
+page-whoareyou-icon-desc = この中から選ぶか、または写真を撮ってください。
+page-whoareyou-camera = 写真撮影
+page-whoareyou-camera-take = 写真を撮る
+page-whoareyou-camera-error = カメラが使えない：
+page-whoareyou-error-taken = すでに使われています。別のを選んでください。
+page-whoareyou-error-long = ユーザー名は最大31文字までです。
+page-whoareyou-error-fullname = コンマとコロンを含むことができません。
+page-password-mismatch = パスワードが一致しません。
+page-password-long = 長すぎます。短くしてください。
+page-password-show = パスワードを表示
+page-password-tip-title = 長ければ長いほど強い
+page-password-tip = 「フレーズ」の方が、「数字のスパゲッティ」よりもはるかに優れています。
+page-password-tip-good-desc = 解読するには何世紀もかかるし覚えやすい！
+page-password-tip-bad-desc = 覚えにくいしすぐ解けちゃう！
+page-timezone = タイムゾーン
+page-timezone-search = 都市・タイムゾーンを検索
+page-timezone-none = 該当するタイムゾーンが見つかりません。
+page-timezone-place = { $region }　{ $city }
+page-internet-portal-close = ポータルを閉じる
+page-internet-connect = 接続
+page-internet-connected = 接続済み
+page-internet-refresh = 更新
+page-internet-scanning = 検索中…
+page-internet-no-wifi = Wi-Fiアダプターが検出できませんでした。ケーブルで接続することは可能です。
+page-internet-no-networks = Wi-Fiネットワークが見つかりませんでした。
+page-internet-wifi-off = Wi-Fiがオフになっています。
+page-internet-wifi-off-hardware = このデバイスには、Wi-Fiをオン／オフにするスイッチまたはボタンがあり、オンにしないとネットワークを検出できません。
+page-internet-wifi-enable = Wi-Fiをオンにする
+page-internet-security-open = パブリックネットワーク
+page-internet-security-password = パスワードで保護されています
+page-internet-security-enterprise = 組織のログインで保護されています
+page-internet-security-unsupported = サポートされていない旧式のWEPセキュリティを使用しています
+page-internet-network-info = { $security }、信号強度 3 分の { $bars }
+page-internet-wired = 有線接続
